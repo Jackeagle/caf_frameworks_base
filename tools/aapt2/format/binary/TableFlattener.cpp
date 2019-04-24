@@ -32,6 +32,7 @@
 #include "ValueVisitor.h"
 #include "format/binary/ChunkWriter.h"
 #include "format/binary/ResourceTypeExtensions.h"
+#include "trace/TraceBuffer.h"
 #include "util/BigBuffer.h"
 
 using namespace android;
@@ -238,6 +239,7 @@ class PackageFlattener {
   }
 
   bool FlattenPackage(BigBuffer* buffer) {
+    TRACE_CALL();
     ChunkWriter pkg_writer(buffer);
     ResTable_package* pkg_header = pkg_writer.StartChunk<ResTable_package>(RES_TABLE_PACKAGE_TYPE);
     pkg_header->id = util::HostToDevice32(package_->id.value());
@@ -274,7 +276,9 @@ class PackageFlattener {
       FlattenLibrarySpec(buffer);
     }
 
-    FlattenOverlayable(buffer);
+    if (!FlattenOverlayable(buffer)) {
+      return false;
+    }
 
     pkg_writer.Finish();
     return true;
@@ -468,23 +472,29 @@ class PackageFlattener {
           overlayable_chunk = &chunk;
         }
 
+        if (item.policies == 0) {
+          context_->GetDiagnostics()->Error(DiagMessage(item.overlayable->source)
+                                                << "overlayable "
+                                                << entry->name
+                                                << " does not specify policy");
+          return false;
+        }
+
         uint32_t policy_flags = 0;
-        if (item.policies == OverlayableItem::Policy::kNone) {
-          // Encode overlayable entries defined without a policy as publicly overlayable
+        if (item.policies & OverlayableItem::Policy::kPublic) {
           policy_flags |= ResTable_overlayable_policy_header::POLICY_PUBLIC;
-        } else {
-          if (item.policies & OverlayableItem::Policy::kPublic) {
-            policy_flags |= ResTable_overlayable_policy_header::POLICY_PUBLIC;
-          }
-          if (item.policies & OverlayableItem::Policy::kSystem) {
-            policy_flags |= ResTable_overlayable_policy_header::POLICY_SYSTEM_PARTITION;
-          }
-          if (item.policies & OverlayableItem::Policy::kVendor) {
-            policy_flags |= ResTable_overlayable_policy_header::POLICY_VENDOR_PARTITION;
-          }
-          if (item.policies & OverlayableItem::Policy::kProduct) {
-            policy_flags |= ResTable_overlayable_policy_header::POLICY_PRODUCT_PARTITION;
-          }
+        }
+        if (item.policies & OverlayableItem::Policy::kSystem) {
+          policy_flags |= ResTable_overlayable_policy_header::POLICY_SYSTEM_PARTITION;
+        }
+        if (item.policies & OverlayableItem::Policy::kVendor) {
+          policy_flags |= ResTable_overlayable_policy_header::POLICY_VENDOR_PARTITION;
+        }
+        if (item.policies & OverlayableItem::Policy::kProduct) {
+          policy_flags |= ResTable_overlayable_policy_header::POLICY_PRODUCT_PARTITION;
+        }
+        if (item.policies & OverlayableItem::Policy::kSignature) {
+          policy_flags |= ResTable_overlayable_policy_header::POLICY_SIGNATURE;
         }
 
         auto policy = overlayable_chunk->policy_ids.find(policy_flags);
@@ -702,17 +712,16 @@ class PackageFlattener {
 }  // namespace
 
 bool TableFlattener::Consume(IAaptContext* context, ResourceTable* table) {
-  if (options_.sort_stringpool_entries) {
-    // We must do this before writing the resources, since the string pool IDs may change.
-    table->string_pool.Prune();
-    table->string_pool.Sort([](const StringPool::Context &a, const StringPool::Context &b) -> int {
-      int diff = util::compare(a.priority, b.priority);
-      if (diff == 0) {
-        diff = a.config.compare(b.config);
-      }
-      return diff;
-    });
-  }
+  TRACE_CALL();
+  // We must do this before writing the resources, since the string pool IDs may change.
+  table->string_pool.Prune();
+  table->string_pool.Sort([](const StringPool::Context& a, const StringPool::Context& b) -> int {
+    int diff = util::compare(a.priority, b.priority);
+    if (diff == 0) {
+      diff = a.config.compare(b.config);
+    }
+    return diff;
+  });
 
   // Write the ResTable header.
   ChunkWriter table_writer(buffer_);

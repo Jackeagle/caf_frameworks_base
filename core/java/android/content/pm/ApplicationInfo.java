@@ -43,6 +43,7 @@ import com.android.server.SystemConfig;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.text.Collator;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -650,6 +651,49 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
      */
     public static final int PRIVATE_FLAG_USE_EMBEDDED_DEX = 1 << 25;
 
+    /**
+     * Value for {@link #privateFlags}: indicates whether this application's data will be cleared
+     * on a failed restore.
+     *
+     * <p>Comes from the
+     * android.R.styleable#AndroidManifestApplication_allowClearUserDataOnFailedRestore attribute
+     * of the &lt;application&gt; tag.
+     *
+     * @hide
+     */
+    public static final int PRIVATE_FLAG_ALLOW_CLEAR_USER_DATA_ON_FAILED_RESTORE = 1 << 26;
+
+    /**
+     * Value for {@link #privateFlags}: true if the application allows its audio playback
+     * to be captured by other apps.
+     *
+     * @hide
+     */
+    public static final int PRIVATE_FLAG_ALLOW_AUDIO_PLAYBACK_CAPTURE  = 1 << 27;
+
+    /**
+     * Indicates whether this package is in fact a runtime resource overlay.
+     *
+     * @hide
+     */
+    public static final int PRIVATE_FLAG_IS_RESOURCE_OVERLAY = 1 << 28;
+
+    /**
+     * Value for {@link #privateFlags}: If {@code true} this app allows
+     * shared/external storage media to be a sandboxed view that only contains
+     * files owned by the app.
+     *
+     * @hide
+     */
+    public static final int PRIVATE_FLAG_ALLOW_EXTERNAL_STORAGE_SANDBOX = 1 << 29;
+
+    /**
+     * Value for {@link #privateFlags}: whether this app is pre-installed on the
+     * ODM partition of the system image.
+     * @hide
+     */
+    public static final int PRIVATE_FLAG_ODM = 1 << 30;
+
     /** @hide */
     @IntDef(flag = true, prefix = { "PRIVATE_FLAG_" }, value = {
             PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE,
@@ -662,6 +706,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
             PRIVATE_FLAG_HAS_DOMAIN_URLS,
             PRIVATE_FLAG_HIDDEN,
             PRIVATE_FLAG_INSTANT,
+            PRIVATE_FLAG_IS_RESOURCE_OVERLAY,
             PRIVATE_FLAG_ISOLATED_SPLIT_LOADING,
             PRIVATE_FLAG_OEM,
             PRIVATE_FLAG_PARTIALLY_DIRECT_BOOT_AWARE,
@@ -676,6 +721,10 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
             PRIVATE_FLAG_VENDOR,
             PRIVATE_FLAG_VIRTUAL_PRELOAD,
             PRIVATE_FLAG_HAS_FRAGILE_USER_DATA,
+            PRIVATE_FLAG_ALLOW_CLEAR_USER_DATA_ON_FAILED_RESTORE,
+            PRIVATE_FLAG_ALLOW_AUDIO_PLAYBACK_CAPTURE,
+            PRIVATE_FLAG_ALLOW_EXTERNAL_STORAGE_SANDBOX,
+            PRIVATE_FLAG_ODM,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface ApplicationInfoPrivateFlags {}
@@ -1052,6 +1101,18 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
     public String appComponentFactory;
 
     /**
+     * Resource id of {@link com.android.internal.R.styleable.AndroidManifestProvider_icon}
+     * @hide
+     */
+    public int iconRes;
+
+    /**
+     * Resource id of {@link com.android.internal.R.styleable.AndroidManifestProvider_roundIcon}
+     * @hide
+     */
+    public int roundIconRes;
+
+    /**
      * The category of this app. Categories are used to cluster multiple apps
      * together into meaningful groups, such as when summarizing battery,
      * network, or disk usage. Apps should only define this value when they fit
@@ -1329,6 +1390,8 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
             }
             pw.println(prefix + "HiddenApiEnforcementPolicy=" + getHiddenApiEnforcementPolicy());
             pw.println(prefix + "usesNonSdkApi=" + usesNonSdkApi());
+            pw.println(prefix + "allowsPlaybackCapture="
+                        + (isAudioPlaybackCaptureAllowed() ? "true" : "false"));
         }
         super.dumpBack(pw, prefix);
     }
@@ -1528,6 +1591,8 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         classLoaderName = orig.classLoaderName;
         splitClassLoaderNames = orig.splitClassLoaderNames;
         appComponentFactory = orig.appComponentFactory;
+        iconRes = orig.iconRes;
+        roundIconRes = orig.roundIconRes;
         compileSdkVersion = orig.compileSdkVersion;
         compileSdkVersionCodename = orig.compileSdkVersionCodename;
         mHiddenApiPolicy = orig.mHiddenApiPolicy;
@@ -1607,12 +1672,14 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         dest.writeInt(compileSdkVersion);
         dest.writeString(compileSdkVersionCodename);
         dest.writeString(appComponentFactory);
+        dest.writeInt(iconRes);
+        dest.writeInt(roundIconRes);
         dest.writeInt(mHiddenApiPolicy);
         dest.writeInt(hiddenUntilInstalled ? 1 : 0);
         dest.writeString(zygotePreloadName);
     }
 
-    public static final Parcelable.Creator<ApplicationInfo> CREATOR
+    public static final @android.annotation.NonNull Parcelable.Creator<ApplicationInfo> CREATOR
             = new Parcelable.Creator<ApplicationInfo>() {
         public ApplicationInfo createFromParcel(Parcel source) {
             return new ApplicationInfo(source);
@@ -1681,6 +1748,8 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         compileSdkVersion = source.readInt();
         compileSdkVersionCodename = source.readString();
         appComponentFactory = source.readString();
+        iconRes = source.readInt();
+        roundIconRes = source.readInt();
         mHiddenApiPolicy = source.readInt();
         hiddenUntilInstalled = source.readInt() != 0;
         zygotePreloadName = source.readString();
@@ -1775,6 +1844,27 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
      */
     public boolean hasFragileUserData() {
         return (privateFlags & PRIVATE_FLAG_HAS_FRAGILE_USER_DATA) != 0;
+    }
+
+    /**
+     * Whether an app allows its playback audio to be captured by other apps.
+     *
+     * @return {@code true} if the app indicates that its audio can be captured by other apps.
+     *
+     * @hide
+     */
+    public boolean isAudioPlaybackCaptureAllowed() {
+        return (privateFlags & PRIVATE_FLAG_ALLOW_AUDIO_PLAYBACK_CAPTURE) != 0;
+    }
+
+    /**
+     * If {@code true} this app allows shared/external storage media to be a
+     * sandboxed view that only contains files owned by the app.
+     *
+     * @hide
+     */
+    public boolean isExternalStorageSandboxAllowed() {
+        return (privateFlags & PRIVATE_FLAG_ALLOW_EXTERNAL_STORAGE_SANDBOX) != 0;
     }
 
     private boolean isAllowedToUseHiddenApis() {
@@ -1906,6 +1996,11 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
     }
 
     /** @hide */
+    public boolean isOdm() {
+        return (privateFlags & ApplicationInfo.PRIVATE_FLAG_ODM) != 0;
+    }
+
+    /** @hide */
     public boolean isPartiallyDirectBootAware() {
         return (privateFlags & ApplicationInfo.PRIVATE_FLAG_PARTIALLY_DIRECT_BOOT_AWARE) != 0;
     }
@@ -1987,10 +2082,39 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
     }
 
     /**
+     * Returns true if the package has declared in its manifest that it is a
+     * runtime resource overlay.
+     */
+    public boolean isResourceOverlay() {
+        return (privateFlags & ApplicationInfo.PRIVATE_FLAG_IS_RESOURCE_OVERLAY) != 0;
+    }
+
+    /**
      * @hide
      */
     @Override protected ApplicationInfo getApplicationInfo() {
         return this;
+    }
+
+    /**
+     * Return all the APK paths that may be required to load this application, including all
+     * splits, shared libraries, and resource overlays.
+     * @hide
+     */
+    public String[] getAllApkPaths() {
+        final String[][] inputLists = { splitSourceDirs, sharedLibraryFiles, resourceDirs };
+        final List<String> output = new ArrayList<>(10);
+        if (sourceDir != null) {
+            output.add(sourceDir);
+        }
+        for (String[] inputList : inputLists) {
+            if (inputList != null) {
+                for (String input : inputList) {
+                    output.add(input);
+                }
+            }
+        }
+        return output.toArray(new String[output.size()]);
     }
 
     /** {@hide} */ public void setCodePath(String codePath) { scanSourceDir = codePath; }

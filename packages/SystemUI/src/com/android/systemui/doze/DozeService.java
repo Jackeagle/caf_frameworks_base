@@ -61,7 +61,9 @@ public class DozeService extends DreamService
 
     @Override
     public void onDestroy() {
-        mPluginManager.removePluginListener(this);
+        if (mPluginManager != null) {
+            mPluginManager.removePluginListener(this);
+        }
         super.onDestroy();
         mDozeMachine = null;
     }
@@ -110,7 +112,8 @@ public class DozeService extends DreamService
     @Override
     public void requestWakeUp() {
         PowerManager pm = getSystemService(PowerManager.class);
-        pm.wakeUp(SystemClock.uptimeMillis(), "com.android.systemui:NODOZE");
+        pm.wakeUp(SystemClock.uptimeMillis(), PowerManager.WAKE_REASON_GESTURE,
+                "com.android.systemui:NODOZE");
     }
 
     @Override

@@ -20,6 +20,7 @@ import static android.app.ActivityTaskManager.SPLIT_SCREEN_CREATE_MODE_TOP_OR_LE
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_UNDEFINED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
+import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_SPLIT_SCREEN_PRIMARY;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_BEHIND;
@@ -27,27 +28,28 @@ import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSET;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
 import static android.content.res.Configuration.ORIENTATION_LANDSCAPE;
 import static android.content.res.Configuration.ORIENTATION_PORTRAIT;
+import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Display.FLAG_PRIVATE;
+import static android.view.Display.FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS;
 import static android.view.Display.INVALID_DISPLAY;
 import static android.view.InsetsState.TYPE_IME;
-import static android.view.InsetsState.TYPE_NAVIGATION_BAR;
-import static android.view.InsetsState.TYPE_TOP_BAR;
 import static android.view.Surface.ROTATION_0;
 import static android.view.Surface.ROTATION_180;
 import static android.view.Surface.ROTATION_270;
 import static android.view.Surface.ROTATION_90;
 import static android.view.View.GONE;
-import static android.view.ViewRootImpl.NEW_INSETS_MODE_FULL;
 import static android.view.WindowManager.DOCKED_BOTTOM;
 import static android.view.WindowManager.DOCKED_INVALID;
 import static android.view.WindowManager.DOCKED_TOP;
+import static android.view.WindowManager.LayoutParams.FIRST_APPLICATION_WINDOW;
 import static android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
 import static android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
 import static android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
 import static android.view.WindowManager.LayoutParams.FLAG_SECURE;
 import static android.view.WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER;
 import static android.view.WindowManager.LayoutParams.FLAG_SPLIT_TOUCH;
+import static android.view.WindowManager.LayoutParams.LAST_APPLICATION_WINDOW;
 import static android.view.WindowManager.LayoutParams.NEEDS_MENU_SET_TRUE;
 import static android.view.WindowManager.LayoutParams.NEEDS_MENU_UNSET;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_KEYGUARD;
@@ -129,6 +131,7 @@ import static com.android.server.wm.WindowManagerService.logSurface;
 import static com.android.server.wm.WindowState.RESIZE_HANDLE_WIDTH_IN_DP;
 import static com.android.server.wm.WindowStateAnimator.DRAW_PENDING;
 import static com.android.server.wm.WindowStateAnimator.READY_TO_SHOW;
+import static com.android.server.wm.utils.RegionUtils.rectListToRegion;
 
 import android.animation.AnimationHandler;
 import android.annotation.CallSuper;
@@ -139,17 +142,20 @@ import android.content.pm.PackageManager;
 import android.content.res.CompatibilityInfo;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
+import android.graphics.Insets;
 import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Region;
 import android.graphics.Region.Op;
 import android.hardware.display.DisplayManagerInternal;
+import android.metrics.LogMaker;
 import android.os.Binder;
 import android.os.Debug;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Process;
+import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.Trace;
@@ -162,6 +168,7 @@ import android.view.Display;
 import android.view.DisplayCutout;
 import android.view.DisplayInfo;
 import android.view.Gravity;
+import android.view.ISystemGestureExclusionListener;
 import android.view.InputChannel;
 import android.view.InputDevice;
 import android.view.InputWindowHandle;
@@ -173,13 +180,16 @@ import android.view.SurfaceControl;
 import android.view.SurfaceControl.Transaction;
 import android.view.SurfaceSession;
 import android.view.View;
-import android.view.ViewRootImpl;
 import android.view.WindowManager;
 import android.view.WindowManagerPolicyConstants.PointerEventListener;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.logging.MetricsLogger;
+import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
 import com.android.internal.util.ToBooleanFunction;
 import com.android.internal.util.function.TriConsumer;
+import com.android.internal.util.function.pooled.PooledConsumer;
+import com.android.internal.util.function.pooled.PooledLambda;
 import com.android.server.AnimationThread;
 import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.wm.utils.DisplayRotationUtil;
@@ -260,6 +270,8 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
     final UnknownAppVisibilityController mUnknownAppVisibilityController;
     BoundsAnimationController mBoundsAnimationController;
 
+    private MetricsLogger mMetricsLogger;
+
     /**
      * List of clients without a transtiton animation that we notify once we are done
      * transitioning since they won't be notified through the app window animator.
@@ -303,6 +315,10 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
     private final DisplayPolicy mDisplayPolicy;
     private DisplayRotation mDisplayRotation;
     DisplayFrames mDisplayFrames;
+
+    private final RemoteCallbackList<ISystemGestureExclusionListener>
+            mSystemGestureExclusionListeners = new RemoteCallbackList<>();
+    private final Region mSystemGestureExclusion = new Region();
 
     /**
      * For default display it contains real metrics, empty for others.
@@ -388,7 +404,8 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
     final ArrayList<WindowToken> mExitingTokens = new ArrayList<>();
 
     /** Detect user tapping outside of current focused task bounds .*/
-    TaskTapPointerEventListener mTapDetector;
+    @VisibleForTesting
+    final TaskTapPointerEventListener mTapDetector;
 
     /** Detect user tapping outside of current focused stack bounds .*/
     private Region mTouchExcludeRegion = new Region();
@@ -639,7 +656,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
         if (DEBUG_LAYOUT && !w.mLayoutAttached) {
             Slog.v(TAG, "1ST PASS " + w + ": gone=" + gone + " mHaveFrame=" + w.mHaveFrame
                     + " mLayoutAttached=" + w.mLayoutAttached
-                    + " screen changed=" + w.isConfigChanged());
+                    + " config reported=" + w.isLastConfigReportedToClient());
             final AppWindowToken atoken = w.mAppToken;
             if (gone) Slog.v(TAG, "  GONE: mViewVisibility=" + w.mViewVisibility
                     + " mRelayoutCalled=" + w.mRelayoutCalled + " hidden=" + w.mToken.isHidden()
@@ -654,42 +671,34 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
         // If this view is GONE, then skip it -- keep the current frame, and let the caller know
         // so they can ignore it if they want.  (We do the normal layout for INVISIBLE windows,
         // since that means "perform layout as normal, just don't display").
-        if (!gone || !w.mHaveFrame || w.mLayoutNeeded
-                || ((w.isConfigChanged() || w.setReportResizeHints())
-                && !w.isGoneForLayoutLw() &&
-                ((w.mAttrs.privateFlags & PRIVATE_FLAG_KEYGUARD) != 0 ||
-                        (w.mHasSurface && w.mAppToken != null &&
-                                w.mAppToken.layoutConfigChanges)))) {
-            if (!w.mLayoutAttached) {
-                if (mTmpInitial) {
-                    //Slog.i(TAG, "Window " + this + " clearing mContentChanged - initial");
-                    w.resetContentChanged();
-                }
-                if (w.mAttrs.type == TYPE_DREAM) {
-                    // Don't layout windows behind a dream, so that if it does stuff like hide
-                    // the status bar we won't get a bad transition when it goes away.
-                    mTmpWindow = w;
-                }
-                w.mLayoutNeeded = false;
-                w.prelayout();
-                final boolean firstLayout = !w.isLaidOut();
-                getDisplayPolicy().layoutWindowLw(w, null, mDisplayFrames);
-                w.mLayoutSeq = mLayoutSeq;
-
-                // If this is the first layout, we need to initialize the last inset values as
-                // otherwise we'd immediately cause an unnecessary resize.
-                if (firstLayout) {
-                    w.updateLastInsetValues();
-                }
-
-                if (w.mAppToken != null) {
-                    w.mAppToken.layoutLetterbox(w);
-                }
-
-                if (DEBUG_LAYOUT) Slog.v(TAG, "  LAYOUT: mFrame=" + w.getFrameLw()
-                        + " mContainingFrame=" + w.getContainingFrame()
-                        + " mDisplayFrame=" + w.getDisplayFrameLw());
+        if ((!gone || !w.mHaveFrame || w.mLayoutNeeded) && !w.mLayoutAttached) {
+            if (mTmpInitial) {
+                w.resetContentChanged();
             }
+            if (w.mAttrs.type == TYPE_DREAM) {
+                // Don't layout windows behind a dream, so that if it does stuff like hide
+                // the status bar we won't get a bad transition when it goes away.
+                mTmpWindow = w;
+            }
+            w.mLayoutNeeded = false;
+            w.prelayout();
+            final boolean firstLayout = !w.isLaidOut();
+            getDisplayPolicy().layoutWindowLw(w, null, mDisplayFrames);
+            w.mLayoutSeq = mLayoutSeq;
+
+            // If this is the first layout, we need to initialize the last inset values as
+            // otherwise we'd immediately cause an unnecessary resize.
+            if (firstLayout) {
+                w.updateLastInsetValues();
+            }
+
+            if (w.mAppToken != null) {
+                w.mAppToken.layoutLetterbox(w);
+            }
+
+            if (DEBUG_LAYOUT) Slog.v(TAG, "  LAYOUT: mFrame=" + w.getFrameLw()
+                    + " mContainingFrame=" + w.getContainingFrame()
+                    + " mDisplayFrame=" + w.getDisplayFrameLw());
         }
     };
 
@@ -872,14 +881,21 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
         mBoundsAnimationController = new BoundsAnimationController(service.mContext,
                 mAppTransition, AnimationThread.getHandler(), animationHandler);
 
-        if (mWmService.mInputManager != null) {
-            final InputChannel inputChannel = mWmService.mInputManager.monitorInput("Display "
-                    + mDisplayId, mDisplayId);
-            mPointerEventDispatcher = inputChannel != null
-                    ? new PointerEventDispatcher(inputChannel) : null;
-        } else {
-            mPointerEventDispatcher = null;
+        final InputChannel inputChannel = mWmService.mInputManager.monitorInput(
+                "PointerEventDispatcher" + mDisplayId, mDisplayId);
+        mPointerEventDispatcher = new PointerEventDispatcher(inputChannel);
+
+        // Tap Listeners are supported for:
+        // 1. All physical displays (multi-display).
+        // 2. VirtualDisplays on VR, AA (and everything else).
+        mTapDetector = new TaskTapPointerEventListener(mWmService, this);
+        registerPointerEventListener(mTapDetector);
+        registerPointerEventListener(mWmService.mMousePositionTracker);
+        if (mWmService.mAtmService.getRecentTasks() != null) {
+            registerPointerEventListener(
+                    mWmService.mAtmService.getRecentTasks().getInputListener());
         }
+
         mDisplayPolicy = new DisplayPolicy(service, this);
         mDisplayRotation = new DisplayRotation(service, this);
         if (isDefaultDisplay) {
@@ -896,7 +912,9 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
         mDividerControllerLocked = new DockedStackDividerController(service, this);
         mPinnedStackControllerLocked = new PinnedStackController(service, this);
 
-        final SurfaceControl.Builder b = mWmService.makeSurfaceBuilder(mSession).setOpaque(true);
+        final SurfaceControl.Builder b = mWmService.makeSurfaceBuilder(mSession)
+                .setOpaque(true)
+                .setContainerLayer();
         mWindowingLayer = b.setName("Display Root").build();
         mOverlayLayer = b.setName("Display Overlays").build();
 
@@ -1160,14 +1178,12 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
     @Override
     boolean onDescendantOrientationChanged(IBinder freezeDisplayToken,
             ConfigurationContainer requestingContainer) {
-        final int previousRotation = mRotation;
         final Configuration config = updateOrientationFromAppTokens(
                 getRequestedOverrideConfiguration(), freezeDisplayToken, false);
-        // This event is considered handled iff a configuration propagation is triggered, because
-        // that's the only place lower level containers check if they need to do something to this
-        // request. The only guaranteed signal is that the display is rotated to a different
-        // orientation (i.e. rotating 180 degrees doesn't count).
-        final boolean handled = (mRotation - previousRotation) % 2 != 0;
+        // If display rotation class tells us that it doesn't consider app requested orientation,
+        // this display won't rotate just because of an app changes its requested orientation. Thus
+        // it indicates that this display chooses not to handle this request.
+        final boolean handled = getDisplayRotation().respectAppRequestedOrientation();
         if (config == null) {
             return handled;
         }
@@ -1187,6 +1203,11 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
                     config, null /* starting */, false /* deferResume */, getDisplayId());
         }
         return handled;
+    }
+
+    @Override
+    boolean handlesOrientationChangeFromDescendant() {
+        return getDisplayRotation().respectAppRequestedOrientation();
     }
 
     /**
@@ -1369,8 +1390,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
 
         if (DEBUG_ORIENTATION) Slog.v(TAG_WM, "Display id=" + mDisplayId
                 + " selected orientation " + lastOrientation
-                + ", got rotation " + rotation + " which has "
-                + " metrics");
+                + ", got rotation " + rotation);
 
         if (oldRotation == rotation) {
             // No change.
@@ -1498,24 +1518,11 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
         final int shortSizeDp = shortSize * DisplayMetrics.DENSITY_DEFAULT / mBaseDisplayDensity;
         final int longSizeDp = longSize * DisplayMetrics.DENSITY_DEFAULT / mBaseDisplayDensity;
 
+        mDisplayPolicy.updateConfigurationAndScreenSizeDependentBehaviors();
         mDisplayRotation.configure(width, height, shortSizeDp, longSizeDp);
-        mDisplayPolicy.configure(width, height, shortSizeDp);
 
         mDisplayFrames.onDisplayInfoUpdated(mDisplayInfo,
                 calculateDisplayCutoutForRotation(mDisplayInfo.rotation));
-
-        // Tap Listeners are supported for:
-        // 1. All physical displays (multi-display).
-        // 2. VirtualDisplays on VR, AA (and everything else).
-        if (mPointerEventDispatcher != null && mTapDetector == null) {
-            if (DEBUG_DISPLAY) {
-                Slog.d(TAG,
-                        "Registering PointerEventListener for DisplayId: " + mDisplayId);
-            }
-            mTapDetector = new TaskTapPointerEventListener(mWmService, this);
-            registerPointerEventListener(mTapDetector);
-            registerPointerEventListener(mWmService.mMousePositionTracker);
-        }
     }
 
     /**
@@ -1720,7 +1727,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
             mWmService.mH.sendEmptyMessage(REPORT_HARD_KEYBOARD_STATUS_CHANGE);
         }
 
-        mDisplayPolicy.updateConfigurationDependentBehaviors();
+        mDisplayPolicy.updateConfigurationAndScreenSizeDependentBehaviors();
 
         // Let the policy update hidden states.
         config.keyboardHidden = Configuration.KEYBOARDHIDDEN_NO;
@@ -1978,9 +1985,17 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
 
     @Override
     public void onConfigurationChanged(Configuration newParentConfig) {
+        final int lastOrientation = getConfiguration().orientation;
         super.onConfigurationChanged(newParentConfig);
         if (mDisplayPolicy != null) {
             mDisplayPolicy.onConfigurationChanged();
+        }
+
+        if (lastOrientation != getConfiguration().orientation) {
+            getMetricsLogger().write(
+                    new LogMaker(MetricsEvent.ACTION_PHONE_ORIENTATION_CHANGED)
+                    .setSubtype(getConfiguration().orientation)
+                    .addTaggedData(MetricsEvent.FIELD_DISPLAY_ID, getDisplayId()));
         }
 
         // If there was no pinned stack, we still need to notify the controller of the display info
@@ -2347,30 +2362,24 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
     }
 
     /**
-     * Used to obtain task ID when user taps on coordinate (x, y) in this display, and outside
-     * current task in focus.
-     *
-     * This returns the task ID of the foremost task at (x, y) if the task is not home. Otherwise it
-     * returns -1.
-     *
-     * @param x horizontal coordinate of the tap position
-     * @param y vertical coordinate of the tap position
-     * @return the task ID if a non-home task is found; -1 if not
+     * Returns true if the input point is within an app window.
      */
-    int taskForTapOutside(int x, int y) {
-        for (int stackNdx = mTaskStackContainers.getChildCount() - 1; stackNdx >= 0; --stackNdx) {
-            final TaskStack stack = mTaskStackContainers.getChildAt(stackNdx);
-            if (stack.isActivityTypeHome() && !stack.inMultiWindowMode()) {
-                // We skip not only home stack, but also everything behind home because user can't
-                // see them when home stack is isn't in multi-window mode.
-                break;
+    boolean pointWithinAppWindow(int x, int y) {
+        final int[] targetWindowType = {-1};
+        final Consumer fn = PooledLambda.obtainConsumer((w, nonArg) -> {
+            if (targetWindowType[0] != -1) {
+                return;
             }
-            final int taskId = stack.taskIdFromPoint(x, y);
-            if (taskId != -1) {
-                return taskId;
+
+            if (w.isOnScreen() && w.isVisibleLw() && w.getFrameLw().contains(x, y)) {
+                targetWindowType[0] = w.mAttrs.type;
+                return;
             }
-        }
-        return -1;
+        }, PooledLambda.__(WindowState.class), mTmpRect);
+        forAllWindows(fn, true /* traverseTopToBottom */);
+        ((PooledConsumer) fn).recycle();
+        return FIRST_APPLICATION_WINDOW <= targetWindowType[0]
+                        && targetWindowType[0] <= LAST_APPLICATION_WINDOW;
     }
 
     /**
@@ -2434,9 +2443,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
             mTmpRegion.set(mTmpRect);
             mTouchExcludeRegion.op(mTmpRegion, Op.UNION);
         }
-        if (mTapDetector != null) {
-            mTapDetector.setTouchExcludeRegion(mTouchExcludeRegion);
-        }
+        mTapDetector.setTouchExcludeRegion(mTouchExcludeRegion);
     }
 
     /**
@@ -2486,11 +2493,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
             mWmService.stopFreezingDisplayLocked();
             super.removeImmediately();
             if (DEBUG_DISPLAY) Slog.v(TAG_WM, "Removing display=" + this);
-            if (mPointerEventDispatcher != null && mTapDetector != null) {
-                unregisterPointerEventListener(mTapDetector);
-                unregisterPointerEventListener(mWmService.mMousePositionTracker);
-                mTapDetector = null;
-            }
+            mPointerEventDispatcher.dispose();
             mWmService.mAnimator.removeDisplayLocked(mDisplayId);
             mWindowingLayer.release();
             mOverlayLayer.release();
@@ -2500,7 +2503,6 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
             mRemovingDisplay = false;
         }
 
-        mDisplayPolicy.onDisplayRemoved();
         mWmService.mWindowPlacerLocked.requestTraversal();
     }
 
@@ -2679,27 +2681,33 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
 
     @CallSuper
     @Override
-    public void writeToProto(ProtoOutputStream proto, long fieldId, boolean trim) {
+    public void writeToProto(ProtoOutputStream proto, long fieldId,
+            @WindowTraceLogLevel int logLevel) {
+        // Critical log level logs only visible elements to mitigate performance overheard
+        if (logLevel == WindowTraceLogLevel.CRITICAL && !isVisible()) {
+            return;
+        }
+
         final long token = proto.start(fieldId);
-        super.writeToProto(proto, WINDOW_CONTAINER, trim);
+        super.writeToProto(proto, WINDOW_CONTAINER, logLevel);
         proto.write(ID, mDisplayId);
         for (int stackNdx = mTaskStackContainers.getChildCount() - 1; stackNdx >= 0; --stackNdx) {
             final TaskStack stack = mTaskStackContainers.getChildAt(stackNdx);
-            stack.writeToProto(proto, STACKS, trim);
+            stack.writeToProto(proto, STACKS, logLevel);
         }
         mDividerControllerLocked.writeToProto(proto, DOCKED_STACK_DIVIDER_CONTROLLER);
         mPinnedStackControllerLocked.writeToProto(proto, PINNED_STACK_CONTROLLER);
         for (int i = mAboveAppWindowsContainers.getChildCount() - 1; i >= 0; --i) {
             final WindowToken windowToken = mAboveAppWindowsContainers.getChildAt(i);
-            windowToken.writeToProto(proto, ABOVE_APP_WINDOWS, trim);
+            windowToken.writeToProto(proto, ABOVE_APP_WINDOWS, logLevel);
         }
         for (int i = mBelowAppWindowsContainers.getChildCount() - 1; i >= 0; --i) {
             final WindowToken windowToken = mBelowAppWindowsContainers.getChildAt(i);
-            windowToken.writeToProto(proto, BELOW_APP_WINDOWS, trim);
+            windowToken.writeToProto(proto, BELOW_APP_WINDOWS, logLevel);
         }
         for (int i = mImeWindowsContainers.getChildCount() - 1; i >= 0; --i) {
             final WindowToken windowToken = mImeWindowsContainers.getChildAt(i);
-            windowToken.writeToProto(proto, IME_WINDOWS, trim);
+            windowToken.writeToProto(proto, IME_WINDOWS, logLevel);
         }
         proto.write(DPI, mBaseDisplayDensity);
         mDisplayInfo.writeToProto(proto, DISPLAY_INFO);
@@ -2781,6 +2789,14 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
 
         pw.println();
         mWallpaperController.dump(pw, "  ");
+
+        pw.println();
+        pw.print("mSystemGestureExclusion=");
+        if (mSystemGestureExclusionListeners.getRegisteredCallbackCount() > 0) {
+            pw.println(mSystemGestureExclusion);
+        } else {
+            pw.println("<no lstnrs>");
+        }
 
         pw.println();
         pw.println(prefix + "Application tokens in top down Z order:");
@@ -3044,7 +3060,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
 
     /** Updates the layer assignment of windows on this display. */
     void assignWindowLayers(boolean setLayoutNeeded) {
-        Trace.traceBegin(Trace.TRACE_TAG_WINDOW_MANAGER, "assignWindowLayers");
+        Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "assignWindowLayers");
         assignChildLayers(getPendingTransaction());
         if (setLayoutNeeded) {
             setLayoutNeeded();
@@ -3055,7 +3071,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
         // prepareSurfaces. This allows us to synchronize Z-ordering changes with
         // the hiding and showing of surfaces.
         scheduleAnimation();
-        Trace.traceEnd(Trace.TRACE_TAG_WINDOW_MANAGER);
+        Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
     }
 
     // TODO: This should probably be called any time a visual change is made to the hierarchy like
@@ -3169,13 +3185,11 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
                 "Proposed new IME target: " + target + " for display: " + getDisplayId());
 
         // Now, a special case -- if the last target's window is in the process of exiting, but
-        // not removed, and the new target is home, keep on the last target to avoid flicker.
-        // Home is a special case since its above other stacks in the ordering list, but layed
-        // out below the others.
+        // not removed, keep on the last target to avoid IME flicker.
         if (curTarget != null && !curTarget.mRemoved && curTarget.isDisplayedLw()
-                && curTarget.isClosing() && (target == null || target.isActivityTypeHome())) {
-            if (DEBUG_INPUT_METHOD) Slog.v(TAG_WM, "New target is home while current target is "
-                    + "closing, not changing");
+                && curTarget.isClosing()) {
+            if (DEBUG_INPUT_METHOD) Slog.v(TAG_WM, "Not changing target till current window is"
+                    + " closing and not removed");
             return curTarget;
         }
 
@@ -3244,6 +3258,41 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
         mInputMethodTarget = target;
         mInputMethodTargetWaitingAnim = targetWaitingAnim;
         assignWindowLayers(false /* setLayoutNeeded */);
+        mInsetsStateController.onImeTargetChanged(target);
+        updateImeParent();
+    }
+
+    private void updateImeParent() {
+        // Force attaching IME to the display when magnifying, or it would be magnified with
+        // target app together.
+        final boolean shouldAttachToDisplay = (mMagnificationSpec != null);
+        final SurfaceControl newParent =
+                shouldAttachToDisplay ? mWindowingLayer : computeImeParent();
+        if (newParent != null) {
+            mPendingTransaction.reparent(mImeWindowsContainers.mSurfaceControl, newParent);
+            scheduleAnimation();
+        }
+    }
+
+    /**
+     * Computes the window the IME should be attached to.
+     */
+    @VisibleForTesting
+    SurfaceControl computeImeParent() {
+
+        // Attach it to app if the target is part of an app and such app is covering the entire
+        // screen. If it's not covering the entire screen the IME might extend beyond the apps
+        // bounds.
+        if (mInputMethodTarget != null && mInputMethodTarget.mAppToken != null
+                && mInputMethodTarget.getWindowingMode() == WINDOWING_MODE_FULLSCREEN
+                // An activity with override bounds should be letterboxed inside its parent bounds,
+                // so it doesn't fill the screen.
+                && mInputMethodTarget.mAppToken.matchParentBounds()) {
+            return mInputMethodTarget.mAppToken.getSurfaceControl();
+        }
+
+        // Otherwise, we just attach it to the display.
+        return mWindowingLayer;
     }
 
     boolean getNeedsMenu(WindowState top, WindowManagerPolicy.WindowState bottom) {
@@ -3574,9 +3623,14 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
             // FIRST AND ONE HALF LOOP: Make WindowManagerPolicy think it is animating.
             pendingLayoutChanges = 0;
 
-            mDisplayPolicy.beginPostLayoutPolicyLw();
-            forAllWindows(mApplyPostLayoutPolicy, true /* traverseTopToBottom */);
-            pendingLayoutChanges |= mDisplayPolicy.finishPostLayoutPolicyLw();
+            Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "applyPostLayoutPolicy");
+            try {
+                mDisplayPolicy.beginPostLayoutPolicyLw();
+                forAllWindows(mApplyPostLayoutPolicy, true /* traverseTopToBottom */);
+                pendingLayoutChanges |= mDisplayPolicy.finishPostLayoutPolicyLw();
+            } finally {
+                Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
+            }
             if (DEBUG_LAYOUT_REPEATS) surfacePlacer.debugLayoutRepeats(
                     "after finishPostLayoutPolicyLw", pendingLayoutChanges);
                 mInsetsStateController.onPostLayout();
@@ -3585,7 +3639,13 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
         mTmpApplySurfaceChangesTransactionState.reset();
 
         mTmpRecoveringMemory = recoveringMemory;
-        forAllWindows(mApplySurfaceChangesTransaction, true /* traverseTopToBottom */);
+
+        Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "applyWindowSurfaceChanges");
+        try {
+            forAllWindows(mApplySurfaceChangesTransaction, true /* traverseTopToBottom */);
+        } finally {
+            Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
+        }
         prepareSurfaces();
 
         mLastHasContent = mTmpApplySurfaceChangesTransactionState.displayHasContent;
@@ -3635,11 +3695,6 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
         out.set(left, top, left + width, top + height);
     }
 
-    @Override
-    public void getBounds(Rect out) {
-        calculateBounds(mDisplayInfo, out);
-    }
-
     private void getBounds(Rect out, int orientation) {
         getBounds(out);
 
@@ -3661,6 +3716,15 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
     }
 
     void performLayout(boolean initial, boolean updateInputWindows) {
+        Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "performLayout");
+        try {
+            performLayoutNoTrace(initial, updateInputWindows);
+        } finally {
+            Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
+        }
+    }
+
+    private void performLayoutNoTrace(boolean initial, boolean updateInputWindows) {
         if (!isLayoutNeeded()) {
             return;
         }
@@ -3670,13 +3734,14 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
         final int dh = mDisplayInfo.logicalHeight;
         if (DEBUG_LAYOUT) {
             Slog.v(TAG, "-------------------------------------");
-            Slog.v(TAG, "performLayout: needed=" + isLayoutNeeded() + " dw=" + dw + " dh=" + dh);
+            Slog.v(TAG, "performLayout: needed=" + isLayoutNeeded() + " dw=" + dw
+                    + " dh=" + dh);
         }
 
         mDisplayFrames.onDisplayInfoUpdated(mDisplayInfo,
                 calculateDisplayCutoutForRotation(mDisplayInfo.rotation));
-        // TODO: Not sure if we really need to set the rotation here since we are updating from the
-        // display info above...
+        // TODO: Not sure if we really need to set the rotation here since we are updating from
+        // the display info above...
         mDisplayFrames.mRotation = mRotation;
         mDisplayPolicy.beginLayoutLw(mDisplayFrames, getConfiguration().uiMode);
 
@@ -4411,13 +4476,13 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
                         .show(mSplitScreenDividerAnchor);
                 scheduleAnimation();
             } else {
-                mAppAnimationLayer.destroy();
+                mAppAnimationLayer.remove();
                 mAppAnimationLayer = null;
-                mBoostedAppAnimationLayer.destroy();
+                mBoostedAppAnimationLayer.remove();
                 mBoostedAppAnimationLayer = null;
-                mHomeAppAnimationLayer.destroy();
+                mHomeAppAnimationLayer.remove();
                 mHomeAppAnimationLayer = null;
-                mSplitScreenDividerAnchor.destroy();
+                mSplitScreenDividerAnchor.remove();
                 mSplitScreenDividerAnchor = null;
             }
         }
@@ -4600,7 +4665,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
     @Override
     SurfaceControl.Builder makeChildSurface(WindowContainer child) {
         SurfaceSession s = child != null ? child.getSession() : getSession();
-        final SurfaceControl.Builder b = mWmService.makeSurfaceBuilder(s);
+        final SurfaceControl.Builder b = mWmService.makeSurfaceBuilder(s).setContainerLayer();
         if (child == null) {
             return b;
         }
@@ -4633,6 +4698,8 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
         } else {
             mMagnificationSpec = null;
         }
+        // Re-parent IME's SurfaceControl when MagnificationSpec changed.
+        updateImeParent();
 
         applyMagnificationSpec(getPendingTransaction(), spec);
         getPendingTransaction().apply();
@@ -4714,20 +4781,25 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
 
     @Override
     void prepareSurfaces() {
-        final ScreenRotationAnimation screenRotationAnimation =
-                mWmService.mAnimator.getScreenRotationAnimationLocked(mDisplayId);
-        if (screenRotationAnimation != null && screenRotationAnimation.isAnimating()) {
-            screenRotationAnimation.getEnterTransformation().getMatrix().getValues(mTmpFloats);
-            mPendingTransaction.setMatrix(mWindowingLayer,
-                    mTmpFloats[Matrix.MSCALE_X], mTmpFloats[Matrix.MSKEW_Y],
-                    mTmpFloats[Matrix.MSKEW_X], mTmpFloats[Matrix.MSCALE_Y]);
-            mPendingTransaction.setPosition(mWindowingLayer,
-                    mTmpFloats[Matrix.MTRANS_X], mTmpFloats[Matrix.MTRANS_Y]);
-            mPendingTransaction.setAlpha(mWindowingLayer,
-                    screenRotationAnimation.getEnterTransformation().getAlpha());
-        }
+        Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "prepareSurfaces");
+        try {
+            final ScreenRotationAnimation screenRotationAnimation =
+                    mWmService.mAnimator.getScreenRotationAnimationLocked(mDisplayId);
+            if (screenRotationAnimation != null && screenRotationAnimation.isAnimating()) {
+                screenRotationAnimation.getEnterTransformation().getMatrix().getValues(mTmpFloats);
+                mPendingTransaction.setMatrix(mWindowingLayer,
+                        mTmpFloats[Matrix.MSCALE_X], mTmpFloats[Matrix.MSKEW_Y],
+                        mTmpFloats[Matrix.MSKEW_X], mTmpFloats[Matrix.MSCALE_Y]);
+                mPendingTransaction.setPosition(mWindowingLayer,
+                        mTmpFloats[Matrix.MTRANS_X], mTmpFloats[Matrix.MTRANS_Y]);
+                mPendingTransaction.setAlpha(mWindowingLayer,
+                        screenRotationAnimation.getEnterTransformation().getAlpha());
+            }
 
-        super.prepareSurfaces();
+            super.prepareSurfaces();
+        } finally {
+            Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
+        }
     }
 
     void assignStackOrdering() {
@@ -4775,15 +4847,11 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
     }
 
     void registerPointerEventListener(@NonNull PointerEventListener listener) {
-        if (mPointerEventDispatcher != null) {
-            mPointerEventDispatcher.registerInputEventListener(listener);
-        }
+        mPointerEventDispatcher.registerInputEventListener(listener);
     }
 
     void unregisterPointerEventListener(@NonNull PointerEventListener listener) {
-        if (mPointerEventDispatcher != null) {
-            mPointerEventDispatcher.unregisterInputEventListener(listener);
-        }
+        mPointerEventDispatcher.unregisterInputEventListener(listener);
     }
 
     void prepareAppTransition(@WindowManager.TransitionType int transit,
@@ -4855,12 +4923,11 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
      * @see Display#FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS
      */
     boolean supportsSystemDecorations() {
-        // TODO(b/114338689): Read the setting from DisplaySettings.
-        return mDisplay.supportsSystemDecorations()
-                // TODO (b/111363427): Remove this and set the new FLAG_SHOULD_SHOW_LAUNCHER flag
-                // (b/114338689) whenever vr 2d display id is set.
-                || mDisplayId == mWmService.mVr2dDisplayId
-                || mWmService.mForceDesktopModeOnExternalDisplays;
+        return (mWmService.mDisplayWindowSettings.shouldShowSystemDecorsLocked(this)
+                || (mDisplay.getFlags() & FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS) != 0
+                || mWmService.mForceDesktopModeOnExternalDisplays)
+                // VR virtual display will be used to run and render 2D app within a VR experience.
+                && mDisplayId != mWmService.mVr2dDisplayId;
     }
 
     /**
@@ -4876,6 +4943,105 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
         }
         mPendingTransaction.setInputWindowInfo(sc, mPortalWindowHandle)
                 .reparent(mWindowingLayer, sc).reparent(mOverlayLayer, sc);
+    }
+
+    @VisibleForTesting
+    SurfaceControl getWindowingLayer() {
+        return mWindowingLayer;
+    }
+
+    /**
+     * Updates the display's system gesture exclusion.
+     *
+     * @return true, if the exclusion changed.
+     */
+    boolean updateSystemGestureExclusion() {
+        if (mSystemGestureExclusionListeners.getRegisteredCallbackCount() == 0) {
+            // No one's interested anyways.
+            return false;
+        }
+
+        final Region systemGestureExclusion = calculateSystemGestureExclusion();
+        try {
+            if (mSystemGestureExclusion.equals(systemGestureExclusion)) {
+                return false;
+            }
+            mSystemGestureExclusion.set(systemGestureExclusion);
+            for (int i = mSystemGestureExclusionListeners.beginBroadcast() - 1; i >= 0; --i) {
+                try {
+                    mSystemGestureExclusionListeners.getBroadcastItem(i)
+                            .onSystemGestureExclusionChanged(mDisplayId, systemGestureExclusion);
+                } catch (RemoteException e) {
+                    Slog.e(TAG, "Failed to notify SystemGestureExclusionListener", e);
+                }
+            }
+            mSystemGestureExclusionListeners.finishBroadcast();
+            return true;
+        } finally {
+            systemGestureExclusion.recycle();
+        }
+    }
+
+    @VisibleForTesting
+    Region calculateSystemGestureExclusion() {
+        final Region global = Region.obtain();
+        final Region touchableRegion = Region.obtain();
+        final Region local = Region.obtain();
+
+        // Traverse all windows bottom up to assemble the gesture exclusion rects.
+        // For each window, we only take the rects that fall within its touchable region.
+        forAllWindows(w -> {
+            if (w.cantReceiveTouchInput() || !w.isVisible()
+                    || (w.getAttrs().flags & FLAG_NOT_TOUCHABLE) != 0) {
+                return;
+            }
+            final boolean modal =
+                    (w.mAttrs.flags & (FLAG_NOT_TOUCH_MODAL | FLAG_NOT_FOCUSABLE)) == 0;
+
+            // Only keep the exclusion zones from the windows behind where the current window
+            // isn't touchable.
+            w.getTouchableRegion(touchableRegion);
+            global.op(touchableRegion, Op.DIFFERENCE);
+
+            rectListToRegion(w.getSystemGestureExclusion(), local);
+
+            // Transform to display coordinates
+            local.scale(w.mGlobalScale);
+            final Rect frame = w.getWindowFrames().mFrame;
+            local.translate(frame.left, frame.top);
+
+            // A window can only exclude system gestures where it is actually touchable
+            local.op(touchableRegion, Op.INTERSECT);
+
+            global.op(local, Op.UNION);
+        }, false /* topToBottom */);
+        local.recycle();
+        touchableRegion.recycle();
+        return global;
+    }
+
+    void registerSystemGestureExclusionListener(ISystemGestureExclusionListener listener) {
+        mSystemGestureExclusionListeners.register(listener);
+        final boolean changed;
+        if (mSystemGestureExclusionListeners.getRegisteredCallbackCount() == 1) {
+            changed = updateSystemGestureExclusion();
+        } else {
+            changed = false;
+        }
+
+        if (!changed) {
+            // If updateSystemGestureExclusion changed the exclusion, it will already have
+            // notified the listener. Otherwise, we'll do it here.
+            try {
+                listener.onSystemGestureExclusionChanged(mDisplayId, mSystemGestureExclusion);
+            } catch (RemoteException e) {
+                Slog.e(TAG, "Failed to notify SystemGestureExclusionListener during register", e);
+            }
+        }
+    }
+
+    void unregisterSystemGestureExclusionListener(ISystemGestureExclusionListener listener) {
+        mSystemGestureExclusionListeners.unregister(listener);
     }
 
     /**
@@ -4901,5 +5067,27 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
         portalWindowHandle.ownerUid = Process.myUid();
         portalWindowHandle.portalToDisplayId = mDisplayId;
         return portalWindowHandle;
+    }
+
+    /**
+     * @see IWindowManager#setForwardedInsets
+     */
+    public void setForwardedInsets(Insets insets) {
+        if (insets == null) {
+            insets = Insets.NONE;
+        }
+        if (mDisplayPolicy.getForwardedInsets().equals(insets)) {
+            return;
+        }
+        mDisplayPolicy.setForwardedInsets(insets);
+        setLayoutNeeded();
+        mWmService.mWindowPlacerLocked.requestTraversal();
+    }
+
+    protected MetricsLogger getMetricsLogger() {
+        if (mMetricsLogger == null) {
+            mMetricsLogger = new MetricsLogger();
+        }
+        return mMetricsLogger;
     }
 }

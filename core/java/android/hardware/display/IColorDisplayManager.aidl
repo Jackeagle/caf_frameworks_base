@@ -24,6 +24,7 @@ interface IColorDisplayManager {
 
     boolean setSaturationLevel(int saturationLevel);
     boolean setAppSaturationLevel(String packageName, int saturationLevel);
+    boolean isSaturationActivated();
 
     int getTransformCapabilities();
 
@@ -41,4 +42,7 @@ interface IColorDisplayManager {
 
     int getColorMode();
     void setColorMode(int colorMode);
+
+    boolean isDisplayWhiteBalanceEnabled();
+    boolean setDisplayWhiteBalanceEnabled(boolean enabled);
 }

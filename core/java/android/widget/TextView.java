@@ -172,6 +172,9 @@ import android.view.inputmethod.ExtractedText;
 import android.view.inputmethod.ExtractedTextRequest;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
+import android.view.inspector.InspectableProperty;
+import android.view.inspector.InspectableProperty.EnumEntry;
+import android.view.inspector.InspectableProperty.FlagEntry;
 import android.view.textclassifier.TextClassification;
 import android.view.textclassifier.TextClassificationContext;
 import android.view.textclassifier.TextClassificationManager;
@@ -432,8 +435,13 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     private ColorStateList mHintTextColor;
     private ColorStateList mLinkTextColor;
     @ViewDebug.ExportedProperty(category = "text")
-    @UnsupportedAppUsage
+
+    /**
+     * {@link #setTextColor(int)} or {@link #getCurrentTextColor()} should be used instead.
+     */
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     private int mCurTextColor;
+
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private int mCurHintTextColor;
     private boolean mFreezesText;
@@ -656,7 +664,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     @UnsupportedAppUsage
     private CharWrapper mCharWrapper;
 
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(trackingBug = 124050217)
     private Marquee mMarquee;
     @UnsupportedAppUsage
     private boolean mRestartMarquee;
@@ -704,7 +712,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     @UnsupportedAppUsage
     private ChangeWatcher mChangeWatcher;
 
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(trackingBug = 123769451)
     private ArrayList<TextWatcher> mListeners;
 
     // display attributes
@@ -1047,6 +1055,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         int inputType = EditorInfo.TYPE_NULL;
         a = theme.obtainStyledAttributes(
                     attrs, com.android.internal.R.styleable.TextView, defStyleAttr, defStyleRes);
+        saveAttributeDataForStyleable(context, com.android.internal.R.styleable.TextView, attrs, a,
+                defStyleAttr, defStyleRes);
         int firstBaselineToTopHeight = -1;
         int lastBaselineToBottomHeight = -1;
         int lineHeight = -1;
@@ -1889,6 +1899,10 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @see #setAutoSizeTextTypeUniformWithConfiguration(int, int, int, int)
      * @see #setAutoSizeTextTypeUniformWithPresetSizes(int[], int)
      */
+    @InspectableProperty(enumMapping = {
+            @EnumEntry(name = "none", value = AUTO_SIZE_TEXT_TYPE_NONE),
+            @EnumEntry(name = "uniform", value = AUTO_SIZE_TEXT_TYPE_UNIFORM)
+    })
     @AutoSizeTextType
     public int getAutoSizeTextType() {
         return mAutoSizeTextType;
@@ -1901,6 +1915,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @see #setAutoSizeTextTypeUniformWithConfiguration(int, int, int, int)
      */
+    @InspectableProperty
     public int getAutoSizeStepGranularity() {
         return Math.round(mAutoSizeStepGranularityInPx);
     }
@@ -1914,6 +1929,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @see #setAutoSizeTextTypeUniformWithConfiguration(int, int, int, int)
      * @see #setAutoSizeTextTypeUniformWithPresetSizes(int[], int)
      */
+    @InspectableProperty
     public int getAutoSizeMinTextSize() {
         return Math.round(mAutoSizeMinTextSizeInPx);
     }
@@ -1927,6 +1943,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @see #setAutoSizeTextTypeUniformWithConfiguration(int, int, int, int)
      * @see #setAutoSizeTextTypeUniformWithPresetSizes(int[], int)
      */
+    @InspectableProperty
     public int getAutoSizeMaxTextSize() {
         return Math.round(mAutoSizeMaxTextSizeInPx);
     }
@@ -2271,6 +2288,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @attr ref android.R.styleable#TextView_text
      */
     @ViewDebug.CapturedViewProperty
+    @InspectableProperty
     public CharSequence getText() {
         return mText;
     }
@@ -2308,6 +2326,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * contain additional first-or last-line padding.
      * @return The height of one standard line in pixels.
      */
+    @InspectableProperty
     public int getLineHeight() {
         return FastMath.round(mTextPaint.getFontMetricsInt(null) * mSpacingMult + mSpacingAdd);
     }
@@ -3231,6 +3250,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_drawablePadding
      */
+    @InspectableProperty(name = "drawablePadding")
     public int getCompoundDrawablePadding() {
         final Drawables dr = mDrawables;
         return dr != null ? dr.mDrawablePadding : 0;
@@ -3267,6 +3287,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @attr ref android.R.styleable#TextView_drawableTint
      * @see #setCompoundDrawableTintList(ColorStateList)
      */
+    @InspectableProperty(name = "drawableTint")
     public ColorStateList getCompoundDrawableTintList() {
         return mDrawables != null ? mDrawables.mTintList : null;
     }
@@ -3301,6 +3322,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @attr ref android.R.styleable#TextView_drawableTintMode
      * @see #setCompoundDrawableTintMode(PorterDuff.Mode)
      */
+    @InspectableProperty(name = "drawableTintMode")
     public PorterDuff.Mode getCompoundDrawableTintMode() {
         return mDrawables != null ? mDrawables.mTintMode : null;
     }
@@ -3481,6 +3503,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @see #setFirstBaselineToTopHeight(int)
      * @attr ref android.R.styleable#TextView_firstBaselineToTopHeight
      */
+    @InspectableProperty
     public int getFirstBaselineToTopHeight() {
         return getPaddingTop() - getPaint().getFontMetricsInt().top;
     }
@@ -3491,17 +3514,24 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @see #setLastBaselineToBottomHeight(int)
      * @attr ref android.R.styleable#TextView_lastBaselineToBottomHeight
      */
+    @InspectableProperty
     public int getLastBaselineToBottomHeight() {
         return getPaddingBottom() + getPaint().getFontMetricsInt().bottom;
     }
 
     /**
-     * Gets the autolink mask of the text.  See {@link
-     * android.text.util.Linkify#ALL Linkify.ALL} and peers for
-     * possible values.
+     * Gets the autolink mask of the text.
+     *
+     * See {@link Linkify#ALL} and peers for possible values.
      *
      * @attr ref android.R.styleable#TextView_autoLink
      */
+    @InspectableProperty(name = "autoLink", flagMapping = {
+            @FlagEntry(name = "web", target = Linkify.WEB_URLS),
+            @FlagEntry(name = "email", target = Linkify.EMAIL_ADDRESSES),
+            @FlagEntry(name = "phone", target = Linkify.PHONE_NUMBERS),
+            @FlagEntry(name = "map", target = Linkify.MAP_ADDRESSES)
+    })
     public final int getAutoLinkMask() {
         return mAutoLinkMask;
     }
@@ -4150,6 +4180,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     /**
      * @return the size (in pixels) of the default text size in this TextView.
      */
+    @InspectableProperty
     @ViewDebug.ExportedProperty(category = "text")
     public float getTextSize() {
         return mTextPaint.getTextSize();
@@ -4243,6 +4274,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * This will usually be 1.0.
      * @return The horizontal scale factor.
      */
+    @InspectableProperty
     public float getTextScaleX() {
         return mTextPaint.getTextScaleX();
     }
@@ -4303,6 +4335,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @attr ref android.R.styleable#TextView_typeface
      * @attr ref android.R.styleable#TextView_textStyle
      */
+    @InspectableProperty
     public Typeface getTypeface() {
         return mTextPaint.getTypeface();
     }
@@ -4363,6 +4396,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_fallbackLineSpacing
      */
+    @InspectableProperty
     public boolean isFallbackLineSpacing() {
         return mUseFallbackLineSpacing;
     }
@@ -4376,6 +4410,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @see #setElegantTextHeight(boolean)
      * @see Paint#setElegantTextHeight(boolean)
      */
+    @InspectableProperty
     public boolean isElegantTextHeight() {
         return mTextPaint.isElegantTextHeight();
     }
@@ -4388,6 +4423,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @see #setLetterSpacing(float)
      * @see Paint#setLetterSpacing
      */
+    @InspectableProperty
     public float getLetterSpacing() {
         return mTextPaint.getLetterSpacing();
     }
@@ -4426,6 +4462,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @see #setFontFeatureSettings(String)
      * @see Paint#setFontFeatureSettings(String) Paint.setFontFeatureSettings(String)
      */
+    @InspectableProperty
     @Nullable
     public String getFontFeatureSettings() {
         return mTextPaint.getFontFeatureSettings();
@@ -4477,6 +4514,11 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @attr ref android.R.styleable#TextView_breakStrategy
      * @see #setBreakStrategy(int)
      */
+    @InspectableProperty(enumMapping = {
+            @EnumEntry(name = "simple", value = Layout.BREAK_STRATEGY_SIMPLE),
+            @EnumEntry(name = "high_quality", value = Layout.BREAK_STRATEGY_HIGH_QUALITY),
+            @EnumEntry(name = "balanced", value = Layout.BREAK_STRATEGY_BALANCED)
+    })
     @Layout.BreakStrategy
     public int getBreakStrategy() {
         return mBreakStrategy;
@@ -4523,6 +4565,11 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @attr ref android.R.styleable#TextView_hyphenationFrequency
      * @see #setHyphenationFrequency(int)
      */
+    @InspectableProperty(enumMapping = {
+            @EnumEntry(name = "none", value = Layout.HYPHENATION_FREQUENCY_NONE),
+            @EnumEntry(name = "normal", value = Layout.HYPHENATION_FREQUENCY_NORMAL),
+            @EnumEntry(name = "full", value = Layout.HYPHENATION_FREQUENCY_FULL)
+    })
     @Layout.HyphenationFrequency
     public int getHyphenationFrequency() {
         return mHyphenationFrequency;
@@ -4580,6 +4627,10 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @see #setJustificationMode(int)
      */
+    @InspectableProperty(enumMapping = {
+            @EnumEntry(name = "none", value = Layout.JUSTIFICATION_MODE_NONE),
+            @EnumEntry(name = "inter_word", value = Layout.JUSTIFICATION_MODE_INTER_WORD)
+    })
     public @Layout.JustificationMode int getJustificationMode() {
         return mJustificationMode;
     }
@@ -4720,6 +4771,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_textColor
      */
+    @InspectableProperty(name = "textColor")
     public final ColorStateList getTextColors() {
         return mTextColor;
     }
@@ -4754,6 +4806,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_textColorHighlight
      */
+    @InspectableProperty(name = "textColorHighlight")
     @ColorInt
     public int getHighlightColor() {
         return mHighlightColor;
@@ -4819,6 +4872,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_shadowRadius
      */
+    @InspectableProperty
     public float getShadowRadius() {
         return mShadowRadius;
     }
@@ -4830,6 +4884,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_shadowDx
      */
+    @InspectableProperty
     public float getShadowDx() {
         return mShadowDx;
     }
@@ -4842,6 +4897,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_shadowDy
      */
+    @InspectableProperty
     public float getShadowDy() {
         return mShadowDy;
     }
@@ -4854,6 +4910,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_shadowColor
      */
+    @InspectableProperty
     @ColorInt
     public int getShadowColor() {
         return mShadowColor;
@@ -4901,6 +4958,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_linksClickable
      */
+    @InspectableProperty
     public final boolean getLinksClickable() {
         return mLinksClickable;
     }
@@ -4961,6 +5019,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_textColorHint
      */
+    @InspectableProperty(name = "textColorHint")
     public final ColorStateList getHintTextColors() {
         return mHintTextColor;
     }
@@ -5013,6 +5072,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_textColorLink
      */
+    @InspectableProperty(name = "textColorLink")
     public final ColorStateList getLinkTextColors() {
         return mLinkTextColor;
     }
@@ -5062,6 +5122,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @see android.view.Gravity
      * @attr ref android.R.styleable#TextView_gravity
      */
+    @InspectableProperty(valueType = InspectableProperty.ValueType.GRAVITY)
     public int getGravity() {
         return mGravity;
     }
@@ -5118,6 +5179,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @attr ref android.R.styleable#TextView_scrollHorizontally
      * @see #setHorizontallyScrolling(boolean)
      */
+    @InspectableProperty(name = "scrollHorizontally")
     public final boolean isHorizontallyScrollable() {
         return mHorizontallyScrolling;
     }
@@ -5170,6 +5232,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_minLines
      */
+    @InspectableProperty
     public int getMinLines() {
         return mMinMode == LINES ? mMinimum : -1;
     }
@@ -5252,6 +5315,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_maxLines
      */
+    @InspectableProperty
     public int getMaxLines() {
         return mMaxMode == LINES ? mMaximum : -1;
     }
@@ -5291,6 +5355,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_maxHeight
      */
+    @InspectableProperty
     public int getMaxHeight() {
         return mMaxMode == PIXELS ? mMaximum : -1;
     }
@@ -5375,6 +5440,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_minEms
      */
+    @InspectableProperty
     public int getMinEms() {
         return mMinWidthMode == EMS ? mMinWidth : -1;
     }
@@ -5418,6 +5484,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_minWidth
      */
+    @InspectableProperty
     public int getMinWidth() {
         return mMinWidthMode == PIXELS ? mMinWidth : -1;
     }
@@ -5457,6 +5524,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_maxEms
      */
+    @InspectableProperty
     public int getMaxEms() {
         return mMaxWidthMode == EMS ? mMaxWidth : -1;
     }
@@ -5496,6 +5564,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_maxWidth
      */
+    @InspectableProperty
     public int getMaxWidth() {
         return mMaxWidthMode == PIXELS ? mMaxWidth : -1;
     }
@@ -5579,6 +5648,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_lineSpacingMultiplier
      */
+    @InspectableProperty
     public float getLineSpacingMultiplier() {
         return mSpacingMult;
     }
@@ -5593,6 +5663,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_lineSpacingExtra
      */
+    @InspectableProperty
     public float getLineSpacingExtra() {
         return mSpacingAdd;
     }
@@ -5877,6 +5948,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @see #setFreezesText
      */
+    @InspectableProperty
     public boolean getFreezesText() {
         return mFreezesText;
     }
@@ -6340,6 +6412,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_hint
      */
+    @InspectableProperty
     @ViewDebug.CapturedViewProperty
     public CharSequence getHint() {
         return mHint;
@@ -6351,6 +6424,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_singleLine
      */
+    @InspectableProperty
     public boolean isSingleLine() {
         return mSingleLine;
     }
@@ -6592,6 +6666,147 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @see #setInputType(int)
      * @see android.text.InputType
      */
+    @InspectableProperty(flagMapping = {
+            @FlagEntry(name = "none", mask = 0xffffffff, target = InputType.TYPE_NULL),
+            @FlagEntry(
+                    name = "text",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_VARIATION,
+                    target = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_NORMAL),
+            @FlagEntry(
+                    name = "textUri",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_VARIATION,
+                    target = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI),
+            @FlagEntry(
+                    name = "textEmailAddress",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_VARIATION,
+                    target = InputType.TYPE_CLASS_TEXT
+                            | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS),
+            @FlagEntry(
+                    name = "textEmailSubject",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_VARIATION,
+                    target = InputType.TYPE_CLASS_TEXT
+                            | InputType.TYPE_TEXT_VARIATION_EMAIL_SUBJECT),
+            @FlagEntry(
+                    name = "textShortMessage",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_VARIATION,
+                    target = InputType.TYPE_CLASS_TEXT
+                            | InputType.TYPE_TEXT_VARIATION_SHORT_MESSAGE),
+            @FlagEntry(
+                    name = "textLongMessage",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_VARIATION,
+                    target = InputType.TYPE_CLASS_TEXT
+                            | InputType.TYPE_TEXT_VARIATION_LONG_MESSAGE),
+            @FlagEntry(
+                    name = "textPersonName",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_VARIATION,
+                    target = InputType.TYPE_CLASS_TEXT
+                            | InputType.TYPE_TEXT_VARIATION_PERSON_NAME),
+            @FlagEntry(
+                    name = "textPostalAddress",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_VARIATION,
+                    target = InputType.TYPE_CLASS_TEXT
+                            | InputType.TYPE_TEXT_VARIATION_POSTAL_ADDRESS),
+            @FlagEntry(
+                    name = "textPassword",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_VARIATION,
+                    target = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD),
+            @FlagEntry(
+                    name = "textVisiblePassword",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_VARIATION,
+                    target = InputType.TYPE_CLASS_TEXT
+                            | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD),
+            @FlagEntry(
+                    name = "textWebEditText",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_VARIATION,
+                    target = InputType.TYPE_CLASS_TEXT
+                            | InputType.TYPE_TEXT_VARIATION_WEB_EDIT_TEXT),
+            @FlagEntry(
+                    name = "textFilter",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_VARIATION,
+                    target = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_FILTER),
+            @FlagEntry(
+                    name = "textPhonetic",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_VARIATION,
+                    target = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PHONETIC),
+            @FlagEntry(
+                    name = "textWebEmailAddress",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_VARIATION,
+                    target = InputType.TYPE_CLASS_TEXT
+                            | InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS),
+            @FlagEntry(
+                    name = "textWebPassword",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_VARIATION,
+                    target = InputType.TYPE_CLASS_TEXT
+                            | InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD),
+            @FlagEntry(
+                    name = "number",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_VARIATION,
+                    target = InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_NORMAL),
+            @FlagEntry(
+                    name = "numberPassword",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_VARIATION,
+                    target = InputType.TYPE_CLASS_NUMBER
+                            | InputType.TYPE_NUMBER_VARIATION_PASSWORD),
+            @FlagEntry(
+                    name = "phone",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_VARIATION,
+                    target = InputType.TYPE_CLASS_PHONE),
+            @FlagEntry(
+                    name = "datetime",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_VARIATION,
+                    target = InputType.TYPE_CLASS_DATETIME
+                            | InputType.TYPE_DATETIME_VARIATION_NORMAL),
+            @FlagEntry(
+                    name = "date",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_VARIATION,
+                    target = InputType.TYPE_CLASS_DATETIME
+                            | InputType.TYPE_DATETIME_VARIATION_DATE),
+            @FlagEntry(
+                    name = "time",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_VARIATION,
+                    target = InputType.TYPE_CLASS_DATETIME
+                            | InputType.TYPE_DATETIME_VARIATION_TIME),
+            @FlagEntry(
+                    name = "textCapCharacters",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_FLAGS,
+                    target = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS),
+            @FlagEntry(
+                    name = "textCapWords",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_FLAGS,
+                    target = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS),
+            @FlagEntry(
+                    name = "textCapSentences",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_FLAGS,
+                    target = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES),
+            @FlagEntry(
+                    name = "textAutoCorrect",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_FLAGS,
+                    target = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_AUTO_CORRECT),
+            @FlagEntry(
+                    name = "textAutoComplete",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_FLAGS,
+                    target = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_AUTO_COMPLETE),
+            @FlagEntry(
+                    name = "textMultiLine",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_FLAGS,
+                    target = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE),
+            @FlagEntry(
+                    name = "textImeMultiLine",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_FLAGS,
+                    target = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_IME_MULTI_LINE),
+            @FlagEntry(
+                    name = "textNoSuggestions",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_FLAGS,
+                    target = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS),
+            @FlagEntry(
+                    name = "numberSigned",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_FLAGS,
+                    target = InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_SIGNED),
+            @FlagEntry(
+                    name = "numberDecimal",
+                    mask = InputType.TYPE_MASK_CLASS | InputType.TYPE_MASK_FLAGS,
+                    target = InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL),
+    })
     public int getInputType() {
         return mEditor == null ? EditorInfo.TYPE_NULL : mEditor.mInputType;
     }
@@ -6614,8 +6829,57 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * Get the type of the Input Method Editor (IME).
      * @return the type of the IME
      * @see #setImeOptions(int)
-     * @see android.view.inputmethod.EditorInfo
+     * @see EditorInfo
      */
+    @InspectableProperty(flagMapping = {
+            @FlagEntry(name = "normal", mask = 0xffffffff, target = EditorInfo.IME_NULL),
+            @FlagEntry(
+                    name = "actionUnspecified",
+                    mask = EditorInfo.IME_MASK_ACTION,
+                    target = EditorInfo.IME_ACTION_UNSPECIFIED),
+            @FlagEntry(
+                    name = "actionNone",
+                    mask = EditorInfo.IME_MASK_ACTION,
+                    target = EditorInfo.IME_ACTION_NONE),
+            @FlagEntry(
+                    name = "actionGo",
+                    mask = EditorInfo.IME_MASK_ACTION,
+                    target = EditorInfo.IME_ACTION_GO),
+            @FlagEntry(
+                    name = "actionSearch",
+                    mask = EditorInfo.IME_MASK_ACTION,
+                    target = EditorInfo.IME_ACTION_SEARCH),
+            @FlagEntry(
+                    name = "actionSend",
+                    mask = EditorInfo.IME_MASK_ACTION,
+                    target = EditorInfo.IME_ACTION_SEND),
+            @FlagEntry(
+                    name = "actionNext",
+                    mask = EditorInfo.IME_MASK_ACTION,
+                    target = EditorInfo.IME_ACTION_NEXT),
+            @FlagEntry(
+                    name = "actionDone",
+                    mask = EditorInfo.IME_MASK_ACTION,
+                    target = EditorInfo.IME_ACTION_DONE),
+            @FlagEntry(
+                    name = "actionPrevious",
+                    mask = EditorInfo.IME_MASK_ACTION,
+                    target = EditorInfo.IME_ACTION_PREVIOUS),
+            @FlagEntry(name = "flagForceAscii", target = EditorInfo.IME_FLAG_FORCE_ASCII),
+            @FlagEntry(name = "flagNavigateNext", target = EditorInfo.IME_FLAG_NAVIGATE_NEXT),
+            @FlagEntry(
+                    name = "flagNavigatePrevious",
+                    target = EditorInfo.IME_FLAG_NAVIGATE_PREVIOUS),
+            @FlagEntry(
+                    name = "flagNoAccessoryAction",
+                    target = EditorInfo.IME_FLAG_NO_ACCESSORY_ACTION),
+            @FlagEntry(name = "flagNoEnterAction", target = EditorInfo.IME_FLAG_NO_ENTER_ACTION),
+            @FlagEntry(name = "flagNoExtractUi", target = EditorInfo.IME_FLAG_NO_EXTRACT_UI),
+            @FlagEntry(name = "flagNoFullscreen", target = EditorInfo.IME_FLAG_NO_FULLSCREEN),
+            @FlagEntry(
+                    name = "flagNoPersonalizedLearning",
+                    target = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING),
+    })
     public int getImeOptions() {
         return mEditor != null && mEditor.mInputContentType != null
                 ? mEditor.mInputContentType.imeOptions : EditorInfo.IME_NULL;
@@ -6644,6 +6908,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @see #setImeActionLabel
      * @see android.view.inputmethod.EditorInfo
      */
+    @InspectableProperty
     public CharSequence getImeActionLabel() {
         return mEditor != null && mEditor.mInputContentType != null
                 ? mEditor.mInputContentType.imeActionLabel : null;
@@ -6655,6 +6920,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @see #setImeActionLabel
      * @see android.view.inputmethod.EditorInfo
      */
+    @InspectableProperty
     public int getImeActionId() {
         return mEditor != null && mEditor.mInputContentType != null
                 ? mEditor.mInputContentType.imeActionId : 0;
@@ -6777,6 +7043,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @see #setPrivateImeOptions(String)
      * @see EditorInfo#privateImeOptions
      */
+    @InspectableProperty
     public String getPrivateImeOptions() {
         return mEditor != null && mEditor.mInputContentType != null
                 ? mEditor.mInputContentType.privateImeOptions : null;
@@ -7385,6 +7652,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_textIsSelectable
      */
+    @InspectableProperty(name = "textIsSelectable")
     public boolean isTextSelectable() {
         return mEditor == null ? false : mEditor.mTextIsSelectable;
     }
@@ -8924,6 +9192,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_includeFontPadding
      */
+    @InspectableProperty
     public boolean getIncludeFontPadding() {
         return mIncludePad;
     }
@@ -9812,7 +10081,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
-     * Return true iff there is a selection inside this text view.
+     * Return true iff there is a selection of nonzero length inside this text view.
      */
     public boolean hasSelection() {
         final int selectionStart = getSelectionStart();
@@ -9870,6 +10139,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @see #setAllCaps(boolean)
      * @see #setTransformationMethod(TransformationMethod)
      */
+    @InspectableProperty(name = "textAllCaps")
     public boolean isAllCaps() {
         final TransformationMethod method = getTransformationMethod();
         return method != null && method instanceof AllCapsTransformationMethod;
@@ -9979,6 +10249,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_marqueeRepeatLimit
      */
+    @InspectableProperty
     public int getMarqueeRepeatLimit() {
         return mMarqueeRepeatLimit;
     }
@@ -9987,6 +10258,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * Returns where, if anywhere, words that are longer than the view
      * is wide should be ellipsized.
      */
+    @InspectableProperty
     @ViewDebug.ExportedProperty
     public TextUtils.TruncateAt getEllipsize() {
         return mEllipsize;
@@ -10038,6 +10310,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @attr ref android.R.styleable#TextView_cursorVisible
      */
+    @InspectableProperty
     public boolean isCursorVisible() {
         // true is the default value
         return mEditor == null ? true : mEditor.mCursorVisible;
@@ -10967,6 +11240,22 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                     .getSystemService(TextServicesManager.class);
         } catch (PackageManager.NameNotFoundException e) {
             return null;
+        }
+    }
+
+    /**
+     * Starts {@link Activity} as a text-operation user if it is specified with
+     * {@link #setTextOperationUser(UserHandle)}.
+     *
+     * <p>Otherwise, just starts {@link Activity} with {@link Context#startActivity(Intent)}.</p>
+     *
+     * @param intent The description of the activity to start.
+     */
+    void startActivityAsTextOperationUserIfNecessary(@NonNull Intent intent) {
+        if (mTextOperationUser != null) {
+            getContext().startActivityAsUser(intent, mTextOperationUser);
+        } else {
+            getContext().startActivity(intent);
         }
     }
 
@@ -12457,7 +12746,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * return value may not be the same as the one TextView uses if the View's layout direction is
      * not resolved or detached from parent root view.
      */
-    public TextDirectionHeuristic getTextDirectionHeuristic() {
+    public @NonNull TextDirectionHeuristic getTextDirectionHeuristic() {
         if (hasPasswordTransformationMethod()) {
             // passwords fields should be LTR
             return TextDirectionHeuristics.LTR;
@@ -12775,7 +13064,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         }
 
         @SuppressWarnings("hiding")
-        public static final Parcelable.Creator<SavedState> CREATOR =
+        public static final @android.annotation.NonNull Parcelable.Creator<SavedState> CREATOR =
                 new Parcelable.Creator<SavedState>() {
                     public SavedState createFromParcel(Parcel in) {
                         return new SavedState(in);

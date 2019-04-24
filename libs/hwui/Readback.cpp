@@ -20,7 +20,6 @@
 #include "renderthread/EglManager.h"
 #include "renderthread/VulkanManager.h"
 
-#include <SkToSRGBColorFilter.h>
 #include <gui/Surface.h>
 #include <ui/Fence.h>
 #include <ui/GraphicBuffer.h>
@@ -29,6 +28,7 @@
 #include "hwui/Bitmap.h"
 #include "utils/Color.h"
 #include "utils/MathUtils.h"
+#include "utils/TraceUtils.h"
 
 using namespace android::uirenderer::renderthread;
 
@@ -84,6 +84,7 @@ CopyResult Readback::copyHWBitmapInto(Bitmap* hwBitmap, SkBitmap* bitmap) {
 }
 
 CopyResult Readback::copyLayerInto(DeferredLayerUpdater* deferredLayer, SkBitmap* bitmap) {
+    ATRACE_CALL();
     if (!mRenderThread.getGrContext()) {
         return CopyResult::UnknownError;
     }
@@ -104,10 +105,11 @@ CopyResult Readback::copyLayerInto(DeferredLayerUpdater* deferredLayer, SkBitmap
 
 CopyResult Readback::copyImageInto(const sk_sp<SkImage>& image, Matrix4& texTransform,
                                    const Rect& srcRect, SkBitmap* bitmap) {
+    ATRACE_CALL();
     if (Properties::getRenderPipelineType() == RenderPipelineType::SkiaGL) {
         mRenderThread.requireGlContext();
     } else {
-        mRenderThread.vulkanManager().initialize();
+        mRenderThread.requireVkContext();
     }
     if (!image.get()) {
         return CopyResult::UnknownError;
@@ -164,14 +166,15 @@ bool Readback::copyLayerInto(Layer* layer, const SkRect* srcRect, const SkRect* 
      * with reading incorrect data from EGLImage backed SkImage (likely a driver bug).
      */
     sk_sp<SkSurface> tmpSurface = SkSurface::MakeRenderTarget(mRenderThread.getGrContext(),
-                                                              SkBudgeted::kYes, bitmap->info());
+                                                              SkBudgeted::kYes, bitmap->info(), 0,
+                                                              kTopLeft_GrSurfaceOrigin, nullptr);
 
     // if we can't generate a GPU surface that matches the destination bitmap (e.g. 565) then we
     // attempt to do the intermediate rendering step in 8888
     if (!tmpSurface.get()) {
         SkImageInfo tmpInfo = bitmap->info().makeColorType(SkColorType::kN32_SkColorType);
         tmpSurface = SkSurface::MakeRenderTarget(mRenderThread.getGrContext(), SkBudgeted::kYes,
-                                                 tmpInfo);
+                                                 tmpInfo, 0, kTopLeft_GrSurfaceOrigin, nullptr);
         if (!tmpSurface.get()) {
             ALOGW("Unable to generate GPU buffer in a format compatible with the provided bitmap");
             return false;

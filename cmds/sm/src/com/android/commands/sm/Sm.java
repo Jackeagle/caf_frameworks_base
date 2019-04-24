@@ -282,7 +282,7 @@ public final class Sm {
                 StorageManager.DEBUG_VIRTUAL_DISK);
     }
 
-    public void runIsolatedStorage() {
+    public void runIsolatedStorage() throws RemoteException {
         final int value;
         final int mask = StorageManager.DEBUG_ISOLATED_STORAGE_FORCE_ON
                 | StorageManager.DEBUG_ISOLATED_STORAGE_FORCE_OFF;
@@ -301,16 +301,7 @@ public final class Sm {
             default:
                 return;
         }
-
-        // Toggling isolated-storage state will result in a device reboot. So to avoid this command
-        // from erroring out (DeadSystemException), call setDebugFlags() in a separate thread.
-        new Thread(() -> {
-            try {
-                mSm.setDebugFlags(value, mask);
-            } catch (RemoteException e) {
-                Log.e(TAG, "Encountered an error!", e);
-            }
-        }).start();
+        mSm.setDebugFlags(value, mask);
     }
 
     public void runIdleMaint() throws RemoteException {

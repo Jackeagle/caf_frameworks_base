@@ -77,6 +77,9 @@ public abstract class ConfigurationContainer<E extends ConfigurationContainer> {
      */
     private Configuration mFullConfiguration = new Configuration();
 
+    /** The bit mask of the last override fields of full configuration. */
+    private int mLastOverrideConfigurationChanges;
+
     /**
      * Contains merged override configuration settings from the top of the hierarchy down to this
      * particular instance. It is different from {@link #mFullConfiguration} because it starts from
@@ -108,6 +111,11 @@ public abstract class ConfigurationContainer<E extends ConfigurationContainer> {
         return mFullConfiguration;
     }
 
+    /** Returns the last changes from applying override configuration. */
+    int getLastOverrideConfigurationChanges() {
+        return mLastOverrideConfigurationChanges;
+    }
+
     /**
      * Notify that parent config changed and we need to update full configuration.
      * @see #mFullConfiguration
@@ -116,7 +124,8 @@ public abstract class ConfigurationContainer<E extends ConfigurationContainer> {
         mTmpConfig.setTo(mResolvedOverrideConfiguration);
         resolveOverrideConfiguration(newParentConfig);
         mFullConfiguration.setTo(newParentConfig);
-        mFullConfiguration.updateFrom(mResolvedOverrideConfiguration);
+        mLastOverrideConfigurationChanges =
+                mFullConfiguration.updateFrom(mResolvedOverrideConfiguration);
         if (!mTmpConfig.equals(mResolvedOverrideConfiguration)) {
             onMergedOverrideConfigurationChanged();
             // This depends on the assumption that change-listeners don't do
@@ -329,6 +338,10 @@ public abstract class ConfigurationContainer<E extends ConfigurationContainer> {
         }
 
         return boundsChange;
+    }
+
+    boolean hasOverrideConfiguration() {
+        return mHasOverrideConfiguration;
     }
 
     public WindowConfiguration getWindowConfiguration() {
@@ -551,18 +564,24 @@ public abstract class ConfigurationContainer<E extends ConfigurationContainer> {
      * @param proto    Stream to write the ConfigurationContainer object to.
      * @param fieldId  Field Id of the ConfigurationContainer as defined in the parent
      *                 message.
-     * @param trim     If true, reduce amount of data written.
+     * @param logLevel Determines the amount of data to be written to the Protobuf.
      * @hide
      */
     @CallSuper
-    public void writeToProto(ProtoOutputStream proto, long fieldId, boolean trim) {
-        final long token = proto.start(fieldId);
-        if (!trim || mHasOverrideConfiguration) {
-            mRequestedOverrideConfiguration.writeToProto(proto, OVERRIDE_CONFIGURATION);
+    protected void writeToProto(ProtoOutputStream proto, long fieldId,
+            @WindowTraceLogLevel int logLevel) {
+        // Critical log level logs only visible elements to mitigate performance overheard
+        if (logLevel != WindowTraceLogLevel.ALL && !mHasOverrideConfiguration) {
+            return;
         }
-        if (!trim) {
-            mFullConfiguration.writeToProto(proto, FULL_CONFIGURATION);
-            mMergedOverrideConfiguration.writeToProto(proto, MERGED_OVERRIDE_CONFIGURATION);
+
+        final long token = proto.start(fieldId);
+        mRequestedOverrideConfiguration.writeToProto(proto, OVERRIDE_CONFIGURATION,
+                logLevel == WindowTraceLogLevel.CRITICAL);
+        if (logLevel == WindowTraceLogLevel.ALL) {
+            mFullConfiguration.writeToProto(proto, FULL_CONFIGURATION, false /* critical */);
+            mMergedOverrideConfiguration.writeToProto(proto, MERGED_OVERRIDE_CONFIGURATION,
+                    false /* critical */);
         }
         proto.end(token);
     }

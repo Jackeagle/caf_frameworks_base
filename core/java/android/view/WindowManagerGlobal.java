@@ -17,6 +17,7 @@
 package android.view;
 
 import android.animation.ValueAnimator;
+import android.annotation.NonNull;
 import android.annotation.UnsupportedAppUsage;
 import android.app.ActivityManager;
 import android.content.ComponentCallbacks2;
@@ -92,11 +93,11 @@ public final class WindowManagerGlobal {
     public static final int RELAYOUT_RES_SURFACE_RESIZED = 0x20;
 
     /**
-     * In multi-window we force show the navigation bar. Because we don't want that the surface size
-     * changes in this mode, we instead have a flag whether the navigation bar size should always be
-     * consumed, so the app is treated like there is no virtual navigation bar at all.
+     * In multi-window we force show the system bars. Because we don't want that the surface size
+     * changes in this mode, we instead have a flag whether the system bar sizes should always be
+     * consumed, so the app is treated like there is no virtual system bars at all.
      */
-    public static final int RELAYOUT_RES_CONSUME_ALWAYS_NAV_BAR = 0x40;
+    public static final int RELAYOUT_RES_CONSUME_ALWAYS_SYSTEM_BARS = 0x40;
 
     /**
      * Flag for relayout: the client will be later giving
@@ -117,9 +118,10 @@ public final class WindowManagerGlobal {
     public static final int ADD_FLAG_IN_TOUCH_MODE = RELAYOUT_RES_IN_TOUCH_MODE;
 
     /**
-     * Like {@link #RELAYOUT_RES_CONSUME_ALWAYS_NAV_BAR}, but as a "hint" when adding the window.
+     * Like {@link #RELAYOUT_RES_CONSUME_ALWAYS_SYSTEM_BARS}, but as a "hint" when adding the
+     * window.
      */
-    public static final int ADD_FLAG_ALWAYS_CONSUME_NAV_BAR = 0x4;
+    public static final int ADD_FLAG_ALWAYS_CONSUME_SYSTEM_BARS = 0x4;
 
     public static final int ADD_OKAY = 0;
     public static final int ADD_BAD_APP_TOKEN = -1;
@@ -267,6 +269,16 @@ public final class WindowManagerGlobal {
             }
         }
         return views;
+    }
+
+    /**
+     * @return the list of all views attached to the global window manager
+     */
+    @NonNull
+    public ArrayList<View> getWindowViews() {
+        synchronized (mLock) {
+            return new ArrayList<>(mViews);
+        }
     }
 
     public View getWindowView(IBinder windowToken) {
@@ -520,7 +532,7 @@ public final class WindowManagerGlobal {
         return false;
     }
 
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     public void trimMemory(int level) {
         if (ThreadedRenderer.isAvailable()) {
             if (shouldDestroyEglContext(level)) {

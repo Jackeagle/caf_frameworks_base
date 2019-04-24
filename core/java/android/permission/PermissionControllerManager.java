@@ -16,13 +16,19 @@
 
 package android.permission;
 
+import static android.app.admin.DevicePolicyManager.PERMISSION_GRANT_STATE_DEFAULT;
+import static android.app.admin.DevicePolicyManager.PERMISSION_GRANT_STATE_DENIED;
+import static android.app.admin.DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED;
 import static android.permission.PermissionControllerService.SERVICE_INTERFACE;
 
+import static com.android.internal.util.Preconditions.checkArgument;
 import static com.android.internal.util.Preconditions.checkArgumentNonnegative;
 import static com.android.internal.util.Preconditions.checkCollectionElementsNotNull;
 import static com.android.internal.util.Preconditions.checkFlagsArgument;
 import static com.android.internal.util.Preconditions.checkNotNull;
 import static com.android.internal.util.Preconditions.checkStringNotEmpty;
+
+import static java.lang.Math.min;
 
 import android.Manifest;
 import android.annotation.CallbackExecutor;
@@ -33,6 +39,7 @@ import android.annotation.RequiresPermission;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
 import android.annotation.TestApi;
+import android.app.admin.DevicePolicyManager.PermissionGrantState;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -49,6 +56,7 @@ import android.os.RemoteException;
 import android.os.UserHandle;
 import android.util.ArrayMap;
 import android.util.Log;
+import android.util.Pair;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.infra.AbstractMultiplePendingRequestsRemoteService;
@@ -60,6 +68,7 @@ import libcore.io.IoUtils;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
@@ -82,9 +91,12 @@ public final class PermissionControllerManager {
 
     private static final Object sLock = new Object();
 
-    /** App global remote service used by all {@link PermissionControllerManager managers} */
+    /**
+     * Global remote services (per user) used by all {@link PermissionControllerManager managers}
+     */
     @GuardedBy("sLock")
-    private static RemoteService sRemoteService;
+    private static ArrayMap<Pair<Integer, Thread>, RemoteService> sRemoteServices
+            = new ArrayMap<>(1);
 
     /**
      * The key for retrieving the result from the returned bundle.
@@ -200,24 +212,33 @@ public final class PermissionControllerManager {
     }
 
     private final @NonNull Context mContext;
+    private final @NonNull RemoteService mRemoteService;
 
     /**
      * Create a new {@link PermissionControllerManager}.
      *
      * @param context to create the manager for
+     * @param handler handler to schedule work
      *
      * @hide
      */
-    public PermissionControllerManager(@NonNull Context context) {
+    public PermissionControllerManager(@NonNull Context context, @NonNull Handler handler) {
         synchronized (sLock) {
-            if (sRemoteService == null) {
+            Pair<Integer, Thread> key = new Pair<>(context.getUserId(),
+                    handler.getLooper().getThread());
+            RemoteService remoteService = sRemoteServices.get(key);
+            if (remoteService == null) {
                 Intent intent = new Intent(SERVICE_INTERFACE);
                 intent.setPackage(context.getPackageManager().getPermissionControllerPackageName());
                 ResolveInfo serviceInfo = context.getPackageManager().resolveService(intent, 0);
 
-                sRemoteService = new RemoteService(context.getApplicationContext(),
-                        serviceInfo.getComponentInfo().getComponentName());
+                remoteService = new RemoteService(context.getApplicationContext(),
+                        serviceInfo.getComponentInfo().getComponentName(), handler,
+                        context.getUser());
+                sRemoteServices.put(key, remoteService);
             }
+
+            mRemoteService = remoteService;
         }
 
         mContext = context;
@@ -252,8 +273,42 @@ public final class PermissionControllerManager {
                     + " required");
         }
 
-        sRemoteService.scheduleRequest(new PendingRevokeRuntimePermissionRequest(sRemoteService,
+        mRemoteService.scheduleRequest(new PendingRevokeRuntimePermissionRequest(mRemoteService,
                 request, doDryRun, reason, mContext.getPackageName(), executor, callback));
+    }
+
+    /**
+     * Set the runtime permission state from a device admin.
+     *
+     * @param callerPackageName The package name of the admin requesting the change
+     * @param packageName Package the permission belongs to
+     * @param permission Permission to change
+     * @param grantState State to set the permission into
+     * @param executor Executor to run the {@code callback} on
+     * @param callback The callback
+     *
+     * @hide
+     */
+    @RequiresPermission(allOf = {Manifest.permission.GRANT_RUNTIME_PERMISSIONS,
+            Manifest.permission.REVOKE_RUNTIME_PERMISSIONS,
+            Manifest.permission.ADJUST_RUNTIME_PERMISSIONS_POLICY},
+            conditional = true)
+    public void setRuntimePermissionGrantStateByDeviceAdmin(@NonNull String callerPackageName,
+            @NonNull String packageName, @NonNull String permission,
+            @PermissionGrantState int grantState, @NonNull @CallbackExecutor Executor executor,
+            @NonNull Consumer<Boolean> callback) {
+        checkStringNotEmpty(callerPackageName);
+        checkStringNotEmpty(packageName);
+        checkStringNotEmpty(permission);
+        checkArgument(grantState == PERMISSION_GRANT_STATE_GRANTED
+                || grantState == PERMISSION_GRANT_STATE_DENIED
+                || grantState == PERMISSION_GRANT_STATE_DEFAULT);
+        checkNotNull(executor);
+        checkNotNull(callback);
+
+        mRemoteService.scheduleRequest(new PendingSetRuntimePermissionGrantStateByDeviceAdmin(
+                mRemoteService, callerPackageName, packageName, permission, grantState, executor,
+                callback));
     }
 
     /**
@@ -273,8 +328,51 @@ public final class PermissionControllerManager {
         checkNotNull(executor);
         checkNotNull(callback);
 
-        sRemoteService.scheduleRequest(new PendingGetRuntimePermissionBackup(sRemoteService,
+        mRemoteService.scheduleRequest(new PendingGetRuntimePermissionBackup(mRemoteService,
                 user, executor, callback));
+    }
+
+    /**
+     * Restore a backup of the runtime permissions.
+     *
+     * @param backup the backup to restore. The backup is sent asynchronously, hence it should not
+     *               be modified after calling this method.
+     * @param user The user to be restore
+     *
+     * @hide
+     */
+    @RequiresPermission(Manifest.permission.GRANT_RUNTIME_PERMISSIONS)
+    public void restoreRuntimePermissionBackup(@NonNull byte[] backup, @NonNull UserHandle user) {
+        checkNotNull(backup);
+        checkNotNull(user);
+
+        mRemoteService.scheduleAsyncRequest(
+                new PendingRestoreRuntimePermissionBackup(mRemoteService, backup, user));
+    }
+
+    /**
+     * Restore a backup of the runtime permissions that has been delayed.
+     *
+     * @param packageName The package that is ready to have it's permissions restored.
+     * @param user The user to restore
+     * @param executor Executor to execute the callback on
+     * @param callback Is called with {@code true} iff there is still more delayed backup left
+     *
+     * @hide
+     */
+    @RequiresPermission(Manifest.permission.GRANT_RUNTIME_PERMISSIONS)
+    public void restoreDelayedRuntimePermissionBackup(@NonNull String packageName,
+            @NonNull UserHandle user,
+            @NonNull @CallbackExecutor Executor executor,
+            @NonNull Consumer<Boolean> callback) {
+        checkNotNull(packageName);
+        checkNotNull(user);
+        checkNotNull(executor);
+        checkNotNull(callback);
+
+        mRemoteService.scheduleRequest(
+                new PendingRestoreDelayedRuntimePermissionBackup(mRemoteService, packageName,
+                        user, executor, callback));
     }
 
     /**
@@ -292,8 +390,8 @@ public final class PermissionControllerManager {
         checkNotNull(packageName);
         checkNotNull(callback);
 
-        sRemoteService.scheduleRequest(new PendingGetAppPermissionRequest(sRemoteService,
-                packageName, callback, handler == null ? sRemoteService.getHandler() : handler));
+        mRemoteService.scheduleRequest(new PendingGetAppPermissionRequest(mRemoteService,
+                packageName, callback, handler == null ? mRemoteService.getHandler() : handler));
     }
 
     /**
@@ -310,7 +408,7 @@ public final class PermissionControllerManager {
         checkNotNull(packageName);
         checkNotNull(permissionName);
 
-        sRemoteService.scheduleAsyncRequest(new PendingRevokeAppPermissionRequest(packageName,
+        mRemoteService.scheduleAsyncRequest(new PendingRevokeAppPermissionRequest(packageName,
                 permissionName));
     }
 
@@ -333,9 +431,9 @@ public final class PermissionControllerManager {
         checkFlagsArgument(flags, COUNT_WHEN_SYSTEM | COUNT_ONLY_WHEN_GRANTED);
         checkNotNull(callback);
 
-        sRemoteService.scheduleRequest(new PendingCountPermissionAppsRequest(sRemoteService,
+        mRemoteService.scheduleRequest(new PendingCountPermissionAppsRequest(mRemoteService,
                 permissionNames, flags, callback,
-                handler == null ? sRemoteService.getHandler() : handler));
+                handler == null ? mRemoteService.getHandler() : handler));
     }
 
     /**
@@ -356,30 +454,25 @@ public final class PermissionControllerManager {
         checkNotNull(executor);
         checkNotNull(callback);
 
-        sRemoteService.scheduleRequest(new PendingGetPermissionUsagesRequest(sRemoteService,
+        mRemoteService.scheduleRequest(new PendingGetPermissionUsagesRequest(mRemoteService,
                 countSystem, numMillis, executor, callback));
     }
 
     /**
-     * Check whether an application is qualified for a role.
+     * Grant or upgrade runtime permissions. The upgrade could be performed
+     * based on whether the device upgraded, whether the permission database
+     * version is old, or because the permission policy changed.
      *
-     * @param roleName name of the role to check for
-     * @param packageName package name of the application to check for
      * @param executor Executor on which to invoke the callback
      * @param callback Callback to receive the result
      *
      * @hide
      */
-    @RequiresPermission(Manifest.permission.MANAGE_ROLE_HOLDERS)
-    public void isApplicationQualifiedForRole(@NonNull String roleName, @NonNull String packageName,
+    @RequiresPermission(Manifest.permission.ADJUST_RUNTIME_PERMISSIONS_POLICY)
+    public void grantOrUpgradeDefaultRuntimePermissions(
             @NonNull @CallbackExecutor Executor executor, @NonNull Consumer<Boolean> callback) {
-        checkStringNotEmpty(roleName);
-        checkStringNotEmpty(packageName);
-        checkNotNull(executor);
-        checkNotNull(callback);
-
-        sRemoteService.scheduleRequest(new PendingIsApplicationQualifiedForRoleRequest(
-                sRemoteService, roleName, packageName, executor, callback));
+        mRemoteService.scheduleRequest(new PendingGrantOrUpgradeDefaultRuntimePermissionsRequest(
+                mRemoteService, executor, callback));
     }
 
     /**
@@ -395,11 +488,13 @@ public final class PermissionControllerManager {
          *
          * @param context A context to use
          * @param componentName The component of the service to connect to
+         * @param user User the remote service should be connected as
          */
-        RemoteService(@NonNull Context context, @NonNull ComponentName componentName) {
-            super(context, SERVICE_INTERFACE, componentName, UserHandle.myUserId(),
-                    service -> Log.e(TAG, "RuntimePermPresenterService " + service + " died"),
-                    false, false, 1);
+        RemoteService(@NonNull Context context, @NonNull ComponentName componentName,
+                @NonNull Handler handler, @NonNull UserHandle user) {
+            super(context, SERVICE_INTERFACE, componentName, user.getIdentifier(),
+                    service -> Log.e(TAG, "RemoteService " + service + " died"),
+                    handler, 0, false, 1);
         }
 
         /**
@@ -425,7 +520,7 @@ public final class PermissionControllerManager {
         }
 
         @Override
-        public void scheduleRequest(@NonNull PendingRequest<RemoteService,
+        public void scheduleRequest(@NonNull BasePendingRequest<RemoteService,
                 IPermissionController> pendingRequest) {
             super.scheduleRequest(pendingRequest);
         }
@@ -516,6 +611,80 @@ public final class PermissionControllerManager {
         protected void onPostExecute(byte[] backup) {
             IoUtils.closeQuietly(mLocalPipe);
             mCallback.accept(backup);
+        }
+    }
+
+    /**
+     * Task to send a large amount of data to a remote service.
+     */
+    private static class FileWriterTask extends AsyncTask<byte[], Void, Void> {
+        private static final int CHUNK_SIZE = 4 * 1024;
+
+        private ParcelFileDescriptor mLocalPipe;
+        private ParcelFileDescriptor mRemotePipe;
+
+        @Override
+        protected void onPreExecute() {
+            ParcelFileDescriptor[] pipe;
+            try {
+                pipe = ParcelFileDescriptor.createPipe();
+            } catch (IOException e) {
+                Log.e(TAG, "Could not create pipe needed to send runtime permission backup",
+                        e);
+                return;
+            }
+
+            mRemotePipe = pipe[0];
+            mLocalPipe = pipe[1];
+        }
+
+        /**
+         * Get the file descriptor the remote service should read the data from.
+         *
+         * @return The file the data should be read from
+         */
+        ParcelFileDescriptor getRemotePipe() {
+            return mRemotePipe;
+        }
+
+        /**
+         * Send the data to the remove service.
+         *
+         * @param in The data to send
+         *
+         * @return ignored
+         */
+        @Override
+        protected Void doInBackground(byte[]... in) {
+            byte[] buffer = in[0];
+            try (OutputStream out = new ParcelFileDescriptor.AutoCloseOutputStream(mLocalPipe)) {
+                for (int offset = 0; offset < buffer.length; offset += CHUNK_SIZE) {
+                    out.write(buffer, offset, min(CHUNK_SIZE, buffer.length - offset));
+                }
+            } catch (IOException | NullPointerException e) {
+                Log.e(TAG, "Error sending runtime permission backup", e);
+            }
+
+            return null;
+        }
+
+        /**
+         * Interrupt the send of the data.
+         *
+         * <p>Needs to be called when canceling this task as it might be hung.
+         */
+        void interruptWrite() {
+            IoUtils.closeQuietly(mLocalPipe);
+        }
+
+        @Override
+        protected void onCancelled() {
+            onPostExecute(null);
+        }
+
+        @Override
+        protected void onPostExecute(Void ignored) {
+            IoUtils.closeQuietly(mLocalPipe);
         }
     }
 
@@ -664,6 +833,159 @@ public final class PermissionControllerManager {
             }
 
             finish();
+        }
+    }
+
+    /**
+     * Request for {@link #getRuntimePermissionBackup}
+     */
+    private static final class PendingSetRuntimePermissionGrantStateByDeviceAdmin extends
+            AbstractRemoteService.PendingRequest<RemoteService, IPermissionController> {
+        private final @NonNull String mCallerPackageName;
+        private final @NonNull String mPackageName;
+        private final @NonNull String mPermission;
+        private final @PermissionGrantState int mGrantState;
+
+        private final @NonNull Executor mExecutor;
+        private final @NonNull Consumer<Boolean> mCallback;
+        private final @NonNull RemoteCallback mRemoteCallback;
+
+        private PendingSetRuntimePermissionGrantStateByDeviceAdmin(@NonNull RemoteService service,
+                @NonNull String callerPackageName, @NonNull String packageName,
+                @NonNull String permission, @PermissionGrantState int grantState,
+                @NonNull @CallbackExecutor Executor executor, @NonNull Consumer<Boolean> callback) {
+            super(service);
+
+            mCallerPackageName = callerPackageName;
+            mPackageName = packageName;
+            mPermission = permission;
+            mGrantState = grantState;
+            mExecutor = executor;
+            mCallback = callback;
+
+            mRemoteCallback = new RemoteCallback(result -> executor.execute(() -> {
+                long token = Binder.clearCallingIdentity();
+                try {
+                    callback.accept(result.getBoolean(KEY_RESULT, false));
+                } finally {
+                    Binder.restoreCallingIdentity(token);
+
+                    finish();
+                }
+            }), null);
+        }
+
+        @Override
+        protected void onTimeout(RemoteService remoteService) {
+            long token = Binder.clearCallingIdentity();
+            try {
+                mExecutor.execute(() -> mCallback.accept(false));
+            } finally {
+                Binder.restoreCallingIdentity(token);
+            }
+        }
+
+        @Override
+        public void run() {
+            try {
+                getService().getServiceInterface().setRuntimePermissionGrantStateByDeviceAdmin(
+                        mCallerPackageName, mPackageName, mPermission, mGrantState, mRemoteCallback);
+            } catch (RemoteException e) {
+                Log.e(TAG, "Error setting permissions state for device admin " + mPackageName,
+                        e);
+            }
+        }
+    }
+
+    /**
+     * Request for {@link #restoreRuntimePermissionBackup}
+     */
+    private static final class PendingRestoreRuntimePermissionBackup implements
+            AbstractRemoteService.AsyncRequest<IPermissionController> {
+        private final @NonNull FileWriterTask mBackupSender;
+        private final @NonNull byte[] mBackup;
+        private final @NonNull UserHandle mUser;
+
+        private PendingRestoreRuntimePermissionBackup(@NonNull RemoteService service,
+                @NonNull byte[] backup, @NonNull UserHandle user) {
+            mBackup = backup;
+            mUser = user;
+
+            mBackupSender = new FileWriterTask();
+        }
+
+        @Override
+        public void run(@NonNull IPermissionController service) {
+            mBackupSender.execute(mBackup);
+
+            ParcelFileDescriptor remotePipe = mBackupSender.getRemotePipe();
+            try {
+                service.restoreRuntimePermissionBackup(mUser, remotePipe);
+            } catch (RemoteException e) {
+                Log.e(TAG, "Error sending runtime permission backup", e);
+                mBackupSender.cancel(false);
+                mBackupSender.interruptWrite();
+            } finally {
+                // Remote pipe end is duped by binder call. Local copy is not needed anymore
+                IoUtils.closeQuietly(remotePipe);
+            }
+        }
+    }
+
+    /**
+     * Request for {@link #restoreDelayedRuntimePermissionBackup(String, UserHandle, Executor,
+     * Consumer<Boolean>)}
+     */
+    private static final class PendingRestoreDelayedRuntimePermissionBackup extends
+            AbstractRemoteService.PendingRequest<RemoteService, IPermissionController> {
+        private final @NonNull String mPackageName;
+        private final @NonNull UserHandle mUser;
+        private final @NonNull Executor mExecutor;
+        private final @NonNull Consumer<Boolean> mCallback;
+
+        private final @NonNull RemoteCallback mRemoteCallback;
+
+        private PendingRestoreDelayedRuntimePermissionBackup(@NonNull RemoteService service,
+                @NonNull String packageName, @NonNull UserHandle user, @NonNull Executor executor,
+                @NonNull Consumer<Boolean> callback) {
+            super(service);
+
+            mPackageName = packageName;
+            mUser = user;
+            mExecutor = executor;
+            mCallback = callback;
+
+            mRemoteCallback = new RemoteCallback(result -> executor.execute(() -> {
+                long token = Binder.clearCallingIdentity();
+                try {
+                    callback.accept(result.getBoolean(KEY_RESULT, false));
+                } finally {
+                    Binder.restoreCallingIdentity(token);
+
+                    finish();
+                }
+            }), null);
+        }
+
+        @Override
+        protected void onTimeout(RemoteService remoteService) {
+            long token = Binder.clearCallingIdentity();
+            try {
+                mExecutor.execute(
+                        () -> mCallback.accept(true));
+            } finally {
+                Binder.restoreCallingIdentity(token);
+            }
+        }
+
+        @Override
+        public void run() {
+            try {
+                getService().getServiceInterface().restoreDelayedRuntimePermissionBackup(
+                        mPackageName, mUser, mRemoteCallback);
+            } catch (RemoteException e) {
+                Log.e(TAG, "Error restoring delayed permissions for " + mPackageName, e);
+            }
         }
     }
 
@@ -849,36 +1171,24 @@ public final class PermissionControllerManager {
     }
 
     /**
-     * Request for {@link #isApplicationQualifiedForRole}.
+     * Request for {@link #grantOrUpgradeDefaultRuntimePermissions(Executor, Consumer)}
      */
-    private static final class PendingIsApplicationQualifiedForRoleRequest extends
+    private static final class PendingGrantOrUpgradeDefaultRuntimePermissionsRequest extends
             AbstractRemoteService.PendingRequest<RemoteService, IPermissionController> {
-
-        private final @NonNull String mRoleName;
-        private final @NonNull String mPackageName;
         private final @NonNull Consumer<Boolean> mCallback;
 
         private final @NonNull RemoteCallback mRemoteCallback;
 
-        private PendingIsApplicationQualifiedForRoleRequest(@NonNull RemoteService service,
-                @NonNull String roleName, @NonNull String packageName,
-                @NonNull @CallbackExecutor Executor executor, @NonNull Consumer<Boolean> callback) {
+        private PendingGrantOrUpgradeDefaultRuntimePermissionsRequest(
+                @NonNull RemoteService service,  @NonNull @CallbackExecutor Executor executor,
+                @NonNull Consumer<Boolean> callback) {
             super(service);
-
-            mRoleName = roleName;
-            mPackageName = packageName;
             mCallback = callback;
 
             mRemoteCallback = new RemoteCallback(result -> executor.execute(() -> {
                 long token = Binder.clearCallingIdentity();
                 try {
-                    boolean qualified;
-                    if (result != null) {
-                        qualified = result.getBoolean(KEY_RESULT);
-                    } else {
-                        qualified = false;
-                    }
-                    callback.accept(qualified);
+                    callback.accept(result != null);
                 } finally {
                     Binder.restoreCallingIdentity(token);
                     finish();
@@ -888,16 +1198,21 @@ public final class PermissionControllerManager {
 
         @Override
         protected void onTimeout(RemoteService remoteService) {
-            mCallback.accept(false);
+            long token = Binder.clearCallingIdentity();
+            try {
+                mCallback.accept(false);
+            } finally {
+                Binder.restoreCallingIdentity(token);
+            }
         }
 
         @Override
         public void run() {
             try {
-                getService().getServiceInterface().isApplicationQualifiedForRole(mRoleName,
-                        mPackageName, mRemoteCallback);
+                getService().getServiceInterface().grantOrUpgradeDefaultRuntimePermissions(
+                        mRemoteCallback);
             } catch (RemoteException e) {
-                Log.e(TAG, "Error checking whether application qualifies for role", e);
+                Log.e(TAG, "Error granting or upgrading runtime permissions", e);
             }
         }
     }

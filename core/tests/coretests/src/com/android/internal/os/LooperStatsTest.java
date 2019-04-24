@@ -138,6 +138,26 @@ public final class LooperStatsTest {
     }
 
     @Test
+    public void testThrewException_notSampled() {
+        TestableLooperStats looperStats = new TestableLooperStats(2, 100);
+
+        Object token = looperStats.messageDispatchStarting();
+        looperStats.tickRealtime(10);
+        looperStats.tickThreadTime(10);
+        looperStats.messageDispatched(token, mHandlerFirst.obtainMessage(0));
+        assertThat(looperStats.getEntries()).hasSize(1);
+
+        // Will not be sampled so does not contribute to any entries.
+        Object token2 = looperStats.messageDispatchStarting();
+        looperStats.tickRealtime(100);
+        looperStats.tickThreadTime(10);
+        looperStats.dispatchingThrewException(
+                token2, mHandlerSecond.obtainMessage(7), new ArithmeticException());
+        assertThat(looperStats.getEntries()).hasSize(1);
+        assertThat(looperStats.getEntries().get(0).messageCount).isEqualTo(1);
+    }
+
+    @Test
     public void testMultipleMessagesDispatched() {
         TestableLooperStats looperStats = new TestableLooperStats(2, 100);
 
@@ -432,6 +452,7 @@ public final class LooperStatsTest {
     public void testAddsDebugEntries() {
         TestableLooperStats looperStats = new TestableLooperStats(1, 100);
         looperStats.setAddDebugEntries(true);
+        looperStats.setSamplingInterval(10);
 
         Message message = mHandlerFirst.obtainMessage(1000);
         message.when = looperStats.getSystemUptimeMillis();
@@ -439,7 +460,7 @@ public final class LooperStatsTest {
         looperStats.messageDispatched(token, message);
 
         List<LooperStats.ExportedEntry> entries = looperStats.getEntries();
-        assertThat(entries).hasSize(4);
+        assertThat(entries).hasSize(5);
         LooperStats.ExportedEntry debugEntry1 = entries.get(1);
         assertThat(debugEntry1.handlerClassName).isEqualTo("");
         assertThat(debugEntry1.messageName).isEqualTo("__DEBUG_start_time_millis");
@@ -454,6 +475,36 @@ public final class LooperStatsTest {
         assertThat(debugEntry3.handlerClassName).isEqualTo("");
         assertThat(debugEntry3.messageName).isEqualTo("__DEBUG_battery_time_millis");
         assertThat(debugEntry3.totalLatencyMicros).isAtLeast(0L);
+        LooperStats.ExportedEntry debugEntry4 = entries.get(4);
+        assertThat(debugEntry4.messageName).isEqualTo("__DEBUG_sampling_interval");
+        assertThat(debugEntry4.totalLatencyMicros).isEqualTo(10L);
+    }
+
+    @Test
+    public void testScreenStateTrackingDisabled() {
+        TestableLooperStats looperStats = new TestableLooperStats(1, 100);
+        looperStats.setTrackScreenInteractive(false);
+
+        Message message = mHandlerFirst.obtainMessage(1000);
+        message.workSourceUid = 1000;
+        message.when = looperStats.getSystemUptimeMillis();
+
+        looperStats.tickUptime(30);
+        mDeviceState.setScreenInteractive(false);
+        Object token = looperStats.messageDispatchStarting();
+        looperStats.messageDispatched(token, message);
+
+        looperStats.tickUptime(30);
+        mDeviceState.setScreenInteractive(true);
+        token = looperStats.messageDispatchStarting();
+        looperStats.messageDispatched(token, message);
+
+        List<LooperStats.ExportedEntry> entries = looperStats.getEntries();
+        assertThat(entries).hasSize(1);
+        LooperStats.ExportedEntry entry = entries.get(0);
+        assertThat(entry.isInteractive).isEqualTo(false);
+        assertThat(entry.messageCount).isEqualTo(2);
+        assertThat(entry.recordedMessageCount).isEqualTo(2);
     }
 
     private static void assertThrows(Class<? extends Exception> exceptionClass, Runnable r) {
@@ -481,6 +532,7 @@ public final class LooperStatsTest {
             super(samplingInterval, sizeCap);
             mSamplingInterval = samplingInterval;
             setAddDebugEntries(false);
+            setTrackScreenInteractive(true);
             if (deviceState != null) {
                 setDeviceState(deviceState.getReadonlyClient());
             }

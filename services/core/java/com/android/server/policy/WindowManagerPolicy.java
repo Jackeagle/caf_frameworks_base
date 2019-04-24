@@ -64,6 +64,7 @@ import static android.view.WindowManager.LayoutParams.isSystemAlertWindowType;
 import static java.lang.annotation.RetentionPolicy.SOURCE;
 
 import android.annotation.IntDef;
+import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.WindowConfiguration;
 import android.content.Context;
@@ -442,7 +443,7 @@ public interface WindowManagerPolicy extends WindowManagerPolicyConstants {
          * Returns true if the window is current in multi-windowing mode. i.e. it shares the
          * screen with other application windows.
          */
-        public boolean isInMultiWindowMode();
+        boolean inMultiWindowMode();
 
         public int getRotationAnimationHint();
 
@@ -516,6 +517,10 @@ public interface WindowManagerPolicy extends WindowManagerPolicyConstants {
         public static final int LID_ABSENT = -1;
         public static final int LID_CLOSED = 0;
         public static final int LID_OPEN = 1;
+
+        public static final int LID_BEHAVIOR_NONE = 0;
+        public static final int LID_BEHAVIOR_SLEEP = 1;
+        public static final int LID_BEHAVIOR_LOCK = 2;
 
         public static final int CAMERA_LENS_COVER_ABSENT = -1;
         public static final int CAMERA_LENS_UNCOVERED = 0;
@@ -824,9 +829,11 @@ public interface WindowManagerPolicy extends WindowManagerPolicyConstants {
                 return  9;
             case TYPE_SYSTEM_ALERT:
                 // like the ANR / app crashed dialogs
-                return  canAddInternalSystemWindow ? 11 : 10;
+                // Type is deprecated for non-system apps. For system apps, this type should be
+                // in a higher layer than TYPE_APPLICATION_OVERLAY.
+                return  canAddInternalSystemWindow ? 13 : 10;
             case TYPE_APPLICATION_OVERLAY:
-                return  canAddInternalSystemWindow ? 13 : 12;
+                return  12;
             case TYPE_DREAM:
                 // used for Dreams (screensavers with TYPE_DREAM windows)
                 return  14;
@@ -1003,11 +1010,13 @@ public interface WindowManagerPolicy extends WindowManagerPolicyConstants {
      * affect the power state of the device, for example, waking on motions.
      * Generally, it's best to keep as little as possible in the queue thread
      * because it's the most fragile.
+     * @param displayId The display ID of the motion event.
      * @param policyFlags The policy flags associated with the motion.
      *
      * @return Actions flags: may be {@link #ACTION_PASS_TO_USER}.
      */
-    public int interceptMotionBeforeQueueingNonInteractive(long whenNanos, int policyFlags);
+    int interceptMotionBeforeQueueingNonInteractive(int displayId, long whenNanos,
+            int policyFlags);
 
     /**
      * Called from the input dispatcher thread before a key is dispatched to a window.
@@ -1070,12 +1079,12 @@ public interface WindowManagerPolicy extends WindowManagerPolicyConstants {
     /**
      * Called when the device has started waking up.
      */
-    public void startedWakingUp();
+    void startedWakingUp(@OnReason int reason);
 
     /**
      * Called when the device has finished waking up.
      */
-    public void finishedWakingUp();
+    void finishedWakingUp(@OnReason int reason);
 
     /**
      * Called when the device has started going to sleep.
@@ -1297,8 +1306,8 @@ public interface WindowManagerPolicy extends WindowManagerPolicyConstants {
     /**
      * Call from application to perform haptic feedback on its window.
      */
-    public boolean performHapticFeedbackLw(WindowState win, int effectId, boolean always,
-            String reason);
+    public boolean performHapticFeedback(int uid, String packageName, int effectId,
+            boolean always, String reason);
 
     /**
      * Called when we have started keeping the screen on because a window
@@ -1466,6 +1475,25 @@ public interface WindowManagerPolicy extends WindowManagerPolicyConstants {
      * Unregisters an IDisplayFoldListener.
      */
     default void unregisterDisplayFoldListener(IDisplayFoldListener listener) {}
+
+    /**
+     * Overrides the folded area.
+     *
+     * @param area the overriding folded area or an empty {@code Rect} to clear the override.
+     */
+    default void setOverrideFoldedArea(@NonNull Rect area) {}
+
+    /**
+     * Get the display folded area.
+     */
+    default @NonNull Rect getFoldedArea() {
+        return new Rect();
+    }
+
+    /**
+     * A new window on default display has been focused.
+     */
+    default void onDefaultDisplayFocusChangedLw(WindowState newFocus) {}
 
     /**
      * Updates the flag about whether AOD is showing.

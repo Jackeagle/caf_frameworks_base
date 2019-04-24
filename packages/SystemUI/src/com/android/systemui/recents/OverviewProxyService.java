@@ -16,7 +16,7 @@
 
 package com.android.systemui.recents;
 
-import static android.content.pm.PackageManager.MATCH_DIRECT_BOOT_UNAWARE;
+import static android.content.pm.PackageManager.MATCH_SYSTEM_ONLY;
 import static android.view.MotionEvent.ACTION_CANCEL;
 import static android.view.MotionEvent.ACTION_DOWN;
 import static android.view.MotionEvent.ACTION_UP;
@@ -24,7 +24,12 @@ import static android.view.MotionEvent.ACTION_UP;
 import static com.android.systemui.shared.system.NavigationBarCompat.FLAG_DISABLE_SWIPE_UP;
 import static com.android.systemui.shared.system.NavigationBarCompat.FLAG_SHOW_OVERVIEW_BUTTON;
 import static com.android.systemui.shared.system.NavigationBarCompat.InteractionType;
+import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_INPUT_MONITOR;
+import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SUPPORTS_WINDOW_CORNERS;
+import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SYSUI_PROXY;
+import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_WINDOW_CORNER_RADIUS;
 
+import android.annotation.FloatRange;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -32,15 +37,18 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.graphics.Rect;
+import android.graphics.Region;
+import android.hardware.input.InputManager;
 import android.os.Binder;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.PatternMatcher;
 import android.os.RemoteException;
 import android.os.UserHandle;
-import android.provider.Settings;
 import android.util.Log;
+import android.view.InputMonitor;
 import android.view.MotionEvent;
 
 import com.android.internal.policy.ScreenDecorationsUtils;
@@ -51,6 +59,7 @@ import com.android.systemui.recents.OverviewProxyService.OverviewProxyListener;
 import com.android.systemui.shared.recents.IOverviewProxy;
 import com.android.systemui.shared.recents.ISystemUiProxy;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
+import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.stackdivider.Divider;
 import com.android.systemui.statusbar.phone.StatusBar;
 import com.android.systemui.statusbar.policy.CallbackController;
@@ -93,9 +102,12 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
     private final List<OverviewProxyListener> mConnectionCallbacks = new ArrayList<>();
     private final Intent mQuickStepIntent;
 
+    private Region mActiveNavBarRegion;
+
     private IOverviewProxy mOverviewProxy;
     private int mConnectionBackoffAttempts;
     private @InteractionType int mInteractionFlags;
+    private boolean mBound;
     private boolean mIsEnabled;
     private int mCurrentBoundedUserId = -1;
     private float mBackButtonAlpha;
@@ -257,6 +269,46 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
             }
         }
 
+        public void onAssistantProgress(@FloatRange(from = 0.0, to = 1.0) float progress) {
+            if (!verifyCaller("onAssistantProgress")) {
+                return;
+            }
+            long token = Binder.clearCallingIdentity();
+            try {
+                mHandler.post(() -> notifyAssistantProgress(progress));
+            } finally {
+                Binder.restoreCallingIdentity(token);
+            }
+        }
+
+        public void startAssistant(Bundle bundle) {
+            if (!verifyCaller("startAssistant")) {
+                return;
+            }
+            long token = Binder.clearCallingIdentity();
+            try {
+                mHandler.post(() -> notifyStartAssistant(bundle));
+            } finally {
+                Binder.restoreCallingIdentity(token);
+            }
+        }
+
+        public Bundle monitorGestureInput(String name, int displayId) {
+            if (!verifyCaller("monitorGestureInput")) {
+                return null;
+            }
+            long token = Binder.clearCallingIdentity();
+            try {
+                InputMonitor monitor =
+                        InputManager.getInstance().monitorGestureInput(name, displayId);
+                Bundle result = new Bundle();
+                result.putParcelable(KEY_EXTRA_INPUT_MONITOR, monitor);
+                return result;
+            } finally {
+                Binder.restoreCallingIdentity(token);
+            }
+        }
+
         private boolean verifyCaller(String reason) {
             final int callerId = Binder.getCallingUserHandle().getIdentifier();
             if (callerId != mCurrentBoundedUserId) {
@@ -303,12 +355,19 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
             } catch (RemoteException e) {
                 Log.e(TAG_OPS, "Lost connection to launcher service", e);
             }
+
+            Bundle params = new Bundle();
+            params.putBinder(KEY_EXTRA_SYSUI_PROXY, mSysUiProxy.asBinder());
+            params.putFloat(KEY_EXTRA_WINDOW_CORNER_RADIUS, mWindowCornerRadius);
+            params.putBoolean(KEY_EXTRA_SUPPORTS_WINDOW_CORNERS, mSupportsRoundedCornersOnWindows);
             try {
-                mOverviewProxy.onBind(mSysUiProxy);
+                mOverviewProxy.onInitialize(params);
             } catch (RemoteException e) {
                 mCurrentBoundedUserId = -1;
-                Log.e(TAG_OPS, "Failed to call onBind()", e);
+                Log.e(TAG_OPS, "Failed to call onInitialize()", e);
             }
+            dispatchNavButtonBounds();
+
             notifyConnectionChanged();
         }
 
@@ -369,6 +428,9 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
         mSupportsRoundedCornersOnWindows = ScreenDecorationsUtils
                 .supportsRoundedCornersOnWindows(mContext.getResources());
 
+        // Assumes device always starts with back button until launcher tells it that it does not
+        mBackButtonAlpha = 1.0f;
+
         // Listen for the package update changes.
         if (mDeviceProvisionedController.getCurrentUser() == UserHandle.USER_SYSTEM) {
             updateEnabledState();
@@ -379,6 +441,35 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
                     PatternMatcher.PATTERN_LITERAL);
             filter.addAction(Intent.ACTION_PACKAGE_CHANGED);
             mContext.registerReceiver(mLauncherStateChangedReceiver, filter);
+        }
+    }
+
+    public void notifyBackAction(boolean completed, int downX, int downY, boolean isButton,
+            boolean gestureSwipeLeft) {
+        try {
+            if (mOverviewProxy != null) {
+                mOverviewProxy.onBackAction(completed, downX, downY, isButton, gestureSwipeLeft);
+            }
+        } catch (RemoteException e) {
+            Log.e(TAG_OPS, "Failed to notify back action", e);
+        }
+    }
+
+    /**
+     * Sets the navbar region which can receive touch inputs
+     */
+    public void onActiveNavBarRegionChanges(Region activeRegion) {
+        mActiveNavBarRegion = activeRegion;
+        dispatchNavButtonBounds();
+    }
+
+    private void dispatchNavButtonBounds() {
+        if (mOverviewProxy != null && mActiveNavBarRegion != null) {
+            try {
+                mOverviewProxy.onActiveNavBarRegionChanges(mActiveNavBarRegion);
+            } catch (RemoteException e) {
+                Log.e(TAG_OPS, "Failed to call onActiveNavBarRegionChanges()", e);
+            }
         }
     }
 
@@ -423,16 +514,15 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
         mHandler.removeCallbacks(mConnectionRunnable);
         Intent launcherServiceIntent = new Intent(ACTION_QUICKSTEP)
                 .setPackage(mRecentsComponentName.getPackageName());
-        boolean bound = false;
         try {
-            bound = mContext.bindServiceAsUser(launcherServiceIntent,
+            mBound = mContext.bindServiceAsUser(launcherServiceIntent,
                     mOverviewServiceConnection,
                     Context.BIND_AUTO_CREATE | Context.BIND_FOREGROUND_SERVICE_WHILE_AWAKE,
                     UserHandle.of(mDeviceProvisionedController.getCurrentUser()));
         } catch (SecurityException e) {
             Log.e(TAG_OPS, "Unable to bind because of security error", e);
         }
-        if (bound) {
+        if (mBound) {
             // Ensure that connection has been established even if it thinks it is bound
             mHandler.postDelayed(mDeferredConnectionCallback, DEFERRED_CALLBACK_MILLIS);
         } else {
@@ -482,9 +572,14 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
     }
 
     private void disconnectFromLauncherService() {
+        if (mBound) {
+            // Always unbind the service (ie. if called through onNullBinding or onBindingDied)
+            mContext.unbindService(mOverviewServiceConnection);
+            mBound = false;
+        }
+
         if (mOverviewProxy != null) {
             mOverviewProxy.asBinder().unlinkToDeath(mOverviewServiceDeathRcpt, 0);
-            mContext.unbindService(mOverviewServiceConnection);
             mOverviewProxy = null;
             notifyBackButtonAlphaChanged(1f, false /* animate */);
             notifyConnectionChanged();
@@ -493,11 +588,9 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
 
     private int getDefaultInteractionFlags() {
         // If there is no settings available use device default or get it from settings
-        final boolean defaultState = getSwipeUpDefaultValue();
-        final boolean swipeUpEnabled = getSwipeUpSettingAvailable()
-                ? getSwipeUpEnabledFromSettings(defaultState)
-                : defaultState;
-        return swipeUpEnabled ? 0 : DEFAULT_DISABLE_SWIPE_UP_STATE;
+        return QuickStepContract.isLegacyMode(mContext)
+                ? DEFAULT_DISABLE_SWIPE_UP_STATE
+                : 0;
     }
 
     private void notifyBackButtonAlphaChanged(float alpha, boolean animate) {
@@ -524,25 +617,32 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
         }
     }
 
+    private void notifyAssistantProgress(@FloatRange(from = 0.0, to = 1.0) float progress) {
+        for (int i = mConnectionCallbacks.size() - 1; i >= 0; --i) {
+            mConnectionCallbacks.get(i).onAssistantProgress(progress);
+        }
+    }
+
+    private void notifyStartAssistant(Bundle bundle) {
+        for (int i = mConnectionCallbacks.size() - 1; i >= 0; --i) {
+            mConnectionCallbacks.get(i).startAssistant(bundle);
+        }
+    }
+
+    public void notifyAssistantVisibilityChanged(float visibility) {
+        try {
+            if (mOverviewProxy != null) {
+                mOverviewProxy.onAssistantVisibilityChanged(visibility);
+            }
+        } catch (RemoteException e) {
+            Log.e(TAG_OPS, "Failed to call onAssistantVisibilityChanged()", e);
+        }
+    }
+
     private void updateEnabledState() {
         mIsEnabled = mContext.getPackageManager().resolveServiceAsUser(mQuickStepIntent,
-                MATCH_DIRECT_BOOT_UNAWARE,
+                MATCH_SYSTEM_ONLY,
                 ActivityManagerWrapper.getInstance().getCurrentUserId()) != null;
-    }
-
-    private boolean getSwipeUpDefaultValue() {
-        return mContext.getResources()
-                .getBoolean(com.android.internal.R.bool.config_swipe_up_gesture_default);
-    }
-
-    private boolean getSwipeUpSettingAvailable() {
-        return mContext.getResources()
-                .getBoolean(com.android.internal.R.bool.config_swipe_up_gesture_setting_available);
-    }
-
-    private boolean getSwipeUpEnabledFromSettings(boolean defaultValue) {
-        return Settings.Secure.getInt(mContext.getContentResolver(),
-                Settings.Secure.SWIPE_UP_TO_SWITCH_APPS_ENABLED, defaultValue ? 1 : 0) == 1;
     }
 
     @Override
@@ -557,11 +657,8 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
 
         pw.print("  quickStepIntent="); pw.println(mQuickStepIntent);
         pw.print("  quickStepIntentResolved="); pw.println(isEnabled());
-
-        final boolean swipeUpDefaultValue = getSwipeUpDefaultValue();
-        final boolean swipeUpEnabled = getSwipeUpEnabledFromSettings(swipeUpDefaultValue);
-        pw.print("  swipeUpSetting="); pw.println(swipeUpEnabled);
-        pw.print("  swipeUpSettingDefault="); pw.println(swipeUpDefaultValue);
+        pw.print("  navBarMode=");
+        pw.println(QuickStepContract.getCurrentInteractionMode(mContext));
     }
 
     public interface OverviewProxyListener {
@@ -571,5 +668,7 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
         default void onOverviewShown(boolean fromHome) {}
         default void onQuickScrubStarted() {}
         default void onBackButtonAlphaChanged(float alpha, boolean animate) {}
+        default void onAssistantProgress(@FloatRange(from = 0.0, to = 1.0) float progress) {}
+        default void startAssistant(Bundle bundle) {}
     }
 }

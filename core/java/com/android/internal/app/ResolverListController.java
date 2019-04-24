@@ -25,19 +25,17 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
-import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.os.RemoteException;
 import android.util.Log;
-import com.android.internal.annotations.GuardedBy;
+
 import com.android.internal.annotations.VisibleForTesting;
 
-import java.lang.InterruptedException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.concurrent.CountDownLatch;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 
 /**
  * A helper for the ResolverActivity that exposes methods to retrieve, filter and sort its list of
@@ -56,7 +54,7 @@ public class ResolverListController {
     private static final String TAG = "ResolverListController";
     private static final boolean DEBUG = false;
 
-    private ResolverComparator mResolverComparator;
+    private AbstractResolverComparator mResolverComparator;
     private boolean isComputed = false;
 
     public ResolverListController(
@@ -71,7 +69,8 @@ public class ResolverListController {
         mTargetIntent = targetIntent;
         mReferrerPackage = referrerPackage;
         mResolverComparator =
-                new ResolverComparator(mContext, mTargetIntent, mReferrerPackage, null);
+                new ResolverRankerServiceResolverComparator(
+                    mContext, mTargetIntent, mReferrerPackage, null);
     }
 
     @VisibleForTesting
@@ -147,18 +146,12 @@ public class ResolverListController {
                         newInfo.activityInfo.packageName, newInfo.activityInfo.name);
                 final ResolverActivity.ResolvedComponentInfo rci =
                         new ResolverActivity.ResolvedComponentInfo(name, intent, newInfo);
-                rci.setPinned(isComponentPinned(name));
                 into.add(rci);
             }
         }
     }
 
     // Filter out any activities that the launched uid does not have permission for.
-    //
-    // Also filter out those that are suspended because they couldn't be started. We don't do this
-    // when we have an explicit list of resolved activities, because that only happens when
-    // we are being subclassed, so we can safely launch whatever they gave us.
-    //
     // To preserve the inputList, optionally will return the original list if any modification has
     // been made.
     @VisibleForTesting
@@ -172,9 +165,8 @@ public class ResolverListController {
             int granted = ActivityManager.checkComponentPermission(
                     ai.permission, mLaunchedFromUid,
                     ai.applicationInfo.uid, ai.exported);
-            boolean suspended = (ai.applicationInfo.flags
-                    & ApplicationInfo.FLAG_SUSPENDED) != 0;
-            if (granted != PackageManager.PERMISSION_GRANTED || suspended
+
+            if (granted != PackageManager.PERMISSION_GRANTED
                     || isComponentFiltered(ai.getComponentName())) {
                 // Access not allowed! We're about to filter an item,
                 // so modify the unfiltered version if it hasn't already been modified.
@@ -223,7 +215,7 @@ public class ResolverListController {
         return listToReturn;
     }
 
-    private class ComputeCallback implements ResolverComparator.AfterCompute {
+    private class ComputeCallback implements AbstractResolverComparator.AfterCompute {
 
         private CountDownLatch mFinishComputeSignal;
 
@@ -254,6 +246,7 @@ public class ResolverListController {
                 isComputed = true;
             }
             Collections.sort(inputList, mResolverComparator);
+
             long afterRank = System.currentTimeMillis();
             if (DEBUG) {
                 Log.d(TAG, "Time Cost: " + Long.toString(afterRank - beforeRank));
@@ -263,15 +256,12 @@ public class ResolverListController {
         }
     }
 
+
     private static boolean isSameResolvedComponent(ResolveInfo a,
             ResolverActivity.ResolvedComponentInfo b) {
         final ActivityInfo ai = a.activityInfo;
         return ai.packageName.equals(b.name.getPackageName())
                 && ai.name.equals(b.name.getClassName());
-    }
-
-    boolean isComponentPinned(ComponentName name) {
-        return false;
     }
 
     boolean isComponentFiltered(ComponentName componentName) {

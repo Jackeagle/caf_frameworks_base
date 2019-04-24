@@ -118,7 +118,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.ToBooleanFunction;
 import com.android.server.AttributeCache;
 import com.android.server.LocalServices;
-import com.android.server.display.ColorDisplayService;
+import com.android.server.display.color.ColorDisplayService;
 import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.policy.WindowManagerPolicy.StartingSurface;
 import com.android.server.wm.RemoteAnimationController.RemoteAnimationRecord;
@@ -153,7 +153,6 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
 
     /** @see WindowContainer#fillsParent() */
     private boolean mFillsParent;
-    boolean layoutConfigChanges;
     boolean mShowForAllUsers;
     int mTargetSdk;
 
@@ -238,6 +237,17 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
 
     ArrayDeque<Rect> mFrozenBounds = new ArrayDeque<>();
     ArrayDeque<Configuration> mFrozenMergedConfig = new ArrayDeque<>();
+
+    /**
+     * The scale to fit at least one side of the activity to its parent. If the activity uses
+     * 1920x1080, and the actually size on the screen is 960x540, then the scale is 0.5.
+     */
+    private float mSizeCompatScale = 1f;
+    /**
+     * The bounds in global coordinates for activity in size compatibility mode.
+     * @see ActivityRecord#inSizeCompatMode
+     */
+    private Rect mSizeCompatBounds;
 
     private boolean mDisablePreviewScreenshots;
 
@@ -326,7 +336,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
     AppWindowToken(WindowManagerService service, IApplicationToken token,
             ComponentName activityComponent, boolean voiceInteraction, DisplayContent dc,
             long inputDispatchingTimeoutNanos, boolean fullscreen, boolean showForAllUsers,
-            int targetSdk, int orientation, int rotationAnimationHint, int configChanges,
+            int targetSdk, int orientation, int rotationAnimationHint,
             boolean launchTaskBehind, boolean alwaysFocusable,
             ActivityRecord activityRecord) {
         this(service, token, activityComponent, voiceInteraction, dc, fullscreen);
@@ -337,7 +347,6 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         mShowForAllUsers = showForAllUsers;
         mTargetSdk = targetSdk;
         mOrientation = orientation;
-        layoutConfigChanges = (configChanges & (CONFIG_SCREEN_SIZE | CONFIG_ORIENTATION)) != 0;
         mLaunchTaskBehind = launchTaskBehind;
         mAlwaysFocusable = alwaysFocusable;
         mRotationAnimationHint = rotationAnimationHint;
@@ -571,6 +580,8 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
                     }
                 }
             }
+            // Changes in opening apps and closing apps may cause orientation change.
+            reportDescendantOrientationChangeIfNeeded();
             return;
         }
 
@@ -718,9 +729,29 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
                 }
                 SurfaceControl.closeTransaction();
             }
+
+            // Visibility changes may cause orientation request change.
+            reportDescendantOrientationChangeIfNeeded();
         }
 
         return delayed;
+    }
+
+    private void reportDescendantOrientationChangeIfNeeded() {
+        // Orientation request is exposed only when we're visible. Therefore visibility change
+        // will change requested orientation. Notify upward the hierarchy ladder to adjust
+        // configuration. This is important to cases where activities with incompatible
+        // orientations launch, or user goes back from an activity of bi-orientation to an
+        // activity with specified orientation.
+        if (mActivityRecord.getRequestedConfigurationOrientation() == getConfiguration().orientation
+                || getOrientationIgnoreVisibility() == SCREEN_ORIENTATION_UNSET) {
+            return;
+        }
+
+        final IBinder freezeToken =
+                mActivityRecord.mayFreezeScreenLocked(mActivityRecord.app)
+                        ? mActivityRecord.appToken : null;
+        onDescendantOrientationChanged(freezeToken, mActivityRecord);
     }
 
     /**
@@ -883,6 +914,10 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
                    + " displayId=" + dc.getDisplayId());
             dc.setFocusedApp(null);
             mWmService.updateFocusedWindowLocked(UPDATE_FOCUS_NORMAL, true /*updateInputWindows*/);
+        }
+        if (mLetterbox != null) {
+            mLetterbox.destroy();
+            mLetterbox = null;
         }
 
         if (!delayed) {
@@ -1275,7 +1310,19 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
     void onDisplayChanged(DisplayContent dc) {
         DisplayContent prevDc = mDisplayContent;
         super.onDisplayChanged(dc);
-        if (prevDc != null && prevDc.mFocusedApp == this) {
+        if (prevDc == null) {
+            return;
+        }
+        if (prevDc.mChangingApps.contains(this)) {
+            // This gets called *after* the AppWindowToken has been reparented to the new display.
+            // That reparenting resulted in this window changing modes (eg. FREEFORM -> FULLSCREEN),
+            // so this token is now "frozen" while waiting for the animation to start on prevDc
+            // (which will be cancelled since the window is no-longer a child). However, since this
+            // is no longer a child of prevDc, this won't be notified of the cancelled animation,
+            // so we need to cancel the change transition here.
+            clearChangeLeash(getPendingTransaction(), true /* cancel */);
+        }
+        if (prevDc.mFocusedApp == this) {
             prevDc.setFocusedApp(null);
             final TaskStack stack = dc.getTopStack();
             if (stack != null) {
@@ -1284,6 +1331,10 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
                     dc.setFocusedApp(this);
                 }
             }
+        }
+
+        if (prevDc != mDisplayContent && mLetterbox != null) {
+            mLetterbox.onMovedToDisplay(mDisplayContent.getDisplayId());
         }
     }
 
@@ -1543,11 +1594,53 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         return mOrientation;
     }
 
+    /** @return {@code true} if the compatibility bounds is taking effect. */
+    boolean inSizeCompatMode() {
+        return mSizeCompatBounds != null;
+    }
+
+    @Override
+    float getSizeCompatScale() {
+        return inSizeCompatMode() ? mSizeCompatScale : super.getSizeCompatScale();
+    }
+
+    /**
+     * @return Non-empty bounds if the activity has override bounds.
+     * @see ActivityRecord#resolveOverrideConfiguration(Configuration)
+     */
+    Rect getResolvedOverrideBounds() {
+        // Get bounds from resolved override configuration because it is computed with orientation.
+        return getResolvedOverrideConfiguration().windowConfiguration.getBounds();
+    }
+
     @Override
     public void onConfigurationChanged(Configuration newParentConfig) {
         final int prevWinMode = getWindowingMode();
         mTmpPrevBounds.set(getBounds());
         super.onConfigurationChanged(newParentConfig);
+
+        final Task task = getTask();
+        final Rect overrideBounds = getResolvedOverrideBounds();
+        if (task != null && !overrideBounds.isEmpty()
+                // If the changes come from change-listener, the incoming parent configuration is
+                // still the old one. Make sure their orientations are the same to reduce computing
+                // the compatibility bounds for the intermediate state.
+                && (task.mTaskRecord == null || task.mTaskRecord
+                        .getConfiguration().orientation == newParentConfig.orientation)) {
+            final Rect taskBounds = task.getBounds();
+            // Since we only center the activity horizontally, if only the fixed height is smaller
+            // than its container, the override bounds don't need to take effect.
+            if ((overrideBounds.width() != taskBounds.width()
+                    || overrideBounds.height() > taskBounds.height())) {
+                calculateCompatBoundsTransformation(newParentConfig);
+                updateSurfacePosition();
+            } else if (mSizeCompatBounds != null) {
+                mSizeCompatBounds = null;
+                mSizeCompatScale = 1f;
+                updateSurfacePosition();
+            }
+        }
+
         final int winMode = getWindowingMode();
 
         if (prevWinMode == winMode) {
@@ -1584,7 +1677,10 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
     }
 
     private boolean shouldStartChangeTransition(int prevWinMode, int newWinMode) {
-        if (!isVisible() || getDisplayContent().mAppTransition.isTransitionSet()) {
+        if (mWmService.mDisableTransitionAnimation
+                || !isVisible()
+                || getDisplayContent().mAppTransition.isTransitionSet()
+                || getSurfaceControl() == null) {
             return false;
         }
         // Only do an animation into and out-of freeform mode for now. Other mode
@@ -1642,18 +1738,71 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
             final ActivityManager.TaskSnapshot snapshot = snapshotCtrl.getSnapshot(
                     getTask().mTaskId, getTask().mUserId, false /* restoreFromDisk */,
                     false /* reducedResolution */);
-            mThumbnail = new AppWindowThumbnail(t, this, snapshot.getSnapshot(),
-                    true /* relative */);
+            if (snapshot != null) {
+                mThumbnail = new AppWindowThumbnail(t, this, snapshot.getSnapshot(),
+                        true /* relative */);
+            }
         }
     }
 
     boolean isInChangeTransition() {
-        return mTransitChangeLeash != null || isChangeTransition(mTransit);
+        return mTransitChangeLeash != null || AppTransition.isChangeTransit(mTransit);
     }
 
     @VisibleForTesting
     AppWindowThumbnail getThumbnail() {
         return mThumbnail;
+    }
+
+    /**
+     * Calculates the scale and offset to horizontal center the size compatibility bounds into the
+     * region which is available to application.
+     */
+    private void calculateCompatBoundsTransformation(Configuration newParentConfig) {
+        final Rect parentAppBounds = newParentConfig.windowConfiguration.getAppBounds();
+        final Rect viewportBounds = parentAppBounds != null
+                ? parentAppBounds : newParentConfig.windowConfiguration.getBounds();
+        final Rect appBounds = getWindowConfiguration().getAppBounds();
+        final Rect contentBounds = appBounds != null ? appBounds : getResolvedOverrideBounds();
+        final float contentW = contentBounds.width();
+        final float contentH = contentBounds.height();
+        final float viewportW = viewportBounds.width();
+        final float viewportH = viewportBounds.height();
+        // Only allow to scale down.
+        mSizeCompatScale = (contentW <= viewportW && contentH <= viewportH)
+                ? 1 : Math.min(viewportW / contentW, viewportH / contentH);
+        final int offsetX = (int) ((viewportW - contentW * mSizeCompatScale + 1) * 0.5f)
+                + viewportBounds.left;
+
+        if (mSizeCompatBounds == null) {
+            mSizeCompatBounds = new Rect();
+        }
+        mSizeCompatBounds.set(contentBounds);
+        mSizeCompatBounds.offsetTo(0, 0);
+        mSizeCompatBounds.scale(mSizeCompatScale);
+        // The decor inset is included in height.
+        mSizeCompatBounds.bottom += viewportBounds.top;
+        mSizeCompatBounds.left += offsetX;
+        mSizeCompatBounds.right += offsetX;
+    }
+
+    @Override
+    public Rect getBounds() {
+        if (mSizeCompatBounds != null) {
+            return mSizeCompatBounds;
+        }
+        return super.getBounds();
+    }
+
+    @Override
+    public boolean matchParentBounds() {
+        if (super.matchParentBounds()) {
+            return true;
+        }
+        // An activity in size compatibility mode may have override bounds which equals to its
+        // parent bounds, so the exact bounds should also be checked.
+        final WindowContainer parent = getParent();
+        return parent == null || parent.getBounds().equals(getResolvedOverrideBounds());
     }
 
     @Override
@@ -1825,13 +1974,21 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         final boolean surfaceReady = w.isDrawnLw()  // Regular case
                 || w.mWinAnimator.mSurfaceDestroyDeferred  // The preserved surface is still ready.
                 || w.isDragResizeChanged();  // Waiting for relayoutWindow to call preserveSurface.
-        final boolean needsLetterbox = w.isLetterboxedAppWindow() && fillsParent() && surfaceReady;
+        final boolean needsLetterbox = surfaceReady && w.isLetterboxedAppWindow() && fillsParent();
         if (needsLetterbox) {
             if (mLetterbox == null) {
                 mLetterbox = new Letterbox(() -> makeChildSurface(null));
+                mLetterbox.attachInput(w);
             }
             getPosition(mTmpPoint);
-            mLetterbox.layout(getParent().getBounds(), w.getFrameLw(), mTmpPoint);
+            // Get the bounds of the "space-to-fill". We union the Task and the Stack bounds here
+            // to handle both split window (where task-bounds can be larger) and orientation
+            // letterbox (where the task is letterboxed within stack).
+            Rect spaceToFill = getTask().getBounds();
+            if (getStack() != null) {
+                spaceToFill.union(getStack().getBounds());
+            }
+            mLetterbox.layout(spaceToFill, w.getFrameLw(), mTmpPoint);
         } else if (mLetterbox != null) {
             mLetterbox.hide();
         }
@@ -2281,6 +2438,12 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
                 getWindowingMode() == WINDOWING_MODE_SPLIT_SCREEN_PRIMARY;
         final boolean allowSplitScreenPrimaryAnimation = transit != TRANSIT_WALLPAPER_OPEN;
 
+        // Don't animate when the task runs recents animation.
+        final RecentsAnimationController controller = mWmService.getRecentsAnimationController();
+        if (controller != null && controller.isAnimatingTask(getTask())) {
+            return false;
+        }
+
         // We animate always if it's not split screen primary, and only some special cases in split
         // screen primary because it causes issues with stack clipping when we run an un-minimize
         // animation at the same time.
@@ -2300,30 +2463,6 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         return boundsLayer;
     }
 
-    /** Get position and crop region of animation. */
-    @VisibleForTesting
-    void getAnimationBounds(Point outPosition, Rect outBounds) {
-        outPosition.set(0, 0);
-        outBounds.setEmpty();
-
-        final TaskStack stack = getStack();
-        final Task task = getTask();
-        if (task != null && task.inFreeformWindowingMode()) {
-            task.getRelativeDisplayedPosition(outPosition);
-        } else if (stack != null) {
-            stack.getRelativeDisplayedPosition(outPosition);
-        }
-
-        // Always use stack bounds in order to have the ability to animate outside the task region.
-        // It also needs to be consistent when {@link #mNeedsAnimationBoundsLayer} is set that crops
-        // according to the bounds.
-        if (stack != null) {
-            stack.getBounds(outBounds);
-        }
-        // We have the relative position so the local position can be removed from bounds.
-        outBounds.offsetTo(0, 0);
-    }
-
     @Override
     Rect getDisplayedBounds() {
         final Task task = getTask();
@@ -2334,10 +2473,6 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
             }
         }
         return getBounds();
-    }
-
-    private static boolean isChangeTransition(int transit) {
-        return transit == TRANSIT_TASK_CHANGE_WINDOWING_MODE;
     }
 
     boolean applyAnimationLocked(WindowManager.LayoutParams lp, int transit, boolean enter,
@@ -2359,9 +2494,15 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         if (okToAnimate()) {
             final AnimationAdapter adapter;
             AnimationAdapter thumbnailAdapter = null;
-            getAnimationBounds(mTmpPoint, mTmpRect);
 
-            boolean isChanging = isChangeTransition(transit) && enter;
+            // Separate position and size for use in animators. Use task-bounds for now so
+            // that activity-level letterbox (maxAspectRatio) is included in the animation.
+            mTmpRect.set(getTask() != null ? getTask().getBounds() : getBounds());
+            mTmpPoint.set(mTmpRect.left, mTmpRect.top);
+            mTmpRect.offsetTo(0, 0);
+
+            final boolean isChanging = AppTransition.isChangeTransit(transit) && enter
+                    && getDisplayContent().mChangingApps.contains(this);
 
             // Delaying animation start isn't compatible with remote animations at all.
             if (getDisplayContent().mAppTransition.getRemoteAnimationController() != null
@@ -2400,7 +2541,8 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
                             new WindowAnimationSpec(a, mTmpPoint, mTmpRect,
                                     getDisplayContent().mAppTransition.canSkipFirstFrame(),
                                     appStackClipMode,
-                                    true /* isAppAnimation */),
+                                    true /* isAppAnimation */,
+                                    mWmService.mWindowCornerRadius),
                             mWmService.mSurfaceAnimationRunner);
                     if (a.getZAdjustment() == Animation.ZORDER_TOP) {
                         mNeedsZBoost = true;
@@ -2504,7 +2646,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
     public void onAnimationLeashDestroyed(Transaction t) {
         super.onAnimationLeashDestroyed(t);
         if (mAnimationBoundsLayer != null) {
-            t.reparent(mAnimationBoundsLayer, null);
+            t.remove(mAnimationBoundsLayer);
             mAnimationBoundsLayer = null;
         }
 
@@ -2561,9 +2703,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
             return;
         } else if (mTransitChangeLeash != null) {
             // unparent mTransitChangeLeash for clean-up
-            t.hide(mTransitChangeLeash);
-            t.reparent(mTransitChangeLeash, null);
-            mTransitChangeLeash = null;
+            clearChangeLeash(t, false /* cancel */);
         }
 
         if (mAnimatingAppWindowTokenRegistry != null) {
@@ -2573,15 +2713,20 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         // If the animation needs to be cropped then an animation bounds layer is created as a child
         // of the pinned stack or animation layer. The leash is then reparented to this new layer.
         if (mNeedsAnimationBoundsLayer) {
-            final TaskStack stack = getStack();
-            if (stack == null) {
-                return;
+            mTmpRect.setEmpty();
+            final Task task = getTask();
+            if (getDisplayContent().mAppTransitionController.isTransitWithinTask(
+                    getTransit(), task)) {
+                task.getBounds(mTmpRect);
+            } else {
+                final TaskStack stack = getStack();
+                if (stack == null) {
+                    return;
+                }
+                // Set clip rect to stack bounds.
+                stack.getBounds(mTmpRect);
             }
             mAnimationBoundsLayer = createAnimationBoundsLayer(t);
-
-            // Set clip rect to stack bounds.
-            mTmpRect.setEmpty();
-            stack.getBounds(mTmpRect);
 
             // Crop to stack bounds.
             t.setWindowCrop(mAnimationBoundsLayer, mTmpRect);
@@ -2637,6 +2782,8 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
 
         getDisplayContent().mAppTransition.notifyAppTransitionFinishedLocked(token);
         scheduleAnimation();
+
+        mActivityRecord.onAnimationFinished();
     }
 
     @Override
@@ -2659,15 +2806,36 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         return super.isSelfAnimating();
     }
 
+    /**
+     * @param cancel {@code true} if clearing the leash due to cancelling instead of transferring
+     *                            to another leash.
+     */
+    private void clearChangeLeash(Transaction t, boolean cancel) {
+        if (mTransitChangeLeash == null) {
+            return;
+        }
+        if (cancel) {
+            clearThumbnail();
+            SurfaceControl sc = getSurfaceControl();
+            SurfaceControl parentSc = getParentSurfaceControl();
+            // Don't reparent if surface is getting destroyed
+            if (parentSc != null && sc != null) {
+                t.reparent(sc, getParentSurfaceControl());
+            }
+        }
+        t.hide(mTransitChangeLeash);
+        t.reparent(mTransitChangeLeash, null);
+        mTransitChangeLeash = null;
+        if (cancel) {
+            onAnimationLeashDestroyed(t);
+        }
+    }
+
     @Override
     void cancelAnimation() {
         cancelAnimationOnly();
         clearThumbnail();
-        if (mTransitChangeLeash != null) {
-            getPendingTransaction().hide(mTransitChangeLeash);
-            getPendingTransaction().reparent(mTransitChangeLeash, null);
-            mTransitChangeLeash = null;
-        }
+        clearChangeLeash(getPendingTransaction(), true /* cancel */);
     }
 
     /**
@@ -2830,6 +2998,10 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         if (mPendingRelaunchCount != 0) {
             pw.print(prefix); pw.print("mPendingRelaunchCount="); pw.println(mPendingRelaunchCount);
         }
+        if (mSizeCompatScale != 1f || mSizeCompatBounds != null) {
+            pw.println(prefix + "mSizeCompatScale=" + mSizeCompatScale + " mSizeCompatBounds="
+                    + mSizeCompatBounds);
+        }
         if (mRemovingFromDisplay) {
             pw.println(prefix + "mRemovingFromDisplay=" + mRemovingFromDisplay);
         }
@@ -2885,10 +3057,16 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
 
     @CallSuper
     @Override
-    public void writeToProto(ProtoOutputStream proto, long fieldId, boolean trim) {
+    public void writeToProto(ProtoOutputStream proto, long fieldId,
+            @WindowTraceLogLevel int logLevel) {
+        // Critical log level logs only visible elements to mitigate performance overheard
+        if (logLevel == WindowTraceLogLevel.CRITICAL && !isVisible()) {
+            return;
+        }
+
         final long token = proto.start(fieldId);
         writeNameToProto(proto, NAME);
-        super.writeToProto(proto, WINDOW_TOKEN, trim);
+        super.writeToProto(proto, WINDOW_TOKEN, logLevel);
         proto.write(LAST_SURFACE_SHOWING, mLastSurfaceShowing);
         proto.write(IS_WAITING_FOR_TRANSITION_START, isWaitingForTransitionStart());
         proto.write(IS_REALLY_ANIMATING, isReallyAnimating());
@@ -2907,7 +3085,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         proto.write(ALL_DRAWN, allDrawn);
         proto.write(LAST_ALL_DRAWN, mLastAllDrawn);
         proto.write(REMOVED, removed);
-        if (startingWindow != null){
+        if (startingWindow != null) {
             startingWindow.writeIdentifierToProto(proto, STARTING_WINDOW);
         }
         proto.write(STARTING_DISPLAYED, startingDisplayed);
@@ -2952,8 +3130,17 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         }
     }
 
+    /** Gets the inner bounds of letterbox. The bounds will be empty if there is no letterbox. */
+    void getLetterboxInnerBounds(Rect outBounds) {
+        if (mLetterbox != null) {
+            outBounds.set(mLetterbox.getInnerFrame());
+        } else {
+            outBounds.setEmpty();
+        }
+    }
+
     /**
-     * @eturn true if there is a letterbox and any part of that letterbox overlaps with
+     * @return {@code true} if there is a letterbox and any part of that letterbox overlaps with
      * the given {@code rect}.
      */
     boolean isLetterboxOverlappingWith(Rect rect) {
@@ -2997,7 +3184,9 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
     void removeFromPendingTransition() {
         if (isWaitingForTransitionStart() && mDisplayContent != null) {
             mDisplayContent.mOpeningApps.remove(this);
-            mDisplayContent.mChangingApps.remove(this);
+            if (mDisplayContent.mChangingApps.remove(this)) {
+                clearChangeLeash(getPendingTransaction(), true /* cancel */);
+            }
             mDisplayContent.mClosingApps.remove(this);
         }
     }

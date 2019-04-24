@@ -33,7 +33,7 @@ import android.graphics.fonts.FontStyle;
 import android.graphics.fonts.FontVariationAxis;
 import android.graphics.fonts.SystemFonts;
 import android.os.Build;
-import android.os.Build.VERSION_CODES;
+import android.os.ParcelFileDescriptor;
 import android.provider.FontRequest;
 import android.provider.FontsContract;
 import android.text.FontConfig;
@@ -47,7 +47,6 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.Preconditions;
 
 import dalvik.annotation.optimization.CriticalNative;
-import dalvik.system.VMRuntime;
 
 import libcore.util.NativeAllocationRegistry;
 
@@ -74,8 +73,9 @@ public class Typeface {
 
     private static String TAG = "Typeface";
 
-    private static final NativeAllocationRegistry sRegistry = new NativeAllocationRegistry(
-            Typeface.class.getClassLoader(), nativeGetReleaseFunc(), 64);
+    private static final NativeAllocationRegistry sRegistry =
+            NativeAllocationRegistry.createMalloced(
+            Typeface.class.getClassLoader(), nativeGetReleaseFunc());
 
     /** The default NORMAL typeface object */
     public static final Typeface DEFAULT;
@@ -92,7 +92,13 @@ public class Typeface {
     /** The NORMAL style of the default monospace typeface. */
     public static final Typeface MONOSPACE;
 
-    @UnsupportedAppUsage
+    /**
+     * The default {@link Typeface}s for different text styles.
+     * Call {@link #defaultFromStyle(int)} to get the default typeface for the given text style.
+     * It shouldn't be changed for app wide typeface settings. Please use theme and font XML for
+     * the same purpose.
+     */
+    @UnsupportedAppUsage(trackingBug = 123769446)
     static Typeface[] sDefaults;
 
     /**
@@ -121,11 +127,19 @@ public class Typeface {
     static Typeface sDefaultTypeface;
 
     // Following two fields are not used but left for hiddenapi private list
-    @UnsupportedAppUsage
+    /**
+     * sSystemFontMap is read only and unmodifiable.
+     * Use public API {@link #create(String, int)} to get the typeface for given familyName.
+     */
+    @UnsupportedAppUsage(trackingBug = 123769347)
     static final Map<String, Typeface> sSystemFontMap;
 
     // We cannot support sSystemFallbackMap since we will migrate to public FontFamily API.
-    @UnsupportedAppUsage
+    /**
+     * @deprecated Use {@link android.graphics.fonts.FontFamily} instead.
+     */
+    @UnsupportedAppUsage(trackingBug = 123768928)
+    @Deprecated
     static final Map<String, android.graphics.FontFamily[]> sSystemFallbackMap =
             Collections.emptyMap();
 
@@ -165,7 +179,12 @@ public class Typeface {
     private int[] mSupportedAxes;
     private static final int[] EMPTY_AXES = {};
 
-    @UnsupportedAppUsage
+    /**
+     * Please use font in xml and also your application global theme to change the default Typeface.
+     * android:textViewStyle and its attribute android:textAppearance can be used in order to change
+     * typeface and other text related properties.
+     */
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     private static void setDefault(Typeface t) {
         sDefaultTypeface = t;
         nativeSetDefault(t.native_instance);
@@ -245,16 +264,7 @@ public class Typeface {
                 if (familyBuilder == null) {
                     familyBuilder = new FontFamily.Builder(fontBuilder.build());
                 } else {
-                    try {
-                        familyBuilder.addFont(fontBuilder.build());
-                    } catch (IllegalArgumentException e) {
-                        if (VMRuntime.getRuntime().getTargetSdkVersion() <= VERSION_CODES.P) {
-                            // Surpress the IllegalArgumentException for keeping the backward
-                            // compatibility.
-                            continue;
-                        }
-                        throw e;
-                    }
+                    familyBuilder.addFont(fontBuilder.build());
                 }
             }
             if (familyBuilder == null) {
@@ -276,6 +286,10 @@ public class Typeface {
             typeface = new Typeface.CustomFallbackBuilder(family)
                     .setStyle(bestFont.getStyle())
                     .build();
+        } catch (IllegalArgumentException e) {
+            // To be a compatible behavior with API28 or before, catch IllegalArgumentExcetpion
+            // thrown by native code and returns null.
+            return null;
         } catch (IOException e) {
             typeface = Typeface.DEFAULT;
         }
@@ -349,7 +363,7 @@ public class Typeface {
         private final AssetManager mAssetManager;
         private final String mPath;
 
-        private final Font.Builder mFontBuilder;
+        private final @Nullable Font.Builder mFontBuilder;
 
         private String mFallbackFamilyName;
 
@@ -376,7 +390,16 @@ public class Typeface {
          * @param fd The file descriptor. The passed fd must be mmap-able.
          */
         public Builder(@NonNull FileDescriptor fd) {
-            mFontBuilder = new Font.Builder(fd);
+            Font.Builder builder;
+            try {
+                builder = new Font.Builder(ParcelFileDescriptor.dup(fd));
+            } catch (IOException e) {
+                // We cannot tell the error to developer at this moment since we cannot change the
+                // public API signature. Instead, silently fallbacks to system fallback in the build
+                // method as the same as other error cases.
+                builder = null;
+            }
+            mFontBuilder = builder;
             mAssetManager = null;
             mPath = null;
         }
@@ -566,6 +589,9 @@ public class Typeface {
          * @return Newly created Typeface. May return null if some parameters are invalid.
          */
         public Typeface build() {
+            if (mFontBuilder == null) {
+                return resolveFallbackTypeface();
+            }
             try {
                 final Font font = mFontBuilder.build();
                 final String key = mAssetManager == null ? null : createAssetUid(
@@ -668,7 +694,7 @@ public class Typeface {
      * </pre>
      * </p>
      */
-    public static class CustomFallbackBuilder {
+    public static final class CustomFallbackBuilder {
         private static final int MAX_CUSTOM_FALLBACK = 64;
         private final ArrayList<FontFamily> mFamilies = new ArrayList<>();
         private String mFallbackName = null;
@@ -709,7 +735,7 @@ public class Typeface {
          * @param familyName a family name to be used for fallback if the provided fonts can not be
          *                   used
          */
-        public CustomFallbackBuilder setSystemFallback(@NonNull String familyName) {
+        public @NonNull CustomFallbackBuilder setSystemFallback(@NonNull String familyName) {
             Preconditions.checkNotNull(familyName);
             mFallbackName = familyName;
             return this;
@@ -724,7 +750,7 @@ public class Typeface {
          *
          * @param style a font style
          */
-        public CustomFallbackBuilder setStyle(@NonNull FontStyle style) {
+        public @NonNull CustomFallbackBuilder setStyle(@NonNull FontStyle style) {
             mStyle = style;
             return this;
         }
@@ -739,7 +765,7 @@ public class Typeface {
          * @param family a fallback family
          * @throws IllegalArgumentException if you give more than 64 custom fallback families
          */
-        public CustomFallbackBuilder addCustomFallback(@NonNull FontFamily family) {
+        public @NonNull CustomFallbackBuilder addCustomFallback(@NonNull FontFamily family) {
             Preconditions.checkNotNull(family);
             Preconditions.checkArgument(mFamilies.size() < getMaxCustomFallbackCount(),
                     "Custom fallback limit exceeded(" + getMaxCustomFallbackCount() + ")");
@@ -752,7 +778,7 @@ public class Typeface {
          *
          * @return the Typeface object
          */
-        public Typeface build() {
+        public @NonNull Typeface build() {
             final int userFallbackSize = mFamilies.size();
             final FontFamily[] fallback = SystemFonts.getSystemFallback(mFallbackName);
             final long[] ptrArray = new long[fallback.length + userFallbackSize];
@@ -993,7 +1019,7 @@ public class Typeface {
      * @deprecated
      */
     @Deprecated
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(trackingBug = 123768928)
     private static Typeface createFromFamilies(android.graphics.FontFamily[] families) {
         long[] ptrArray = new long[families.length];
         for (int i = 0; i < families.length; i++) {
@@ -1019,9 +1045,11 @@ public class Typeface {
 
     /**
      * This method is used by supportlib-v27.
-     * TODO: Remove private API use in supportlib: http://b/72665240
+     *
+     * @deprecated Use {@link android.graphics.fonts.FontFamily} instead.
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(trackingBug = 123768395)
+    @Deprecated
     private static Typeface createFromFamiliesWithDefault(
             android.graphics.FontFamily[] families, int weight, int italic) {
         return createFromFamiliesWithDefault(families, DEFAULT_FAMILY, weight, italic);
@@ -1039,8 +1067,11 @@ public class Typeface {
      *               the first family's font is used. If the first family has multiple fonts, the
      *               closest to the regular weight and upright font is used.
      * @param families array of font families
+     *
+     * @deprecated Use {@link android.graphics.fonts.FontFamily} instead.
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(trackingBug = 123768928)
+    @Deprecated
     private static Typeface createFromFamiliesWithDefault(android.graphics.FontFamily[] families,
                 String fallbackName, int weight, int italic) {
         android.graphics.fonts.FontFamily[] fallback = SystemFonts.getSystemFallback(fallbackName);

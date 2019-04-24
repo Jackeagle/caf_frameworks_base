@@ -47,7 +47,11 @@ interface IPackageInstaller {
     void registerCallback(IPackageInstallerCallback callback, int userId);
     void unregisterCallback(IPackageInstallerCallback callback);
 
+    @UnsupportedAppUsage
     void uninstall(in VersionedPackage versionedPackage, String callerPackageName, int flags,
+            in IntentSender statusReceiver, int userId);
+
+    void installExistingPackage(String packageName, int installFlags, int installReason,
             in IntentSender statusReceiver, int userId);
 
     void setPermissionsResult(int sessionId, boolean accepted);

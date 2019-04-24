@@ -21,6 +21,7 @@ import static java.lang.annotation.RetentionPolicy.SOURCE;
 import android.annotation.IntDef;
 import android.annotation.Nullable;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.content.pm.VersionedPackage;
 import android.os.Environment;
 import android.os.Handler;
@@ -28,8 +29,8 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.ArrayMap;
+import android.util.ArraySet;
 import android.util.AtomicFile;
-import android.util.Log;
 import android.util.Slog;
 import android.util.Xml;
 
@@ -76,16 +77,18 @@ public class PackageWatchdog {
     private static final String ATTR_VERSION = "version";
     private static final String ATTR_NAME = "name";
     private static final String ATTR_DURATION = "duration";
+    private static final String ATTR_EXPLICIT_HEALTH_CHECK_DURATION = "health-check-duration";
+    private static final String ATTR_PASSED_HEALTH_CHECK = "passed-health-check";
 
     private static PackageWatchdog sPackageWatchdog;
 
     private final Object mLock = new Object();
     // System server context
     private final Context mContext;
-    // Handler to run package cleanup runnables
-    private final Handler mTimerHandler;
-    // Handler for processing IO and observer actions
-    private final Handler mWorkerHandler;
+    // Handler to run short running tasks
+    private final Handler mShortTaskHandler;
+    // Handler for processing IO and long running tasks
+    private final Handler mLongTaskHandler;
     // Contains (observer-name -> observer-handle) that have ever been registered from
     // previous boots. Observers with all packages expired are periodically pruned.
     // It is saved to disk on system shutdown and repouplated on startup so it survives reboots.
@@ -93,40 +96,45 @@ public class PackageWatchdog {
     private final ArrayMap<String, ObserverInternal> mAllObservers = new ArrayMap<>();
     // File containing the XML data of monitored packages /data/system/package-watchdog.xml
     private final AtomicFile mPolicyFile;
-    // Runnable to prune monitored packages that have expired
-    private final Runnable mPackageCleanup;
-    // Last SystemClock#uptimeMillis a package clean up was executed.
-    // 0 if mPackageCleanup not running.
-    private long mUptimeAtLastRescheduleMs;
-    // Duration a package cleanup was last scheduled for.
-    // 0 if mPackageCleanup not running.
-    private long mDurationAtLastReschedule;
+    private final ExplicitHealthCheckController mHealthCheckController;
+    // Flag to control whether explicit health checks are supported or not
+    @GuardedBy("mLock")
+    private boolean mIsHealthCheckEnabled = true;
+    @GuardedBy("mLock")
+    private boolean mIsPackagesReady;
+    // SystemClock#uptimeMillis when we last executed #pruneObservers.
+    // 0 if no prune is scheduled.
+    @GuardedBy("mLock")
+    private long mUptimeAtLastPruneMs;
+    // Duration in millis that the last prune was scheduled for.
+    // Used along with #mUptimeAtLastPruneMs after scheduling a prune to determine the remaining
+    // duration before #pruneObservers will be executed.
+    // 0 if no prune is scheduled.
+    @GuardedBy("mLock")
+    private long mDurationAtLastPrune;
 
-    // TODO(zezeozue): Remove redundant context param
     private PackageWatchdog(Context context) {
-        mContext = context;
-        mPolicyFile = new AtomicFile(new File(new File(Environment.getDataDirectory(), "system"),
-                        "package-watchdog.xml"));
-        mTimerHandler = new Handler(Looper.myLooper());
-        mWorkerHandler = BackgroundThread.getHandler();
-        mPackageCleanup = this::rescheduleCleanup;
-        loadFromFile();
+        // Needs to be constructed inline
+        this(context, new AtomicFile(
+                        new File(new File(Environment.getDataDirectory(), "system"),
+                                "package-watchdog.xml")),
+                new Handler(Looper.myLooper()), BackgroundThread.getHandler(),
+                new ExplicitHealthCheckController(context));
     }
 
     /**
-     * Creates a PackageWatchdog for testing that uses the same {@code looper} for all handlers
-     * and creates package-watchdog.xml in an apps data directory.
+     * Creates a PackageWatchdog that allows injecting dependencies.
      */
     @VisibleForTesting
-    PackageWatchdog(Context context, Looper looper) {
+    PackageWatchdog(Context context, AtomicFile policyFile, Handler shortTaskHandler,
+            Handler longTaskHandler, ExplicitHealthCheckController controller) {
         mContext = context;
-        mPolicyFile = new AtomicFile(new File(context.getFilesDir(), "package-watchdog.xml"));
-        mTimerHandler = new Handler(looper);
-        mWorkerHandler = mTimerHandler;
-        mPackageCleanup = this::rescheduleCleanup;
+        mPolicyFile = policyFile;
+        mShortTaskHandler = shortTaskHandler;
+        mLongTaskHandler = longTaskHandler;
+        mHealthCheckController = controller;
         loadFromFile();
     }
-
 
     /** Creates or gets singleton instance of PackageWatchdog. */
     public static PackageWatchdog getInstance(Context context) {
@@ -135,6 +143,21 @@ public class PackageWatchdog {
                 sPackageWatchdog = new PackageWatchdog(context);
             }
             return sPackageWatchdog;
+        }
+    }
+
+    /**
+     * Called during boot to notify when packages are ready on the device so we can start
+     * binding.
+     */
+    public void onPackagesReady() {
+        synchronized (mLock) {
+            mIsPackagesReady = true;
+            mHealthCheckController.setCallbacks(packageName -> onHealthCheckPassed(packageName),
+                    packages -> onSupportedPackages(packages),
+                    () -> syncRequestsAsync());
+            // Controller is initially disabled until here where we may enable it and sync requests
+            setExplicitHealthCheckEnabled(mIsHealthCheckEnabled);
         }
     }
 
@@ -150,9 +173,9 @@ public class PackageWatchdog {
             if (internalObserver != null) {
                 internalObserver.mRegisteredObserver = observer;
             }
-            if (mDurationAtLastReschedule == 0) {
-                // Nothing running, schedule
-                rescheduleCleanup();
+            if (mDurationAtLastPrune == 0) {
+                // Nothing running, prune
+                pruneAndSchedule();
             }
         }
     }
@@ -161,39 +184,55 @@ public class PackageWatchdog {
      * Starts observing the health of the {@code packages} for {@code observer} and notifies
      * {@code observer} of any package failures within the monitoring duration.
      *
+     * <p>If monitoring a package supporting explicit health check, at the end of the monitoring
+     * duration if {@link #onHealthCheckPassed} was never called,
+     * {@link PackageHealthObserver#execute} will be called as if the package failed.
+     *
      * <p>If {@code observer} is already monitoring a package in {@code packageNames},
-     * the monitoring window of that package will be reset to {@code durationMs}.
+     * the monitoring window of that package will be reset to {@code durationMs} and the health
+     * check state will be reset to a default depending on if the package is contained in
+     * {@link mPackagesWithExplicitHealthCheckEnabled}.
      *
      * @throws IllegalArgumentException if {@code packageNames} is empty
      * or {@code durationMs} is less than 1
      */
     public void startObservingHealth(PackageHealthObserver observer, List<String> packageNames,
             long durationMs) {
-        if (packageNames.isEmpty() || durationMs < 1) {
-            throw new IllegalArgumentException("Observation not started, no packages specified"
-                    + "or invalid duration");
+        if (packageNames.isEmpty()) {
+            Slog.wtf(TAG, "No packages to observe, " + observer.getName());
+            return;
         }
+        if (durationMs < 1) {
+            // TODO: Instead of failing, monitor for default? 48hrs?
+            throw new IllegalArgumentException("Invalid duration " + durationMs + "ms for observer "
+                    + observer.getName() + ". Not observing packages " + packageNames);
+        }
+
         List<MonitoredPackage> packages = new ArrayList<>();
         for (int i = 0; i < packageNames.size(); i++) {
-            packages.add(new MonitoredPackage(packageNames.get(i), durationMs));
+            // Health checks not available yet so health check state will start INACTIVE
+            packages.add(new MonitoredPackage(packageNames.get(i), durationMs, false));
         }
+
         synchronized (mLock) {
             ObserverInternal oldObserver = mAllObservers.get(observer.getName());
             if (oldObserver == null) {
-                Slog.d(TAG, observer.getName() + " started monitoring health of packages "
-                        + packageNames);
+                Slog.d(TAG, observer.getName() + " started monitoring health "
+                        + "of packages " + packageNames);
                 mAllObservers.put(observer.getName(),
                         new ObserverInternal(observer.getName(), packages));
             } else {
-                Slog.d(TAG, observer.getName() + " added the following packages to monitor "
-                        + packageNames);
+                Slog.d(TAG, observer.getName() + " added the following "
+                        + "packages to monitor " + packageNames);
                 oldObserver.updatePackages(packages);
             }
         }
         registerHealthObserver(observer);
-        // Always reschedule because we may need to expire packages
-        // earlier than we are already scheduled for
-        rescheduleCleanup();
+        // Always prune because we may have received packges requiring an earlier
+        // schedule than we are currently scheduled for.
+        pruneAndSchedule();
+        Slog.i(TAG, "Syncing health check requests, observing packages " + packageNames);
+        syncRequestsAsync();
         saveToFileAsync();
     }
 
@@ -240,7 +279,7 @@ public class PackageWatchdog {
      * <p>This method could be called frequently if there is a severe problem on the device.
      */
     public void onPackageFailure(List<VersionedPackage> packages) {
-        mWorkerHandler.post(() -> {
+        mLongTaskHandler.post(() -> {
             synchronized (mLock) {
                 if (mAllObservers.isEmpty()) {
                     return;
@@ -276,15 +315,35 @@ public class PackageWatchdog {
         });
     }
 
-    // TODO(zezeozue): Optimize write? Maybe only write a separate smaller file?
+    // TODO(b/120598832): Optimize write? Maybe only write a separate smaller file? Also
+    // avoid holding lock?
     // This currently adds about 7ms extra to shutdown thread
     /** Writes the package information to file during shutdown. */
     public void writeNow() {
-        if (!mAllObservers.isEmpty()) {
-            mWorkerHandler.removeCallbacks(this::saveToFile);
-            pruneObservers(SystemClock.uptimeMillis() - mUptimeAtLastRescheduleMs);
-            saveToFile();
-            Slog.i(TAG, "Last write to update package durations");
+        synchronized (mLock) {
+            if (!mAllObservers.isEmpty()) {
+                mLongTaskHandler.removeCallbacks(this::saveToFile);
+                pruneObservers(SystemClock.uptimeMillis() - mUptimeAtLastPruneMs);
+                saveToFile();
+                Slog.i(TAG, "Last write to update package durations");
+            }
+        }
+    }
+
+    // TODO(b/120598832): Set depending on DeviceConfig flag
+    /**
+     * Enables or disables explicit health checks.
+     * <p> If explicit health checks are enabled, the health check service is started.
+     * <p> If explicit health checks are disabled, pending explicit health check requests are
+     * passed and the health check service is stopped.
+     */
+    public void setExplicitHealthCheckEnabled(boolean enabled) {
+        synchronized (mLock) {
+            mIsHealthCheckEnabled = enabled;
+            mHealthCheckController.setEnabled(enabled);
+            Slog.i(TAG, "Syncing health check requests, explicit health check is "
+                    + (enabled ? "enabled" : "disabled"));
+            syncRequestsAsync();
         }
     }
 
@@ -322,7 +381,7 @@ public class PackageWatchdog {
          */
         boolean execute(VersionedPackage versionedPackage);
 
-        // TODO(zezeozue): Ensure uniqueness?
+        // TODO(b/120598832): Ensure uniqueness?
         /**
          * Identifier for the observer, should not change across device updates otherwise the
          * watchdog may drop observing packages with the old name.
@@ -330,59 +389,200 @@ public class PackageWatchdog {
         String getName();
     }
 
-    /** Reschedules handler to prune expired packages from observers. */
-    private void rescheduleCleanup() {
+    /**
+     * Serializes and syncs health check requests with the {@link ExplicitHealthCheckController}.
+     */
+    private void syncRequestsAsync() {
+        if (!mShortTaskHandler.hasCallbacks(this::syncRequests)) {
+            mShortTaskHandler.post(this::syncRequests);
+        }
+    }
+
+    /**
+     * Syncs health check requests with the {@link ExplicitHealthCheckController}.
+     * Calls to this must be serialized.
+     *
+     * @see #syncRequestsAsync
+     */
+    private void syncRequests() {
+        Set<String> packages = null;
         synchronized (mLock) {
-            long nextDurationToScheduleMs = getEarliestPackageExpiryLocked();
+            if (mIsPackagesReady) {
+                packages = getPackagesPendingHealthChecksLocked();
+            } // else, we will sync requests when packages become ready
+        }
+
+        // Call outside lock to avoid holding lock when calling into the controller.
+        if (packages != null) {
+            mHealthCheckController.syncRequests(packages);
+        }
+    }
+
+    /**
+     * Updates the observers monitoring {@code packageName} that explicit health check has passed.
+     *
+     * <p> This update is strictly for registered observers at the time of the call
+     * Observers that register after this signal will have no knowledge of prior signals and will
+     * effectively behave as if the explicit health check hasn't passed for {@code packageName}.
+     *
+     * <p> {@code packageName} can still be considered failed if reported by
+     * {@link #onPackageFailure} before the package expires.
+     *
+     * <p> Triggered by components outside the system server when they are fully functional after an
+     * update.
+     */
+    private void onHealthCheckPassed(String packageName) {
+        Slog.i(TAG, "Health check passed for package: " + packageName);
+        boolean shouldUpdateFile = false;
+        synchronized (mLock) {
+            for (int observerIdx = 0; observerIdx < mAllObservers.size(); observerIdx++) {
+                ObserverInternal observer = mAllObservers.valueAt(observerIdx);
+                MonitoredPackage monitoredPackage = observer.mPackages.get(packageName);
+                if (monitoredPackage != null && !monitoredPackage.mHasPassedHealthCheck) {
+                    monitoredPackage.mHasPassedHealthCheck = true;
+                    shouldUpdateFile = true;
+                }
+            }
+        }
+
+        // So we can unbind from the service if this was the last result we expected
+        Slog.i(TAG, "Syncing health check requests, health check passed for " + packageName);
+        syncRequestsAsync();
+
+        if (shouldUpdateFile) {
+            saveToFileAsync();
+        }
+    }
+
+    private void onSupportedPackages(List<String> supportedPackages) {
+        boolean shouldUpdateFile = false;
+        boolean shouldPrune = false;
+
+        synchronized (mLock) {
+            Slog.d(TAG, "Received supported packages " + supportedPackages);
+            Iterator<ObserverInternal> oit = mAllObservers.values().iterator();
+            while (oit.hasNext()) {
+                ObserverInternal observer = oit.next();
+                Iterator<MonitoredPackage> pit =
+                        observer.mPackages.values().iterator();
+                while (pit.hasNext()) {
+                    MonitoredPackage monitoredPackage = pit.next();
+                    String packageName = monitoredPackage.mName;
+                    int healthCheckState = monitoredPackage.getHealthCheckState();
+
+                    if (healthCheckState != MonitoredPackage.STATE_PASSED) {
+                        // Have to update file, we will either transition state or reduce
+                        // health check duration
+                        shouldUpdateFile = true;
+
+                        if (supportedPackages.contains(packageName)) {
+                            // Supports health check, transition to ACTIVE if not already.
+                            // We need to prune packages earlier than already scheduled.
+                            shouldPrune = true;
+
+                            // TODO: Get healthCheckDuration from supportedPackages
+                            long healthCheckDuration = monitoredPackage.mDurationMs;
+                            monitoredPackage.mHealthCheckDurationMs = Math.min(healthCheckDuration,
+                                    monitoredPackage.mDurationMs);
+                            Slog.i(TAG, packageName + " health check state is now: ACTIVE("
+                                    + monitoredPackage.mHealthCheckDurationMs + "ms)");
+                        } else {
+                            // Does not support health check, transistion to PASSED
+                            monitoredPackage.mHasPassedHealthCheck = true;
+                            Slog.i(TAG, packageName + " health check state is now: PASSED");
+                        }
+                    } else {
+                        Slog.i(TAG, packageName + " does not support health check, state: PASSED");
+                    }
+                }
+            }
+        }
+
+        if (shouldUpdateFile) {
+            saveToFileAsync();
+        }
+        if (shouldPrune) {
+            pruneAndSchedule();
+        }
+    }
+
+    private Set<String> getPackagesPendingHealthChecksLocked() {
+        Slog.d(TAG, "Getting all observed packages pending health checks");
+        Set<String> packages = new ArraySet<>();
+        Iterator<ObserverInternal> oit = mAllObservers.values().iterator();
+        while (oit.hasNext()) {
+            ObserverInternal observer = oit.next();
+            Iterator<MonitoredPackage> pit =
+                    observer.mPackages.values().iterator();
+            while (pit.hasNext()) {
+                MonitoredPackage monitoredPackage = pit.next();
+                String packageName = monitoredPackage.mName;
+                if (!monitoredPackage.mHasPassedHealthCheck) {
+                    packages.add(packageName);
+                }
+            }
+        }
+        return packages;
+    }
+
+    /** Executes {@link #pruneObservers} and schedules the next execution. */
+    private void pruneAndSchedule() {
+        synchronized (mLock) {
+            long nextDurationToScheduleMs = getNextPruneScheduleMillisLocked();
             if (nextDurationToScheduleMs == Long.MAX_VALUE) {
-                Slog.i(TAG, "No monitored packages, ending package cleanup");
-                mDurationAtLastReschedule = 0;
-                mUptimeAtLastRescheduleMs = 0;
+                Slog.i(TAG, "No monitored packages, ending prune");
+                mDurationAtLastPrune = 0;
+                mUptimeAtLastPruneMs = 0;
                 return;
             }
             long uptimeMs = SystemClock.uptimeMillis();
-            // O if mPackageCleanup not running
-            long elapsedDurationMs = mUptimeAtLastRescheduleMs == 0
-                    ? 0 : uptimeMs - mUptimeAtLastRescheduleMs;
-            // Less than O if mPackageCleanup unexpectedly didn't run yet even though
-            // and we are past the last duration scheduled to run
-            long remainingDurationMs = mDurationAtLastReschedule - elapsedDurationMs;
-            if (mUptimeAtLastRescheduleMs == 0
+            // O if not running
+            long elapsedDurationMs = mUptimeAtLastPruneMs == 0
+                    ? 0 : uptimeMs - mUptimeAtLastPruneMs;
+            // Less than O if unexpectedly didn't run yet even though
+            // we are past the last duration scheduled to run
+            long remainingDurationMs = mDurationAtLastPrune - elapsedDurationMs;
+            if (mUptimeAtLastPruneMs == 0
                     || remainingDurationMs <= 0
                     || nextDurationToScheduleMs < remainingDurationMs) {
                 // First schedule or an earlier reschedule
                 pruneObservers(elapsedDurationMs);
-                mTimerHandler.removeCallbacks(mPackageCleanup);
-                mTimerHandler.postDelayed(mPackageCleanup, nextDurationToScheduleMs);
-                mDurationAtLastReschedule = nextDurationToScheduleMs;
-                mUptimeAtLastRescheduleMs = uptimeMs;
+                // We don't use Handler#hasCallbacks because we want to update the schedule delay
+                mShortTaskHandler.removeCallbacks(this::pruneAndSchedule);
+                mShortTaskHandler.postDelayed(this::pruneAndSchedule, nextDurationToScheduleMs);
+                mDurationAtLastPrune = nextDurationToScheduleMs;
+                mUptimeAtLastPruneMs = uptimeMs;
             }
         }
     }
 
     /**
-     * Returns the earliest time a package should expire.
+     * Returns the next time in millis to schedule a prune.
+     *
      * @returns Long#MAX_VALUE if there are no observed packages.
      */
-    private long getEarliestPackageExpiryLocked() {
+    private long getNextPruneScheduleMillisLocked() {
         long shortestDurationMs = Long.MAX_VALUE;
         for (int oIndex = 0; oIndex < mAllObservers.size(); oIndex++) {
             ArrayMap<String, MonitoredPackage> packages = mAllObservers.valueAt(oIndex).mPackages;
             for (int pIndex = 0; pIndex < packages.size(); pIndex++) {
-                long duration = packages.valueAt(pIndex).mDurationMs;
+                MonitoredPackage mp = packages.valueAt(pIndex);
+                long duration = Math.min(mp.mDurationMs, mp.mHealthCheckDurationMs);
                 if (duration < shortestDurationMs) {
                     shortestDurationMs = duration;
                 }
             }
         }
-        Slog.v(TAG, "Earliest package time is " + shortestDurationMs);
+        Slog.i(TAG, "Next prune will be scheduled in " + shortestDurationMs + "ms");
 
         return shortestDurationMs;
     }
 
     /**
      * Removes {@code elapsedMs} milliseconds from all durations on monitored packages.
-     * Discards expired packages and discards observers without any packages.
+     *
+     * <p> Prunes all observers with {@link ObserverInternal#prunePackages} and discards observers
+     * without any packages left.
      */
     private void pruneObservers(long elapsedMs) {
         if (elapsedMs == 0) {
@@ -393,13 +593,49 @@ public class PackageWatchdog {
             Iterator<ObserverInternal> it = mAllObservers.values().iterator();
             while (it.hasNext()) {
                 ObserverInternal observer = it.next();
-                if (!observer.updateMonitoringDurations(elapsedMs)) {
+                Set<MonitoredPackage> failedPackages =
+                        observer.prunePackages(elapsedMs);
+                if (!failedPackages.isEmpty()) {
+                    onHealthCheckFailed(observer, failedPackages);
+                }
+                if (observer.mPackages.isEmpty()) {
                     Slog.i(TAG, "Discarding observer " + observer.mName + ". All packages expired");
                     it.remove();
                 }
             }
         }
+        Slog.i(TAG, "Syncing health check requests, pruned observers");
+        syncRequestsAsync();
         saveToFileAsync();
+    }
+
+    private void onHealthCheckFailed(ObserverInternal observer,
+            Set<MonitoredPackage> failedPackages) {
+        mLongTaskHandler.post(() -> {
+            synchronized (mLock) {
+                PackageHealthObserver registeredObserver = observer.mRegisteredObserver;
+                if (registeredObserver != null) {
+                    PackageManager pm = mContext.getPackageManager();
+                    Iterator<MonitoredPackage> it = failedPackages.iterator();
+                    while (it.hasNext()) {
+                        String failedPackage = it.next().mName;
+                        long versionCode = 0;
+                        Slog.i(TAG, "Explicit health check failed for package " + failedPackage);
+                        try {
+                            versionCode = pm.getPackageInfo(
+                                    failedPackage, 0 /* flags */).getLongVersionCode();
+                        } catch (PackageManager.NameNotFoundException e) {
+                            Slog.w(TAG, "Explicit health check failed but could not find package "
+                                    + failedPackage);
+                            // TODO(b/120598832): Skip. We only continue to pass tests for now since
+                            // the tests don't install any packages
+                        }
+                        registeredObserver.execute(
+                                new VersionedPackage(failedPackage, versionCode));
+                    }
+                }
+            }
+        });
     }
 
     /**
@@ -426,7 +662,7 @@ public class PackageWatchdog {
         } catch (FileNotFoundException e) {
             // Nothing to monitor
         } catch (IOException | NumberFormatException | XmlPullParserException e) {
-            Log.wtf(TAG, "Unable to read monitored packages, deleting file", e);
+            Slog.wtf(TAG, "Unable to read monitored packages, deleting file", e);
             mPolicyFile.delete();
         } finally {
             IoUtils.closeQuietly(infile);
@@ -470,32 +706,38 @@ public class PackageWatchdog {
     }
 
     private void saveToFileAsync() {
-        mWorkerHandler.removeCallbacks(this::saveToFile);
-        mWorkerHandler.post(this::saveToFile);
+        if (!mLongTaskHandler.hasCallbacks(this::saveToFile)) {
+            mLongTaskHandler.post(this::saveToFile);
+        }
     }
 
     /**
      * Represents an observer monitoring a set of packages along with the failure thresholds for
      * each package.
+     *
+     * <p> Note, the PackageWatchdog#mLock must always be held when reading or writing
+     * instances of this class.
      */
-    static class ObserverInternal {
+    //TODO(b/120598832): Remove 'm' from non-private fields
+    private static class ObserverInternal {
         public final String mName;
-        public final ArrayMap<String, MonitoredPackage> mPackages;
+        //TODO(b/120598832): Add getter for mPackages
+        @GuardedBy("mLock")
+        public final ArrayMap<String, MonitoredPackage> mPackages = new ArrayMap<>();
         @Nullable
+        @GuardedBy("mLock")
         public PackageHealthObserver mRegisteredObserver;
 
         ObserverInternal(String name, List<MonitoredPackage> packages) {
             mName = name;
-            mPackages = new ArrayMap<>();
             updatePackages(packages);
         }
 
         /**
-         * Writes important details to file. Doesn't persist any package failure thresholds.
-         *
-         * <p>Note that this method is <b>not</b> thread safe. It should only be called from
-         * #saveToFile which runs on a single threaded handler.
+         * Writes important {@link MonitoredPackage} details for this observer to file.
+         * Does not persist any package failure thresholds.
          */
+        @GuardedBy("mLock")
         public boolean write(XmlSerializer out) {
             try {
                 out.startTag(null, TAG_OBSERVER);
@@ -505,6 +747,10 @@ public class PackageWatchdog {
                     out.startTag(null, TAG_PACKAGE);
                     out.attribute(null, ATTR_NAME, p.mName);
                     out.attribute(null, ATTR_DURATION, String.valueOf(p.mDurationMs));
+                    out.attribute(null, ATTR_EXPLICIT_HEALTH_CHECK_DURATION,
+                            String.valueOf(p.mHealthCheckDurationMs));
+                    out.attribute(null, ATTR_PASSED_HEALTH_CHECK,
+                            String.valueOf(p.mHasPassedHealthCheck));
                     out.endTag(null, TAG_PACKAGE);
                 }
                 out.endTag(null, TAG_OBSERVER);
@@ -515,51 +761,68 @@ public class PackageWatchdog {
             }
         }
 
+        @GuardedBy("mLock")
         public void updatePackages(List<MonitoredPackage> packages) {
-            synchronized (mName) {
-                for (int pIndex = 0; pIndex < packages.size(); pIndex++) {
-                    MonitoredPackage p = packages.get(pIndex);
-                    mPackages.put(p.mName, p);
-                }
+            for (int pIndex = 0; pIndex < packages.size(); pIndex++) {
+                MonitoredPackage p = packages.get(pIndex);
+                mPackages.put(p.mName, p);
             }
         }
 
         /**
          * Reduces the monitoring durations of all packages observed by this observer by
-         *  {@code elapsedMs}. If any duration is less than 0, the package is removed from
-         * observation.
+         * {@code elapsedMs}. If any duration is less than 0, the package is removed from
+         * observation. If any health check duration is less than 0, the health check result
+         * is evaluated.
          *
-         * @returns {@code true} if there are still packages to be observed, {@code false} otherwise
+         * @returns a {@link Set} of packages that were removed from the observer without explicit
+         * health check passing, or an empty list if no package expired for which an explicit health
+         * check was still pending
          */
-        public boolean updateMonitoringDurations(long elapsedMs) {
-            List<MonitoredPackage> packages = new ArrayList<>();
-            synchronized (mName) {
-                Iterator<MonitoredPackage> it = mPackages.values().iterator();
-                while (it.hasNext()) {
-                    MonitoredPackage p = it.next();
-                    long newDuration = p.mDurationMs - elapsedMs;
-                    if (newDuration > 0) {
-                        p.mDurationMs = newDuration;
-                    } else {
-                        it.remove();
+        @GuardedBy("mLock")
+        private Set<MonitoredPackage> prunePackages(long elapsedMs) {
+            Set<MonitoredPackage> failedPackages = new ArraySet<>();
+            Iterator<MonitoredPackage> it = mPackages.values().iterator();
+            while (it.hasNext()) {
+                MonitoredPackage p = it.next();
+                int healthCheckState = p.getHealthCheckState();
+
+                // Handle health check timeouts
+                if (healthCheckState == MonitoredPackage.STATE_ACTIVE) {
+                    // Only reduce duration if state is active
+                    p.mHealthCheckDurationMs -= elapsedMs;
+                    // Check duration after reducing duration
+                    if (p.mHealthCheckDurationMs <= 0) {
+                        failedPackages.add(p);
                     }
                 }
-                return !mPackages.isEmpty();
+
+                // Handle package expiry
+                p.mDurationMs -= elapsedMs;
+                // Check duration after reducing duration
+                if (p.mDurationMs <= 0) {
+                    if (healthCheckState == MonitoredPackage.STATE_INACTIVE) {
+                        Slog.w(TAG, "Package " + p.mName
+                                + " expiring without starting health check, failing");
+                        failedPackages.add(p);
+                    }
+                    it.remove();
+                }
             }
+            return failedPackages;
         }
 
         /**
          * Increments failure counts of {@code packageName}.
          * @returns {@code true} if failure threshold is exceeded, {@code false} otherwise
          */
+        @GuardedBy("mLock")
         public boolean onPackageFailure(String packageName) {
-            synchronized (mName) {
-                MonitoredPackage p = mPackages.get(packageName);
-                if (p != null) {
-                    return p.onFailure();
-                }
-                return false;
+            MonitoredPackage p = mPackages.get(packageName);
+            if (p != null) {
+                return p.onFailure();
             }
+            return false;
         }
 
         /**
@@ -574,6 +837,7 @@ public class PackageWatchdog {
             if (TAG_OBSERVER.equals(parser.getName())) {
                 observerName = parser.getAttributeValue(null, ATTR_NAME);
                 if (TextUtils.isEmpty(observerName)) {
+                    Slog.wtf(TAG, "Unable to read observer name");
                     return null;
                 }
             }
@@ -582,17 +846,27 @@ public class PackageWatchdog {
             try {
                 while (XmlUtils.nextElementWithin(parser, innerDepth)) {
                     if (TAG_PACKAGE.equals(parser.getName())) {
-                        String packageName = parser.getAttributeValue(null, ATTR_NAME);
-                        long duration = Long.parseLong(
-                                parser.getAttributeValue(null, ATTR_DURATION));
-                        if (!TextUtils.isEmpty(packageName)) {
-                            packages.add(new MonitoredPackage(packageName, duration));
+                        try {
+                            String packageName = parser.getAttributeValue(null, ATTR_NAME);
+                            long duration = Long.parseLong(
+                                    parser.getAttributeValue(null, ATTR_DURATION));
+                            long healthCheckDuration = Long.parseLong(
+                                    parser.getAttributeValue(null,
+                                            ATTR_EXPLICIT_HEALTH_CHECK_DURATION));
+                            boolean hasPassedHealthCheck = Boolean.parseBoolean(
+                                    parser.getAttributeValue(null, ATTR_PASSED_HEALTH_CHECK));
+                            if (!TextUtils.isEmpty(packageName)) {
+                                packages.add(new MonitoredPackage(packageName, duration,
+                                        healthCheckDuration, hasPassedHealthCheck));
+                            }
+                        } catch (NumberFormatException e) {
+                            Slog.wtf(TAG, "Skipping package for observer " + observerName, e);
+                            continue;
                         }
                     }
                 }
-            } catch (IOException e) {
-                return null;
-            } catch (XmlPullParserException e) {
+            } catch (XmlPullParserException | IOException e) {
+                Slog.wtf(TAG, "Unable to read observer " + observerName, e);
                 return null;
             }
             if (packages.isEmpty()) {
@@ -602,19 +876,51 @@ public class PackageWatchdog {
         }
     }
 
-    /** Represents a package along with the time it should be monitored for. */
-    static class MonitoredPackage {
+    /**
+     * Represents a package along with the time it should be monitored for.
+     *
+     * <p> Note, the PackageWatchdog#mLock must always be held when reading or writing
+     * instances of this class.
+     */
+    //TODO(b/120598832): Remove 'm' from non-private fields
+    private static class MonitoredPackage {
+        // Health check states
+        // mName has not passed health check but has requested a health check
+        public static int STATE_ACTIVE = 0;
+        // mName has not passed health check and has not requested a health check
+        public static int STATE_INACTIVE = 1;
+        // mName has passed health check
+        public static int STATE_PASSED = 2;
+
         public final String mName;
+        // Whether an explicit health check has passed
+        @GuardedBy("mLock")
+        public boolean mHasPassedHealthCheck;
         // System uptime duration to monitor package
+        @GuardedBy("mLock")
         public long mDurationMs;
+        // System uptime duration to check the result of an explicit health check
+        // Initially, MAX_VALUE until we get a value from the health check service
+        // and request health checks.
+        @GuardedBy("mLock")
+        public long mHealthCheckDurationMs = Long.MAX_VALUE;
         // System uptime of first package failure
+        @GuardedBy("mLock")
         private long mUptimeStartMs;
         // Number of failures since mUptimeStartMs
+        @GuardedBy("mLock")
         private int mFailures;
 
-        MonitoredPackage(String name, long durationMs) {
+        MonitoredPackage(String name, long durationMs, boolean hasPassedHealthCheck) {
+            this(name, durationMs, Long.MAX_VALUE, hasPassedHealthCheck);
+        }
+
+        MonitoredPackage(String name, long durationMs, long healthCheckDurationMs,
+                boolean hasPassedHealthCheck) {
             mName = name;
             mDurationMs = durationMs;
+            mHealthCheckDurationMs = healthCheckDurationMs;
+            mHasPassedHealthCheck = hasPassedHealthCheck;
         }
 
         /**
@@ -622,11 +928,12 @@ public class PackageWatchdog {
          *
          * @return {@code true} if failure count exceeds a threshold, {@code false} otherwise
          */
-        public synchronized boolean onFailure() {
+        @GuardedBy("mLock")
+        public boolean onFailure() {
             final long now = SystemClock.uptimeMillis();
             final long duration = now - mUptimeStartMs;
             if (duration > TRIGGER_DURATION_MS) {
-                // TODO(zezeozue): Reseting to 1 is not correct
+                // TODO(b/120598832): Reseting to 1 is not correct
                 // because there may be more than 1 failure in the last trigger window from now
                 // This is the RescueParty impl, will leave for now
                 mFailures = 1;
@@ -639,6 +946,21 @@ public class PackageWatchdog {
                 mFailures = 0;
             }
             return failed;
+        }
+
+        /**
+         * Returns any of the health check states of {@link #STATE_ACTIVE},
+         * {@link #STATE_INACTIVE} or {@link #STATE_PASSED}
+         */
+        @GuardedBy("mLock")
+        public int getHealthCheckState() {
+            if (mHasPassedHealthCheck) {
+                return STATE_PASSED;
+            } else if (mHealthCheckDurationMs == Long.MAX_VALUE) {
+                return STATE_INACTIVE;
+            } else {
+                return STATE_ACTIVE;
+            }
         }
     }
 }

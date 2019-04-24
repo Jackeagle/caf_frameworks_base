@@ -40,6 +40,7 @@ import static android.system.OsConstants.W_OK;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.TestApi;
+import android.annotation.UnsupportedAppUsage;
 import android.content.ContentResolver;
 import android.provider.DocumentsContract.Document;
 import android.system.ErrnoException;
@@ -85,7 +86,7 @@ import java.util.zip.CheckedInputStream;
 /**
  * Utility methods useful for working with files.
  */
-public class FileUtils {
+public final class FileUtils {
     private static final String TAG = "FileUtils";
 
     /** {@hide} */ public static final int S_IRWXU = 00700;
@@ -103,6 +104,7 @@ public class FileUtils {
     /** {@hide} */ public static final int S_IWOTH = 00002;
     /** {@hide} */ public static final int S_IXOTH = 00001;
 
+    @UnsupportedAppUsage
     private FileUtils() {
     }
 
@@ -135,6 +137,7 @@ public class FileUtils {
      * @return 0 on success, otherwise errno.
      * @hide
      */
+    @UnsupportedAppUsage
     public static int setPermissions(File path, int mode, int uid, int gid) {
         return setPermissions(path.getAbsolutePath(), mode, uid, gid);
     }
@@ -148,6 +151,7 @@ public class FileUtils {
      * @return 0 on success, otherwise errno.
      * @hide
      */
+    @UnsupportedAppUsage
     public static int setPermissions(String path, int mode, int uid, int gid) {
         try {
             Os.chmod(path, mode);
@@ -177,6 +181,7 @@ public class FileUtils {
      * @return 0 on success, otherwise errno.
      * @hide
      */
+    @UnsupportedAppUsage
     public static int setPermissions(FileDescriptor fd, int mode, int uid, int gid) {
         try {
             Os.fchmod(fd, mode);
@@ -233,6 +238,7 @@ public class FileUtils {
      *
      * @hide
      */
+    @UnsupportedAppUsage
     public static boolean sync(FileOutputStream stream) {
         try {
             if (stream != null) {
@@ -248,6 +254,7 @@ public class FileUtils {
      * @deprecated use {@link #copy(File, File)} instead.
      * @hide
      */
+    @UnsupportedAppUsage
     @Deprecated
     public static boolean copyFile(File srcFile, File destFile) {
         try {
@@ -273,6 +280,7 @@ public class FileUtils {
      * @deprecated use {@link #copy(InputStream, OutputStream)} instead.
      * @hide
      */
+    @UnsupportedAppUsage
     @Deprecated
     public static boolean copyToFile(InputStream inputStream, File destFile) {
         try {
@@ -309,6 +317,7 @@ public class FileUtils {
      * kernel before falling back to a userspace copy as a last resort.
      *
      * @return number of bytes copied.
+     * @hide
      */
     public static long copy(@NonNull File from, @NonNull File to) throws IOException {
         return copy(from, to, null, null, null);
@@ -324,6 +333,7 @@ public class FileUtils {
      * @param executor that listener events should be delivered via.
      * @param listener to be periodically notified as the copy progresses.
      * @return number of bytes copied.
+     * @hide
      */
     public static long copy(@NonNull File from, @NonNull File to,
             @Nullable CancellationSignal signal, @Nullable Executor executor,
@@ -582,6 +592,7 @@ public class FileUtils {
      * @param file  The file to check
      * @hide
      */
+    @UnsupportedAppUsage
     public static boolean isFilenameSafe(File file) {
         // Note, we check whether it matches what's known to be safe,
         // rather than what's known to be unsafe.  Non-ASCII, control
@@ -598,6 +609,7 @@ public class FileUtils {
      * @throws IOException if something goes wrong reading the file
      * @hide
      */
+    @UnsupportedAppUsage
     public static String readTextFile(File file, int max, String ellipsis) throws IOException {
         InputStream input = new FileInputStream(file);
         // wrapping a BufferedInputStream around it because when reading /proc with unbuffered
@@ -652,6 +664,7 @@ public class FileUtils {
     }
 
     /** {@hide} */
+    @UnsupportedAppUsage
     public static void stringToFile(File file, String string) throws IOException {
         stringToFile(file.getAbsolutePath(), string);
     }
@@ -685,6 +698,7 @@ public class FileUtils {
      * @throws IOException
      * @hide
      */
+    @UnsupportedAppUsage
     public static void stringToFile(String filename, String string) throws IOException {
         bytesToFile(filename, string.getBytes(StandardCharsets.UTF_8));
     }
@@ -699,6 +713,7 @@ public class FileUtils {
      *             to its potential for collision.
      * @hide
      */
+    @UnsupportedAppUsage
     @Deprecated
     public static long checksumCrc32(File file) throws FileNotFoundException, IOException {
         CRC32 checkSummer = new CRC32();
@@ -781,6 +796,7 @@ public class FileUtils {
      * @return if any files were deleted.
      * @hide
      */
+    @UnsupportedAppUsage
     public static boolean deleteOlderFiles(File dir, int minCount, long minAgeMs) {
         if (minCount < 0 || minAgeMs < 0) {
             throw new IllegalArgumentException("Constraints must be positive or 0");
@@ -889,6 +905,7 @@ public class FileUtils {
     }
 
     /** {@hide} */
+    @UnsupportedAppUsage
     public static boolean deleteContents(File dir) {
         File[] files = dir.listFiles();
         boolean success = true;
@@ -1091,6 +1108,12 @@ public class FileUtils {
             throws FileNotFoundException {
         final String[] parts = splitFileName(mimeType, displayName);
         return buildUniqueFileWithExtension(parent, parts[0], parts[1]);
+    }
+
+    /** {@hide} */
+    public static File buildNonUniqueFile(File parent, String mimeType, String displayName) {
+        final String[] parts = splitFileName(mimeType, displayName);
+        return buildFile(parent, parts[0], parts[1]);
     }
 
     /**

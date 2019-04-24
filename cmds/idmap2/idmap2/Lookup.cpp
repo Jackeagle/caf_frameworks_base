@@ -37,6 +37,7 @@
 #include "idmap2/CommandLineOptions.h"
 #include "idmap2/Idmap.h"
 #include "idmap2/Result.h"
+#include "idmap2/SysTrace.h"
 #include "idmap2/Xml.h"
 #include "idmap2/ZipFile.h"
 
@@ -52,9 +53,11 @@ using android::ResTable_config;
 using android::StringPiece16;
 using android::base::StringPrintf;
 using android::idmap2::CommandLineOptions;
+using android::idmap2::Error;
 using android::idmap2::IdmapHeader;
 using android::idmap2::ResourceId;
 using android::idmap2::Result;
+using android::idmap2::Unit;
 using android::idmap2::Xml;
 using android::idmap2::ZipFile;
 using android::util::Utf16ToUtf8;
@@ -70,17 +73,17 @@ Result<ResourceId> WARN_UNUSED ParseResReference(const AssetManager2& am, const 
   ResourceId resid;
   resid = strtol(res.c_str(), &endptr, kBaseHex);
   if (*endptr == '\0') {
-    return {resid};
+    return resid;
   }
 
   // next, try to parse as a package:type/name string
   resid = am.GetResourceId(res, "", fallback_package);
   if (is_valid_resid(resid)) {
-    return {resid};
+    return resid;
   }
 
   // end of the road: res could not be parsed
-  return {};
+  return Error("failed to obtain resource id for %s", res.c_str());
 }
 
 Result<std::string> WARN_UNUSED GetValue(const AssetManager2& am, ResourceId resid) {
@@ -89,7 +92,7 @@ Result<std::string> WARN_UNUSED GetValue(const AssetManager2& am, ResourceId res
   uint32_t flags;
   ApkAssetsCookie cookie = am.GetResource(resid, false, 0, &value, &config, &flags);
   if (cookie == kInvalidCookie) {
-    return {};
+    return Error("no resource 0x%08x in asset manager", resid);
   }
 
   std::string out;
@@ -127,35 +130,36 @@ Result<std::string> WARN_UNUSED GetValue(const AssetManager2& am, ResourceId res
       out.append(StringPrintf("dataType=0x%02x data=0x%08x", value.dataType, value.data));
       break;
   }
-  return {out};
+  return out;
 }
 
 Result<std::string> GetTargetPackageNameFromManifest(const std::string& apk_path) {
   const auto zip = ZipFile::Open(apk_path);
   if (!zip) {
-    return {};
+    return Error("failed to open %s as zip", apk_path.c_str());
   }
   const auto entry = zip->Uncompress("AndroidManifest.xml");
   if (!entry) {
-    return {};
+    return Error("failed to uncompress AndroidManifest.xml in %s", apk_path.c_str());
   }
   const auto xml = Xml::Create(entry->buf, entry->size);
   if (!xml) {
-    return {};
+    return Error("failed to create XML buffer");
   }
   const auto tag = xml->FindTag("overlay");
   if (!tag) {
-    return {};
+    return Error("failed to find <overlay> tag");
   }
   const auto iter = tag->find("targetPackage");
   if (iter == tag->end()) {
-    return {};
+    return Error("failed to find targetPackage attribute");
   }
-  return {iter->second};
+  return iter->second;
 }
 }  // namespace
 
-bool Lookup(const std::vector<std::string>& args, std::ostream& out_error) {
+Result<Unit> Lookup(const std::vector<std::string>& args) {
+  SYSTRACE << "Lookup " << args;
   std::vector<std::string> idmap_paths;
   std::string config_str;
   std::string resid_str;
@@ -169,14 +173,14 @@ bool Lookup(const std::vector<std::string>& args, std::ostream& out_error) {
                            "'[package:]type/name') to look up",
                            &resid_str);
 
-  if (!opts.Parse(args, out_error)) {
-    return false;
+  const auto opts_ok = opts.Parse(args);
+  if (!opts_ok) {
+    return opts_ok.GetError();
   }
 
   ConfigDescription config;
   if (!ConfigDescription::Parse(config_str, &config)) {
-    out_error << "error: failed to parse config" << std::endl;
-    return false;
+    return Error("failed to parse config");
   }
 
   std::vector<std::unique_ptr<const ApkAssets>> apk_assets;
@@ -188,39 +192,33 @@ bool Lookup(const std::vector<std::string>& args, std::ostream& out_error) {
     auto idmap_header = IdmapHeader::FromBinaryStream(fin);
     fin.close();
     if (!idmap_header) {
-      out_error << "error: failed to read idmap from " << idmap_path << std::endl;
-      return false;
+      return Error("failed to read idmap from %s", idmap_path.c_str());
     }
 
     if (i == 0) {
       target_path = idmap_header->GetTargetPath().to_string();
       auto target_apk = ApkAssets::Load(target_path);
       if (!target_apk) {
-        out_error << "error: failed to read target apk from " << target_path << std::endl;
-        return false;
+        return Error("failed to read target apk from %s", target_path.c_str());
       }
       apk_assets.push_back(std::move(target_apk));
 
       const Result<std::string> package_name =
           GetTargetPackageNameFromManifest(idmap_header->GetOverlayPath().to_string());
       if (!package_name) {
-        out_error << "error: failed to parse android:targetPackage from overlay manifest"
-                  << std::endl;
-        return false;
+        return Error("failed to parse android:targetPackage from overlay manifest");
       }
       target_package_name = *package_name;
     } else if (target_path != idmap_header->GetTargetPath()) {
-      out_error << "error: different target APKs (expected target APK " << target_path << " but "
-                << idmap_path << " has target APK " << idmap_header->GetTargetPath() << ")"
-                << std::endl;
-      return false;
+      return Error("different target APKs (expected target APK %s but %s has target APK %s)",
+                   target_path.c_str(), idmap_path.c_str(),
+                   idmap_header->GetTargetPath().to_string().c_str());
     }
 
     auto overlay_apk = ApkAssets::LoadOverlay(idmap_path);
     if (!overlay_apk) {
-      out_error << "error: failed to read overlay apk from " << idmap_header->GetOverlayPath()
-                << std::endl;
-      return false;
+      return Error("failed to read overlay apk from %s",
+                   idmap_header->GetOverlayPath().to_string().c_str());
     }
     apk_assets.push_back(std::move(overlay_apk));
   }
@@ -235,16 +233,14 @@ bool Lookup(const std::vector<std::string>& args, std::ostream& out_error) {
 
   const Result<ResourceId> resid = ParseResReference(am, resid_str, target_package_name);
   if (!resid) {
-    out_error << "error: failed to parse resource ID" << std::endl;
-    return false;
+    return Error(resid.GetError(), "failed to parse resource ID");
   }
 
   const Result<std::string> value = GetValue(am, *resid);
   if (!value) {
-    out_error << StringPrintf("error: resource 0x%08x not found", *resid) << std::endl;
-    return false;
+    return Error(value.GetError(), "resource 0x%08x not found", *resid);
   }
   std::cout << *value << std::endl;
 
-  return true;
+  return Unit{};
 }

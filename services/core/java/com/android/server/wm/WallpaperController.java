@@ -34,8 +34,6 @@ import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 import static com.android.server.wm.WindowManagerService.H.WALLPAPER_DRAW_PENDING_TIMEOUT;
 
 import android.graphics.Bitmap;
-import android.graphics.ColorSpace;
-import android.graphics.GraphicBuffer;
 import android.graphics.Rect;
 import android.hardware.HardwareBuffer;
 import android.os.Bundle;
@@ -50,6 +48,7 @@ import android.view.SurfaceControl;
 import android.view.WindowManager;
 import android.view.animation.Animation;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.ToBooleanFunction;
 
 import java.io.PrintWriter;
@@ -700,41 +699,53 @@ class WallpaperController {
         mWallpaperTokens.remove(token);
     }
 
+
+    @VisibleForTesting
+    boolean canScreenshotWallpaper() {
+        return canScreenshotWallpaper(getTopVisibleWallpaper());
+    }
+
+    private boolean canScreenshotWallpaper(WindowState wallpaperWindowState) {
+        if (!mService.mPolicy.isScreenOn()) {
+            if (DEBUG_SCREENSHOT) {
+                Slog.i(TAG_WM, "Attempted to take screenshot while display was off.");
+            }
+            return false;
+        }
+
+        if (wallpaperWindowState == null) {
+            if (DEBUG_SCREENSHOT) {
+                Slog.i(TAG_WM, "No visible wallpaper to screenshot");
+            }
+            return false;
+        }
+        return true;
+    }
+
     /**
      * Take a screenshot of the wallpaper if it's visible.
      *
      * @return Bitmap of the wallpaper
      */
     Bitmap screenshotWallpaperLocked() {
-        if (!mService.mPolicy.isScreenOn()) {
-            if (DEBUG_SCREENSHOT) {
-                Slog.i(TAG_WM, "Attempted to take screenshot while display was off.");
-            }
-            return null;
-        }
-
         final WindowState wallpaperWindowState = getTopVisibleWallpaper();
-        if (wallpaperWindowState == null) {
-            if (DEBUG_SCREENSHOT) {
-                Slog.i(TAG_WM, "No visible wallpaper to screenshot");
-            }
+        if (!canScreenshotWallpaper(wallpaperWindowState)) {
             return null;
         }
 
         final Rect bounds = wallpaperWindowState.getBounds();
         bounds.offsetTo(0, 0);
 
-        GraphicBuffer wallpaperBuffer = SurfaceControl.captureLayers(
+        SurfaceControl.ScreenshotGraphicBuffer wallpaperBuffer = SurfaceControl.captureLayers(
                 wallpaperWindowState.getSurfaceControl().getHandle(), bounds, 1 /* frameScale */);
 
         if (wallpaperBuffer == null) {
             Slog.w(TAG_WM, "Failed to screenshot wallpaper");
             return null;
         }
-        // TODO(b/116112787) Now that hardware bitmap creation can take color space, we
-        // should continue to fix screenshot.
-        return Bitmap.wrapHardwareBuffer(HardwareBuffer.createFromGraphicBuffer(wallpaperBuffer),
-                                         ColorSpace.get(ColorSpace.Named.SRGB));
+        return Bitmap.wrapHardwareBuffer(
+                HardwareBuffer.createFromGraphicBuffer(wallpaperBuffer.getGraphicBuffer()),
+                wallpaperBuffer.getColorSpace());
     }
 
     private WindowState getTopVisibleWallpaper() {

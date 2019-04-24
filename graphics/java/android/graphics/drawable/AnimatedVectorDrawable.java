@@ -33,16 +33,17 @@ import android.content.res.ColorStateList;
 import android.content.res.Resources;
 import android.content.res.Resources.Theme;
 import android.content.res.TypedArray;
+import android.graphics.BlendMode;
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
 import android.graphics.Insets;
 import android.graphics.Outline;
 import android.graphics.PixelFormat;
-import android.graphics.PorterDuff;
 import android.graphics.RecordingCanvas;
 import android.graphics.Rect;
 import android.graphics.RenderNode;
 import android.os.Build;
+import android.os.Handler;
 import android.util.ArrayMap;
 import android.util.AttributeSet;
 import android.util.IntArray;
@@ -476,8 +477,8 @@ public class AnimatedVectorDrawable extends Drawable implements Animatable2 {
     }
 
     @Override
-    public void setTintMode(PorterDuff.Mode tintMode) {
-        mAnimatedVectorState.mVectorDrawable.setTintMode(tintMode);
+    public void setTintMode(@NonNull BlendMode blendMode) {
+        mAnimatedVectorState.mVectorDrawable.setTintMode(blendMode);
     }
 
     @Override
@@ -1241,6 +1242,7 @@ public class AnimatedVectorDrawable extends Drawable implements Animatable2 {
 
         // If the duration of an animation is more than 300 frames, we cap the sample size to 300.
         private static final int MAX_SAMPLE_POINTS = 300;
+        private Handler mHandler;
         private AnimatorListener mListener = null;
         private final LongArray mStartDelays = new LongArray();
         private PropertyValuesHolder.PropertyValues mTmpValues =
@@ -1251,7 +1253,6 @@ public class AnimatedVectorDrawable extends Drawable implements Animatable2 {
         private boolean mInitialized = false;
         private boolean mIsReversible = false;
         private boolean mIsInfinite = false;
-        // TODO: Consider using NativeAllocationRegistery to track native allocation
         private final VirtualRefBasePtr mSetRefBasePtr;
         private WeakReference<RenderNode> mLastSeenTarget = null;
         private int mLastListenerId = 0;
@@ -1671,6 +1672,9 @@ public class AnimatedVectorDrawable extends Drawable implements Animatable2 {
                                 .mRootName);
             }
             mStarted = true;
+            if (mHandler == null) {
+                mHandler = new Handler();
+            }
             nStart(mSetPtr, this, ++mLastListenerId);
             invalidateOwningView();
             if (mListener != null) {
@@ -1780,7 +1784,7 @@ public class AnimatedVectorDrawable extends Drawable implements Animatable2 {
         // onFinished: should be called from native
         @UnsupportedAppUsage
         private static void callOnFinished(VectorDrawableAnimatorRT set, int id) {
-            set.onAnimationEnd(id);
+            set.mHandler.post(() -> set.onAnimationEnd(id));
         }
 
         private void transferPendingActions(VectorDrawableAnimator animatorSet) {

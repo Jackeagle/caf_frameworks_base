@@ -21,6 +21,7 @@ import static android.Manifest.permission.CONFIGURE_DISPLAY_COLOR_MODE;
 import android.annotation.IntDef;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
+import android.annotation.TestApi;
 import android.annotation.UnsupportedAppUsage;
 import android.app.KeyguardManager;
 import android.content.res.CompatibilityInfo;
@@ -32,6 +33,7 @@ import android.graphics.Point;
 import android.graphics.Rect;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.DisplayManagerGlobal;
+import android.os.Build;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.Process;
@@ -75,7 +77,7 @@ public final class Display {
     private final int mLayerStack;
     private final int mFlags;
     private final int mType;
-    private final String mAddress;
+    private final DisplayAddress mAddress;
     private final int mOwnerUid;
     private final String mOwnerPackageName;
     private final Resources mResources;
@@ -229,7 +231,6 @@ public final class Display {
      * bar, navigation bar, home activity or IME.
      * </p>
      *
-     * @see #supportsSystemDecorations
      * @hide
      */
     // TODO (b/114338689): Remove the flag and use IWindowManager#setShouldShowSystemDecors
@@ -495,7 +496,7 @@ public final class Display {
      * @return True if the display is still valid.
      * @hide
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     public boolean getDisplayInfo(DisplayInfo outDisplayInfo) {
         synchronized (this) {
             updateDisplayInfoLocked();
@@ -556,7 +557,7 @@ public final class Display {
      * @hide
      */
     @UnsupportedAppUsage
-    public String getAddress() {
+    public DisplayAddress getAddress() {
         return mAddress;
     }
 
@@ -905,17 +906,6 @@ public final class Display {
     }
 
     /**
-     * Returns whether this display should support showing system decorations.
-     *
-     * @see #FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS
-     * @hide
-     */
-    // TODO (b/114338689): Remove the method and use IWindowManager#shouldShowSystemDecors
-    public boolean supportsSystemDecorations() {
-        return (mDisplayInfo.flags & FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS) != 0;
-    }
-
-    /**
      * Returns the display's HDR capabilities.
      *
      * @see #isHdr()
@@ -1107,16 +1097,19 @@ public final class Display {
      * Returns true if the specified UID has access to this display.
      * @hide
      */
+    @TestApi
     public boolean hasAccess(int uid) {
-        return Display.hasAccess(uid, mFlags, mOwnerUid);
+        return hasAccess(uid, mFlags, mOwnerUid, mDisplayId);
     }
 
     /** @hide */
-    public static boolean hasAccess(int uid, int flags, int ownerUid) {
+    public static boolean hasAccess(int uid, int flags, int ownerUid, int displayId) {
         return (flags & Display.FLAG_PRIVATE) == 0
                 || uid == ownerUid
                 || uid == Process.SYSTEM_UID
-                || uid == 0;
+                || uid == 0
+                // Check if the UID is present on given display.
+                || DisplayManagerGlobal.getInstance().isUidPresentOnDisplay(uid, displayId);
     }
 
     /**
@@ -1372,7 +1365,7 @@ public final class Display {
         }
 
         @SuppressWarnings("hiding")
-        public static final Parcelable.Creator<Mode> CREATOR
+        public static final @android.annotation.NonNull Parcelable.Creator<Mode> CREATOR
                 = new Parcelable.Creator<Mode>() {
             @Override
             public Mode createFromParcel(Parcel in) {
@@ -1501,7 +1494,7 @@ public final class Display {
             return hash;
         }
 
-        public static final Creator<HdrCapabilities> CREATOR = new Creator<HdrCapabilities>() {
+        public static final @android.annotation.NonNull Creator<HdrCapabilities> CREATOR = new Creator<HdrCapabilities>() {
             @Override
             public HdrCapabilities createFromParcel(Parcel source) {
                 return new HdrCapabilities(source);

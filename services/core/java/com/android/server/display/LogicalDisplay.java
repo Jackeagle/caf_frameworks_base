@@ -87,12 +87,20 @@ final class LogicalDisplay {
     // True if the logical display has unique content.
     private boolean mHasContent;
 
-    private int mRequestedModeId;
+    private int[] mAllowedDisplayModes = new int[0];
     private int mRequestedColorMode;
 
     // The display offsets to apply to the display projection.
     private int mDisplayOffsetX;
     private int mDisplayOffsetY;
+
+    /**
+     * {@code true} if display scaling is disabled, or {@code false} if the default scaling mode
+     * is used.
+     * @see #isDisplayScalingDisabled()
+     * @see #setDisplayScalingDisabledLocked(boolean)
+     */
+    private boolean mDisplayScalingDisabled;
 
     // Temporary rectangle used when needed.
     private final Rect mTempLayerStackRect = new Rect();
@@ -293,6 +301,7 @@ final class LogicalDisplay {
             boolean maskCutout =
                     (deviceInfo.flags & DisplayDeviceInfo.FLAG_MASK_DISPLAY_CUTOUT) != 0;
             mBaseDisplayInfo.displayCutout = maskCutout ? null : deviceInfo.displayCutout;
+            mBaseDisplayInfo.displayId = mDisplayId;
 
             mPrimaryDisplayDeviceInfo = deviceInfo;
             mInfo = null;
@@ -345,12 +354,14 @@ final class LogicalDisplay {
         // Set the layer stack.
         device.setLayerStackLocked(t, isBlanked ? BLANK_LAYER_STACK : mLayerStack);
 
-        // Set the color mode and mode.
+        // Set the color mode and allowed display mode.
         if (device == mPrimaryDisplayDevice) {
-            device.requestDisplayModesLocked(
-                    mRequestedColorMode, mRequestedModeId);
+            device.setAllowedDisplayModesLocked(mAllowedDisplayModes);
+            device.setRequestedColorModeLocked(mRequestedColorMode);
         } else {
-            device.requestDisplayModesLocked(0, 0);  // Revert to default.
+            // Reset to default for non primary displays
+            device.setAllowedDisplayModesLocked(new int[] {0});
+            device.setRequestedColorModeLocked(0);
         }
 
         // Only grab the display info now as it may have been changed based on the requests above.
@@ -397,7 +408,7 @@ final class LogicalDisplay {
         // multiplying the fractions by the product of their denominators before
         // comparing them.
         int displayRectWidth, displayRectHeight;
-        if ((displayInfo.flags & Display.FLAG_SCALING_DISABLED) != 0) {
+        if ((displayInfo.flags & Display.FLAG_SCALING_DISABLED) != 0 || mDisplayScalingDisabled) {
             displayRectWidth = displayInfo.logicalWidth;
             displayRectHeight = displayInfo.logicalHeight;
         } else if (physWidth * displayInfo.logicalHeight
@@ -454,17 +465,17 @@ final class LogicalDisplay {
     }
 
     /**
-     * Requests the given mode.
+     * Sets the display modes the system is free to switch between.
      */
-    public void setRequestedModeIdLocked(int modeId) {
-        mRequestedModeId = modeId;
+    public void setAllowedDisplayModesLocked(int[] modes) {
+        mAllowedDisplayModes = modes;
     }
 
     /**
-     * Returns the pending requested mode.
+     * Returns the display modes the system is free to switch between.
      */
-    public int getRequestedModeIdLocked() {
-        return mRequestedModeId;
+    public int[] getAllowedDisplayModesLocked() {
+        return mAllowedDisplayModes;
     }
 
     /**
@@ -501,13 +512,32 @@ final class LogicalDisplay {
         mDisplayOffsetY = y;
     }
 
+    /**
+     * @return {@code true} if display scaling is disabled, or {@code false} if the default scaling
+     * mode is used.
+     */
+    public boolean isDisplayScalingDisabled() {
+        return mDisplayScalingDisabled;
+    }
+
+    /**
+     * Disables scaling for a display.
+     *
+     * @param disableScaling {@code true} to disable scaling,
+     * {@code false} to use the default scaling behavior of the logical display.
+     */
+    public void setDisplayScalingDisabledLocked(boolean disableScaling) {
+        mDisplayScalingDisabled = disableScaling;
+    }
+
     public void dumpLocked(PrintWriter pw) {
         pw.println("mDisplayId=" + mDisplayId);
         pw.println("mLayerStack=" + mLayerStack);
         pw.println("mHasContent=" + mHasContent);
-        pw.println("mRequestedMode=" + mRequestedModeId);
+        pw.println("mAllowedDisplayModes=" + Arrays.toString(mAllowedDisplayModes));
         pw.println("mRequestedColorMode=" + mRequestedColorMode);
         pw.println("mDisplayOffset=(" + mDisplayOffsetX + ", " + mDisplayOffsetY + ")");
+        pw.println("mDisplayScalingDisabled=" + mDisplayScalingDisabled);
         pw.println("mPrimaryDisplayDevice=" + (mPrimaryDisplayDevice != null ?
                 mPrimaryDisplayDevice.getNameLocked() : "null"));
         pw.println("mBaseDisplayInfo=" + mBaseDisplayInfo);

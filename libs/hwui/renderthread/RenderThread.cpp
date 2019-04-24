@@ -28,6 +28,8 @@
 #include "renderstate/RenderState.h"
 #include "utils/FatVector.h"
 #include "utils/TimeUtils.h"
+#include "utils/TraceUtils.h"
+#include "../HardwareBitmapUploader.h"
 
 #ifdef HWUI_GLES_WRAP_ENABLED
 #include "debug/GlesDriver.h"
@@ -41,6 +43,7 @@
 #include <utils/Condition.h>
 #include <utils/Log.h>
 #include <utils/Mutex.h>
+#include <thread>
 
 namespace android {
 namespace uirenderer {
@@ -51,12 +54,9 @@ namespace renderthread {
 // using just a few large reads.
 static const size_t EVENT_BUFFER_SIZE = 100;
 
-// Slight delay to give the UI time to push us a new frame before we replay
-static const nsecs_t DISPATCH_FRAME_CALLBACKS_DELAY = milliseconds_to_nanoseconds(4);
-
 static bool gHasRenderThreadInstance = false;
 
-static void (*gOnStartHook)() = nullptr;
+static JVMAttachHook gOnStartHook = nullptr;
 
 class DisplayEventReceiverWrapper : public VsyncSource {
 public:
@@ -111,9 +111,13 @@ bool RenderThread::hasInstance() {
     return gHasRenderThreadInstance;
 }
 
-void RenderThread::setOnStartHook(void (*onStartHook)()) {
+void RenderThread::setOnStartHook(JVMAttachHook onStartHook) {
     LOG_ALWAYS_FATAL_IF(hasInstance(), "can't set an onStartHook after we've started...");
     gOnStartHook = onStartHook;
+}
+
+JVMAttachHook RenderThread::getOnStartHook() {
+    return gOnStartHook;
 }
 
 RenderThread& RenderThread::getInstance() {
@@ -166,14 +170,12 @@ void RenderThread::initThreadLocals() {
     mDisplayInfo = DeviceInfo::get()->displayInfo();
     nsecs_t frameIntervalNanos = static_cast<nsecs_t>(1000000000 / mDisplayInfo.fps);
     mTimeLord.setFrameInterval(frameIntervalNanos);
+    mDispatchFrameDelay = static_cast<nsecs_t>(frameIntervalNanos * .25f);
     initializeDisplayEventReceiver();
     mEglManager = new EglManager();
     mRenderState = new RenderState(*this);
-    mVkManager = new VulkanManager(*this);
+    mVkManager = new VulkanManager();
     mCacheManager = new CacheManager(mDisplayInfo);
-    if (Properties::getRenderPipelineType() == RenderPipelineType::SkiaVulkan) {
-        mVkManager->initialize();
-    }
 }
 
 void RenderThread::requireGlContext() {
@@ -191,8 +193,7 @@ void RenderThread::requireGlContext() {
     LOG_ALWAYS_FATAL_IF(!glInterface.get());
 
     GrContextOptions options;
-    options.fPreferExternalImagesOverES3 = true;
-    options.fDisableDistanceFieldPaths = true;
+    initGrContextOptions(options);
     auto glesVersion = reinterpret_cast<const char*>(glGetString(GL_VERSION));
     auto size = glesVersion ? strlen(glesVersion) : -1;
     cacheManager().configureContext(&options, glesVersion, size);
@@ -201,13 +202,38 @@ void RenderThread::requireGlContext() {
     setGrContext(grContext);
 }
 
+void RenderThread::requireVkContext() {
+    if (mVkManager->hasVkContext()) {
+        return;
+    }
+    mVkManager->initialize();
+    GrContextOptions options;
+    initGrContextOptions(options);
+    auto vkDriverVersion = mVkManager->getDriverVersion();
+    cacheManager().configureContext(&options, &vkDriverVersion, sizeof(vkDriverVersion));
+    sk_sp<GrContext> grContext = mVkManager->createContext(options);
+    LOG_ALWAYS_FATAL_IF(!grContext.get());
+    setGrContext(grContext);
+}
+
+void RenderThread::initGrContextOptions(GrContextOptions& options) {
+    options.fPreferExternalImagesOverES3 = true;
+    options.fDisableDistanceFieldPaths = true;
+}
+
 void RenderThread::destroyRenderingContext() {
     mFunctorManager.onContextDestroyed();
-    if (mEglManager->hasEglContext()) {
-        setGrContext(nullptr);
-        mEglManager->destroy();
+    if (Properties::getRenderPipelineType() == RenderPipelineType::SkiaGL) {
+        if (mEglManager->hasEglContext()) {
+            setGrContext(nullptr);
+            mEglManager->destroy();
+        }
+    } else {
+        if (vulkanManager().hasVkContext()) {
+            setGrContext(nullptr);
+            vulkanManager().destroy();
+        }
     }
-    vulkanManager().destroy();
 }
 
 void RenderThread::dumpGraphicsMemory(int fd) {
@@ -285,7 +311,7 @@ void RenderThread::drainDisplayEventQueue() {
         if (mTimeLord.vsyncReceived(vsyncEvent) && !mFrameCallbackTaskPending) {
             ATRACE_NAME("queue mFrameCallbackTask");
             mFrameCallbackTaskPending = true;
-            nsecs_t runAt = (vsyncEvent + DISPATCH_FRAME_CALLBACKS_DELAY);
+            nsecs_t runAt = (vsyncEvent + mDispatchFrameDelay);
             queue().postAt(runAt, [this]() { dispatchFrameCallbacks(); });
         }
     }
@@ -318,8 +344,9 @@ void RenderThread::requestVsync() {
 
 bool RenderThread::threadLoop() {
     setpriority(PRIO_PROCESS, 0, PRIORITY_DISPLAY);
+    Looper::setForThread(mLooper);
     if (gOnStartHook) {
-        gOnStartHook();
+        gOnStartHook("RenderThread");
     }
     initThreadLocals();
 
@@ -378,6 +405,19 @@ sk_sp<Bitmap> RenderThread::allocateHardwareBitmap(SkBitmap& skBitmap) {
 
 bool RenderThread::isCurrent() {
     return gettid() == getInstance().getTid();
+}
+
+void RenderThread::preload() {
+    // EGL driver is always preloaded only if HWUI renders with GL.
+    if (Properties::getRenderPipelineType() == RenderPipelineType::SkiaGL) {
+        std::thread eglInitThread([]() {
+            eglGetDisplay(EGL_DEFAULT_DISPLAY);
+        });
+        eglInitThread.detach();
+    } else {
+        requireVkContext();
+    }
+    HardwareBitmapUploader::initialize();
 }
 
 } /* namespace renderthread */

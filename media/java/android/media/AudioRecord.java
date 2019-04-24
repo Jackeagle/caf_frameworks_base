@@ -17,12 +17,18 @@
 package android.media;
 
 import android.annotation.CallbackExecutor;
+import android.annotation.FloatRange;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SystemApi;
+import android.annotation.TestApi;
 import android.annotation.UnsupportedAppUsage;
 import android.app.ActivityThread;
+import android.media.MediaRecorder.Source;
+import android.media.audiopolicy.AudioMix;
+import android.media.audiopolicy.AudioPolicy;
+import android.media.projection.MediaProjection;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
@@ -36,6 +42,7 @@ import android.util.Log;
 import android.util.Pair;
 
 import com.android.internal.annotations.GuardedBy;
+import com.android.internal.util.Preconditions;
 
 import java.io.IOException;
 import java.lang.annotation.Retention;
@@ -181,6 +188,8 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection,
     //---------------------------------------------------------
     // Member variables
     //--------------------
+    private AudioPolicy mAudioCapturePolicy;
+
     /**
      * The audio data sampling rate in Hz.
      * Never {@link AudioFormat#SAMPLE_RATE_UNSPECIFIED}.
@@ -395,7 +404,7 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection,
         int initResult = native_setup( new WeakReference<AudioRecord>(this),
                 mAudioAttributes, sampleRate, mChannelMask, mChannelIndexMask,
                 mAudioFormat, mNativeBufferSizeInBytes,
-                session, ActivityThread.currentOpPackageName(), 0 /*nativeRecordInJavaObj*/);
+                session, getCurrentOpPackageName(), 0 /*nativeRecordInJavaObj*/);
         if (initResult != SUCCESS) {
             loge("Error code "+initResult+" when initializing native AudioRecord object.");
             return; // with mState == STATE_UNINITIALIZED
@@ -405,6 +414,15 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection,
         mSessionId = session[0];
 
         mState = STATE_INITIALIZED;
+    }
+
+    private String getCurrentOpPackageName() {
+        String opPackageName = ActivityThread.currentOpPackageName();
+        if (opPackageName != null) {
+            return opPackageName;
+        }
+        // Command line utility
+        return "uid:" + Binder.getCallingUid();
     }
 
     /**
@@ -425,6 +443,16 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection,
         } else {
             mState = STATE_UNINITIALIZED;
         }
+    }
+
+    /**
+     * Sets an {@link AudioPolicy} to automatically unregister when the record is released.
+     *
+     * <p>This is to prevent users of the audio capture API from having to manually unregister the
+     * policy that was used to create the record.
+     */
+    private void unregisterAudioPolicyOnRelease(AudioPolicy audioPolicy) {
+        mAudioCapturePolicy = audioPolicy;
     }
 
     /**
@@ -490,6 +518,11 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection,
      * the minimum buffer size for the source is used.
      */
     public static class Builder {
+
+        private static final String ERROR_MESSAGE_SOURCE_MISMATCH =
+                "Cannot both set audio source and set playback capture config";
+
+        private AudioPlaybackCaptureConfiguration mAudioPlaybackCaptureConfiguration;
         private AudioAttributes mAttributes;
         private AudioFormat mFormat;
         private int mBufferSizeInBytes;
@@ -507,7 +540,10 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection,
          * @return the same Builder instance.
          * @throws IllegalArgumentException
          */
-        public Builder setAudioSource(int source) throws IllegalArgumentException {
+        public Builder setAudioSource(@Source int source) throws IllegalArgumentException {
+            Preconditions.checkState(
+                    mAudioPlaybackCaptureConfiguration == null,
+                    ERROR_MESSAGE_SOURCE_MISMATCH);
             if ( (source < MediaRecorder.AudioSource.DEFAULT) ||
                     (source > MediaRecorder.getAudioSourceMax()) ) {
                 throw new IllegalArgumentException("Invalid audio source " + source);
@@ -577,6 +613,25 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection,
         }
 
         /**
+         * Sets the {@link AudioRecord} to record audio played by other apps.
+         *
+         * @param config Defines what apps to record audio from (i.e., via either their uid or
+         *               the type of audio).
+         * @throws IllegalStateException if called in conjunction with {@link #setAudioSource(int)}.
+         * @throws NullPointerException if {@code config} is null.
+         */
+        public @NonNull Builder setAudioPlaybackCaptureConfig(
+                @NonNull AudioPlaybackCaptureConfiguration config) {
+            Preconditions.checkNotNull(
+                    config, "Illegal null AudioPlaybackCaptureConfiguration argument");
+            Preconditions.checkState(
+                    mAttributes == null,
+                    ERROR_MESSAGE_SOURCE_MISMATCH);
+            mAudioPlaybackCaptureConfiguration = config;
+            return this;
+        }
+
+        /**
          * @hide
          * To be only used by system components.
          * @param sessionId ID of audio session the AudioRecord must be attached to, or
@@ -594,6 +649,26 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection,
             return this;
         }
 
+        private @NonNull AudioRecord buildAudioPlaybackCaptureRecord() {
+            AudioMix audioMix = mAudioPlaybackCaptureConfiguration.createAudioMix(mFormat);
+            MediaProjection projection = mAudioPlaybackCaptureConfiguration.getMediaProjection();
+            AudioPolicy audioPolicy = new AudioPolicy.Builder(/*context=*/ null)
+                    .setMediaProjection(projection)
+                    .addMix(audioMix).build();
+
+            int error = AudioManager.registerAudioPolicyStatic(audioPolicy);
+            if (error != 0) {
+                throw new UnsupportedOperationException("Error: could not register audio policy");
+            }
+
+            AudioRecord record = audioPolicy.createAudioRecordSink(audioMix);
+            if (record == null) {
+                throw new UnsupportedOperationException("Cannot create AudioRecord");
+            }
+            record.unregisterAudioPolicyOnRelease(audioPolicy);
+            return record;
+        }
+
         /**
          * @return a new {@link AudioRecord} instance successfully initialized with all
          *     the parameters set on this <code>Builder</code>.
@@ -602,6 +677,10 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection,
          *     or if the device was not available.
          */
         public AudioRecord build() throws UnsupportedOperationException {
+            if (mAudioPlaybackCaptureConfiguration != null) {
+                return buildAudioPlaybackCaptureRecord();
+            }
+
             if (mFormat == null) {
                 mFormat = new AudioFormat.Builder()
                         .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
@@ -755,6 +834,9 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection,
             stop();
         } catch(IllegalStateException ise) {
             // don't raise an exception, we're releasing the resources.
+        }
+        if (mAudioCapturePolicy != null) {
+            AudioManager.unregisterAudioPolicyAsyncStatic(mAudioCapturePolicy);
         }
         native_release();
         mState = STATE_UNINITIALIZED;
@@ -1711,14 +1793,14 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection,
     // MicrophoneDirection
     //--------------------
     /**
-     * Specifies the logical microphone (for processing).
+     * Specifies the logical microphone (for processing). Applications can use this to specify
+     * which side of the device to optimize capture from. Typically used in conjunction with
+     * the camera capturing video.
      *
-     * @param direction Direction constant (MicrophoneDirection.MIC_DIRECTION_*)
-     * @return retval OK if the call is successful, an error code otherwise.
-     * @hide
+     * @return true if sucessful.
      */
-    public int setMicrophoneDirection(int direction) {
-        return native_set_microphone_direction(direction);
+    public boolean setPreferredMicrophoneDirection(@DirectionMode int direction) {
+        return native_set_preferred_microphone_direction(direction) == AudioSystem.SUCCESS;
     }
 
     /**
@@ -1727,11 +1809,13 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection,
      *
      * @param zoom the desired field dimension of microphone capture. Range is from -1 (wide angle),
      * though 0 (no zoom) to 1 (maximum zoom).
-     * @return retval OK if the call is successful, an error code otherwise.
-     * @hide
+     * @return true if sucessful.
      */
-    public int setMicrophoneFieldDimension(float zoom) {
-        return native_set_microphone_field_dimension(zoom);
+    public boolean setPreferredMicrophoneFieldDimension(
+                            @FloatRange(from = -1.0, to = 1.0) float zoom) {
+        Preconditions.checkArgument(
+                zoom >= -1 && zoom <= 1, "Argument must fall between -1 & 1 (inclusive)");
+        return native_set_preferred_microphone_field_dimension(zoom) == AudioSystem.SUCCESS;
     }
 
     //---------------------------------------------------------
@@ -1887,8 +1971,8 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection,
 
     private native int native_getPortId();
 
-    private native int native_set_microphone_direction(int direction);
-    private native int native_set_microphone_field_dimension(float zoom);
+    private native int native_set_preferred_microphone_direction(int direction);
+    private native int native_set_preferred_microphone_field_dimension(float zoom);
 
     //---------------------------------------------------------
     // Utility methods
@@ -1906,41 +1990,100 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection,
     {
         private MetricsConstants() {}
 
-        /**
-         * Key to extract the output format being recorded
-         * from the {@link AudioRecord#getMetrics} return value.
-         * The value is a String.
-         */
-        public static final String ENCODING = "android.media.audiorecord.encoding";
+        // MM_PREFIX is slightly different than TAG, used to avoid cut-n-paste errors.
+        private static final String MM_PREFIX = "android.media.audiorecord.";
 
         /**
-         * Key to extract the Source Type for this track
+         * Key to extract the audio data encoding for this track
          * from the {@link AudioRecord#getMetrics} return value.
-         * The value is a String.
+         * The value is a {@code String}.
          */
-        public static final String SOURCE = "android.media.audiorecord.source";
+        public static final String ENCODING = MM_PREFIX + "encoding";
+
+        /**
+         * Key to extract the source type for this track
+         * from the {@link AudioRecord#getMetrics} return value.
+         * The value is a {@code String}.
+         */
+        public static final String SOURCE = MM_PREFIX + "source";
 
         /**
          * Key to extract the estimated latency through the recording pipeline
          * from the {@link AudioRecord#getMetrics} return value.
          * This is in units of milliseconds.
-         * The value is an integer.
+         * The value is an {@code int}.
+         * @deprecated Not properly supported in the past.
          */
-        public static final String LATENCY = "android.media.audiorecord.latency";
+        @Deprecated
+        public static final String LATENCY = MM_PREFIX + "latency";
 
         /**
          * Key to extract the sink sample rate for this record track in Hz
          * from the {@link AudioRecord#getMetrics} return value.
-         * The value is an integer.
+         * The value is an {@code int}.
          */
-        public static final String SAMPLERATE = "android.media.audiorecord.samplerate";
+        public static final String SAMPLERATE = MM_PREFIX + "samplerate";
 
         /**
          * Key to extract the number of channels being recorded in this record track
          * from the {@link AudioRecord#getMetrics} return value.
-         * The value is an integer.
+         * The value is an {@code int}.
          */
-        public static final String CHANNELS = "android.media.audiorecord.channels";
+        public static final String CHANNELS = MM_PREFIX + "channels";
 
+        /**
+         * Use for testing only. Do not expose.
+         * The native channel mask.
+         * The value is a {@code long}.
+         * @hide
+         */
+        @TestApi
+        public static final String CHANNEL_MASK = MM_PREFIX + "channelMask";
+
+
+        /**
+         * Use for testing only. Do not expose.
+         * The port id of this input port in audioserver.
+         * The value is an {@code int}.
+         * @hide
+         */
+        @TestApi
+        public static final String PORT_ID = MM_PREFIX + "portId";
+
+        /**
+         * Use for testing only. Do not expose.
+         * The buffer frameCount.
+         * The value is an {@code int}.
+         * @hide
+         */
+        @TestApi
+        public static final String FRAME_COUNT = MM_PREFIX + "frameCount";
+
+        /**
+         * Use for testing only. Do not expose.
+         * The actual record track attributes used.
+         * The value is a {@code String}.
+         * @hide
+         */
+        @TestApi
+        public static final String ATTRIBUTES = MM_PREFIX + "attributes";
+
+        /**
+         * Use for testing only. Do not expose.
+         * The buffer frameCount
+         * The value is a {@code double}.
+         * @hide
+         */
+        @TestApi
+        public static final String DURATION_MS = MM_PREFIX + "durationMs";
+
+        /**
+         * Use for testing only. Do not expose.
+         * The number of times the record track has started
+         * The value is a {@code long}.
+         * @hide
+         */
+        @TestApi
+        public static final String START_COUNT = MM_PREFIX + "startCount";
     }
 }

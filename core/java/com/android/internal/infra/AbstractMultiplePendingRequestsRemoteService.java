@@ -19,6 +19,7 @@ package com.android.internal.infra;
 import android.annotation.NonNull;
 import android.content.ComponentName;
 import android.content.Context;
+import android.os.Handler;
 import android.os.IInterface;
 import android.util.Slog;
 
@@ -31,7 +32,6 @@ import java.util.ArrayList;
  *
  * @param <S> the concrete remote service class
  * @param <I> the interface of the binder service
- * @hide
  */
 public abstract class AbstractMultiplePendingRequestsRemoteService<S
         extends AbstractMultiplePendingRequestsRemoteService<S, I>, I extends IInterface>
@@ -39,13 +39,13 @@ public abstract class AbstractMultiplePendingRequestsRemoteService<S
 
     private final int mInitialCapacity;
 
-    protected ArrayList<PendingRequest<S, I>> mPendingRequests;
+    protected ArrayList<BasePendingRequest<S, I>> mPendingRequests;
 
     public AbstractMultiplePendingRequestsRemoteService(@NonNull Context context,
             @NonNull String serviceInterface, @NonNull ComponentName componentName, int userId,
-            @NonNull VultureCallback<S> callback, boolean bindInstantServiceAllowed,
-            boolean verbose, int initialCapacity) {
-        super(context, serviceInterface, componentName, userId, callback, bindInstantServiceAllowed,
+            @NonNull VultureCallback<S> callback, @NonNull Handler handler,
+            int bindingFlags, boolean verbose, int initialCapacity) {
+        super(context, serviceInterface, componentName, userId, callback, handler, bindingFlags,
                 verbose);
         mInitialCapacity = initialCapacity;
     }
@@ -85,7 +85,7 @@ public abstract class AbstractMultiplePendingRequestsRemoteService<S
     }
 
     @Override // from AbstractRemoteService
-    void handlePendingRequestWhileUnBound(@NonNull PendingRequest<S, I> pendingRequest) {
+    void handlePendingRequestWhileUnBound(@NonNull BasePendingRequest<S, I> pendingRequest) {
         if (mPendingRequests == null) {
             mPendingRequests = new ArrayList<>(mInitialCapacity);
         }

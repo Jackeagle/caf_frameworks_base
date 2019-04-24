@@ -34,6 +34,7 @@
     <string name="keyguard_password_wrong_pin_code" msgid="6535018036285012028">"ПИН код буруу байна."</string>
     <string name="keyguard_sim_error_message_short" msgid="592109500618448312">"Карт хүчингүй байна."</string>
     <string name="keyguard_charged" msgid="3316115607283493413">"Бүрэн цэнэглэсэн"</string>
+    <string name="keyguard_plugged_in_wireless" msgid="3004717438401575235">"<xliff:g id="PERCENTAGE">%s</xliff:g> • Утасгүй цэнэглэж байна"</string>
     <string name="keyguard_plugged_in" msgid="3161102098900158923">"<xliff:g id="PERCENTAGE">%s</xliff:g> • Цэнэглэж байна"</string>
     <string name="keyguard_plugged_in_charging_fast" msgid="3684592786276709342">"<xliff:g id="PERCENTAGE">%s</xliff:g> • Хурдан цэнэглэж байна"</string>
     <string name="keyguard_plugged_in_charging_slowly" msgid="509533586841478405">"<xliff:g id="PERCENTAGE">%s</xliff:g> • Удаан цэнэглэж байна"</string>
@@ -150,7 +151,10 @@
       <item quantity="other">SIM-г идэвхгүй болголоо. Үргэлжлүүлэхийн тулд PUK кодыг оруулна уу. Таны SIM бүрмөсөн хүчингүй болох хүртэл <xliff:g id="_NUMBER_1">%d</xliff:g> оролдлого үлдлээ. Дэлгэрэнгүй мэдээлэл авахын тулд оператор компанитайгаа холбогдоно уу.</item>
       <item quantity="one">SIM-г идэвхгүй болголоо. Үргэлжлүүлэхийн тулд PUK кодыг оруулна уу. Таны SIM бүрмөсөн хүчингүй болох хүртэл <xliff:g id="_NUMBER_0">%d</xliff:g> оролдлого үлдлээ. Дэлгэрэнгүй мэдээлэл авахын тулд оператор компанитайгаа холбогдоно уу.</item>
     </plurals>
-    <string name="type_clock_header" msgid="4786545441902447636">"Одоо"</string>
+    <plurals name="type_clock_header" formatted="false" msgid="6782840450655632763">
+      <item quantity="other">"<annotation name="color">"Одоо"</annotation>\n"^1\n^2</item>
+      <item quantity="one">"<annotation name="color">"Одоо"</annotation>\n"^1\n^2</item>
+    </plurals>
   <string-array name="type_clock_hours">
     <item msgid="3543074812389379830">"Арван хоёр"</item>
     <item msgid="7389464214252023751">"Нэг"</item>
@@ -167,15 +171,15 @@
   </string-array>
   <string-array name="type_clock_minutes">
     <item msgid="8322049385467207985">"Цаг"</item>
-    <item msgid="8837126587669001578">"Нэг"</item>
-    <item msgid="4294343372940455660">"Хоёр"</item>
-    <item msgid="7129166637707421536">"Гурав"</item>
-    <item msgid="7579404865008788673">"Дөрөв"</item>
-    <item msgid="3873924689207380586">"Тав"</item>
-    <item msgid="4849565597850069377">"Зургаа"</item>
-    <item msgid="4404219424523572364">"Долоо"</item>
-    <item msgid="8740481214764087329">"Найм"</item>
-    <item msgid="1713216865806811237">"Ес"</item>
+    <item msgid="2091812961809760681">"Нэг"</item>
+    <item msgid="1496435384877290709">"Хоёр"</item>
+    <item msgid="881846472976674129">"Гурав"</item>
+    <item msgid="2784477043911540584">"Дөрөв"</item>
+    <item msgid="1610928853656700614">"Тав"</item>
+    <item msgid="2317806244043886658">"Зургаа"</item>
+    <item msgid="3318687539120971327">"Долоо"</item>
+    <item msgid="5701600693712102348">"Найм"</item>
+    <item msgid="3247381605947372495">"Ес"</item>
     <item msgid="3508406095411245038">"Арав"</item>
     <item msgid="7161996337755311711">"Арван нэг"</item>
     <item msgid="4044549963329624197">"Арван хоёр"</item>

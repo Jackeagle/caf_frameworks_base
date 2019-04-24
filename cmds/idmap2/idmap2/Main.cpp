@@ -24,13 +24,17 @@
 #include <vector>
 
 #include "idmap2/CommandLineOptions.h"
+#include "idmap2/Result.h"
+#include "idmap2/SysTrace.h"
 
 #include "Commands.h"
 
 using android::idmap2::CommandLineOptions;
+using android::idmap2::Result;
+using android::idmap2::Unit;
 
 using NameToFunctionMap =
-    std::map<std::string, std::function<bool(const std::vector<std::string>&, std::ostream&)>>;
+    std::map<std::string, std::function<Result<Unit>(const std::vector<std::string>&)>>;
 
 namespace {
 
@@ -48,6 +52,7 @@ void PrintUsage(const NameToFunctionMap& commands, std::ostream& out) {
 }  // namespace
 
 int main(int argc, char** argv) {
+  SYSTRACE << "main";
   const NameToFunctionMap commands = {
       {"create", Create}, {"dump", Dump}, {"lookup", Lookup}, {"scan", Scan}, {"verify", Verify},
   };
@@ -67,5 +72,10 @@ int main(int argc, char** argv) {
     PrintUsage(commands, std::cerr);
     return EXIT_FAILURE;
   }
-  return iter->second(*args, std::cerr) ? EXIT_SUCCESS : EXIT_FAILURE;
+  const auto result = iter->second(*args);
+  if (!result) {
+    std::cerr << "error: " << result.GetErrorMessage() << std::endl;
+    return EXIT_FAILURE;
+  }
+  return EXIT_SUCCESS;
 }

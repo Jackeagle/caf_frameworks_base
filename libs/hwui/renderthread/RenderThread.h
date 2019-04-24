@@ -24,6 +24,7 @@
 #include "TimeLord.h"
 #include "thread/ThreadBase.h"
 #include "WebViewFunctorManager.h"
+#include "utils/TimeUtils.h"
 
 #include <GrContext.h>
 #include <SkBitmap.h>
@@ -40,6 +41,7 @@
 namespace android {
 
 class Bitmap;
+class AutoBackendTextureRelease;
 
 namespace uirenderer {
 
@@ -75,12 +77,15 @@ struct VsyncSource {
 
 class DummyVsyncSource;
 
+typedef void (*JVMAttachHook)(const char* name);
+
 class RenderThread : private ThreadBase {
     PREVENT_COPY_AND_ASSIGN(RenderThread);
 
 public:
     // Sets a callback that fires before any RenderThread setup has occurred.
-    ANDROID_API static void setOnStartHook(void (*onStartHook)());
+    ANDROID_API static void setOnStartHook(JVMAttachHook onStartHook);
+    static JVMAttachHook getOnStartHook();
 
     WorkQueue& queue() { return ThreadBase::queue(); }
 
@@ -109,7 +114,10 @@ public:
     void dumpGraphicsMemory(int fd);
 
     void requireGlContext();
+    void requireVkContext();
     void destroyRenderingContext();
+
+    void preload();
 
     /**
      * isCurrent provides a way to query, if the caller is running on
@@ -119,6 +127,8 @@ public:
      */
     static bool isCurrent();
 
+    static void initGrContextOptions(GrContextOptions& options);
+
 protected:
     virtual bool threadLoop() override;
 
@@ -126,6 +136,7 @@ private:
     friend class DispatchFrameCallbacks;
     friend class RenderProxy;
     friend class DummyVsyncSource;
+    friend class android::AutoBackendTextureRelease;
     friend class android::uirenderer::TestUtils;
     friend class android::uirenderer::WebViewFunctor;
     friend class android::uirenderer::skiapipeline::VkFunctorDrawHandler;
@@ -156,6 +167,7 @@ private:
     bool mFrameCallbackTaskPending;
 
     TimeLord mTimeLord;
+    nsecs_t mDispatchFrameDelay = 4_ms;
     RenderState* mRenderState;
     EglManager* mEglManager;
     WebViewFunctorManager& mFunctorManager;

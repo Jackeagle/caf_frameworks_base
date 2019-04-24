@@ -24,6 +24,8 @@ import static com.android.systemui.util.SysuiLifecycle.viewAttachLifecycle;
 import static java.lang.annotation.RetentionPolicy.SOURCE;
 
 import android.animation.ArgbEvaluator;
+import android.animation.LayoutTransition;
+import android.animation.ObjectAnimator;
 import android.annotation.IntDef;
 import android.app.ActivityManager;
 import android.content.Context;
@@ -45,8 +47,10 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.annotation.StyleRes;
+
 import com.android.settingslib.Utils;
-import com.android.settingslib.graph.BatteryMeterDrawableBase;
+import com.android.settingslib.graph.ThemedBatteryDrawable;
 import com.android.systemui.plugins.DarkIconDispatcher;
 import com.android.systemui.plugins.DarkIconDispatcher.DarkReceiver;
 import com.android.systemui.settings.CurrentUserTracker;
@@ -76,7 +80,7 @@ public class BatteryMeterView extends LinearLayout implements
     public static final int MODE_OFF = 2;
     public static final int MODE_ESTIMATE = 3;
 
-    private final BatteryMeterDrawableBase mDrawable;
+    private final ThemedBatteryDrawable mDrawable;
     private final String mSlotBattery;
     private final ImageView mBatteryIconView;
     private final CurrentUserTracker mUserTracker;
@@ -84,6 +88,7 @@ public class BatteryMeterView extends LinearLayout implements
 
     private BatteryController mBatteryController;
     private SettingObserver mSettingObserver;
+    private final @StyleRes int mPercentageStyleId;
     private int mTextColor;
     private int mLevel;
     private int mShowPercentMode = MODE_DEFAULT;
@@ -94,9 +99,11 @@ public class BatteryMeterView extends LinearLayout implements
     private boolean mIsSubscribedForTunerUpdates;
     private boolean mCharging;
 
+    private int mDarkModeSingleToneColor;
     private int mDarkModeBackgroundColor;
     private int mDarkModeFillColor;
 
+    private int mLightModeSingleToneColor;
     private int mLightModeBackgroundColor;
     private int mLightModeFillColor;
     private int mUser;
@@ -106,6 +113,7 @@ public class BatteryMeterView extends LinearLayout implements
      */
     private boolean mUseWallpaperTextColors;
 
+    private int mNonAdaptedSingleToneColor;
     private int mNonAdaptedForegroundColor;
     private int mNonAdaptedBackgroundColor;
 
@@ -127,7 +135,8 @@ public class BatteryMeterView extends LinearLayout implements
                 defStyle, 0);
         final int frameColor = atts.getColor(R.styleable.BatteryMeterView_frameColor,
                 context.getColor(R.color.meter_background_color));
-        mDrawable = new BatteryMeterDrawableBase(context, frameColor);
+        mPercentageStyleId = atts.getResourceId(R.styleable.BatteryMeterView_textAppearance, 0);
+        mDrawable = new ThemedBatteryDrawable(context, frameColor);
         atts.recycle();
 
         mSettingObserver = new SettingObserver(new Handler(context.getMainLooper()));
@@ -137,6 +146,8 @@ public class BatteryMeterView extends LinearLayout implements
 
         addOnAttachStateChangeListener(
                 new DisableStateTracker(DISABLE_NONE, DISABLE2_SYSTEM_ICONS));
+
+        setupLayoutTransition();
 
         mSlotBattery = context.getString(
                 com.android.internal.R.string.status_bar_battery);
@@ -169,6 +180,25 @@ public class BatteryMeterView extends LinearLayout implements
         setClipChildren(false);
         setClipToPadding(false);
         Dependency.get(ConfigurationController.class).observe(viewAttachLifecycle(this), this);
+
+        // Needed for PorderDuff.Mode.CLEAR operations to work properly, but redraws don't happen
+        // enough to justify a hardware layer.
+        setLayerType(LAYER_TYPE_SOFTWARE, null);
+    }
+
+    private void setupLayoutTransition() {
+        LayoutTransition transition = new LayoutTransition();
+        transition.setDuration(200);
+
+        ObjectAnimator appearAnimator = ObjectAnimator.ofFloat(null, "alpha", 0f, 1f);
+        transition.setAnimator(LayoutTransition.APPEARING, appearAnimator);
+        transition.setInterpolator(LayoutTransition.APPEARING, Interpolators.ALPHA_IN);
+
+        ObjectAnimator disappearAnimator = ObjectAnimator.ofFloat(null, "alpha", 1f, 0f);
+        transition.setInterpolator(LayoutTransition.DISAPPEARING, Interpolators.ALPHA_OUT);
+        transition.setAnimator(LayoutTransition.DISAPPEARING, disappearAnimator);
+
+        setLayoutTransition(transition);
     }
 
     public void setForceShowPercent(boolean show) {
@@ -243,9 +273,11 @@ public class BatteryMeterView extends LinearLayout implements
         if (mUseWallpaperTextColors) {
             updateColors(
                     Utils.getColorAttrDefaultColor(mContext, R.attr.wallpaperTextColor),
-                    Utils.getColorAttrDefaultColor(mContext, R.attr.wallpaperTextColorSecondary));
+                    Utils.getColorAttrDefaultColor(mContext, R.attr.wallpaperTextColorSecondary),
+                    Utils.getColorAttrDefaultColor(mContext, R.attr.wallpaperTextColor));
         } else {
-            updateColors(mNonAdaptedForegroundColor, mNonAdaptedBackgroundColor);
+            updateColors(mNonAdaptedForegroundColor, mNonAdaptedBackgroundColor,
+                    mNonAdaptedSingleToneColor);
         }
     }
 
@@ -258,10 +290,14 @@ public class BatteryMeterView extends LinearLayout implements
                 Utils.getThemeAttr(context, R.attr.darkIconTheme));
         Context dualToneLightTheme = new ContextThemeWrapper(context,
                 Utils.getThemeAttr(context, R.attr.lightIconTheme));
+        mDarkModeSingleToneColor = Utils.getColorAttrDefaultColor(dualToneDarkTheme,
+                R.attr.singleToneColor);
         mDarkModeBackgroundColor = Utils.getColorAttrDefaultColor(dualToneDarkTheme,
                 R.attr.backgroundColor);
         mDarkModeFillColor = Utils.getColorAttrDefaultColor(dualToneDarkTheme,
                 R.attr.fillColor);
+        mLightModeSingleToneColor = Utils.getColorAttrDefaultColor(dualToneLightTheme,
+                R.attr.singleToneColor);
         mLightModeBackgroundColor = Utils.getColorAttrDefaultColor(dualToneLightTheme,
                 R.attr.backgroundColor);
         mLightModeFillColor = Utils.getColorAttrDefaultColor(dualToneLightTheme, R.attr.fillColor);
@@ -303,8 +339,8 @@ public class BatteryMeterView extends LinearLayout implements
 
     @Override
     public void onBatteryLevelChanged(int level, boolean pluggedIn, boolean charging) {
-        mDrawable.setBatteryLevel(level);
         mDrawable.setCharging(pluggedIn);
+        mDrawable.setBatteryLevel(level);
         mCharging = pluggedIn;
         mLevel = level;
         updatePercentText();
@@ -315,7 +351,7 @@ public class BatteryMeterView extends LinearLayout implements
 
     @Override
     public void onPowerSaveChanged(boolean isPowerSave) {
-        mDrawable.setPowerSave(isPowerSave);
+        mDrawable.setPowerSaveEnabled(isPowerSave);
     }
 
     private TextView loadPercentView() {
@@ -342,13 +378,21 @@ public class BatteryMeterView extends LinearLayout implements
         if (mBatteryPercentView != null) {
             if (mShowPercentMode == MODE_ESTIMATE && !mCharging) {
                 mBatteryController.getEstimatedTimeRemainingString((String estimate) -> {
-                    mBatteryPercentView.setText(estimate);
+                    if (estimate != null) {
+                        mBatteryPercentView.setText(estimate);
+                    } else {
+                        setPercentTextAtCurrentLevel();
+                    }
                 });
             } else {
-                mBatteryPercentView.setText(
-                        NumberFormat.getPercentInstance().format(mLevel / 100f));
+                setPercentTextAtCurrentLevel();
             }
         }
+    }
+
+    private void setPercentTextAtCurrentLevel() {
+        mBatteryPercentView.setText(
+                NumberFormat.getPercentInstance().format(mLevel / 100f));
     }
 
     private void updateShowPercent() {
@@ -362,6 +406,9 @@ public class BatteryMeterView extends LinearLayout implements
             if (!showing) {
                 mBatteryPercentView = loadPercentView();
                 if (mTextColor != 0) mBatteryPercentView.setTextColor(mTextColor);
+                if (mPercentageStyleId != 0) { // Only set if specified as attribute
+                    mBatteryPercentView.setTextAppearance(mPercentageStyleId);
+                }
                 updatePercentText();
                 addView(mBatteryPercentView,
                         new ViewGroup.LayoutParams(
@@ -400,27 +447,29 @@ public class BatteryMeterView extends LinearLayout implements
         scaledLayoutParams.setMargins(0, 0, 0, marginBottom);
 
         mBatteryIconView.setLayoutParams(scaledLayoutParams);
-        FontSizeUtils.updateFontSize(mBatteryPercentView, R.dimen.qs_time_expanded_size);
     }
 
     @Override
     public void onDarkChanged(Rect area, float darkIntensity, int tint) {
         float intensity = DarkIconDispatcher.isInArea(area, this) ? darkIntensity : 0;
+        mNonAdaptedSingleToneColor = getColorForDarkIntensity(
+                intensity, mLightModeSingleToneColor, mDarkModeSingleToneColor);
         mNonAdaptedForegroundColor = getColorForDarkIntensity(
                 intensity, mLightModeFillColor, mDarkModeFillColor);
         mNonAdaptedBackgroundColor = getColorForDarkIntensity(
                 intensity, mLightModeBackgroundColor,mDarkModeBackgroundColor);
 
         if (!mUseWallpaperTextColors) {
-            updateColors(mNonAdaptedForegroundColor, mNonAdaptedBackgroundColor);
+            updateColors(mNonAdaptedForegroundColor, mNonAdaptedBackgroundColor,
+                    mNonAdaptedSingleToneColor);
         }
     }
 
-    private void updateColors(int foregroundColor, int backgroundColor) {
-        mDrawable.setColors(foregroundColor, backgroundColor);
-        mTextColor = foregroundColor;
+    private void updateColors(int foregroundColor, int backgroundColor, int singleToneColor) {
+        mDrawable.setColors(foregroundColor, backgroundColor, singleToneColor);
+        mTextColor = singleToneColor;
         if (mBatteryPercentView != null) {
-            mBatteryPercentView.setTextColor(foregroundColor);
+            mBatteryPercentView.setTextColor(singleToneColor);
         }
     }
 
@@ -429,7 +478,7 @@ public class BatteryMeterView extends LinearLayout implements
     }
 
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
-        String powerSave = mDrawable == null ? null : mDrawable.getPowerSave() + "";
+        String powerSave = mDrawable == null ? null : mDrawable.getPowerSaveEnabled() + "";
         CharSequence percent = mBatteryPercentView == null ? null : mBatteryPercentView.getText();
         pw.println("  BatteryMeterView:");
         pw.println("    mDrawable.getPowerSave: " + powerSave);

@@ -16,6 +16,7 @@
 
 package android.app;
 
+import android.annotation.Nullable;
 import android.annotation.SystemApi;
 import android.app.slice.Slice;
 import android.content.ComponentName;
@@ -354,12 +355,17 @@ public final class WallpaperInfo implements Parcelable {
     
     /**
      * Returns an URI that provides a settings {@link Slice} for this wallpaper.
+     * The wallpaper should implement a SliceProvider associated with this URI.
+     * The system will display the Slice in the customization section while previewing the live
+     * wallpaper. Because this URI is accessible to other apps, it is recommended to protect it
+     * with the android.permission.BIND_WALLPAPER permission.
      *
      * <p>{@code null} will be returned if there is no settings Slice URI associated
      * with the wallpaper.
      *
      * @return The URI.
      */
+    @Nullable
     public Uri getSettingsSliceUri() {
         if (mSettingsSliceUri == null) {
             return null;
@@ -371,10 +377,17 @@ public final class WallpaperInfo implements Parcelable {
      * Returns whether this wallpaper service can support multiple engines to render on each surface
      * independently. An example use case is a multi-display set-up where the wallpaper service can
      * render surfaces to each of the connected displays.
+     * <p>
+     * This corresponds to the value {@link android.R.styleable#Wallpaper_supportsMultipleDisplays}
+     * in the XML description of the wallpaper.
+     * <p>
+     * The default value is {@code false}.
      *
      * @see WallpaperService#onCreateEngine()
      * @see WallpaperService.Engine#onCreate(SurfaceHolder)
      * @return {@code true} if multiple engines can render independently on each surface.
+     *
+     * @attr ref android.R.styleable#Wallpaper_supportsMultipleDisplays
      */
     public boolean supportsMultipleDisplays() {
         return mSupportMultipleDisplays;
@@ -416,7 +429,7 @@ public final class WallpaperInfo implements Parcelable {
     /**
      * Used to make this class parcelable.
      */
-    public static final Parcelable.Creator<WallpaperInfo> CREATOR = new Parcelable.Creator<WallpaperInfo>() {
+    public static final @android.annotation.NonNull Parcelable.Creator<WallpaperInfo> CREATOR = new Parcelable.Creator<WallpaperInfo>() {
         public WallpaperInfo createFromParcel(Parcel source) {
             return new WallpaperInfo(source);
         }

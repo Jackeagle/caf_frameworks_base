@@ -19,6 +19,7 @@ package android.os;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SystemApi;
+import android.annotation.UnsupportedAppUsage;
 import android.util.ExceptionUtils;
 import android.util.Log;
 import android.util.Slog;
@@ -247,6 +248,7 @@ public class Binder implements IBinder {
     /**
      * Raw native pointer to JavaBBinderHolder object. Owned by this Java object. Not null.
      */
+    @UnsupportedAppUsage
     private final long mObject;
 
     private IInterface mOwner;
@@ -442,24 +444,20 @@ public class Binder implements IBinder {
      *
      * @param workSource The original UID responsible for the binder call.
      * @return token to restore original work source.
-     * @hide
      **/
     @CriticalNative
-    @SystemApi
     public static final native long setCallingWorkSourceUid(int workSource);
 
     /**
      * Returns the work source set by the caller.
      *
      * Unlike {@link Binder#getCallingUid()}, this result of this method cannot be trusted. The
-     * caller can set the value to whatever he wants. Only use this value if you trust the calling
+     * caller can set the value to whatever they want. Only use this value if you trust the calling
      * uid.
      *
      * @return The original UID responsible for the binder transaction.
-     * @hide
      */
     @CriticalNative
-    @SystemApi
     public static final native int getCallingWorkSourceUid();
 
     /**
@@ -482,10 +480,8 @@ public class Binder implements IBinder {
      * </pre>
      *
      * @return token to restore original work source.
-     * @hide
      **/
     @CriticalNative
-    @SystemApi
     public static final native long clearCallingWorkSource();
 
     /**
@@ -501,11 +497,8 @@ public class Binder implements IBinder {
      *   Binder.restoreCallingWorkSource(token);
      * }
      * </pre>
-     *
-     * @hide
      **/
     @CriticalNative
-    @SystemApi
     public static final native void restoreCallingWorkSource(long token);
 
     /**
@@ -653,7 +646,8 @@ public class Binder implements IBinder {
          *
          * @return an object that will be passed back to #onTransactEnded (or null).
          */
-        Object onTransactStarted(IBinder binder, int transactionCode);
+        @Nullable
+        Object onTransactStarted(@NonNull IBinder binder, int transactionCode);
 
         /**
          * Called after onTranact (even when an exception is thrown).
@@ -967,7 +961,7 @@ public class Binder implements IBinder {
      * By default, we use the calling uid since we can always trust it.
      */
     private static volatile BinderInternal.WorkSourceProvider sWorkSourceProvider =
-            Binder::getCallingUid;
+            (x) -> Binder.getCallingUid();
 
     /**
      * Sets the work source provider.
@@ -989,23 +983,26 @@ public class Binder implements IBinder {
     }
 
     // Entry point from android_util_Binder.cpp's onTransact
+    @UnsupportedAppUsage
     private boolean execTransact(int code, long dataObj, long replyObj,
             int flags) {
-        final int workSourceUid = sWorkSourceProvider.resolveWorkSourceUid();
-        final long origWorkSource = ThreadLocalWorkSource.setUid(workSourceUid);
+        // At that point, the parcel request headers haven't been parsed so we do not know what
+        // WorkSource the caller has set. Use calling uid as the default.
+        final int callingUid = Binder.getCallingUid();
+        final long origWorkSource = ThreadLocalWorkSource.setUid(callingUid);
         try {
-            return execTransactInternal(code, dataObj, replyObj, flags, workSourceUid);
+            return execTransactInternal(code, dataObj, replyObj, flags, callingUid);
         } finally {
             ThreadLocalWorkSource.restore(origWorkSource);
         }
     }
 
-    private boolean execTransactInternal(int code, long dataObj, long replyObj,
-            int flags, int workSourceUid) {
+    private boolean execTransactInternal(int code, long dataObj, long replyObj, int flags,
+            int callingUid) {
         // Make sure the observer won't change while processing a transaction.
         final BinderInternal.Observer observer = sObserver;
         final CallSession callSession =
-                observer != null ? observer.callStarted(this, code, workSourceUid) : null;
+                observer != null ? observer.callStarted(this, code, UNSET_WORKSOURCE) : null;
         Parcel data = Parcel.obtain(dataObj);
         Parcel reply = Parcel.obtain(replyObj);
         // theoretically, we should call transact, which will call onTransact,
@@ -1045,6 +1042,10 @@ public class Binder implements IBinder {
                 Trace.traceEnd(Trace.TRACE_TAG_ALWAYS);
             }
             if (observer != null) {
+                // The parcel RPC headers have been called during onTransact so we can now access
+                // the worksource uid from the parcel.
+                final int workSourceUid = sWorkSourceProvider.resolveWorkSourceUid(
+                        data.readCallingWorkSourceUid());
                 observer.callEnded(callSession, data.dataSize(), reply.dataSize(), workSourceUid);
             }
         }

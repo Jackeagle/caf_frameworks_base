@@ -21,26 +21,32 @@ import static android.view.Display.DEFAULT_DISPLAY;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.any;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.anyInt;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doAnswer;
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.doNothing;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.eq;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.mock;
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.verify;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.when;
-import static com.android.server.policy.WindowManagerPolicy.NAV_BAR_BOTTOM;
-import static com.android.server.policy.WindowManagerPolicy.NAV_BAR_LEFT;
-import static com.android.server.policy.WindowManagerPolicy.NAV_BAR_RIGHT;
 import static com.android.server.wm.ActivityStack.ActivityState.INITIALIZING;
 import static com.android.server.wm.ActivityStack.ActivityState.PAUSING;
 import static com.android.server.wm.ActivityStack.ActivityState.RESUMED;
 import static com.android.server.wm.ActivityStack.ActivityState.STOPPED;
 import static com.android.server.wm.ActivityStack.REMOVE_TASK_MODE_MOVING;
+import static com.android.server.wm.ActivityStack.STACK_VISIBILITY_INVISIBLE;
+import static com.android.server.wm.ActivityStack.STACK_VISIBILITY_VISIBLE;
+import static com.android.server.wm.ActivityStack.STACK_VISIBILITY_VISIBLE_BEHIND_TRANSLUCENT;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
 
+import android.app.ActivityManager;
+import android.app.ActivityManagerInternal;
 import android.app.ActivityOptions;
 import android.app.servertransaction.ActivityConfigurationChangeItem;
 import android.app.servertransaction.ClientTransaction;
@@ -57,6 +63,8 @@ import androidx.test.filters.MediumTest;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.invocation.InvocationOnMock;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * Tests for the {@link ActivityRecord} class.
@@ -154,34 +162,8 @@ public class ActivityRecordTests extends ActivityTestsBase {
         assertTrue(mActivity.isState(STOPPED));
     }
 
-    @Test
-    public void testPositionLimitedAspectRatioNavBarBottom() {
-        verifyPositionWithLimitedAspectRatio(NAV_BAR_BOTTOM, new Rect(0, 0, 1000, 2000), 1.5f,
-                new Rect(0, 0, 1000, 1500));
-    }
-
-    @Test
-    public void testPositionLimitedAspectRatioNavBarLeft() {
-        verifyPositionWithLimitedAspectRatio(NAV_BAR_LEFT, new Rect(0, 0, 2000, 1000), 1.5f,
-                new Rect(500, 0, 2000, 1000));
-    }
-
-    @Test
-    public void testPositionLimitedAspectRatioNavBarRight() {
-        verifyPositionWithLimitedAspectRatio(NAV_BAR_RIGHT, new Rect(0, 0, 2000, 1000), 1.5f,
-                new Rect(0, 0, 1500, 1000));
-    }
-
-    private void verifyPositionWithLimitedAspectRatio(int navBarPosition, Rect taskBounds,
-            float aspectRatio, Rect expectedActivityBounds) {
-        // Verify with nav bar on the right.
-        when(mService.mWindowManager.getNavBarPosition(mActivity.getDisplayId()))
-                .thenReturn(navBarPosition);
-        mTask.getConfiguration().windowConfiguration.setAppBounds(taskBounds);
-        mActivity.info.maxAspectRatio = aspectRatio;
-        mActivity.ensureActivityConfiguration(
-                0 /* globalChanges */, false /* preserveWindow */);
-        assertEquals(expectedActivityBounds, mActivity.getBounds());
+    private void ensureActivityConfiguration() {
+        mActivity.ensureActivityConfiguration(0 /* globalChanges */, false /* preserveWindow */);
     }
 
     @Test
@@ -193,6 +175,23 @@ public class ActivityRecordTests extends ActivityTestsBase {
         assertTrue(activity.canBeLaunchedOnDisplay(DEFAULT_DISPLAY));
         // An activity cannot be launched on a non-existent display.
         assertFalse(activity.canBeLaunchedOnDisplay(DEFAULT_DISPLAY + 1));
+    }
+
+    @Test
+    public void testRestartProcessIfVisible() {
+        doNothing().when(mSupervisor).scheduleRestartTimeout(mActivity);
+        mActivity.visible = true;
+        mActivity.haveState = false;
+        mActivity.setState(ActivityStack.ActivityState.RESUMED, "testRestart");
+        prepareFixedAspectRatioUnresizableActivity();
+
+        final Rect originalOverrideBounds = new Rect(mActivity.getBounds());
+        mTask.getWindowConfiguration().setAppBounds(0, 0, 600, 1200);
+        // The visible activity should recompute configuration according to the last parent bounds.
+        mService.restartActivityProcessIfVisible(mActivity.appToken);
+
+        assertEquals(ActivityStack.ActivityState.RESTARTING_PROCESS, mActivity.getState());
+        assertNotEquals(originalOverrideBounds, mActivity.getBounds());
     }
 
     @Test
@@ -277,7 +276,7 @@ public class ActivityRecordTests extends ActivityTestsBase {
 
         mActivity.mRelaunchReason = ActivityTaskManagerService.RELAUNCH_REASON_NONE;
 
-        mActivity.ensureActivityConfiguration(0, false, false);
+        ensureActivityConfiguration();
 
         assertEquals(ActivityTaskManagerService.RELAUNCH_REASON_WINDOWING_MODE_RESIZE,
                 mActivity.mRelaunchReason);
@@ -301,7 +300,7 @@ public class ActivityRecordTests extends ActivityTestsBase {
 
         mActivity.mRelaunchReason = ActivityTaskManagerService.RELAUNCH_REASON_NONE;
 
-        mActivity.ensureActivityConfiguration(0, false, false);
+        ensureActivityConfiguration();
 
         assertEquals(ActivityTaskManagerService.RELAUNCH_REASON_FREE_RESIZE,
                 mActivity.mRelaunchReason);
@@ -323,7 +322,7 @@ public class ActivityRecordTests extends ActivityTestsBase {
         mActivity.mRelaunchReason =
                 ActivityTaskManagerService.RELAUNCH_REASON_WINDOWING_MODE_RESIZE;
 
-        mActivity.ensureActivityConfiguration(0, false, false);
+        ensureActivityConfiguration();
 
         assertEquals(ActivityTaskManagerService.RELAUNCH_REASON_NONE,
                 mActivity.mRelaunchReason);
@@ -378,5 +377,188 @@ public class ActivityRecordTests extends ActivityTestsBase {
 
         mSupervisor.endDeferResume();
         assertEquals(true, mActivity.shouldMakeActive(null /* activeActivity */));
+    }
+
+    @Test
+    public void testShouldResume_stackVisibility() {
+        mActivity.setState(ActivityStack.ActivityState.STOPPED, "Testing");
+        spyOn(mStack);
+
+        doReturn(STACK_VISIBILITY_VISIBLE).when(mStack).getVisibility(null);
+        assertEquals(true, mActivity.shouldResumeActivity(null /* activeActivity */));
+
+        doReturn(STACK_VISIBILITY_VISIBLE_BEHIND_TRANSLUCENT).when(mStack).getVisibility(null);
+        assertEquals(false, mActivity.shouldResumeActivity(null /* activeActivity */));
+
+        doReturn(STACK_VISIBILITY_INVISIBLE).when(mStack).getVisibility(null);
+        assertEquals(false, mActivity.shouldResumeActivity(null /* activeActivity */));
+    }
+
+    @Test
+    public void testPushConfigurationWhenLaunchTaskBehind() throws Exception {
+        mActivity.setState(ActivityStack.ActivityState.STOPPED, "Testing");
+
+        final TestActivityStack stack = (TestActivityStack) new StackBuilder(mRootActivityContainer)
+                .build();
+        try {
+            stack.setIsTranslucent(false);
+            assertFalse(mStack.shouldBeVisible(null /* starting */));
+
+            mTask.onRequestedOverrideConfigurationChanged(mTask.getConfiguration());
+            mActivity.setLastReportedConfiguration(new MergedConfiguration(new Configuration(),
+                    mActivity.getConfiguration()));
+
+            mActivity.mLaunchTaskBehind = true;
+            mActivity.info.configChanges |= ActivityInfo.CONFIG_ORIENTATION;
+            final Configuration newConfig = new Configuration(mActivity.getConfiguration());
+            newConfig.orientation = newConfig.orientation == Configuration.ORIENTATION_PORTRAIT
+                    ? Configuration.ORIENTATION_LANDSCAPE
+                    : Configuration.ORIENTATION_PORTRAIT;
+
+            mTask.onConfigurationChanged(newConfig);
+
+            mActivity.ensureActivityConfiguration(0 /* globalChanges */,
+                    false /* preserveWindow */, true /* ignoreStopState */);
+
+            final ActivityConfigurationChangeItem expected =
+                    ActivityConfigurationChangeItem.obtain(newConfig);
+            verify(mService.getLifecycleManager()).scheduleTransaction(
+                    eq(mActivity.app.getThread()), eq(mActivity.appToken), eq(expected));
+        } finally {
+            stack.getDisplay().removeChild(stack);
+        }
+    }
+
+    @Test
+    public void testSizeCompatMode_FixedAspectRatioBoundsWithDecor() {
+        final int decorHeight = 200; // e.g. The device has cutout.
+        final Rect parentAppBounds = new Rect(0, decorHeight, 600, 1000);
+        mTask.getWindowConfiguration().setAppBounds(parentAppBounds);
+        mTask.getConfiguration().orientation = Configuration.ORIENTATION_PORTRAIT;
+        doReturn(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED)
+                .when(mActivity.mAppWindowToken).getOrientationIgnoreVisibility();
+        mActivity.info.resizeMode = ActivityInfo.RESIZE_MODE_UNRESIZEABLE;
+        mActivity.info.minAspectRatio = mActivity.info.maxAspectRatio = 1;
+        ensureActivityConfiguration();
+        // The parent configuration doesn't change since the first resolved configuration, so the
+        // activity shouldn't be in the size compatibility mode.
+        assertFalse(mActivity.inSizeCompatMode());
+
+        final Rect appBounds = mActivity.getWindowConfiguration().getAppBounds();
+        // Ensure the app bounds keep the declared aspect ratio.
+        assertEquals(appBounds.width(), appBounds.height());
+        // The decor height should be a part of the effective bounds.
+        assertEquals(mActivity.getBounds().height(), appBounds.height() + decorHeight);
+
+        mTask.getConfiguration().orientation = Configuration.ORIENTATION_LANDSCAPE;
+        mActivity.onConfigurationChanged(mTask.getConfiguration());
+        // After changing orientation, the aspect ratio should be the same.
+        assertEquals(appBounds.width(), appBounds.height());
+        // The decor height will be included in width.
+        assertEquals(mActivity.getBounds().width(), appBounds.width() + decorHeight);
+    }
+
+    @Test
+    public void testSizeCompatMode_FixedScreenConfigurationWhenMovingToDisplay() {
+        // Initialize different bounds on a new display.
+        final ActivityDisplay newDisplay = addNewActivityDisplayAt(ActivityDisplay.POSITION_TOP);
+        newDisplay.getWindowConfiguration().setAppBounds(new Rect(0, 0, 1000, 2000));
+        newDisplay.getConfiguration().densityDpi = 300;
+
+        mTask.getConfiguration().densityDpi = 200;
+        prepareFixedAspectRatioUnresizableActivity();
+
+        final Rect originalBounds = new Rect(mActivity.getBounds());
+        final int originalDpi = mActivity.getConfiguration().densityDpi;
+
+        // Move the non-resizable activity to the new display.
+        mStack.reparent(newDisplay, true /* onTop */, false /* displayRemoved */);
+        ensureActivityConfiguration();
+
+        assertEquals(originalBounds, mActivity.getBounds());
+        assertEquals(originalDpi, mActivity.getConfiguration().densityDpi);
+        assertTrue(mActivity.inSizeCompatMode());
+    }
+
+    @Test
+    public void testSizeCompatMode_FixedScreenBoundsWhenDisplaySizeChanged() {
+        when(mActivity.mAppWindowToken.getOrientationIgnoreVisibility()).thenReturn(
+                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        mTask.getWindowConfiguration().setAppBounds(mStack.getDisplay().getBounds());
+        mTask.getConfiguration().orientation = Configuration.ORIENTATION_PORTRAIT;
+        mActivity.info.screenOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
+        mActivity.info.resizeMode = ActivityInfo.RESIZE_MODE_UNRESIZEABLE;
+        ensureActivityConfiguration();
+        final Rect originalBounds = new Rect(mActivity.getBounds());
+
+        // Change the size of current display.
+        mStack.getDisplay().setBounds(0, 0, 1000, 2000);
+        ensureActivityConfiguration();
+
+        assertEquals(originalBounds, mActivity.getBounds());
+        assertTrue(mActivity.inSizeCompatMode());
+    }
+
+    @Test
+    public void testSizeCompatMode_FixedScreenLayoutSizeBits() {
+        final int fixedScreenLayout = Configuration.SCREENLAYOUT_LONG_NO
+                | Configuration.SCREENLAYOUT_SIZE_NORMAL;
+        mTask.getConfiguration().screenLayout = fixedScreenLayout
+                | Configuration.SCREENLAYOUT_LAYOUTDIR_LTR;
+        prepareFixedAspectRatioUnresizableActivity();
+
+        // The initial configuration should inherit from parent.
+        assertEquals(mTask.getConfiguration().screenLayout,
+                mActivity.getConfiguration().screenLayout);
+
+        mTask.getConfiguration().screenLayout = Configuration.SCREENLAYOUT_LAYOUTDIR_RTL
+                | Configuration.SCREENLAYOUT_LONG_YES | Configuration.SCREENLAYOUT_SIZE_LARGE;
+        mActivity.onConfigurationChanged(mTask.getConfiguration());
+
+        // The size and aspect ratio bits don't change, but the layout direction should be updated.
+        assertEquals(fixedScreenLayout | Configuration.SCREENLAYOUT_LAYOUTDIR_RTL,
+                mActivity.getConfiguration().screenLayout);
+    }
+
+    @Test
+    public void testSizeCompatMode_ResetNonVisibleActivity() {
+        final ActivityDisplay display = mStack.getDisplay();
+        spyOn(display);
+
+        prepareFixedAspectRatioUnresizableActivity();
+        mActivity.setState(STOPPED, "testSizeCompatMode");
+        mActivity.visible = false;
+        mActivity.app.setReportedProcState(ActivityManager.PROCESS_STATE_CACHED_ACTIVITY);
+        // Make the parent bounds to be different so the activity is in size compatibility mode.
+        mTask.getWindowConfiguration().setAppBounds(new Rect(0, 0, 600, 1200));
+
+        // Simulate the display changes orientation.
+        doReturn(ActivityInfo.CONFIG_SCREEN_SIZE | ActivityInfo.CONFIG_ORIENTATION
+                | ActivityInfo.CONFIG_WINDOW_CONFIGURATION)
+                        .when(display).getLastOverrideConfigurationChanges();
+        mActivity.onConfigurationChanged(mTask.getConfiguration());
+        // The override configuration should not change so it is still in size compatibility mode.
+        assertTrue(mActivity.inSizeCompatMode());
+
+        // Simulate the display changes density.
+        doReturn(ActivityInfo.CONFIG_DENSITY).when(display).getLastOverrideConfigurationChanges();
+        mService.mAmInternal = mock(ActivityManagerInternal.class);
+        mActivity.onConfigurationChanged(mTask.getConfiguration());
+        // The override configuration should be reset and the activity's process will be killed.
+        assertFalse(mActivity.inSizeCompatMode());
+        verify(mActivity).restartProcessIfVisible();
+        mService.mH.runWithScissors(() -> { }, TimeUnit.SECONDS.toMillis(3));
+        verify(mService.mAmInternal).killProcess(
+                eq(mActivity.app.mName), eq(mActivity.app.mUid), anyString());
+    }
+
+    /** Setup {@link #mActivity} as a size-compat-mode-able activity without fixed orientation. */
+    private void prepareFixedAspectRatioUnresizableActivity() {
+        when(mActivity.mAppWindowToken.getOrientationIgnoreVisibility()).thenReturn(
+                ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        mTask.getWindowConfiguration().setAppBounds(mStack.getDisplay().getBounds());
+        mActivity.info.resizeMode = ActivityInfo.RESIZE_MODE_UNRESIZEABLE;
+        mActivity.info.maxAspectRatio = 1.5f;
+        ensureActivityConfiguration();
     }
 }

@@ -145,8 +145,16 @@ public class UsageStatsService extends SystemService implements
     AppTimeLimitController mAppTimeLimit;
 
     final SparseArray<ArraySet<String>> mUsageReporters = new SparseArray();
-    final SparseArray<String> mVisibleActivities = new SparseArray();
+    final SparseArray<ActivityData> mVisibleActivities = new SparseArray();
 
+    private static class ActivityData {
+        private final String mTaskRootPackage;
+        private final String mTaskRootClass;
+        private ActivityData(String taskRootPackage, String taskRootClass) {
+            mTaskRootPackage = taskRootPackage;
+            mTaskRootClass = taskRootClass;
+        }
+    }
 
     private UsageStatsManagerInternal.AppIdleStateChangeListener mStandbyChangeListener =
             new UsageStatsManagerInternal.AppIdleStateChangeListener() {
@@ -432,6 +440,7 @@ public class UsageStatsService extends SystemService implements
         synchronized (mLock) {
             mHandler.removeMessages(MSG_REPORT_EVENT);
             Event event = new Event(DEVICE_SHUTDOWN, SystemClock.elapsedRealtime());
+            event.mPackage = Event.DEVICE_EVENT_PACKAGE_NAME;
             // orderly shutdown, the last event is DEVICE_SHUTDOWN.
             reportEventToAllUserId(event);
             flushToDiskLocked();
@@ -449,6 +458,7 @@ public class UsageStatsService extends SystemService implements
      */
     void prepareForPossibleShutdown() {
         Event event = new Event(DEVICE_SHUTDOWN, SystemClock.elapsedRealtime());
+        event.mPackage = Event.DEVICE_EVENT_PACKAGE_NAME;
         mHandler.obtainMessage(MSG_REPORT_EVENT_TO_ALL_USERID, event).sendToTarget();
         mHandler.sendEmptyMessage(MSG_FLUSH_TO_DISK);
     }
@@ -462,45 +472,57 @@ public class UsageStatsService extends SystemService implements
             final long elapsedRealtime = SystemClock.elapsedRealtime();
             convertToSystemTimeLocked(event);
 
-            if (event.getPackageName() != null
-                    && mPackageManagerInternal.isPackageEphemeral(userId, event.getPackageName())) {
+            if (event.mPackage != null
+                    && mPackageManagerInternal.isPackageEphemeral(userId, event.mPackage)) {
                 event.mFlags |= Event.FLAG_IS_PACKAGE_INSTANT_APP;
-            }
-
-            final UserUsageStatsService service =
-                    getUserDataAndInitializeIfNeededLocked(userId, timeNow);
-            service.reportEvent(event);
-
-            mAppStandby.reportEvent(event, elapsedRealtime, userId);
-
-            String packageName;
-
-            switch(mUsageSource) {
-                case USAGE_SOURCE_CURRENT_ACTIVITY:
-                    packageName = event.getPackageName();
-                    break;
-                case USAGE_SOURCE_TASK_ROOT_ACTIVITY:
-                default:
-                    packageName = event.getTaskRootPackageName();
-                    if (packageName == null) {
-                        packageName = event.getPackageName();
-                    }
-                    break;
             }
 
             switch (event.mEventType) {
                 case Event.ACTIVITY_RESUMED:
-                    synchronized (mVisibleActivities) {
-                        mVisibleActivities.put(event.mInstanceId, event.getClassName());
-                        try {
-                            mAppTimeLimit.noteUsageStart(packageName, userId);
-                        } catch (IllegalArgumentException iae) {
-                            Slog.e(TAG, "Failed to note usage start", iae);
+                    // check if this activity has already been resumed
+                    if (mVisibleActivities.get(event.mInstanceId) != null) break;
+                    mVisibleActivities.put(event.mInstanceId,
+                            new ActivityData(event.mTaskRootPackage, event.mTaskRootClass));
+                    try {
+                        switch(mUsageSource) {
+                            case USAGE_SOURCE_CURRENT_ACTIVITY:
+                                mAppTimeLimit.noteUsageStart(event.mPackage, userId);
+                                break;
+                            case USAGE_SOURCE_TASK_ROOT_ACTIVITY:
+                            default:
+                                mAppTimeLimit.noteUsageStart(event.mTaskRootPackage, userId);
+                                break;
+                        }
+                    } catch (IllegalArgumentException iae) {
+                        Slog.e(TAG, "Failed to note usage start", iae);
+                    }
+                    break;
+                case Event.ACTIVITY_PAUSED:
+                    if (event.mTaskRootPackage == null) {
+                        // Task Root info is missing. Repair the event based on previous data
+                        final ActivityData prevData = mVisibleActivities.get(event.mInstanceId);
+                        if (prevData == null) {
+                            Slog.w(TAG, "Unexpected activity event reported! (" + event.mPackage
+                                    + "/" + event.mClass + " event : " + event.mEventType
+                                    + " instanceId : " + event.mInstanceId + ")");
+                        } else {
+                            event.mTaskRootPackage = prevData.mTaskRootPackage;
+                            event.mTaskRootClass = prevData.mTaskRootClass;
                         }
                     }
                     break;
-                case Event.ACTIVITY_STOPPED:
                 case Event.ACTIVITY_DESTROYED:
+                    // Treat activity destroys like activity stops.
+                    event.mEventType = Event.ACTIVITY_STOPPED;
+                    // Fallthrough
+                case Event.ACTIVITY_STOPPED:
+                    final ActivityData prevData =
+                            mVisibleActivities.removeReturnOld(event.mInstanceId);
+                    if (prevData == null) {
+                        // The activity stop was already handled.
+                        return;
+                    }
+
                     ArraySet<String> tokens;
                     synchronized (mUsageReporters) {
                         tokens = mUsageReporters.removeReturnOld(event.mInstanceId);
@@ -513,7 +535,7 @@ public class UsageStatsService extends SystemService implements
                                 final String token = tokens.valueAt(i);
                                 try {
                                     mAppTimeLimit.noteUsageStop(
-                                            buildFullToken(event.getPackageName(), token), userId);
+                                            buildFullToken(event.mPackage, token), userId);
                                 } catch (IllegalArgumentException iae) {
                                     Slog.w(TAG, "Failed to stop usage for during reporter death: "
                                             + iae);
@@ -521,18 +543,32 @@ public class UsageStatsService extends SystemService implements
                             }
                         }
                     }
-
-                    synchronized (mVisibleActivities) {
-                        if (mVisibleActivities.removeReturnOld(event.mInstanceId) != null) {
-                            try {
-                                mAppTimeLimit.noteUsageStop(packageName, userId);
-                            } catch (IllegalArgumentException iae) {
-                                Slog.w(TAG, "Failed to note usage stop", iae);
-                            }
+                    if (event.mTaskRootPackage == null) {
+                        // Task Root info is missing. Repair the event based on previous data
+                        event.mTaskRootPackage = prevData.mTaskRootPackage;
+                        event.mTaskRootClass = prevData.mTaskRootClass;
+                    }
+                    try {
+                        switch(mUsageSource) {
+                            case USAGE_SOURCE_CURRENT_ACTIVITY:
+                                mAppTimeLimit.noteUsageStop(event.mPackage, userId);
+                                break;
+                            case USAGE_SOURCE_TASK_ROOT_ACTIVITY:
+                            default:
+                                mAppTimeLimit.noteUsageStop(event.mTaskRootPackage, userId);
+                                break;
                         }
+                    } catch (IllegalArgumentException iae) {
+                        Slog.w(TAG, "Failed to note usage stop", iae);
                     }
                     break;
             }
+
+            final UserUsageStatsService service =
+                    getUserDataAndInitializeIfNeededLocked(userId, timeNow);
+            service.reportEvent(event);
+
+            mAppStandby.reportEvent(event, elapsedRealtime, userId);
         }
     }
 
@@ -1363,7 +1399,8 @@ public class UsageStatsService extends SystemService implements
 
         @Override
         public void registerAppUsageLimitObserver(int observerId, String[] packages,
-                long timeLimitMs, PendingIntent callbackIntent, String callingPackage) {
+                long timeLimitMs, long timeUsedMs, PendingIntent callbackIntent,
+                String callingPackage) {
             if (!hasPermissions(callingPackage,
                     Manifest.permission.SUSPEND_APPS, Manifest.permission.OBSERVE_APP_USAGE)) {
                 throw new SecurityException("Caller doesn't have both SUSPEND_APPS and "
@@ -1373,7 +1410,7 @@ public class UsageStatsService extends SystemService implements
             if (packages == null || packages.length == 0) {
                 throw new IllegalArgumentException("Must specify at least one package");
             }
-            if (callbackIntent == null) {
+            if (callbackIntent == null && timeUsedMs < timeLimitMs) {
                 throw new NullPointerException("callbackIntent can't be null");
             }
             final int callingUid = Binder.getCallingUid();
@@ -1381,7 +1418,7 @@ public class UsageStatsService extends SystemService implements
             final long token = Binder.clearCallingIdentity();
             try {
                 UsageStatsService.this.registerAppUsageLimitObserver(callingUid, observerId,
-                        packages, timeLimitMs, callbackIntent, userId);
+                        packages, timeLimitMs, timeUsedMs, callbackIntent, userId);
             } finally {
                 Binder.restoreCallingIdentity(token);
             }
@@ -1509,9 +1546,9 @@ public class UsageStatsService extends SystemService implements
     }
 
     void registerAppUsageLimitObserver(int callingUid, int observerId, String[] packages,
-            long timeLimitMs, PendingIntent callbackIntent, int userId) {
-        mAppTimeLimit.addAppUsageLimitObserver(callingUid, observerId, packages, timeLimitMs,
-                callbackIntent, userId);
+            long timeLimitMs, long timeUsedMs, PendingIntent callbackIntent, int userId) {
+        mAppTimeLimit.addAppUsageLimitObserver(callingUid, observerId, packages,
+                timeLimitMs, timeUsedMs, callbackIntent, userId);
     }
 
     void unregisterAppUsageLimitObserver(int callingUid, int observerId, int userId) {
@@ -1715,8 +1752,8 @@ public class UsageStatsService extends SystemService implements
         }
 
         @Override
-        public void reportExemptedSyncScheduled(String packageName, int userId) {
-            mAppStandby.postReportExemptedSyncScheduled(packageName, userId);
+        public void reportSyncScheduled(String packageName, int userId, boolean exempted) {
+            mAppStandby.postReportSyncScheduled(packageName, userId, exempted);
         }
 
         @Override

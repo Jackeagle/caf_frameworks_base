@@ -671,6 +671,24 @@ TEST_F(ManifestFixerTest, ApplicationInjectDebuggable) {
       {}, "application", xml::kSchemaAndroid, "debuggable", "true"), NotNull());
 }
 
+TEST_F(ManifestFixerTest, ApplicationProfileable) {
+  std::string shell = R"(
+      <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          package="android">
+        <application>
+          <profileable android:shell="true"/>
+        </application>
+      </manifest>)";
+  EXPECT_THAT(Verify(shell), NotNull());
+  std::string noshell = R"(
+      <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          package="android">
+        <application>
+          <profileable/>
+        </application>
+      </manifest>)";
+  EXPECT_THAT(Verify(noshell), NotNull());
+}
 
 TEST_F(ManifestFixerTest, IgnoreNamespacedElements) {
   std::string input = R"EOF(
@@ -725,6 +743,43 @@ TEST_F(ManifestFixerTest, InsertCompileSdkVersions) {
   attr = manifest->root->FindAttribute(xml::kSchemaAndroid, "compileSdkVersionCodename");
   ASSERT_THAT(attr, NotNull());
   EXPECT_THAT(attr->value, StrEq("P"));
+
+  attr = manifest->root->FindAttribute("", "platformBuildVersionCode");
+  ASSERT_THAT(attr, NotNull());
+  EXPECT_THAT(attr->value, StrEq("28"));
+
+  attr = manifest->root->FindAttribute("", "platformBuildVersionName");
+  ASSERT_THAT(attr, NotNull());
+  EXPECT_THAT(attr->value, StrEq("P"));
+}
+
+TEST_F(ManifestFixerTest, OverrideCompileSdkVersions) {
+  std::string input = R"(
+      <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="android"
+          compileSdkVersion="27" compileSdkVersionCodename="O"
+          platformBuildVersionCode="27" platformBuildVersionName="O"/>)";
+  ManifestFixerOptions options;
+  options.compile_sdk_version = {"28"};
+  options.compile_sdk_version_codename = {"P"};
+
+  std::unique_ptr<xml::XmlResource> manifest = VerifyWithOptions(input, options);
+  ASSERT_THAT(manifest, NotNull());
+
+  xml::Attribute* attr = manifest->root->FindAttribute(xml::kSchemaAndroid, "compileSdkVersion");
+  ASSERT_THAT(attr, NotNull());
+  EXPECT_THAT(attr->value, StrEq("28"));
+
+  attr = manifest->root->FindAttribute(xml::kSchemaAndroid, "compileSdkVersionCodename");
+  ASSERT_THAT(attr, NotNull());
+  EXPECT_THAT(attr->value, StrEq("P"));
+
+  attr = manifest->root->FindAttribute("", "platformBuildVersionCode");
+  ASSERT_THAT(attr, NotNull());
+  EXPECT_THAT(attr->value, StrEq("28"));
+
+  attr = manifest->root->FindAttribute("", "platformBuildVersionName");
+  ASSERT_THAT(attr, NotNull());
+  EXPECT_THAT(attr->value, StrEq("P"));
 }
 
 TEST_F(ManifestFixerTest, UnexpectedElementsInManifest) {
@@ -748,59 +803,6 @@ TEST_F(ManifestFixerTest, UnexpectedElementsInManifest) {
   // By default the flag should be set to 'false'.
   manifest = Verify(input);
   ASSERT_THAT(manifest, IsNull());
-}
-
-TEST_F(ManifestFixerTest, InsertPlatformBuildVersions) {
-  // Test for insertion when versionCode and versionName are included in the manifest
-  {
-    std::string input = R"(
-        <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="android"
-          android:versionCode="27" android:versionName="O"/>)";
-    std::unique_ptr<xml::XmlResource> manifest = Verify(input);
-    ASSERT_THAT(manifest, NotNull());
-
-    xml::Attribute* attr = manifest->root->FindAttribute("", "platformBuildVersionCode");
-    ASSERT_THAT(attr, NotNull());
-    EXPECT_THAT(attr->value, StrEq("27"));
-    attr = manifest->root->FindAttribute("", "platformBuildVersionName");
-    ASSERT_THAT(attr, NotNull());
-    EXPECT_THAT(attr->value, StrEq("O"));
-  }
-
-  // Test for insertion when versionCode and versionName defaults are specified
-  {
-    std::string input = R"(
-      <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="android"/>)";
-    ManifestFixerOptions options;
-    options.version_code_default = {"27"};
-    options.version_name_default = {"O"};
-    std::unique_ptr<xml::XmlResource> manifest = VerifyWithOptions(input, options);
-    ASSERT_THAT(manifest, NotNull());
-
-    xml::Attribute* attr = manifest->root->FindAttribute("", "platformBuildVersionCode");
-    ASSERT_THAT(attr, NotNull());
-    EXPECT_THAT(attr->value, StrEq("27"));
-    attr = manifest->root->FindAttribute("", "platformBuildVersionName");
-    ASSERT_THAT(attr, NotNull());
-    EXPECT_THAT(attr->value, StrEq("O"));
-  }
-
-  // Test that the platform build version attributes are not changed if they are currently present
-  {
-    std::string input = R"(
-        <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="android"
-          android:versionCode="28" android:versionName="P"
-          platformBuildVersionCode="27" platformBuildVersionName="O"/>)";
-    std::unique_ptr<xml::XmlResource> manifest = Verify(input);
-    ASSERT_THAT(manifest, NotNull());
-
-    xml::Attribute* attr = manifest->root->FindAttribute("", "platformBuildVersionCode");
-    ASSERT_THAT(attr, NotNull());
-    EXPECT_THAT(attr->value, StrEq("27"));
-    attr = manifest->root->FindAttribute("", "platformBuildVersionName");
-    ASSERT_THAT(attr, NotNull());
-    EXPECT_THAT(attr->value, StrEq("O"));
-  }
 }
 
 TEST_F(ManifestFixerTest, UsesLibraryMustHaveNonEmptyName) {

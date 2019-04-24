@@ -17,25 +17,28 @@
 package com.android.systemui.statusbar.phone;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.doReturn;
 
 import android.graphics.drawable.Drawable;
-import android.support.test.filters.SmallTest;
 import android.view.View;
-import com.android.systemui.statusbar.policy.KeyButtonDrawable;
+
+import androidx.test.filters.SmallTest;
+import androidx.test.runner.AndroidJUnit4;
+
 import com.android.systemui.SysuiTestCase;
+import com.android.systemui.statusbar.policy.KeyButtonDrawable;
+
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-
-import android.support.test.runner.AndroidJUnit4;
 
 /** atest NavigationBarContextTest */
 @SmallTest
@@ -171,12 +174,15 @@ public class NavigationBarContextTest extends SysuiTestCase {
     }
 
     @Test
+    @Ignore("b/112934365")
     public void testUpdateIconsDarkIntensity() throws Exception {
         final int unusedColor = 0;
         final Drawable d = mock(Drawable.class);
         final ContextualButton button = spy(mBtn0);
-        final KeyButtonDrawable kbd1 = spy(new KeyButtonDrawable(d, unusedColor, unusedColor));
-        final KeyButtonDrawable kbd2 = spy(new KeyButtonDrawable(d, unusedColor, unusedColor));
+        final KeyButtonDrawable kbd1 = spy(new KeyButtonDrawable(d, unusedColor, unusedColor,
+                false /* horizontalFlip */));
+        final KeyButtonDrawable kbd2 = spy(new KeyButtonDrawable(d, unusedColor, unusedColor,
+                false /* horizontalFlip */));
         kbd1.setDarkIntensity(TEST_DARK_INTENSITY);
         kbd2.setDarkIntensity(0f);
 

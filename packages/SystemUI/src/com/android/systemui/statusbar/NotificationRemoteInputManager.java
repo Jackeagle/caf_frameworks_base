@@ -54,6 +54,7 @@ import com.android.systemui.Dumpable;
 import com.android.systemui.statusbar.notification.NotificationEntryListener;
 import com.android.systemui.statusbar.notification.NotificationEntryManager;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
+import com.android.systemui.statusbar.notification.collection.NotificationEntry.EditedSuggestionInfo;
 import com.android.systemui.statusbar.notification.logging.NotificationLogger;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
 import com.android.systemui.statusbar.phone.ShadeController;
@@ -62,6 +63,7 @@ import com.android.systemui.statusbar.policy.RemoteInputView;
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Objects;
 import java.util.Set;
 
 import javax.inject.Inject;
@@ -131,7 +133,8 @@ public class NotificationRemoteInputManager implements Dumpable {
         @Override
         public boolean onClickHandler(
                 View view, PendingIntent pendingIntent, RemoteViews.RemoteResponse response) {
-            mShadeController.get().wakeUpIfDozing(SystemClock.uptimeMillis(), view);
+            mShadeController.get().wakeUpIfDozing(SystemClock.uptimeMillis(), view,
+                    "NOTIFICATION_CLICK");
 
             if (handleRemoteInput(view, pendingIntent)) {
                 return true;
@@ -140,7 +143,7 @@ public class NotificationRemoteInputManager implements Dumpable {
             if (DEBUG) {
                 Log.v(TAG, "Notification click handler invoked for intent: " + pendingIntent);
             }
-            logActionClick(view);
+            logActionClick(view, pendingIntent);
             // The intent we are sending is for the application, which
             // won't have permission to immediately start an activity after
             // the user switches to home.  We know it is safe to do at this
@@ -157,11 +160,11 @@ public class NotificationRemoteInputManager implements Dumpable {
             });
         }
 
-        private void logActionClick(View view) {
+        private void logActionClick(View view, PendingIntent actionIntent) {
             Integer actionIndex = (Integer)
                     view.getTag(com.android.internal.R.id.notification_action_index_tag);
             if (actionIndex == null) {
-                Log.e(TAG, "Couldn't retrieve the actionIndex from the clicked button");
+                // Custom action button, not logging.
                 return;
             }
             ViewParent parent = view.getParent();
@@ -180,8 +183,20 @@ public class NotificationRemoteInputManager implements Dumpable {
             }
             final int count = mEntryManager.getNotificationData().getActiveNotifications().size();
             final int rank = mEntryManager.getNotificationData().getRank(key);
+
+            // Notification may be updated before this function is executed, and thus play safe
+            // here and verify that the action object is still the one that where the click happens.
+            Notification.Action[] actions = statusBarNotification.getNotification().actions;
+            if (actions == null || actionIndex >= actions.length) {
+                Log.w(TAG, "statusBarNotification.getNotification().actions is null or invalid");
+                return;
+            }
             final Notification.Action action =
                     statusBarNotification.getNotification().actions[actionIndex];
+            if (Objects.equals(action.actionIntent, actionIntent)) {
+                Log.w(TAG, "actionIntent does not match");
+                return;
+            }
             NotificationVisibility.NotificationLocation location =
                     NotificationLogger.getNotificationLocation(
                             mEntryManager.getNotificationData().get(key));
@@ -231,7 +246,8 @@ public class NotificationRemoteInputManager implements Dumpable {
                 return false;
             }
 
-            return activateRemoteInput(view, inputs, input, pendingIntent);
+            return activateRemoteInput(view, inputs, input, pendingIntent,
+                    null /* editedSuggestionInfo */);
         }
     };
 
@@ -291,6 +307,19 @@ public class NotificationRemoteInputManager implements Dumpable {
                 }
                 try {
                     mBarService.onNotificationDirectReplied(entry.notification.getKey());
+                    if (entry.editedSuggestionInfo != null) {
+                        boolean modifiedBeforeSending =
+                                !TextUtils.equals(entry.remoteInputText,
+                                        entry.editedSuggestionInfo.originalText);
+                        mBarService.onNotificationSmartReplySent(
+                                entry.notification.getKey(),
+                                entry.editedSuggestionInfo.index,
+                                entry.editedSuggestionInfo.originalText,
+                                NotificationLogger
+                                        .getNotificationLocation(entry)
+                                        .toMetricsEventEnum(),
+                                modifiedBeforeSending);
+                    }
                 } catch (RemoteException e) {
                     // Nothing to do, system going down
                 }
@@ -310,10 +339,12 @@ public class NotificationRemoteInputManager implements Dumpable {
      * @param inputs The remote inputs that need to be sent to the app.
      * @param input The remote input that needs to be activated.
      * @param pendingIntent The pending intent to be sent to the app.
+     * @param editedSuggestionInfo The smart reply that should be inserted in the remote input, or
+     *         {@code null} if the user is not editing a smart reply.
      * @return Whether the {@link RemoteInput} was activated.
      */
     public boolean activateRemoteInput(View view, RemoteInput[] inputs, RemoteInput input,
-            PendingIntent pendingIntent) {
+            PendingIntent pendingIntent, @Nullable EditedSuggestionInfo editedSuggestionInfo) {
 
         ViewParent p = view.getParent();
         RemoteInputView riv = null;
@@ -386,7 +417,7 @@ public class NotificationRemoteInputManager implements Dumpable {
 
         riv.setRevealParameters(cx, cy, r);
         riv.setPendingIntent(pendingIntent);
-        riv.setRemoteInput(inputs, input);
+        riv.setRemoteInput(inputs, input, editedSuggestionInfo);
         riv.focusAnimated();
 
         return true;
@@ -443,9 +474,6 @@ public class NotificationRemoteInputManager implements Dumpable {
     }
 
     public boolean shouldKeepForRemoteInputHistory(NotificationEntry entry) {
-        if (entry.isDismissed()) {
-            return false;
-        }
         if (!FORCE_REMOTE_INPUT_HISTORY) {
             return false;
         }
@@ -453,9 +481,6 @@ public class NotificationRemoteInputManager implements Dumpable {
     }
 
     public boolean shouldKeepForSmartReplyHistory(NotificationEntry entry) {
-        if (entry.isDismissed()) {
-            return false;
-        }
         if (!FORCE_REMOTE_INPUT_HISTORY) {
             return false;
         }
@@ -643,9 +668,6 @@ public class NotificationRemoteInputManager implements Dumpable {
     protected class RemoteInputActiveExtender extends RemoteInputExtender {
         @Override
         public boolean shouldExtendLifetime(@NonNull NotificationEntry entry) {
-            if (entry.isDismissed()) {
-                return false;
-            }
             return mRemoteInputController.isRemoteInputActive(entry);
         }
 

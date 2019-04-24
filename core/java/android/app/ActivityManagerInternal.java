@@ -196,6 +196,9 @@ public abstract class ActivityManagerInternal {
     /** Kill the processes in the list due to their tasks been removed. */
     public abstract void killProcessesForRemovedTask(ArrayList<Object> procsToKill);
 
+    /** Kill the process immediately. */
+    public abstract void killProcess(String processName, int uid, String reason);
+
     /**
      * Returns {@code true} if {@code uid} is running an activity from {@code packageName}.
      */
@@ -259,10 +262,11 @@ public abstract class ActivityManagerInternal {
 
     public abstract void tempWhitelistForPendingIntent(int callerPid, int callerUid, int targetUid,
             long duration, String tag);
-    public abstract int broadcastIntentInPackage(String packageName, int uid, Intent intent,
-            String resolvedType, IIntentReceiver resultTo, int resultCode, String resultData,
-            Bundle resultExtras, String requiredPermission, Bundle bOptions, boolean serialized,
-            boolean sticky, int userId, boolean allowBackgroundActivityStarts);
+    public abstract int broadcastIntentInPackage(String packageName, int uid, int realCallingUid,
+            int realCallingPid, Intent intent, String resolvedType, IIntentReceiver resultTo,
+            int resultCode, String resultData, Bundle resultExtras, String requiredPermission,
+            Bundle bOptions, boolean serialized, boolean sticky, int userId,
+            boolean allowBackgroundActivityStarts);
     public abstract ComponentName startServiceInPackage(int uid, Intent service,
             String resolvedType, boolean fgRequired, String callingPackage, int userId,
             boolean allowBackgroundActivityStarts) throws TransactionTooLargeException;
@@ -275,6 +279,7 @@ public abstract class ActivityManagerInternal {
     public abstract boolean isActivityStartsLoggingEnabled();
     /** Returns true if the background activity starts is enabled. */
     public abstract boolean isBackgroundActivityStartsEnabled();
+    public abstract boolean isPackageNameWhitelistedForBgActivityStarts(String packageName);
     public abstract void reportCurKeyguardUsageEvent(boolean keyguardShowing);
 
     /** Input dispatch timeout to a window, start the ANR process. */
@@ -324,6 +329,9 @@ public abstract class ActivityManagerInternal {
     /** Returns true if the given uid is the app in the foreground. */
     public abstract boolean isAppForeground(int uid);
 
+    /** Returns true if the given uid is currently marked 'bad' */
+    public abstract boolean isAppBad(ApplicationInfo info);
+
     /** Remove pending backup for the given userId. */
     public abstract void clearPendingBackup(int userId);
 
@@ -332,4 +340,21 @@ public abstract class ActivityManagerInternal {
      * like persisting database etc.
      */
     public abstract void prepareForPossibleShutdown();
+
+    /**
+     * Returns {@code true} if {@code uid} is running a foreground service of a specific
+     * {@code foregroundServiceType}.
+     */
+    public abstract boolean hasRunningForegroundService(int uid, int foregroundServiceType);
+
+    /**
+     * Registers the specified {@code processObserver} to be notified of future changes to
+     * process state.
+     */
+    public abstract void registerProcessObserver(IProcessObserver processObserver);
+
+    /**
+     * Unregisters the specified {@code processObserver}.
+     */
+    public abstract void unregisterProcessObserver(IProcessObserver processObserver);
 }

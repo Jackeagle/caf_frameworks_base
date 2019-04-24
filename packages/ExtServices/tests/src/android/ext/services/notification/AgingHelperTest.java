@@ -39,9 +39,10 @@ import android.os.Build;
 import android.os.Process;
 import android.os.UserHandle;
 import android.service.notification.StatusBarNotification;
-import android.support.test.InstrumentationRegistry;
-import android.support.test.runner.AndroidJUnit4;
 import android.testing.TestableContext;
+
+import androidx.test.InstrumentationRegistry;
+import androidx.test.runner.AndroidJUnit4;
 
 import org.junit.Before;
 import org.junit.Rule;
@@ -67,6 +68,8 @@ public class AgingHelperTest {
     private IPackageManager mPackageManager;
     @Mock
     private AgingHelper.Callback mCallback;
+    @Mock
+    private SmsHelper mSmsHelper;
 
     private AgingHelper mAgingHelper;
 
@@ -99,7 +102,7 @@ public class AgingHelperTest {
     public void testNoSnoozingOnPost() {
         NotificationChannel channel = new NotificationChannel("", "", IMPORTANCE_HIGH);
         StatusBarNotification sbn = generateSbn(channel.getId());
-        NotificationEntry entry = new NotificationEntry(mPackageManager, sbn, channel);
+        NotificationEntry entry = new NotificationEntry(mPackageManager, sbn, channel, mSmsHelper);
 
 
         mAgingHelper.onNotificationPosted(entry);
@@ -110,7 +113,7 @@ public class AgingHelperTest {
     public void testPostResetsSnooze() {
         NotificationChannel channel = new NotificationChannel("", "", IMPORTANCE_HIGH);
         StatusBarNotification sbn = generateSbn(channel.getId());
-        NotificationEntry entry = new NotificationEntry(mPackageManager, sbn, channel);
+        NotificationEntry entry = new NotificationEntry(mPackageManager, sbn, channel, mSmsHelper);
 
 
         mAgingHelper.onNotificationPosted(entry);
@@ -121,7 +124,7 @@ public class AgingHelperTest {
     public void testSnoozingOnSeen() {
         NotificationChannel channel = new NotificationChannel("", "", IMPORTANCE_HIGH);
         StatusBarNotification sbn = generateSbn(channel.getId());
-        NotificationEntry entry = new NotificationEntry(mPackageManager, sbn, channel);
+        NotificationEntry entry = new NotificationEntry(mPackageManager, sbn, channel, mSmsHelper);
         entry.setSeen();
         when(mCategorizer.getCategory(entry)).thenReturn(NotificationCategorizer.CATEGORY_PEOPLE);
 
@@ -134,7 +137,7 @@ public class AgingHelperTest {
         NotificationChannel channel = new NotificationChannel("", "", IMPORTANCE_HIGH);
         channel.lockFields(NotificationChannel.USER_LOCKED_IMPORTANCE);
         StatusBarNotification sbn = generateSbn(channel.getId());
-        NotificationEntry entry = new NotificationEntry(mPackageManager, sbn, channel);
+        NotificationEntry entry = new NotificationEntry(mPackageManager, sbn, channel, mSmsHelper);
         when(mCategorizer.getCategory(entry)).thenReturn(NotificationCategorizer.CATEGORY_PEOPLE);
 
         mAgingHelper.onNotificationSeen(entry);

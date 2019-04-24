@@ -44,10 +44,11 @@ import android.service.notification.NotificationListenerService.Ranking;
 import android.service.notification.NotificationListenerService.RankingMap;
 import android.service.notification.NotificationStats;
 import android.service.notification.StatusBarNotification;
-import android.support.test.InstrumentationRegistry;
 import android.test.ServiceTestCase;
 import android.testing.TestableContext;
 import android.util.AtomicFile;
+
+import androidx.test.InstrumentationRegistry;
 
 import com.android.internal.util.FastXmlSerializer;
 
@@ -85,6 +86,7 @@ public class AssistantTest extends ServiceTestCase<Assistant> {
     @Mock INotificationManager mNoMan;
     @Mock AtomicFile mFile;
     @Mock IPackageManager mPackageManager;
+    @Mock SmsHelper mSmsHelper;
 
     Assistant mAssistant;
     Application mApplication;
@@ -180,7 +182,7 @@ public class AssistantTest extends ServiceTestCase<Assistant> {
         mAssistant.setFakeRanking(generateRanking(sbn, P1C1));
         mAssistant.onNotificationPosted(sbn, mock(RankingMap.class));
 
-        verify(mNoMan, never()).applyAdjustmentFromAssistant(any(), any());
+        verify(mNoMan, never()).applyEnqueuedAdjustmentFromAssistant(any(), any());
     }
 
     @Test
@@ -193,7 +195,7 @@ public class AssistantTest extends ServiceTestCase<Assistant> {
         mAssistant.onNotificationPosted(sbn, mock(RankingMap.class));
 
         ArgumentCaptor<Adjustment> captor = ArgumentCaptor.forClass(Adjustment.class);
-        verify(mNoMan, times(1)).applyAdjustmentFromAssistant(any(), captor.capture());
+        verify(mNoMan, times(1)).applyEnqueuedAdjustmentFromAssistant(any(), captor.capture());
         assertEquals(sbn.getKey(), captor.getValue().getKey());
         assertEquals(Ranking.USER_SENTIMENT_NEGATIVE,
                 captor.getValue().getSignals().getInt(Adjustment.KEY_USER_SENTIMENT));
@@ -208,7 +210,7 @@ public class AssistantTest extends ServiceTestCase<Assistant> {
         mAssistant.setFakeRanking(generateRanking(sbn, P1C3));
         mAssistant.onNotificationPosted(sbn, mock(RankingMap.class));
 
-        verify(mNoMan, never()).applyAdjustmentFromAssistant(any(), any());
+        verify(mNoMan, never()).applyEnqueuedAdjustmentFromAssistant(any(), any());
     }
 
     @Test
@@ -228,7 +230,7 @@ public class AssistantTest extends ServiceTestCase<Assistant> {
         mAssistant.onNotificationPosted(sbn, mock(RankingMap.class));
 
         ArgumentCaptor<Adjustment> captor = ArgumentCaptor.forClass(Adjustment.class);
-        verify(mNoMan, times(1)).applyAdjustmentFromAssistant(any(), captor.capture());
+        verify(mNoMan, times(1)).applyEnqueuedAdjustmentFromAssistant(any(), captor.capture());
         assertEquals(sbn.getKey(), captor.getValue().getKey());
         assertEquals(Ranking.USER_SENTIMENT_NEGATIVE,
                 captor.getValue().getSignals().getInt(Adjustment.KEY_USER_SENTIMENT));
@@ -251,7 +253,7 @@ public class AssistantTest extends ServiceTestCase<Assistant> {
         sbn = generateSbn(PKG1, UID1, P1C1, "new one!", "group");
         mAssistant.onNotificationPosted(sbn, mock(RankingMap.class));
 
-        verify(mNoMan, never()).applyAdjustmentFromAssistant(any(), any());
+        verify(mNoMan, never()).applyEnqueuedAdjustmentFromAssistant(any(), any());
     }
 
     @Test
@@ -270,7 +272,7 @@ public class AssistantTest extends ServiceTestCase<Assistant> {
         sbn = generateSbn(PKG1, UID1, P1C1, "new one!", null);
         mAssistant.onNotificationPosted(sbn, mock(RankingMap.class));
 
-        verify(mNoMan, never()).applyAdjustmentFromAssistant(any(), any());
+        verify(mNoMan, never()).applyEnqueuedAdjustmentFromAssistant(any(), any());
     }
 
     @Test
@@ -289,7 +291,7 @@ public class AssistantTest extends ServiceTestCase<Assistant> {
         sbn = generateSbn(PKG1, UID1, P1C1, "new one!", null);
         mAssistant.onNotificationPosted(sbn, mock(RankingMap.class));
 
-        verify(mNoMan, never()).applyAdjustmentFromAssistant(any(), any());
+        verify(mNoMan, never()).applyEnqueuedAdjustmentFromAssistant(any(), any());
     }
 
     @Test
@@ -308,7 +310,7 @@ public class AssistantTest extends ServiceTestCase<Assistant> {
         sbn = generateSbn(PKG1, UID1, P1C1, "new one!", null);
         mAssistant.onNotificationPosted(sbn, mock(RankingMap.class));
 
-        verify(mNoMan, never()).applyAdjustmentFromAssistant(any(), any());
+        verify(mNoMan, never()).applyEnqueuedAdjustmentFromAssistant(any(), any());
     }
 
     @Test
@@ -320,7 +322,7 @@ public class AssistantTest extends ServiceTestCase<Assistant> {
         mAssistant.setFakeRanking(generateRanking(sbn, P2C1));
         mAssistant.onNotificationPosted(sbn, mock(RankingMap.class));
 
-        verify(mNoMan, never()).applyAdjustmentFromAssistant(any(), any());
+        verify(mNoMan, never()).applyEnqueuedAdjustmentFromAssistant(any(), any());
     }
 
     @Test
@@ -332,7 +334,7 @@ public class AssistantTest extends ServiceTestCase<Assistant> {
         mAssistant.setFakeRanking(generateRanking(sbn, P1C2));
         mAssistant.onNotificationPosted(sbn, mock(RankingMap.class));
 
-        verify(mNoMan, never()).applyAdjustmentFromAssistant(any(), any());
+        verify(mNoMan, never()).applyEnqueuedAdjustmentFromAssistant(any(), any());
     }
 
     @Test
@@ -467,7 +469,7 @@ public class AssistantTest extends ServiceTestCase<Assistant> {
     public void testAssistantNeverIncreasesImportanceWhenSuggestingSilent() throws Exception {
         StatusBarNotification sbn = generateSbn(PKG1, UID1, P1C3, "min notif!", null);
         Adjustment adjust = mAssistant.createEnqueuedNotificationAdjustment(new NotificationEntry(
-                mPackageManager, sbn, P1C3), new ArrayList<>(), new ArrayList<>());
+                mPackageManager, sbn, P1C3, mSmsHelper), new ArrayList<>(), new ArrayList<>());
         assertEquals(IMPORTANCE_MIN, adjust.getSignals().getInt(Adjustment.KEY_IMPORTANCE));
     }
 }

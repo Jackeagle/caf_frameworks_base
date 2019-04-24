@@ -124,6 +124,7 @@ interface IDevicePolicyManager {
     void setActiveAdmin(in ComponentName policyReceiver, boolean refreshing, int userHandle);
     boolean isAdminActive(in ComponentName policyReceiver, int userHandle);
     List<ComponentName> getActiveAdmins(int userHandle);
+    @UnsupportedAppUsage
     boolean packageHasActiveAdmins(String packageName, int userHandle);
     void getRemoveWarning(in ComponentName policyReceiver, in RemoteCallback result, int userHandle);
     void removeActiveAdmin(in ComponentName policyReceiver, int userHandle);
@@ -155,7 +156,7 @@ interface IDevicePolicyManager {
     void clearProfileOwner(in ComponentName who);
     boolean hasUserSetupCompleted();
 
-    boolean checkDeviceIdentifierAccess(in String packageName, int userHandle, int pid, int uid);
+    boolean checkDeviceIdentifierAccess(in String packageName, int pid, int uid);
 
     void setDeviceOwnerLockScreenInfo(in ComponentName who, CharSequence deviceOwnerInfo);
     CharSequence getDeviceOwnerLockScreenInfo();
@@ -311,8 +312,8 @@ interface IDevicePolicyManager {
 
     void setPermissionPolicy(in ComponentName admin, in String callerPackage, int policy);
     int  getPermissionPolicy(in ComponentName admin);
-    boolean setPermissionGrantState(in ComponentName admin, in String callerPackage, String packageName,
-            String permission, int grantState);
+    void setPermissionGrantState(in ComponentName admin, in String callerPackage, String packageName,
+            String permission, int grantState, in RemoteCallback resultReceiver);
     int getPermissionGrantState(in ComponentName admin, in String callerPackage, String packageName, String permission);
     boolean isProvisioningAllowed(String action, String packageName);
     int checkProvisioningPreCondition(String action, String packageName);

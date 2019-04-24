@@ -22,6 +22,7 @@ import android.annotation.RequiresPermission;
 import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
+import android.annotation.UnsupportedAppUsage;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
@@ -29,12 +30,16 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.os.storage.IStorageManager;
 import android.provider.Settings;
 import android.telephony.euicc.EuiccManager;
 import android.text.TextUtils;
+import android.text.format.DateFormat;
 import android.util.Log;
 import android.view.Display;
 import android.view.WindowManager;
+
+import com.android.internal.content.PackageHelper;
 
 import libcore.io.Streams;
 
@@ -354,6 +359,7 @@ public class RecoverySystem {
      *
      * @return the verification result.
      */
+    @UnsupportedAppUsage
     private static boolean verifyPackageCompatibility(InputStream inputStream) throws IOException {
         ArrayList<String> list = new ArrayList<>();
         ZipInputStream zis = new ZipInputStream(inputStream);
@@ -762,7 +768,8 @@ public class RecoverySystem {
 
         String reasonArg = null;
         if (!TextUtils.isEmpty(reason)) {
-            reasonArg = "--reason=" + sanitizeArg(reason);
+            String timeStamp = DateFormat.format("yyyy-MM-ddTHH:mm:ssZ", System.currentTimeMillis()).toString();
+            reasonArg = "--reason=" + sanitizeArg(reason + "," + timeStamp);
         }
 
         final String localeArg = "--locale=" + Locale.getDefault().toLanguageTag() ;
@@ -850,6 +857,21 @@ public class RecoverySystem {
     /** {@hide} */
     public static void rebootPromptAndWipeUserData(Context context, String reason)
             throws IOException {
+        boolean checkpointing = false;
+
+        // If we are running in checkpointing mode, we should not prompt a wipe.
+        // Checkpointing may save us. If it doesn't, we will wind up here again.
+        try {
+            IStorageManager storageManager = PackageHelper.getStorageManager();
+            if (storageManager.needsCheckpoint()) {
+                Log.i(TAG, "Rescue Party requested wipe. Aborting update instead.");
+                storageManager.abortChanges("rescueparty", false);
+            }
+            return;
+        } catch (RemoteException e) {
+            Log.i(TAG, "Failed to handle with checkpointing. Continuing with wipe.");
+        }
+
         String reasonArg = null;
         if (!TextUtils.isEmpty(reason)) {
             reasonArg = "--reason=" + sanitizeArg(reason);

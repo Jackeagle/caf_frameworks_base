@@ -26,6 +26,7 @@ import static android.system.OsConstants.STDOUT_FILENO;
 import static com.android.internal.os.ZygoteConnectionConstants.CONNECTION_TIMEOUT_MILLIS;
 import static com.android.internal.os.ZygoteConnectionConstants.WRAPPED_PID_TIMEOUT_MILLIS;
 
+import android.annotation.UnsupportedAppUsage;
 import android.content.pm.ApplicationInfo;
 import android.metrics.LogMaker;
 import android.net.Credentials;
@@ -37,6 +38,7 @@ import android.system.ErrnoException;
 import android.system.Os;
 import android.system.StructPollfd;
 import android.util.Log;
+import android.util.StatsLog;
 
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
@@ -68,9 +70,12 @@ class ZygoteConnection {
      * that it closes when the child process terminates. In other cases,
      * it is closed in the peer.
      */
+    @UnsupportedAppUsage
     private final LocalSocket mSocket;
+    @UnsupportedAppUsage
     private final DataOutputStream mSocketOutStream;
     private final BufferedReader mSocketReader;
+    @UnsupportedAppUsage
     private final Credentials peer;
     private final String abiList;
     private boolean isEof;
@@ -158,6 +163,10 @@ class ZygoteConnection {
             return null;
         }
 
+        if (parsedArgs.mUsapPoolStatusSpecified) {
+            return handleUsapPoolStatusChange(zygoteServer, parsedArgs.mUsapPoolEnabled);
+        }
+
         if (parsedArgs.mPreloadDefault) {
             handlePreload();
             return null;
@@ -185,13 +194,14 @@ class ZygoteConnection {
         }
 
         if (parsedArgs.mApiBlacklistExemptions != null) {
-            handleApiBlacklistExemptions(parsedArgs.mApiBlacklistExemptions);
-            return null;
+            return handleApiBlacklistExemptions(zygoteServer, parsedArgs.mApiBlacklistExemptions);
         }
 
-        if (parsedArgs.mHiddenApiAccessLogSampleRate != -1) {
-            handleHiddenApiAccessLogSampleRate(parsedArgs.mHiddenApiAccessLogSampleRate);
-            return null;
+        if (parsedArgs.mHiddenApiAccessLogSampleRate != -1
+                || parsedArgs.mHiddenApiAccessStatslogSampleRate != -1) {
+            return handleHiddenApiAccessLogSampleRate(zygoteServer,
+                    parsedArgs.mHiddenApiAccessLogSampleRate,
+                    parsedArgs.mHiddenApiAccessStatslogSampleRate);
         }
 
         if (parsedArgs.mPermittedCapabilities != 0 || parsedArgs.mEffectiveCapabilities != 0) {
@@ -258,7 +268,7 @@ class ZygoteConnection {
                 parsedArgs.mRuntimeFlags, rlimits, parsedArgs.mMountExternal, parsedArgs.mSeInfo,
                 parsedArgs.mNiceName, fdsToClose, fdsToIgnore, parsedArgs.mStartChildZygote,
                 parsedArgs.mInstructionSet, parsedArgs.mAppDataDir, parsedArgs.mPackageName,
-                parsedArgs.mPackagesForUid, parsedArgs.mVisibleVolIds);
+                parsedArgs.mPackagesForUid, parsedArgs.mSandboxId, parsedArgs.mTargetSdkVersion);
 
         try {
             if (pid == 0) {
@@ -325,21 +335,97 @@ class ZygoteConnection {
         }
     }
 
-    private void handleApiBlacklistExemptions(String[] exemptions) {
+    private Runnable stateChangeWithUsapPoolReset(ZygoteServer zygoteServer,
+            Runnable stateChangeCode) {
         try {
-            ZygoteInit.setApiBlacklistExemptions(exemptions);
+            if (zygoteServer.isUsapPoolEnabled()) {
+                Zygote.emptyUsapPool();
+            }
+
+            stateChangeCode.run();
+
+            if (zygoteServer.isUsapPoolEnabled()) {
+                Runnable fpResult =
+                        zygoteServer.fillUsapPool(
+                                new int[]{mSocket.getFileDescriptor().getInt$()});
+
+                if (fpResult != null) {
+                    zygoteServer.setForkChild();
+                    return fpResult;
+                }
+            }
+
             mSocketOutStream.writeInt(0);
+
+            return null;
         } catch (IOException ioe) {
             throw new IllegalStateException("Error writing to command socket", ioe);
         }
     }
 
-    private class HiddenApiUsageLogger implements VMRuntime.HiddenApiUsageLogger {
+    /**
+     * Makes the necessary changes to implement a new API blacklist exemption policy, and then
+     * responds to the system server, letting it know that the task has been completed.
+     *
+     * This necessitates a change to the internal state of the Zygote.  As such, if the USAP
+     * pool is enabled all existing USAPs have an incorrect API blacklist exemption list.  To
+     * properly handle this request the pool must be emptied and refilled.  This process can return
+     * a Runnable object that must be returned to ZygoteServer.runSelectLoop to be invoked.
+     *
+     * @param zygoteServer  The server object that received the request
+     * @param exemptions  The new exemption list.
+     * @return A Runnable object representing a new app in any USAPs spawned from here; the
+     *         zygote process will always receive a null value from this function.
+     */
+    private Runnable handleApiBlacklistExemptions(ZygoteServer zygoteServer, String[] exemptions) {
+        return stateChangeWithUsapPoolReset(zygoteServer,
+                () -> ZygoteInit.setApiBlacklistExemptions(exemptions));
+    }
+
+    private Runnable handleUsapPoolStatusChange(ZygoteServer zygoteServer, boolean newStatus) {
+        try {
+            Runnable fpResult = zygoteServer.setUsapPoolStatus(newStatus, mSocket);
+
+            if (fpResult == null) {
+                mSocketOutStream.writeInt(0);
+            } else {
+                zygoteServer.setForkChild();
+            }
+
+            return fpResult;
+        } catch (IOException ioe) {
+            throw new IllegalStateException("Error writing to command socket", ioe);
+        }
+    }
+
+    private static class HiddenApiUsageLogger implements VMRuntime.HiddenApiUsageLogger {
 
         private final MetricsLogger mMetricsLogger = new MetricsLogger();
+        private static HiddenApiUsageLogger sInstance = new HiddenApiUsageLogger();
+        private int mHiddenApiAccessLogSampleRate = 0;
+        private int mHiddenApiAccessStatslogSampleRate = 0;
 
-        public void hiddenApiUsed(String packageName, String signature,
+        public static void setHiddenApiAccessLogSampleRates(int sampleRate, int newSampleRate) {
+            sInstance.mHiddenApiAccessLogSampleRate = sampleRate;
+            sInstance.mHiddenApiAccessStatslogSampleRate = newSampleRate;
+        }
+
+        public static HiddenApiUsageLogger getInstance() {
+            return HiddenApiUsageLogger.sInstance;
+        }
+
+        public void hiddenApiUsed(int sampledValue, String packageName, String signature,
                 int accessMethod, boolean accessDenied) {
+            if (sampledValue < mHiddenApiAccessLogSampleRate) {
+                logUsage(packageName, signature, accessMethod, accessDenied);
+            }
+            if (sampledValue < mHiddenApiAccessStatslogSampleRate) {
+                newLogUsage(signature, accessMethod, accessDenied);
+            }
+        }
+
+        private void logUsage(String packageName, String signature, int accessMethod,
+                                  boolean accessDenied) {
             int accessMethodMetric = HiddenApiUsageLogger.ACCESS_METHOD_NONE;
             switch(accessMethod) {
                 case HiddenApiUsageLogger.ACCESS_METHOD_NONE:
@@ -365,16 +451,51 @@ class ZygoteConnection {
             }
             mMetricsLogger.write(logMaker);
         }
+
+        private void newLogUsage(String signature, int accessMethod, boolean accessDenied) {
+            int accessMethodProto = StatsLog.HIDDEN_API_USED__ACCESS_METHOD__NONE;
+            switch(accessMethod) {
+                case HiddenApiUsageLogger.ACCESS_METHOD_NONE:
+                    accessMethodProto = StatsLog.HIDDEN_API_USED__ACCESS_METHOD__NONE;
+                    break;
+                case HiddenApiUsageLogger.ACCESS_METHOD_REFLECTION:
+                    accessMethodProto = StatsLog.HIDDEN_API_USED__ACCESS_METHOD__REFLECTION;
+                    break;
+                case HiddenApiUsageLogger.ACCESS_METHOD_JNI:
+                    accessMethodProto = StatsLog.HIDDEN_API_USED__ACCESS_METHOD__JNI;
+                    break;
+                case HiddenApiUsageLogger.ACCESS_METHOD_LINKING:
+                    accessMethodProto = StatsLog.HIDDEN_API_USED__ACCESS_METHOD__LINKING;
+                    break;
+            }
+            int uid = Process.myUid();
+            StatsLog.write(StatsLog.HIDDEN_API_USED, uid, signature,
+                                   accessMethodProto, accessDenied);
+        }
     }
 
-    private void handleHiddenApiAccessLogSampleRate(int samplingRate) {
-        try {
-            ZygoteInit.setHiddenApiAccessLogSampleRate(samplingRate);
-            ZygoteInit.setHiddenApiUsageLogger(new HiddenApiUsageLogger());
-            mSocketOutStream.writeInt(0);
-        } catch (IOException ioe) {
-            throw new IllegalStateException("Error writing to command socket", ioe);
-        }
+    /**
+     * Changes the API access log sample rate for the Zygote and processes spawned from it.
+     *
+     * This necessitates a change to the internal state of the Zygote.  As such, if the USAP
+     * pool is enabled all existing USAPs have an incorrect API access log sample rate.  To
+     * properly handle this request the pool must be emptied and refilled.  This process can return
+     * a Runnable object that must be returned to ZygoteServer.runSelectLoop to be invoked.
+     *
+     * @param zygoteServer  The server object that received the request
+     * @param samplingRate  The new sample rate for regular logging
+     * @param statsdSamplingRate  The new sample rate for statslog logging
+     * @return A Runnable object representing a new app in any blastulas spawned from here; the
+     *         zygote process will always receive a null value from this function.
+     */
+    private Runnable handleHiddenApiAccessLogSampleRate(ZygoteServer zygoteServer,
+            int samplingRate, int statsdSamplingRate) {
+        return stateChangeWithUsapPoolReset(zygoteServer, () -> {
+            int maxSamplingRate = Math.max(samplingRate, statsdSamplingRate);
+            ZygoteInit.setHiddenApiAccessLogSampleRate(maxSamplingRate);
+            HiddenApiUsageLogger.setHiddenApiAccessLogSampleRates(samplingRate, statsdSamplingRate);
+            ZygoteInit.setHiddenApiUsageLogger(HiddenApiUsageLogger.getInstance());
+        });
     }
 
     protected void preload() {
@@ -405,6 +526,7 @@ class ZygoteConnection {
     /**
      * Closes socket associated with this connection.
      */
+    @UnsupportedAppUsage
     void closeSocket() {
         try {
             mSocket.close();

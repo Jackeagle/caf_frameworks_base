@@ -34,6 +34,7 @@
     <string name="keyguard_password_wrong_pin_code" msgid="6535018036285012028">"ತಪ್ಪಾದ ಪಿನ್‌ ಕೋಡ್."</string>
     <string name="keyguard_sim_error_message_short" msgid="592109500618448312">"ಅಮಾನ್ಯ ಕಾರ್ಡ್."</string>
     <string name="keyguard_charged" msgid="3316115607283493413">"ಪೂರ್ಣವಾಗಿ ಚಾರ್ಜ್ ಆಗಿದೆ"</string>
+    <string name="keyguard_plugged_in_wireless" msgid="3004717438401575235">"<xliff:g id="PERCENTAGE">%s</xliff:g> • ವೈರ್‌ಲೆಸ್ ಆಗಿ ಚಾರ್ಜ್ ಆಗುತ್ತಿದೆ"</string>
     <string name="keyguard_plugged_in" msgid="3161102098900158923">"<xliff:g id="PERCENTAGE">%s</xliff:g> • ಚಾರ್ಜ್‌ ಮಾಡಲಾಗುತ್ತಿದೆ"</string>
     <string name="keyguard_plugged_in_charging_fast" msgid="3684592786276709342">"<xliff:g id="PERCENTAGE">%s</xliff:g> • ವೇಗವಾಗಿ ಚಾರ್ಜ್‌ಮಾಡಲಾಗುತ್ತಿದೆ"</string>
     <string name="keyguard_plugged_in_charging_slowly" msgid="509533586841478405">"<xliff:g id="PERCENTAGE">%s</xliff:g> • ನಿಧಾನವಾಗಿ ಚಾರ್ಜ್ ಮಾಡಲಾಗುತ್ತಿದೆ"</string>
@@ -150,7 +151,10 @@
       <item quantity="one">ಸಿಮ್ ಅನ್ನು ಈಗ ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ. ಮುಂದುವರಿಸಲು PUK ಕೋಡ್ ನಮೂದಿಸಿ. ಸಿಮ್ ಶಾಶ್ವತವಾಗಿ ನಿಷ್ಪ್ರಯೋಜಕವಾಗುವ ಮುನ್ನ ನಿಮ್ಮಲ್ಲಿ <xliff:g id="_NUMBER_1">%d</xliff:g> ಪ್ರಯತ್ನಗಳು ಬಾಕಿ ಉಳಿದಿವೆ. ವಿವರಗಳಿಗಾಗಿ ವಾಹಕವನ್ನು ಸಂಪರ್ಕಿಸಿ.</item>
       <item quantity="other">ಸಿಮ್ ಅನ್ನು ಈಗ ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ. ಮುಂದುವರಿಸಲು PUK ಕೋಡ್ ನಮೂದಿಸಿ. ಸಿಮ್ ಶಾಶ್ವತವಾಗಿ ನಿಷ್ಪ್ರಯೋಜಕವಾಗುವ ಮುನ್ನ ನಿಮ್ಮಲ್ಲಿ <xliff:g id="_NUMBER_1">%d</xliff:g> ಪ್ರಯತ್ನಗಳು ಬಾಕಿ ಉಳಿದಿವೆ. ವಿವರಗಳಿಗಾಗಿ ವಾಹಕವನ್ನು ಸಂಪರ್ಕಿಸಿ.</item>
     </plurals>
-    <string name="type_clock_header" msgid="4786545441902447636">"ಇದು"</string>
+    <plurals name="type_clock_header" formatted="false" msgid="6782840450655632763">
+      <item quantity="one">"<annotation name="color">"ಇದು"</annotation>\n"^1\n^2</item>
+      <item quantity="other">"<annotation name="color">"ಇದು"</annotation>\n"^1\n^2</item>
+    </plurals>
   <string-array name="type_clock_hours">
     <item msgid="3543074812389379830">"ಹನ್ನೆರಡು"</item>
     <item msgid="7389464214252023751">"ಒಂದು"</item>
@@ -167,15 +171,15 @@
   </string-array>
   <string-array name="type_clock_minutes">
     <item msgid="8322049385467207985">"ಗಂಟೆ"</item>
-    <item msgid="8837126587669001578">"ಒಂದು"</item>
-    <item msgid="4294343372940455660">"ಎರಡು"</item>
-    <item msgid="7129166637707421536">"ಮೂರು"</item>
-    <item msgid="7579404865008788673">"ನಾಲ್ಕು"</item>
-    <item msgid="3873924689207380586">"ಐದು"</item>
-    <item msgid="4849565597850069377">"ಆರು"</item>
-    <item msgid="4404219424523572364">"ಏಳು"</item>
-    <item msgid="8740481214764087329">"ಎಂಟು"</item>
-    <item msgid="1713216865806811237">"ಒಂಬತ್ತು"</item>
+    <item msgid="2091812961809760681">"ಓಹ್ ಒಂದು"</item>
+    <item msgid="1496435384877290709">"ಓಹ್ ಎರಡು"</item>
+    <item msgid="881846472976674129">"ಓಹ್ ಮೂರು"</item>
+    <item msgid="2784477043911540584">"ಓಹ್ ನಾಲ್ಕು"</item>
+    <item msgid="1610928853656700614">"ಓಹ್ ಐದು"</item>
+    <item msgid="2317806244043886658">"ಓಹ್ ಆರು"</item>
+    <item msgid="3318687539120971327">"ಓಹ್ ಏಳು"</item>
+    <item msgid="5701600693712102348">"ಓಹ್ ಎಂಟು"</item>
+    <item msgid="3247381605947372495">"ಓಹ್ ಒಂಬತ್ತು"</item>
     <item msgid="3508406095411245038">"ಹತ್ತು"</item>
     <item msgid="7161996337755311711">"ಹನ್ನೊಂದು"</item>
     <item msgid="4044549963329624197">"ಹನ್ನೆರಡು"</item>

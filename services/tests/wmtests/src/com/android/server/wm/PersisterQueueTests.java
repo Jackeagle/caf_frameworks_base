@@ -18,11 +18,10 @@ package com.android.server.wm;
 
 import static com.google.common.truth.Truth.assertWithMessage;
 
-import static junit.framework.Assert.assertNull;
-import static junit.framework.Assert.assertSame;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import android.os.SystemClock;
@@ -47,7 +46,6 @@ import java.util.function.Predicate;
  *  atest WmTests:PersisterQueueTests
  */
 @MediumTest
-@FlakyTest(detail = "Confirm stable in post-submit before removing")
 @Presubmit
 public class PersisterQueueTests implements PersisterQueue.Listener {
     private static final long INTER_WRITE_DELAY_MS = 50;
@@ -159,6 +157,7 @@ public class PersisterQueueTests implements PersisterQueue.Listener {
     }
 
     @Test
+    @FlakyTest(bugId = 128526085)
     public void testProcessTwoItems_OneAfterAnother() throws Exception {
         // First item
         mLatch = new CountDownLatch(1);

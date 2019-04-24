@@ -20,14 +20,17 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SystemService;
 import android.annotation.UnsupportedAppUsage;
+import android.app.ActivityThread;
 import android.content.Context;
 import android.database.ContentObserver;
 import android.os.ServiceManager;
+import android.provider.DeviceConfig;
 import android.provider.Settings;
 import android.service.textclassifier.TextClassifierService;
 import android.view.textclassifier.TextClassifier.TextClassifierType;
 
 import com.android.internal.annotations.GuardedBy;
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.IndentingPrintWriter;
 import com.android.internal.util.Preconditions;
 
@@ -75,14 +78,10 @@ public final class TextClassificationManager {
      * If this is null, this method returns a default text classifier (i.e. either the system text
      * classifier if one exists, or a local text classifier running in this process.)
      * <p>
-     * Note that if system textclassifier is in use, requests will be sent to a textclassifier
-     * package provided from OEM. If you want to make sure the requests are handled in your own
-     * process, you should consider {@link #getLocalTextClassifier()} instead. However, the local
-     * textclassifier may return inferior results to those returned by the system
-     * textclassifier.
+     * Note that requests to the TextClassifier may be handled in an OEM-provided process rather
+     * than in the calling app's process.
      *
      * @see #setTextClassifier(TextClassifier)
-     * @see #getLocalTextClassifier()
      */
     @NonNull
     public TextClassifier getTextClassifier() {
@@ -199,6 +198,9 @@ public final class TextClassificationManager {
             if (mSettingsObserver != null) {
                 getApplicationContext().getContentResolver()
                         .unregisterContentObserver(mSettingsObserver);
+                if (ConfigParser.ENABLE_DEVICE_CONFIG) {
+                    DeviceConfig.removeOnPropertyChangedListener(mSettingsObserver);
+                }
             }
         } finally {
             super.finalize();
@@ -224,11 +226,9 @@ public final class TextClassificationManager {
 
     /**
      * Returns a local textclassifier, which is running in this process.
-     *
-     * @see #getTextClassifier()
      */
     @NonNull
-    public TextClassifier getLocalTextClassifier() {
+    private TextClassifier getLocalTextClassifier() {
         synchronized (mLock) {
             if (mLocalTextClassifier == null) {
                 if (getSettings().isLocalTextClassifierEnabled()) {
@@ -248,7 +248,9 @@ public final class TextClassificationManager {
                 && TextClassifierService.getServiceComponentName(mContext) != null;
     }
 
-    private void invalidate() {
+    /** @hide */
+    @VisibleForTesting
+    public void invalidate() {
         synchronized (mLock) {
             mSettings = null;
             mLocalTextClassifier = null;
@@ -283,7 +285,8 @@ public final class TextClassificationManager {
         }
     }
 
-    private static final class SettingsObserver extends ContentObserver {
+    private static final class SettingsObserver extends ContentObserver
+            implements DeviceConfig.OnPropertyChangedListener {
 
         private final WeakReference<TextClassificationManager> mTcm;
 
@@ -294,10 +297,25 @@ public final class TextClassificationManager {
                     Settings.Global.getUriFor(Settings.Global.TEXT_CLASSIFIER_CONSTANTS),
                     false /* notifyForDescendants */,
                     this);
+            if (ConfigParser.ENABLE_DEVICE_CONFIG) {
+                DeviceConfig.addOnPropertyChangedListener(
+                        DeviceConfig.NAMESPACE_TEXTCLASSIFIER,
+                        ActivityThread.currentApplication().getMainExecutor(),
+                        this);
+            }
         }
 
         @Override
         public void onChange(boolean selfChange) {
+            invalidateSettings();
+        }
+
+        @Override
+        public void onPropertyChanged(String namespace, String name, String value) {
+            invalidateSettings();
+        }
+
+        private void invalidateSettings() {
             final TextClassificationManager tcm = mTcm.get();
             if (tcm != null) {
                 tcm.invalidate();

@@ -35,7 +35,6 @@ import android.provider.ContactsContract.CommonDataKinds.Callable;
 import android.provider.ContactsContract.CommonDataKinds.Phone;
 import android.provider.ContactsContract.Data;
 import android.provider.ContactsContract.DataUsageFeedback;
-import android.telecom.CallIdentification;
 import android.telecom.PhoneAccount;
 import android.telecom.PhoneAccountHandle;
 import android.telecom.TelecomManager;
@@ -605,69 +604,6 @@ public class CallLog {
         public static final String BLOCK_REASON = "block_reason";
 
         /**
-         * The package name of the {@link android.telecom.CallScreeningService} which provided
-         * {@link android.telecom.CallIdentification} for this call.
-         * <P>Type: TEXT</P>
-         */
-        public static final String CALL_ID_PACKAGE_NAME = "call_id_package_name";
-
-        /**
-         * The app name of the {@link android.telecom.CallScreeningService} which provided
-         * {@link android.telecom.CallIdentification} for this call.
-         * <P>Type: TEXT</P>
-         */
-        public static final String CALL_ID_APP_NAME = "call_id_app_name";
-
-        /**
-         * The {@link CallIdentification#getName() name} of a call, as provided by the
-         * {@link android.telecom.CallScreeningService}.
-         * <p>
-         * The name is provided by the app identified by {@link #CALL_ID_PACKAGE_NAME} and
-         * {@link #CALL_ID_APP_NAME}.
-         * <P>Type: TEXT</P>
-         */
-        public static final String CALL_ID_NAME = "call_id_name";
-
-        /**
-         * The {@link CallIdentification#getDescription() description} of a call, as provided by the
-         * {@link android.telecom.CallScreeningService}.
-         * <p>
-         * The description is provided by the app identified by {@link #CALL_ID_PACKAGE_NAME} and
-         * {@link #CALL_ID_APP_NAME}.
-         * <P>Type: TEXT</P>
-         */
-        public static final String CALL_ID_DESCRIPTION = "call_id_description";
-
-        /**
-         * The {@link CallIdentification#getDetails() details} of a call, as provided by the
-         * {@link android.telecom.CallScreeningService}.
-         * <p>
-         * The details field is provided by the app identified by {@link #CALL_ID_PACKAGE_NAME} and
-         * {@link #CALL_ID_APP_NAME}.
-         * <P>Type: TEXT</P>
-         */
-        public static final String CALL_ID_DETAILS = "call_id_details";
-
-        /**
-         * The {@link CallIdentification#getNuisanceConfidence() nuisance confidence} of a call, as
-         * provided by the {@link android.telecom.CallScreeningService}.
-         * <p>
-         * Valid values are defined in {@link CallIdentification}, and include:
-         * <ul>
-         *     <li>{@link CallIdentification#CONFIDENCE_NOT_NUISANCE}</li>
-         *     <li>{@link CallIdentification#CONFIDENCE_LIKELY_NOT_NUISANCE}</li>
-         *     <li>{@link CallIdentification#CONFIDENCE_UNKNOWN}</li>
-         *     <li>{@link CallIdentification#CONFIDENCE_LIKELY_NUISANCE}</li>
-         *     <li>{@link CallIdentification#CONFIDENCE_NUISANCE}</li>
-         * </ul>
-         * <p>
-         * The nuisance confidence is provided by the app identified by
-         * {@link #CALL_ID_PACKAGE_NAME} and {@link #CALL_ID_APP_NAME}.
-         * <P>Type: INTEGER</P>
-         */
-        public static final String CALL_ID_NUISANCE_CONFIDENCE = "call_id_nuisance_confidence";
-
-        /**
          * Adds a call to the call log.
          *
          * @param ci the CallerInfo object to get the target contact from.  Can be null
@@ -696,8 +632,7 @@ public class CallLog {
                 presentation, callType, features, accountHandle, start, duration,
                 dataUsage, false /* addForAllUsers */, null /* userToBeInsertedTo */,
                 false /* isRead */, Calls.BLOCK_REASON_NOT_BLOCKED /* callBlockReason */,
-                null /* callScreeningAppName */, null /* callScreeningComponentName */,
-                null /* callIdentification */);
+                null /* callScreeningAppName */, null /* callScreeningComponentName */);
         }
 
 
@@ -737,8 +672,7 @@ public class CallLog {
                 features, accountHandle, start, duration, dataUsage, addForAllUsers,
                 userToBeInsertedTo, false /* isRead */ , Calls.BLOCK_REASON_NOT_BLOCKED
                 /* callBlockReason */, null /* callScreeningAppName */,
-                null /* callScreeningComponentName */,
-                null /* callIdentification */);
+                null /* callScreeningComponentName */);
         }
 
         /**
@@ -772,19 +706,6 @@ public class CallLog {
          * @param callBlockReason The reason why the call is blocked.
          * @param callScreeningAppName The call screening application name which block the call.
          * @param callScreeningComponentName The call screening component name which block the call.
-         * @param callIdPackageName The package name of the
-         *      {@link android.telecom.CallScreeningService} which provided
-         *      {@link CallIdentification}.
-         * @param callIdAppName The app name of the {@link android.telecom.CallScreeningService}
-         *                      which provided {@link CallIdentification}.
-         * @param callIdName The caller name provided by the
-         *      {@link android.telecom.CallScreeningService}.
-         * @param callIdDescription The caller description provided by the
-         *      {@link android.telecom.CallScreeningService}.
-         * @param callIdDetails The caller details provided by the
-         *      {@link android.telecom.CallScreeningService}.
-         * @param callIdCallType The caller type provided by the
-         *      {@link android.telecom.CallScreeningService}.
          *
          * @result The URI of the call log entry belonging to the user that made or received this
          *        call.  This could be of the shadow provider.  Do not return it to non-system apps,
@@ -796,44 +717,17 @@ public class CallLog {
                 String postDialDigits, String viaNumber, int presentation, int callType,
                 int features, PhoneAccountHandle accountHandle, long start, int duration,
                 Long dataUsage, boolean addForAllUsers, UserHandle userToBeInsertedTo,
-                boolean isRead, int callBlockReason, String callScreeningAppName,
-                String callScreeningComponentName, CallIdentification callIdentification) {
+                boolean isRead, int callBlockReason, CharSequence callScreeningAppName,
+                String callScreeningComponentName) {
             if (VERBOSE_LOG) {
                 Log.v(LOG_TAG, String.format("Add call: number=%s, user=%s, for all=%s",
                         number, userToBeInsertedTo, addForAllUsers));
             }
             final ContentResolver resolver = context.getContentResolver();
-            int numberPresentation = PRESENTATION_ALLOWED;
 
-            TelecomManager tm = null;
-            try {
-                tm = TelecomManager.from(context);
-            } catch (UnsupportedOperationException e) {}
+            String accountAddress = getLogAccountAddress(context, accountHandle);
 
-            String accountAddress = null;
-            if (tm != null && accountHandle != null) {
-                PhoneAccount account = tm.getPhoneAccount(accountHandle);
-                if (account != null) {
-                    Uri address = account.getSubscriptionAddress();
-                    if (address != null) {
-                        accountAddress = address.getSchemeSpecificPart();
-                    }
-                }
-            }
-
-            // Remap network specified number presentation types
-            // PhoneConstants.PRESENTATION_xxx to calllog number presentation types
-            // Calls.PRESENTATION_xxx, in order to insulate the persistent calllog
-            // from any future radio changes.
-            // If the number field is empty set the presentation type to Unknown.
-            if (presentation == PhoneConstants.PRESENTATION_RESTRICTED) {
-                numberPresentation = PRESENTATION_RESTRICTED;
-            } else if (presentation == PhoneConstants.PRESENTATION_PAYPHONE) {
-                numberPresentation = PRESENTATION_PAYPHONE;
-            } else if (TextUtils.isEmpty(number)
-                    || presentation == PhoneConstants.PRESENTATION_UNKNOWN) {
-                numberPresentation = PRESENTATION_UNKNOWN;
-            }
+            int numberPresentation = getLogNumberPresentation(number, presentation);
             if (numberPresentation != PRESENTATION_ALLOWED) {
                 number = "";
                 if (ci != null) {
@@ -876,24 +770,8 @@ public class CallLog {
             }
 
             values.put(BLOCK_REASON, callBlockReason);
-            values.put(CALL_SCREENING_APP_NAME, callScreeningAppName);
+            values.put(CALL_SCREENING_APP_NAME, charSequenceToString(callScreeningAppName));
             values.put(CALL_SCREENING_COMPONENT_NAME, callScreeningComponentName);
-
-            if (callIdentification != null) {
-                values.put(CALL_ID_PACKAGE_NAME, callIdentification.getCallScreeningPackageName());
-                values.put(CALL_ID_APP_NAME, callIdentification.getCallScreeningAppName());
-                values.put(CALL_ID_NAME, callIdentification.getName());
-                values.put(CALL_ID_DESCRIPTION, callIdentification.getDescription());
-                values.put(CALL_ID_DETAILS, callIdentification.getDetails());
-                values.put(CALL_ID_NUISANCE_CONFIDENCE, callIdentification.getNuisanceConfidence());
-            } else {
-                values.putNull(CALL_ID_PACKAGE_NAME);
-                values.putNull(CALL_ID_APP_NAME);
-                values.putNull(CALL_ID_NAME);
-                values.putNull(CALL_ID_DESCRIPTION);
-                values.putNull(CALL_ID_DETAILS);
-                values.putNull(CALL_ID_NUISANCE_CONFIDENCE);
-            }
 
             if ((ci != null) && (ci.contactIdOrZero > 0)) {
                 // Update usage information for the number associated with the contact ID.
@@ -1027,6 +905,10 @@ public class CallLog {
             return result;
         }
 
+        private static String charSequenceToString(CharSequence sequence) {
+            return sequence == null ? null : sequence.toString();
+        }
+
         /** @hide */
         public static boolean shouldHaveSharedCallLogEntries(Context context,
                 UserManager userManager, int userId) {
@@ -1138,14 +1020,61 @@ public class CallLog {
             if (TextUtils.isEmpty(countryIso)) {
                 return;
             }
-            final String normalizedNumber = PhoneNumberUtils.formatNumberToE164(number,
-                    getCurrentCountryIso(context));
+            final String normalizedNumber = PhoneNumberUtils.formatNumberToE164(number, countryIso);
             if (TextUtils.isEmpty(normalizedNumber)) {
                 return;
             }
             final ContentValues values = new ContentValues();
             values.put(Phone.NORMALIZED_NUMBER, normalizedNumber);
             resolver.update(Data.CONTENT_URI, values, Data._ID + "=?", new String[] {dataId});
+        }
+
+        /**
+         * Remap network specified number presentation types
+         * PhoneConstants.PRESENTATION_xxx to calllog number presentation types
+         * Calls.PRESENTATION_xxx, in order to insulate the persistent calllog
+         * from any future radio changes.
+         * If the number field is empty set the presentation type to Unknown.
+         */
+        private static int getLogNumberPresentation(String number, int presentation) {
+            if (presentation == PhoneConstants.PRESENTATION_RESTRICTED) {
+                return presentation;
+            }
+
+            if (presentation == PhoneConstants.PRESENTATION_PAYPHONE) {
+                return presentation;
+            }
+
+            if (TextUtils.isEmpty(number)
+                    || presentation == PhoneConstants.PRESENTATION_UNKNOWN) {
+                return PRESENTATION_UNKNOWN;
+            }
+
+            return PRESENTATION_ALLOWED;
+        }
+
+        private static String getLogAccountAddress(Context context,
+                PhoneAccountHandle accountHandle) {
+            TelecomManager tm = null;
+            try {
+                tm = TelecomManager.from(context);
+            } catch (UnsupportedOperationException e) {
+                if (VERBOSE_LOG) {
+                    Log.v(LOG_TAG, "No TelecomManager found to get account address.");
+                }
+            }
+
+            String accountAddress = null;
+            if (tm != null && accountHandle != null) {
+                PhoneAccount account = tm.getPhoneAccount(accountHandle);
+                if (account != null) {
+                    Uri address = account.getSubscriptionAddress();
+                    if (address != null) {
+                        accountAddress = address.getSchemeSpecificPart();
+                    }
+                }
+            }
+            return accountAddress;
         }
 
         private static String getCurrentCountryIso(Context context) {

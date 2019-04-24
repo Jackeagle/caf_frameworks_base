@@ -27,6 +27,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Contains the list of carrier restrictions.
@@ -92,6 +93,9 @@ public final class CarrierRestrictionRules implements Parcelable {
     @IntDef(prefix = "CARRIER_RESTRICTION_DEFAULT_",
             value = {CARRIER_RESTRICTION_DEFAULT_NOT_ALLOWED, CARRIER_RESTRICTION_DEFAULT_ALLOWED})
     public @interface CarrierRestrictionDefault {}
+
+    /* Wild character for comparison */
+    private static final char WILD_CHARACTER = '?';
 
     private List<CarrierIdentifier> mAllowedCarriers;
     private List<CarrierIdentifier> mExcludedCarriers;
@@ -166,6 +170,125 @@ public final class CarrierRestrictionRules implements Parcelable {
     }
 
     /**
+     * Tests an array of carriers with the carrier restriction configuration. The list of carrier
+     * ids passed as argument does not need to be the same as currently present in the device.
+     *
+     * @param carrierIds list of {@link CarrierIdentifier}, one for each SIM slot on the device
+     * @return a list of boolean with the same size as input, indicating if each
+     * {@link CarrierIdentifier} is allowed or not.
+     */
+    public @NonNull List<Boolean> areCarrierIdentifiersAllowed(
+            @NonNull List<CarrierIdentifier> carrierIds) {
+        ArrayList<Boolean> result = new ArrayList<>(carrierIds.size());
+
+        // First calculate the result for each slot independently
+        for (int i = 0; i < carrierIds.size(); i++) {
+            boolean inAllowedList = isCarrierIdInList(carrierIds.get(i), mAllowedCarriers);
+            boolean inExcludedList = isCarrierIdInList(carrierIds.get(i), mExcludedCarriers);
+            if (mCarrierRestrictionDefault == CARRIER_RESTRICTION_DEFAULT_NOT_ALLOWED) {
+                result.add((inAllowedList && !inExcludedList) ? true : false);
+            } else {
+                result.add((inExcludedList && !inAllowedList) ? false : true);
+            }
+        }
+        // Apply the multi-slot policy, if needed.
+        if (mMultiSimPolicy == MULTISIM_POLICY_ONE_VALID_SIM_MUST_BE_PRESENT) {
+            for (boolean b : result) {
+                if (b) {
+                    result.replaceAll(x -> true);
+                    break;
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Indicates if a certain carrier {@code id} is present inside a {@code list}
+     *
+     * @return true if the carrier {@code id} is present, false otherwise
+     */
+    private static boolean isCarrierIdInList(CarrierIdentifier id, List<CarrierIdentifier> list) {
+        for (CarrierIdentifier listItem : list) {
+            // Compare MCC and MNC
+            if (!patternMatch(id.getMcc(), listItem.getMcc())
+                    || !patternMatch(id.getMnc(), listItem.getMnc())) {
+                continue;
+            }
+
+            // Compare SPN. Comparison is on the complete strings, case insensitive and with wild
+            // characters.
+            String listItemValue = convertNullToEmpty(listItem.getSpn());
+            String idValue = convertNullToEmpty(id.getSpn());
+            if (!listItemValue.isEmpty()) {
+                if (!patternMatch(idValue, listItemValue)) {
+                    continue;
+                }
+            }
+
+            // The IMSI of the configuration can be shorter than actual IMSI in the SIM card.
+            listItemValue = convertNullToEmpty(listItem.getImsi());
+            idValue = convertNullToEmpty(id.getImsi());
+            if (!patternMatch(
+                    idValue.substring(0, Math.min(idValue.length(), listItemValue.length())),
+                    listItemValue)) {
+                continue;
+            }
+
+            // The GID1 of the configuration can be shorter than actual GID1 in the SIM card.
+            listItemValue = convertNullToEmpty(listItem.getGid1());
+            idValue = convertNullToEmpty(id.getGid1());
+            if (!patternMatch(
+                    idValue.substring(0, Math.min(idValue.length(), listItemValue.length())),
+                    listItemValue)) {
+                continue;
+            }
+
+            // The GID2 of the configuration can be shorter than actual GID2 in the SIM card.
+            listItemValue = convertNullToEmpty(listItem.getGid2());
+            idValue = convertNullToEmpty(id.getGid2());
+            if (!patternMatch(
+                    idValue.substring(0, Math.min(idValue.length(), listItemValue.length())),
+                    listItemValue)) {
+                continue;
+            }
+
+            // Valid match was found in the list
+            return true;
+        }
+        return false;
+    }
+
+    private static String convertNullToEmpty(String value) {
+        return Objects.toString(value, "");
+    }
+
+    /**
+     * Performs a case insensitive string comparison against a given pattern. The character '?'
+     * is used in the pattern as wild character in the comparison. The string must have the same
+     * length as the pattern.
+     *
+     * @param str string to match
+     * @param pattern string containing the pattern
+     * @return true in case of match, false otherwise
+     */
+    private static boolean patternMatch(String str, String pattern) {
+        if (str.length() != pattern.length()) {
+            return false;
+        }
+        String lowerCaseStr = str.toLowerCase();
+        String lowerCasePattern = pattern.toLowerCase();
+
+        for (int i = 0; i < lowerCasePattern.length(); i++) {
+            if (lowerCasePattern.charAt(i) != lowerCaseStr.charAt(i)
+                    && lowerCasePattern.charAt(i) != WILD_CHARACTER) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * {@link Parcelable#writeToParcel}
      */
     @Override
@@ -187,7 +310,7 @@ public final class CarrierRestrictionRules implements Parcelable {
     /**
      * {@link Parcelable.Creator}
      */
-    public static final Creator<CarrierRestrictionRules> CREATOR =
+    public static final @android.annotation.NonNull Creator<CarrierRestrictionRules> CREATOR =
             new Creator<CarrierRestrictionRules>() {
         @Override
         public CarrierRestrictionRules createFromParcel(Parcel in) {
@@ -210,7 +333,7 @@ public final class CarrierRestrictionRules implements Parcelable {
     /**
      * Builder for a {@link CarrierRestrictionRules}.
      */
-    public static class Builder {
+    public static final class Builder {
         private final CarrierRestrictionRules mRules;
 
         /** {@hide} */
@@ -219,14 +342,14 @@ public final class CarrierRestrictionRules implements Parcelable {
         }
 
         /** build command */
-        public CarrierRestrictionRules build() {
+        public @NonNull CarrierRestrictionRules build() {
             return mRules;
         }
 
         /**
          * Indicate that all carriers are allowed.
          */
-        public Builder setAllCarriersAllowed() {
+        public @NonNull Builder setAllCarriersAllowed() {
             mRules.mAllowedCarriers.clear();
             mRules.mExcludedCarriers.clear();
             mRules.mCarrierRestrictionDefault = CARRIER_RESTRICTION_DEFAULT_ALLOWED;
@@ -238,7 +361,8 @@ public final class CarrierRestrictionRules implements Parcelable {
          *
          * @param allowedCarriers list of allowed carriers
          */
-        public Builder setAllowedCarriers(List<CarrierIdentifier> allowedCarriers) {
+        public @NonNull Builder setAllowedCarriers(
+                @NonNull List<CarrierIdentifier> allowedCarriers) {
             mRules.mAllowedCarriers = new ArrayList<CarrierIdentifier>(allowedCarriers);
             return this;
         }
@@ -248,7 +372,8 @@ public final class CarrierRestrictionRules implements Parcelable {
          *
          * @param excludedCarriers list of excluded carriers
          */
-        public Builder setExcludedCarriers(List<CarrierIdentifier> excludedCarriers) {
+        public @NonNull Builder setExcludedCarriers(
+                @NonNull List<CarrierIdentifier> excludedCarriers) {
             mRules.mExcludedCarriers = new ArrayList<CarrierIdentifier>(excludedCarriers);
             return this;
         }
@@ -258,7 +383,7 @@ public final class CarrierRestrictionRules implements Parcelable {
          *
          * @param carrierRestrictionDefault prioritized carrier list
          */
-        public Builder setDefaultCarrierRestriction(
+        public @NonNull Builder setDefaultCarrierRestriction(
                 @CarrierRestrictionDefault int carrierRestrictionDefault) {
             mRules.mCarrierRestrictionDefault = carrierRestrictionDefault;
             return this;
@@ -269,7 +394,7 @@ public final class CarrierRestrictionRules implements Parcelable {
          *
          * @param multiSimPolicy multi SIM policy
          */
-        public Builder setMultiSimPolicy(@MultiSimPolicy int multiSimPolicy) {
+        public @NonNull Builder setMultiSimPolicy(@MultiSimPolicy int multiSimPolicy) {
             mRules.mMultiSimPolicy = multiSimPolicy;
             return this;
         }

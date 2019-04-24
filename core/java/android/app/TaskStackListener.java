@@ -19,6 +19,7 @@ package android.app;
 import android.annotation.UnsupportedAppUsage;
 import android.app.ActivityManager.TaskSnapshot;
 import android.content.ComponentName;
+import android.os.IBinder;
 import android.os.RemoteException;
 
 /**
@@ -70,8 +71,24 @@ public abstract class TaskStackListener extends ITaskStackListener.Stub {
     }
 
     @Override
+    public void onActivityLaunchOnSecondaryDisplayFailed(ActivityManager.RunningTaskInfo taskInfo,
+            int requestedDisplayId) throws RemoteException {
+        onActivityLaunchOnSecondaryDisplayFailed();
+    }
+
+    /**
+     * @deprecated see {@link
+     *         #onActivityLaunchOnSecondaryDisplayFailed(ActivityManager.RunningTaskInfo, int)}
+     */
+    @Deprecated
     @UnsupportedAppUsage
     public void onActivityLaunchOnSecondaryDisplayFailed() throws RemoteException {
+    }
+
+    @Override
+    @UnsupportedAppUsage
+    public void onActivityLaunchOnSecondaryDisplayRerouted(ActivityManager.RunningTaskInfo taskInfo,
+            int requestedDisplayId) throws RemoteException {
     }
 
     @Override
@@ -84,15 +101,42 @@ public abstract class TaskStackListener extends ITaskStackListener.Stub {
     }
 
     @Override
+    public void onTaskMovedToFront(ActivityManager.RunningTaskInfo taskInfo)
+            throws RemoteException {
+        onTaskMovedToFront(taskInfo.taskId);
+    }
+
+    /**
+     * @deprecated see {@link #onTaskMovedToFront(ActivityManager.RunningTaskInfo)}
+     */
+    @Deprecated
     @UnsupportedAppUsage
     public void onTaskMovedToFront(int taskId) throws RemoteException {
     }
 
     @Override
+    public void onTaskRemovalStarted(ActivityManager.RunningTaskInfo taskInfo)
+            throws RemoteException {
+        onTaskRemovalStarted(taskInfo.taskId);
+    }
+
+    /**
+     * @deprecated see {@link #onTaskRemovalStarted(ActivityManager.RunningTaskInfo)}
+     */
+    @Deprecated
     public void onTaskRemovalStarted(int taskId) throws RemoteException {
     }
 
     @Override
+    public void onTaskDescriptionChanged(ActivityManager.RunningTaskInfo taskInfo)
+            throws RemoteException {
+        onTaskDescriptionChanged(taskInfo.taskId, taskInfo.taskDescription);
+    }
+
+    /**
+     * @deprecated see {@link #onTaskDescriptionChanged(ActivityManager.RunningTaskInfo)}
+     */
+    @Deprecated
     public void onTaskDescriptionChanged(int taskId, ActivityManager.TaskDescription td)
             throws RemoteException {
     }
@@ -111,5 +155,11 @@ public abstract class TaskStackListener extends ITaskStackListener.Stub {
     @Override
     @UnsupportedAppUsage
     public void onTaskSnapshotChanged(int taskId, TaskSnapshot snapshot) throws RemoteException {
+    }
+
+    @Override
+    @UnsupportedAppUsage
+    public void onSizeCompatModeActivityChanged(int displayId, IBinder activityToken)
+            throws RemoteException {
     }
 }

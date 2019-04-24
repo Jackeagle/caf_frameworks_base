@@ -97,6 +97,12 @@ public final class CellIdentityGsm extends CellIdentity {
         return new CellIdentityGsm(this);
     }
 
+    /** @hide */
+    public CellIdentityGsm sanitizeLocationInfo() {
+        return new CellIdentityGsm(CellInfo.UNAVAILABLE, CellInfo.UNAVAILABLE, CellInfo.UNAVAILABLE,
+                CellInfo.UNAVAILABLE, mMccStr, mMncStr, mAlphaLong, mAlphaShort);
+    }
+
     /**
      * @return 3-digit Mobile Country Code, 0..999,
      *         {@link android.telephony.CellInfo#UNAVAILABLE UNAVAILABLE} if unavailable.
@@ -160,6 +166,7 @@ public final class CellIdentityGsm extends CellIdentity {
     /**
      * @return Mobile Country Code in string format, null if unavailable.
      */
+    @Nullable
     public String getMccString() {
         return mMccStr;
     }
@@ -167,6 +174,7 @@ public final class CellIdentityGsm extends CellIdentity {
     /**
      * @return Mobile Network Code in string format, null if unavailable.
      */
+    @Nullable
     public String getMncString() {
         return mMncStr;
     }
@@ -260,7 +268,7 @@ public final class CellIdentityGsm extends CellIdentity {
 
     /** Implement the Parcelable interface */
     @SuppressWarnings("hiding")
-    public static final Creator<CellIdentityGsm> CREATOR =
+    public static final @android.annotation.NonNull Creator<CellIdentityGsm> CREATOR =
             new Creator<CellIdentityGsm>() {
                 @Override
                 public CellIdentityGsm createFromParcel(Parcel in) {

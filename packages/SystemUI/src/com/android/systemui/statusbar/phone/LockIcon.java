@@ -21,6 +21,7 @@ import android.content.res.Configuration;
 import android.content.res.TypedArray;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
+import android.graphics.drawable.Animatable2;
 import android.graphics.drawable.AnimatedVectorDrawable;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
@@ -43,24 +44,23 @@ public class LockIcon extends KeyguardAffordanceView implements OnUserInfoChange
 
     private static final int STATE_LOCKED = 0;
     private static final int STATE_LOCK_OPEN = 1;
-    private static final int STATE_FACE_UNLOCK = 2;
-    private static final int STATE_FINGERPRINT = 3;
-    private static final int STATE_BIOMETRICS_ERROR = 4;
+    private static final int STATE_SCANNING_FACE = 2;
+    private static final int STATE_BIOMETRICS_ERROR = 3;
 
     private int mLastState = 0;
     private boolean mTransientBiometricsError;
     private boolean mScreenOn;
     private boolean mLastScreenOn;
-    private Drawable mUserAvatarIcon;
     private final UnlockMethodCache mUnlockMethodCache;
     private AccessibilityController mAccessibilityController;
-    private boolean mHasFingerPrintState;
     private boolean mIsFaceUnlockState;
     private int mDensity;
     private boolean mPulsing;
     private boolean mDozing;
+    private boolean mBouncerVisible;
     private boolean mLastDozing;
     private boolean mLastPulsing;
+    private boolean mLastBouncerVisible;
 
     private final Runnable mDrawOffTimeout = () -> update(true /* forceUpdate */);
     private float mDarkAmount;
@@ -77,7 +77,6 @@ public class LockIcon extends KeyguardAffordanceView implements OnUserInfoChange
 
     @Override
     public void onUserInfoChanged(String name, Drawable picture, String userAccount) {
-        mUserAvatarIcon = picture;
         update();
     }
 
@@ -110,13 +109,11 @@ public class LockIcon extends KeyguardAffordanceView implements OnUserInfoChange
 
     public void update(boolean force) {
         int state = getState();
-        boolean anyFingerprintState = state == STATE_FINGERPRINT
-                || state == STATE_BIOMETRICS_ERROR;
-        mIsFaceUnlockState = state == STATE_FACE_UNLOCK;
-        if (state != mLastState || mLastDozing == mDozing || mLastPulsing == mPulsing
-                || mLastScreenOn != mScreenOn || force) {
+        mIsFaceUnlockState = state == STATE_SCANNING_FACE;
+        if (state != mLastState || mLastDozing != mDozing || mLastPulsing != mPulsing
+                || mLastScreenOn != mScreenOn || mLastBouncerVisible != mBouncerVisible || force) {
             int iconAnimRes = getAnimationResForTransition(mLastState, state, mLastPulsing,
-                    mPulsing, mLastDozing, mDozing);
+                    mPulsing, mLastDozing, mDozing, mBouncerVisible);
             boolean isAnim = iconAnimRes != -1;
 
             Drawable icon;
@@ -138,9 +135,18 @@ public class LockIcon extends KeyguardAffordanceView implements OnUserInfoChange
                     R.string.accessibility_scanning_face));
             }
 
-            mHasFingerPrintState = anyFingerprintState;
             if (animation != null && isAnim) {
                 animation.forceAnimationOnUI();
+                animation.clearAnimationCallbacks();
+                animation.registerAnimationCallback(new Animatable2.AnimationCallback() {
+                    @Override
+                    public void onAnimationEnd(Drawable drawable) {
+                        if (getDrawable() == animation && state == getState()
+                                && doesAnimationLoop(iconAnimRes)) {
+                            animation.start();
+                        }
+                    }
+                });
                 animation.start();
             }
 
@@ -155,6 +161,7 @@ public class LockIcon extends KeyguardAffordanceView implements OnUserInfoChange
             mLastScreenOn = mScreenOn;
             mLastDozing = mDozing;
             mLastPulsing = mPulsing;
+            mLastBouncerVisible = mBouncerVisible;
         }
 
         setVisibility(mDozing && !mPulsing ? GONE : VISIBLE);
@@ -178,7 +185,10 @@ public class LockIcon extends KeyguardAffordanceView implements OnUserInfoChange
     @Override
     public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
         super.onInitializeAccessibilityNodeInfo(info);
-        if (mHasFingerPrintState) {
+        KeyguardUpdateMonitor updateMonitor = KeyguardUpdateMonitor.getInstance(mContext);
+        boolean fingerprintRunning = updateMonitor.isFingerprintDetectionRunning();
+        boolean unlockingAllowed = updateMonitor.isUnlockingWithBiometricAllowed();
+        if (fingerprintRunning && unlockingAllowed) {
             AccessibilityNodeInfo.AccessibilityAction unlock
                     = new AccessibilityNodeInfo.AccessibilityAction(
                     AccessibilityNodeInfo.ACTION_CLICK,
@@ -201,21 +211,16 @@ public class LockIcon extends KeyguardAffordanceView implements OnUserInfoChange
     private Drawable getIconForState(int state) {
         int iconRes;
         switch (state) {
-            case STATE_FINGERPRINT:
             case STATE_LOCKED:
-            case STATE_FACE_UNLOCK:
-                iconRes = com.android.internal.R.drawable.ic_lock_24dp;
+            // Scanning animation is a pulsing padlock. This means that the resting state is
+            // just a padlock.
+            case STATE_SCANNING_FACE:
+            // Error animation also starts and ands on the padlock.
+            case STATE_BIOMETRICS_ERROR:
+                iconRes = com.android.internal.R.drawable.ic_lock;
                 break;
             case STATE_LOCK_OPEN:
-                if (mUnlockMethodCache.isTrustManaged() && mUnlockMethodCache.isTrusted()
-                    && mUserAvatarIcon != null) {
-                    return mUserAvatarIcon;
-                } else {
-                    iconRes = com.android.internal.R.drawable.ic_lock_open_24dp;
-                }
-                break;
-            case STATE_BIOMETRICS_ERROR:
-                iconRes = com.android.internal.R.drawable.ic_auth_error;
+                iconRes = com.android.internal.R.drawable.ic_lock_open;
                 break;
             default:
                 throw new IllegalArgumentException();
@@ -224,22 +229,32 @@ public class LockIcon extends KeyguardAffordanceView implements OnUserInfoChange
         return mContext.getDrawable(iconRes);
     }
 
-    private int getAnimationResForTransition(int oldState, int newState,
-            boolean wasPulsing, boolean pulsing,
-            boolean wasDozing, boolean dozing) {
+    private boolean doesAnimationLoop(int resourceId) {
+        return resourceId == com.android.internal.R.anim.lock_scanning;
+    }
 
-        boolean isError = newState == STATE_BIOMETRICS_ERROR;
-        boolean isUnlocked = newState == STATE_LOCK_OPEN;
-        boolean isLocked = !isUnlocked;
-        boolean wasUnlocked = oldState == STATE_LOCK_OPEN;
+    private static int getAnimationResForTransition(int oldState, int newState,
+            boolean wasPulsing, boolean pulsing, boolean wasDozing, boolean dozing,
+            boolean bouncerVisible) {
+
+        // Never animate when screen is off
+        if (dozing && !pulsing) {
+            return -1;
+        }
+
+        boolean isError = oldState != STATE_BIOMETRICS_ERROR && newState == STATE_BIOMETRICS_ERROR;
+        boolean justUnlocked = oldState != STATE_LOCK_OPEN && newState == STATE_LOCK_OPEN;
+        boolean justLocked = oldState == STATE_LOCK_OPEN && newState == STATE_LOCKED;
 
         if (isError) {
             return com.android.internal.R.anim.lock_to_error;
-        } else if (isUnlocked) {
+        } else if (justUnlocked) {
             return com.android.internal.R.anim.lock_unlock;
-        } else if (wasUnlocked && isLocked && mScreenOn) {
+        } else if (justLocked) {
             return com.android.internal.R.anim.lock_lock;
-        } else if (isLocked && (!wasPulsing && pulsing || wasDozing && !dozing)) {
+        } else if (newState == STATE_SCANNING_FACE && bouncerVisible) {
+            return com.android.internal.R.anim.lock_scanning;
+        } else if (!wasPulsing && pulsing && newState != STATE_LOCK_OPEN) {
             return com.android.internal.R.anim.lock_in;
         }
         return -1;
@@ -247,17 +262,12 @@ public class LockIcon extends KeyguardAffordanceView implements OnUserInfoChange
 
     private int getState() {
         KeyguardUpdateMonitor updateMonitor = KeyguardUpdateMonitor.getInstance(mContext);
-        boolean fingerprintRunning = updateMonitor.isFingerprintDetectionRunning();
-        boolean unlockingAllowed = updateMonitor.isUnlockingWithBiometricAllowed();
         if (mTransientBiometricsError) {
             return STATE_BIOMETRICS_ERROR;
         } else if (mUnlockMethodCache.canSkipBouncer()) {
             return STATE_LOCK_OPEN;
-        } else if (mUnlockMethodCache.isFaceUnlockRunning()
-                || updateMonitor.isFaceDetectionRunning()) {
-            return STATE_FACE_UNLOCK;
-        } else if (fingerprintRunning && unlockingAllowed) {
-            return STATE_FINGERPRINT;
+        } else if (updateMonitor.isFaceDetectionRunning()) {
+            return STATE_SCANNING_FACE;
         } else {
             return STATE_LOCKED;
         }
@@ -290,5 +300,16 @@ public class LockIcon extends KeyguardAffordanceView implements OnUserInfoChange
         Drawable drawable = getDrawable().mutate();
         int color = ColorUtils.blendARGB(Color.TRANSPARENT, Color.WHITE, mDarkAmount);
         drawable.setColorFilter(color, PorterDuff.Mode.SRC_ATOP);
+    }
+
+    /**
+     * If bouncer is visible or not.
+     */
+    public void setBouncerVisible(boolean bouncerVisible) {
+        if (mBouncerVisible == bouncerVisible) {
+            return;
+        }
+        mBouncerVisible = bouncerVisible;
+        update();
     }
 }

@@ -34,6 +34,7 @@
     <string name="keyguard_password_wrong_pin_code" msgid="6535018036285012028">"పిన్ కోడ్ తప్పు."</string>
     <string name="keyguard_sim_error_message_short" msgid="592109500618448312">"చెల్లని కార్డ్."</string>
     <string name="keyguard_charged" msgid="3316115607283493413">"పూర్తిగా ఛార్జ్ చేయబడింది"</string>
+    <string name="keyguard_plugged_in_wireless" msgid="3004717438401575235">"<xliff:g id="PERCENTAGE">%s</xliff:g> • వైర్‌లెస్‌గా ఛార్జ్ అవుతోంది"</string>
     <string name="keyguard_plugged_in" msgid="3161102098900158923">"<xliff:g id="PERCENTAGE">%s</xliff:g> • ఛార్జ్ అవుతోంది"</string>
     <string name="keyguard_plugged_in_charging_fast" msgid="3684592786276709342">"<xliff:g id="PERCENTAGE">%s</xliff:g> • వేగంగా ఛార్జ్ అవుతోంది"</string>
     <string name="keyguard_plugged_in_charging_slowly" msgid="509533586841478405">"<xliff:g id="PERCENTAGE">%s</xliff:g> • నెమ్మదిగా ఛార్జ్ అవుతోంది"</string>
@@ -150,7 +151,10 @@
       <item quantity="other">SIM ఇప్పుడు నిలిపివేయబడింది. PUK కోడ్‌ను నమోదు చేయండి. SIM శాశ్వతంగా నిరుపయోగం కాకుండా ఉండటానికి మీకు <xliff:g id="_NUMBER_1">%d</xliff:g> ప్రయత్నాలు మిగిలి ఉన్నాయి. వివరాల కోసం కారియర్‌ను సంప్రదించండి.</item>
       <item quantity="one">SIM ఇప్పుడు నిలిపివేయబడింది. PUK కోడ్‌ను నమోదు చేయండి. SIM శాశ్వతంగా నిరుపయోగం కాకుండా ఉండటానికి మీకు <xliff:g id="_NUMBER_0">%d</xliff:g> ప్రయత్నం మిగిలి ఉంది వివరాల కోసం కారియర్‌ను సంప్రదించండి.</item>
     </plurals>
-    <string name="type_clock_header" msgid="4786545441902447636">"ఇప్పుడు"</string>
+    <plurals name="type_clock_header" formatted="false" msgid="6782840450655632763">
+      <item quantity="other">"<annotation name="color">"సమయం"</annotation>\n"^1\n^2</item>
+      <item quantity="one">"<annotation name="color">"సమయం"</annotation>\n"^1\n^2</item>
+    </plurals>
   <string-array name="type_clock_hours">
     <item msgid="3543074812389379830">"పన్నెండు"</item>
     <item msgid="7389464214252023751">"ఒకటి"</item>
@@ -167,15 +171,15 @@
   </string-array>
   <string-array name="type_clock_minutes">
     <item msgid="8322049385467207985">"అవుతుంది"</item>
-    <item msgid="8837126587669001578">"ఒకటి అవుతుంది"</item>
-    <item msgid="4294343372940455660">"రెండు అవుతుంది"</item>
-    <item msgid="7129166637707421536">"మూడు అవుతుంది"</item>
-    <item msgid="7579404865008788673">"నాలుగు అవుతుంది"</item>
-    <item msgid="3873924689207380586">"ఐదు అవుతుంది"</item>
-    <item msgid="4849565597850069377">"ఆరు అవుతుంది"</item>
-    <item msgid="4404219424523572364">"ఏడు అవుతుంది"</item>
-    <item msgid="8740481214764087329">"ఎనిమిది అవుతుంది"</item>
-    <item msgid="1713216865806811237">"తొమ్మిది అవుతుంది"</item>
+    <item msgid="2091812961809760681">"ఒక నిమిషం"</item>
+    <item msgid="1496435384877290709">"రెండు నిమిషాలు"</item>
+    <item msgid="881846472976674129">"మూడు నిమిషాలు"</item>
+    <item msgid="2784477043911540584">"నాలుగు నిమిషాలు"</item>
+    <item msgid="1610928853656700614">"ఐదు నిమిషాలు"</item>
+    <item msgid="2317806244043886658">"ఆరు నిమిషాలు"</item>
+    <item msgid="3318687539120971327">"ఏడు నిమిషాలు"</item>
+    <item msgid="5701600693712102348">"ఎనిమిది నిమిషాలు"</item>
+    <item msgid="3247381605947372495">"తొమ్మిది నిమిషాలు"</item>
     <item msgid="3508406095411245038">"పది"</item>
     <item msgid="7161996337755311711">"పదకొండు"</item>
     <item msgid="4044549963329624197">"పన్నెండు"</item>

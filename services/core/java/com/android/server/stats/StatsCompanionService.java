@@ -19,11 +19,14 @@ import static android.content.pm.PackageInfo.REQUESTED_PERMISSION_GRANTED;
 import static android.content.pm.PermissionInfo.PROTECTION_DANGEROUS;
 import static android.os.Process.getPidsForCommands;
 import static android.os.Process.getUidForPid;
+import static android.os.storage.VolumeInfo.TYPE_PRIVATE;
+import static android.os.storage.VolumeInfo.TYPE_PUBLIC;
 
 import static com.android.internal.util.Preconditions.checkNotNull;
 import static com.android.server.am.MemoryStatUtil.readCmdlineFromProcfs;
 import static com.android.server.am.MemoryStatUtil.readMemoryStatFromProcfs;
 import static com.android.server.am.MemoryStatUtil.readRssHighWaterMarkFromProcfs;
+import static com.android.server.am.MemoryStatUtil.readSystemIonHeapSizeFromDebugfs;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -41,10 +44,13 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.IntentSender;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PermissionInfo;
 import android.content.pm.UserInfo;
+import android.hardware.biometrics.BiometricsProtoEnums;
+import android.hardware.face.FaceManager;
 import android.hardware.fingerprint.FingerprintManager;
 import android.net.ConnectivityManager;
 import android.net.INetworkStatsService;
@@ -83,7 +89,10 @@ import android.os.SystemProperties;
 import android.os.Temperature;
 import android.os.UserHandle;
 import android.os.UserManager;
+import android.os.storage.DiskInfo;
 import android.os.storage.StorageManager;
+import android.os.storage.VolumeInfo;
+import android.stats.storage.StorageEnums;
 import android.telephony.ModemActivityInfo;
 import android.telephony.TelephonyManager;
 import android.util.ArrayMap;
@@ -101,6 +110,7 @@ import com.android.internal.os.BatteryStatsHelper;
 import com.android.internal.os.BinderCallsStats.ExportedCallStat;
 import com.android.internal.os.KernelCpuSpeedReader;
 import com.android.internal.os.KernelCpuThreadReader;
+import com.android.internal.os.KernelCpuThreadReaderDiff;
 import com.android.internal.os.KernelCpuThreadReaderSettingsObserver;
 import com.android.internal.os.KernelCpuUidTimeReader.KernelCpuUidActiveTimeReader;
 import com.android.internal.os.KernelCpuUidTimeReader.KernelCpuUidClusterTimeReader;
@@ -118,7 +128,7 @@ import com.android.server.LocalServices;
 import com.android.server.SystemService;
 import com.android.server.SystemServiceManager;
 import com.android.server.am.MemoryStatUtil.MemoryStat;
-import com.android.server.role.RoleManagerServiceInternal;
+import com.android.server.role.RoleManagerInternal;
 import com.android.server.storage.DiskStatsFileLogger;
 import com.android.server.storage.DiskStatsLoggingService;
 
@@ -141,6 +151,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -165,6 +176,7 @@ public class StatsCompanionService extends IStatsCompanionService.Stub {
 
     public static final int CODE_DATA_BROADCAST = 1;
     public static final int CODE_SUBSCRIBER_BROADCAST = 1;
+    public static final int CODE_ACTIVE_CONFIGS_BROADCAST = 1;
     /**
      * The last report time is provided with each intent registered to
      * StatsManager#setFetchReportsOperation. This allows easy de-duping in the receiver if
@@ -251,7 +263,7 @@ public class StatsCompanionService extends IStatsCompanionService.Stub {
     private StoragedUidIoStatsReader mStoragedUidIoStatsReader =
             new StoragedUidIoStatsReader();
     @Nullable
-    private final KernelCpuThreadReader mKernelCpuThreadReader;
+    private final KernelCpuThreadReaderDiff mKernelCpuThreadReader;
 
     private long mDebugElapsedClockPreviousValue = 0;
     private long mDebugElapsedClockPullCount = 0;
@@ -350,6 +362,22 @@ public class StatsCompanionService extends IStatsCompanionService.Stub {
             intentSender.sendIntent(mContext, CODE_DATA_BROADCAST, intent, null, null);
         } catch (IntentSender.SendIntentException e) {
             Slog.w(TAG, "Unable to send using IntentSender");
+        }
+    }
+
+    @Override
+    public void sendActiveConfigsChangedBroadcast(IBinder intentSenderBinder, long[] configIds) {
+        enforceCallingPermission();
+        IntentSender intentSender = new IntentSender(intentSenderBinder);
+        Intent intent = new Intent();
+        intent.putExtra(StatsManager.EXTRA_STATS_ACTIVE_CONFIG_KEYS, configIds);
+        try {
+            intentSender.sendIntent(mContext, CODE_ACTIVE_CONFIGS_BROADCAST, intent, null, null);
+            if (DEBUG) {
+                Slog.d(TAG, "Sent broadcast with config ids " + Arrays.toString(configIds));
+            }
+        } catch (IntentSender.SendIntentException e) {
+            Slog.w(TAG, "Unable to send active configs changed broadcast using IntentSender");
         }
     }
 
@@ -1161,13 +1189,22 @@ public class StatsCompanionService extends IStatsCompanionService.Stub {
         SystemProperties.set("sys.rss_hwm_reset.on", "1");
     }
 
+    private void pullSystemIonHeapSize(
+            int tagId, long elapsedNanos, long wallClockNanos,
+            List<StatsLogEventWrapper> pulledData) {
+        final long systemIonHeapSizeInBytes = readSystemIonHeapSizeFromDebugfs();
+        StatsLogEventWrapper e = new StatsLogEventWrapper(tagId, elapsedNanos, wallClockNanos);
+        e.writeLong(systemIonHeapSizeInBytes);
+        pulledData.add(e);
+    }
+
     private void pullBinderCallsStats(
             int tagId, long elapsedNanos, long wallClockNanos,
             List<StatsLogEventWrapper> pulledData) {
         BinderCallsStatsService.Internal binderStats =
                 LocalServices.getService(BinderCallsStatsService.Internal.class);
         if (binderStats == null) {
-            return;
+            throw new IllegalStateException("binderStats is null");
         }
 
         List<ExportedCallStat> callStats = binderStats.getExportedCallStats();
@@ -1198,7 +1235,7 @@ public class StatsCompanionService extends IStatsCompanionService.Stub {
         BinderCallsStatsService.Internal binderStats =
                 LocalServices.getService(BinderCallsStatsService.Internal.class);
         if (binderStats == null) {
-            return;
+            throw new IllegalStateException("binderStats is null");
         }
 
         ArrayMap<String, Integer> exceptionStats = binderStats.getExportedExceptionStats();
@@ -1216,7 +1253,7 @@ public class StatsCompanionService extends IStatsCompanionService.Stub {
             List<StatsLogEventWrapper> pulledData) {
         LooperStats looperStats = LocalServices.getService(LooperStats.class);
         if (looperStats == null) {
-            return;
+            throw new IllegalStateException("looperStats null");
         }
 
         List<LooperStats.ExportedEntry> entries = looperStats.getEntries();
@@ -1419,23 +1456,45 @@ public class StatsCompanionService extends IStatsCompanionService.Stub {
         }
     }
 
-    private void pullNumFingerprints(int tagId, long elapsedNanos, long wallClockNanos,
-            List<StatsLogEventWrapper> pulledData) {
-        FingerprintManager fingerprintManager = mContext.getSystemService(FingerprintManager.class);
-        if (fingerprintManager == null) {
+    private void pullNumBiometricsEnrolled(int modality, int tagId, long elapsedNanos,
+            long wallClockNanos, List<StatsLogEventWrapper> pulledData) {
+        final PackageManager pm = mContext.getPackageManager();
+        FingerprintManager fingerprintManager = null;
+        FaceManager faceManager = null;
+
+        if (pm.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT)) {
+            fingerprintManager = mContext.getSystemService(
+                    FingerprintManager.class);
+        }
+        if (pm.hasSystemFeature(PackageManager.FEATURE_FACE)) {
+            faceManager = mContext.getSystemService(FaceManager.class);
+        }
+
+        if (modality == BiometricsProtoEnums.MODALITY_FINGERPRINT && fingerprintManager == null) {
+            return;
+        }
+        if (modality == BiometricsProtoEnums.MODALITY_FACE && faceManager == null) {
             return;
         }
         UserManager userManager = mContext.getSystemService(UserManager.class);
         if (userManager == null) {
             return;
         }
+
         final long token = Binder.clearCallingIdentity();
         for (UserInfo user : userManager.getUsers()) {
             final int userId = user.getUserHandle().getIdentifier();
-            final int numFingerprints = fingerprintManager.getEnrolledFingerprints(userId).size();
+            int numEnrolled = 0;
+            if (modality == BiometricsProtoEnums.MODALITY_FINGERPRINT) {
+                numEnrolled = fingerprintManager.getEnrolledFingerprints(userId).size();
+            } else if (modality == BiometricsProtoEnums.MODALITY_FACE) {
+                numEnrolled = faceManager.getEnrolledFaces(userId).size();
+            } else {
+                return;
+            }
             StatsLogEventWrapper e = new StatsLogEventWrapper(tagId, elapsedNanos, wallClockNanos);
             e.writeInt(userId);
-            e.writeInt(numFingerprints);
+            e.writeInt(numEnrolled);
             pulledData.add(e);
         }
         Binder.restoreCallingIdentity(token);
@@ -1675,18 +1734,19 @@ public class StatsCompanionService extends IStatsCompanionService.Stub {
     private void pullCpuTimePerThreadFreq(int tagId, long elapsedNanos, long wallClockNanos,
             List<StatsLogEventWrapper> pulledData) {
         if (this.mKernelCpuThreadReader == null) {
-            return;
+            throw new IllegalStateException("mKernelCpuThreadReader is null");
         }
         ArrayList<KernelCpuThreadReader.ProcessCpuUsage> processCpuUsages =
-                this.mKernelCpuThreadReader.getProcessCpuUsageByUids();
+                this.mKernelCpuThreadReader.getProcessCpuUsageDiffed();
         if (processCpuUsages == null) {
-            return;
+            throw new IllegalStateException("processCpuUsages is null");
         }
         int[] cpuFrequencies = mKernelCpuThreadReader.getCpuFrequenciesKhz();
         if (cpuFrequencies.length > CPU_TIME_PER_THREAD_FREQ_MAX_NUM_FREQUENCIES) {
-            Slog.w(TAG, "Expected maximum " + CPU_TIME_PER_THREAD_FREQ_MAX_NUM_FREQUENCIES
-                    + " frequencies, but got " + cpuFrequencies.length);
-            return;
+            String message = "Expected maximum " + CPU_TIME_PER_THREAD_FREQ_MAX_NUM_FREQUENCIES
+                    + " frequencies, but got " + cpuFrequencies.length;
+            Slog.w(TAG, message);
+            throw new IllegalStateException(message);
         }
         for (int i = 0; i < processCpuUsages.size(); i++) {
             KernelCpuThreadReader.ProcessCpuUsage processCpuUsage = processCpuUsages.get(i);
@@ -1695,10 +1755,11 @@ public class StatsCompanionService extends IStatsCompanionService.Stub {
             for (int j = 0; j < threadCpuUsages.size(); j++) {
                 KernelCpuThreadReader.ThreadCpuUsage threadCpuUsage = threadCpuUsages.get(j);
                 if (threadCpuUsage.usageTimesMillis.length != cpuFrequencies.length) {
-                    Slog.w(TAG, "Unexpected number of usage times,"
+                    String message = "Unexpected number of usage times,"
                             + " expected " + cpuFrequencies.length
-                            + " but got " + threadCpuUsage.usageTimesMillis.length);
-                    continue;
+                            + " but got " + threadCpuUsage.usageTimesMillis.length;
+                    Slog.w(TAG, message);
+                    throw new IllegalStateException(message);
                 }
 
                 StatsLogEventWrapper e =
@@ -1780,8 +1841,8 @@ public class StatsCompanionService extends IStatsCompanionService.Stub {
             long elapsedNanos, final long wallClockNanos, List<StatsLogEventWrapper> pulledData) {
         StatsLogEventWrapper e = new StatsLogEventWrapper(tagId, elapsedNanos, wallClockNanos);
         final long elapsedMillis = SystemClock.elapsedRealtime();
-        // Fails every 10 buckets.
-        if (mDebugFailingElapsedClockPullCount++ % 10 == 0) {
+        // Fails every 5 buckets.
+        if (mDebugFailingElapsedClockPullCount++ % 5 == 0) {
             mDebugFailingElapsedClockPreviousValue = elapsedMillis;
             throw new RuntimeException("Failing debug elapsed clock");
         }
@@ -1867,16 +1928,16 @@ public class StatsCompanionService extends IStatsCompanionService.Stub {
         long callingToken = Binder.clearCallingIdentity();
         try {
             PackageManager pm = mContext.getPackageManager();
-            RoleManagerServiceInternal rm =
-                    LocalServices.getService(RoleManagerServiceInternal.class);
+            RoleManagerInternal rmi = LocalServices.getService(RoleManagerInternal.class);
 
             List<UserInfo> users = mContext.getSystemService(UserManager.class).getUsers();
 
             int numUsers = users.size();
             for (int userNum = 0; userNum < numUsers; userNum++) {
-                UserHandle user = users.get(userNum).getUserHandle();
+                int userId = users.get(userNum).getUserHandle().getIdentifier();
 
-                ArrayMap<String, ArraySet<String>> roles = rm.getRoleHoldersAsUser(user);
+                ArrayMap<String, ArraySet<String>> roles = rmi.getRolesAndHolders(
+                        userId);
 
                 int numRoles = roles.size();
                 for (int roleNum = 0; roleNum < numRoles; roleNum++) {
@@ -1889,7 +1950,7 @@ public class StatsCompanionService extends IStatsCompanionService.Stub {
 
                         PackageInfo pkg;
                         try {
-                            pkg = pm.getPackageInfoAsUser(holderName, 0, user.getIdentifier());
+                            pkg = pm.getPackageInfoAsUser(holderName, 0, userId);
                         } catch (PackageManager.NameNotFoundException e) {
                             Log.w(TAG, "Role holder " + holderName + " not found");
                             return;
@@ -1906,6 +1967,93 @@ public class StatsCompanionService extends IStatsCompanionService.Stub {
             }
         } finally {
             Binder.restoreCallingIdentity(callingToken);
+        }
+    }
+
+    private void pullTimeZoneDataInfo(int tagId,
+            long elapsedNanos, long wallClockNanos, List<StatsLogEventWrapper> pulledData) {
+        String tzDbVersion = "Unknown";
+        try {
+            tzDbVersion = android.icu.util.TimeZone.getTZDataVersion();
+        } catch (Exception e) {
+            Log.e(TAG, "Getting tzdb version failed: ", e);
+        }
+
+        StatsLogEventWrapper e = new StatsLogEventWrapper(tagId, elapsedNanos, wallClockNanos);
+        e.writeString(tzDbVersion);
+        pulledData.add(e);
+    }
+
+    private void pullExternalStorageInfo(int tagId, long elapsedNanos, long wallClockNanos,
+            List<StatsLogEventWrapper> pulledData) {
+        StorageManager storageManager = mContext.getSystemService(StorageManager.class);
+        if (storageManager != null) {
+            List<VolumeInfo> volumes = storageManager.getVolumes();
+            for (VolumeInfo vol : volumes) {
+                final String envState = VolumeInfo.getEnvironmentForState(vol.getState());
+                final DiskInfo diskInfo = vol.getDisk();
+                if (diskInfo != null) {
+                    if (envState.equals(Environment.MEDIA_MOUNTED)) {
+                        // Get the type of the volume, if it is adoptable or portable.
+                        int volumeType = StatsLog.EXTERNAL_STORAGE_INFO__VOLUME_TYPE__OTHER;
+                        if (vol.getType() == TYPE_PUBLIC) {
+                            volumeType = StatsLog.EXTERNAL_STORAGE_INFO__VOLUME_TYPE__PUBLIC;
+                        } else if (vol.getType() == TYPE_PRIVATE) {
+                            volumeType = StatsLog.EXTERNAL_STORAGE_INFO__VOLUME_TYPE__PRIVATE;
+                        }
+                        // Get the type of external storage inserted in the device (sd cards,
+                        // usb, etc)
+                        int externalStorageType;
+                        if (diskInfo.isSd()) {
+                            externalStorageType = StorageEnums.SD_CARD;
+                        } else if (diskInfo.isUsb()) {
+                            externalStorageType = StorageEnums.USB;
+                        } else {
+                            externalStorageType = StorageEnums.OTHER;
+                        }
+                        StatsLogEventWrapper e =
+                                new StatsLogEventWrapper(tagId, elapsedNanos, wallClockNanos);
+                        e.writeInt(externalStorageType);
+                        e.writeInt(volumeType);
+                        e.writeLong(diskInfo.size);
+                        pulledData.add(e);
+                    }
+                }
+            }
+        }
+    }
+
+    private void pullAppsOnExternalStorageInfo(int tagId, long elapsedNanos, long wallClockNanos,
+            List<StatsLogEventWrapper> pulledData) {
+        PackageManager pm = mContext.getPackageManager();
+        StorageManager storage = mContext.getSystemService(StorageManager.class);
+        List<ApplicationInfo> apps = pm.getInstalledApplications(/* flags = */ 0);
+        for (ApplicationInfo appInfo : apps) {
+            UUID storageUuid = appInfo.storageUuid;
+            if (storageUuid != null) {
+                VolumeInfo volumeInfo = storage.findVolumeByUuid(appInfo.storageUuid.toString());
+                if (volumeInfo != null) {
+                    DiskInfo diskInfo = volumeInfo.getDisk();
+                    if (diskInfo != null) {
+                        int externalStorageType = -1;
+                        if (diskInfo.isSd()) {
+                            externalStorageType = StorageEnums.SD_CARD;
+                        } else if (diskInfo.isUsb()) {
+                            externalStorageType = StorageEnums.USB;
+                        } else if (appInfo.isExternal()) {
+                            externalStorageType = StorageEnums.OTHER;
+                        }
+                        // App is installed on external storage.
+                        if (externalStorageType != -1) {
+                            StatsLogEventWrapper e =
+                                    new StatsLogEventWrapper(tagId, elapsedNanos, wallClockNanos);
+                            e.writeInt(externalStorageType);
+                            e.writeString(appInfo.packageName);
+                            pulledData.add(e);
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -1998,6 +2146,10 @@ public class StatsCompanionService extends IStatsCompanionService.Stub {
                 pullProcessMemoryHighWaterMark(tagId, elapsedNanos, wallClockNanos, ret);
                 break;
             }
+            case StatsLog.SYSTEM_ION_HEAP_SIZE: {
+                pullSystemIonHeapSize(tagId, elapsedNanos, wallClockNanos, ret);
+                break;
+            }
             case StatsLog.BINDER_CALLS: {
                 pullBinderCallsStats(tagId, elapsedNanos, wallClockNanos, ret);
                 break;
@@ -2027,7 +2179,13 @@ public class StatsCompanionService extends IStatsCompanionService.Stub {
                 break;
             }
             case StatsLog.NUM_FINGERPRINTS_ENROLLED: {
-                pullNumFingerprints(tagId, elapsedNanos, wallClockNanos, ret);
+                pullNumBiometricsEnrolled(BiometricsProtoEnums.MODALITY_FINGERPRINT, tagId,
+                        elapsedNanos, wallClockNanos, ret);
+                break;
+            }
+            case StatsLog.NUM_FACES_ENROLLED: {
+                pullNumBiometricsEnrolled(BiometricsProtoEnums.MODALITY_FACE, tagId, elapsedNanos,
+                        wallClockNanos, ret);
                 break;
             }
             case StatsLog.PROC_STATS: {
@@ -2089,6 +2247,18 @@ public class StatsCompanionService extends IStatsCompanionService.Stub {
             }
             case StatsLog.DANGEROUS_PERMISSION_STATE: {
                 pullDangerousPermissionState(elapsedNanos, wallClockNanos, ret);
+                break;
+            }
+            case StatsLog.TIME_ZONE_DATA_INFO: {
+                pullTimeZoneDataInfo(tagId, elapsedNanos, wallClockNanos, ret);
+                break;
+            }
+            case StatsLog.EXTERNAL_STORAGE_INFO: {
+                pullExternalStorageInfo(tagId, elapsedNanos, wallClockNanos, ret);
+                break;
+            }
+            case StatsLog.APPS_ON_EXTERNAL_STORAGE_INFO: {
+                pullAppsOnExternalStorageInfo(tagId, elapsedNanos, wallClockNanos, ret);
                 break;
             }
             default:

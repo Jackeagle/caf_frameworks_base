@@ -45,7 +45,7 @@ public final class WifiNetworkSpecifier extends NetworkSpecifier implements Parc
     /**
      * Builder used to create {@link WifiNetworkSpecifier} objects.
      */
-    public static class Builder {
+    public static final class Builder {
         private static final String MATCH_ALL_SSID_PATTERN_PATH = ".*";
         private static final String MATCH_EMPTY_SSID_PATTERN_PATH = "";
         private static final Pair<MacAddress, MacAddress> MATCH_NO_BSSID_PATTERN1 =
@@ -115,7 +115,7 @@ public final class WifiNetworkSpecifier extends NetworkSpecifier implements Parc
          *                    string pattern to use for matching the network's SSID.
          * @return Instance of {@link Builder} to enable chaining of the builder method.
          */
-        public Builder setSsidPattern(@NonNull PatternMatcher ssidPattern) {
+        public @NonNull Builder setSsidPattern(@NonNull PatternMatcher ssidPattern) {
             checkNotNull(ssidPattern);
             mSsidPatternMatcher = ssidPattern;
             return this;
@@ -133,7 +133,7 @@ public final class WifiNetworkSpecifier extends NetworkSpecifier implements Parc
          * @return Instance of {@link Builder} to enable chaining of the builder method.
          * @throws IllegalArgumentException if the SSID is not valid unicode.
          */
-        public Builder setSsid(@NonNull String ssid) {
+        public @NonNull Builder setSsid(@NonNull String ssid) {
             checkNotNull(ssid);
             final CharsetEncoder unicodeEncoder = StandardCharsets.UTF_8.newEncoder();
             if (!unicodeEncoder.canEncode(ssid)) {
@@ -155,7 +155,7 @@ public final class WifiNetworkSpecifier extends NetworkSpecifier implements Parc
          * @param mask Mask for BSSID pattern.
          * @return Instance of {@link Builder} to enable chaining of the builder method.
          */
-        public Builder setBssidPattern(
+        public @NonNull Builder setBssidPattern(
                 @NonNull MacAddress baseAddress, @NonNull MacAddress mask) {
             checkNotNull(baseAddress, mask);
             mBssidPatternMatcher = Pair.create(baseAddress, mask);
@@ -174,7 +174,7 @@ public final class WifiNetworkSpecifier extends NetworkSpecifier implements Parc
          * @param bssid BSSID of the network.
          * @return Instance of {@link Builder} to enable chaining of the builder method.
          */
-        public Builder setBssid(@NonNull MacAddress bssid) {
+        public @NonNull Builder setBssid(@NonNull MacAddress bssid) {
             checkNotNull(bssid);
             mBssidPatternMatcher = Pair.create(bssid, MATCH_EXACT_BSSID_PATTERN_MASK);
             return this;
@@ -183,10 +183,12 @@ public final class WifiNetworkSpecifier extends NetworkSpecifier implements Parc
         /**
          * Specifies whether this represents an Enhanced Open (OWE) network.
          *
+         * @param isEnhancedOpen {@code true} to indicate that the network uses enhanced open,
+         *                       {@code false} otherwise.
          * @return Instance of {@link Builder} to enable chaining of the builder method.
          */
-        public Builder setIsEnhancedOpen() {
-            mIsEnhancedOpen = true;
+        public @NonNull Builder setIsEnhancedOpen(boolean isEnhancedOpen) {
+            mIsEnhancedOpen = isEnhancedOpen;
             return this;
         }
 
@@ -198,7 +200,7 @@ public final class WifiNetworkSpecifier extends NetworkSpecifier implements Parc
          * @return Instance of {@link Builder} to enable chaining of the builder method.
          * @throws IllegalArgumentException if the passphrase is not ASCII encodable.
          */
-        public Builder setWpa2Passphrase(@NonNull String passphrase) {
+        public @NonNull Builder setWpa2Passphrase(@NonNull String passphrase) {
             checkNotNull(passphrase);
             final CharsetEncoder asciiEncoder = StandardCharsets.US_ASCII.newEncoder();
             if (!asciiEncoder.canEncode(passphrase)) {
@@ -216,7 +218,7 @@ public final class WifiNetworkSpecifier extends NetworkSpecifier implements Parc
          * @return Instance of {@link Builder} to enable chaining of the builder method.
          * @throws IllegalArgumentException if the passphrase is not ASCII encodable.
          */
-        public Builder setWpa3Passphrase(@NonNull String passphrase) {
+        public @NonNull Builder setWpa3Passphrase(@NonNull String passphrase) {
             checkNotNull(passphrase);
             final CharsetEncoder asciiEncoder = StandardCharsets.US_ASCII.newEncoder();
             if (!asciiEncoder.canEncode(passphrase)) {
@@ -233,7 +235,7 @@ public final class WifiNetworkSpecifier extends NetworkSpecifier implements Parc
          * @param enterpriseConfig Instance of {@link WifiEnterpriseConfig}.
          * @return Instance of {@link Builder} to enable chaining of the builder method.
          */
-        public Builder setWpa2EnterpriseConfig(
+        public @NonNull Builder setWpa2EnterpriseConfig(
                 @NonNull WifiEnterpriseConfig enterpriseConfig) {
             checkNotNull(enterpriseConfig);
             mWpa2EnterpriseConfig = new WifiEnterpriseConfig(enterpriseConfig);
@@ -247,7 +249,7 @@ public final class WifiNetworkSpecifier extends NetworkSpecifier implements Parc
          * @param enterpriseConfig Instance of {@link WifiEnterpriseConfig}.
          * @return Instance of {@link Builder} to enable chaining of the builder method.
          */
-        public Builder setWpa3EnterpriseConfig(
+        public @NonNull Builder setWpa3EnterpriseConfig(
                 @NonNull WifiEnterpriseConfig enterpriseConfig) {
             checkNotNull(enterpriseConfig);
             mWpa3EnterpriseConfig = new WifiEnterpriseConfig(enterpriseConfig);
@@ -261,66 +263,35 @@ public final class WifiNetworkSpecifier extends NetworkSpecifier implements Parc
          * hidden networks need to be explicitly probed for.</li>
          * <li>If not set, defaults to false (i.e not a hidden network).</li>
          *
+         * @param isHiddenSsid {@code true} to indicate that the network is hidden, {@code false}
+         *                     otherwise.
          * @return Instance of {@link Builder} to enable chaining of the builder method.
          */
-        public Builder setIsHiddenSsid() {
-            mIsHiddenSSID = true;
+        public @NonNull Builder setIsHiddenSsid(boolean isHiddenSsid) {
+            mIsHiddenSSID = isHiddenSsid;
             return this;
-        }
-
-
-        /**
-         * Set defaults for the various low level credential type fields in the newly created
-         * WifiConfiguration object.
-         *
-         * See {@link com.android.server.wifi.WifiConfigManager#setDefaultsInWifiConfiguration(
-         * WifiConfiguration)}.
-         *
-         * @param configuration provided WifiConfiguration object.
-         */
-        private static void setDefaultsInWifiConfiguration(
-                @NonNull WifiConfiguration configuration) {
-            configuration.allowedAuthAlgorithms.set(WifiConfiguration.AuthAlgorithm.OPEN);
-            configuration.allowedProtocols.set(WifiConfiguration.Protocol.RSN);
-            configuration.allowedPairwiseCiphers.set(WifiConfiguration.PairwiseCipher.CCMP);
-            configuration.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.CCMP);
-            configuration.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.TKIP);
         }
 
         private void setSecurityParamsInWifiConfiguration(
                 @NonNull WifiConfiguration configuration) {
             if (!TextUtils.isEmpty(mWpa2PskPassphrase)) { // WPA-PSK network.
-                configuration.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.WPA_PSK);
+                configuration.setSecurityParams(WifiConfiguration.SECURITY_TYPE_PSK);
                 // WifiConfiguration.preSharedKey needs quotes around ASCII password.
                 configuration.preSharedKey = "\"" + mWpa2PskPassphrase + "\"";
             } else if (!TextUtils.isEmpty(mWpa3SaePassphrase)) { // WPA3-SAE network.
-                configuration.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.SAE);
-                // PMF mandatory for SAE.
-                configuration.requirePMF = true;
+                configuration.setSecurityParams(WifiConfiguration.SECURITY_TYPE_SAE);
                 // WifiConfiguration.preSharedKey needs quotes around ASCII password.
                 configuration.preSharedKey = "\"" + mWpa3SaePassphrase + "\"";
             } else if (mWpa2EnterpriseConfig != null) { // WPA-EAP network
-                configuration.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.WPA_EAP);
-                configuration.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.IEEE8021X);
+                configuration.setSecurityParams(WifiConfiguration.SECURITY_TYPE_EAP);
                 configuration.enterpriseConfig = mWpa2EnterpriseConfig;
             } else if (mWpa3EnterpriseConfig != null) { // WPA3-SuiteB network
-                configuration.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.SUITE_B_192);
-                configuration.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.GCMP_256);
-                // TODO (b/113878056): Verify these params once we verify SuiteB configuration.
-                configuration.allowedGroupManagementCiphers.set(
-                        WifiConfiguration.GroupMgmtCipher.BIP_GMAC_256);
-                configuration.allowedSuiteBCiphers.set(
-                        WifiConfiguration.SuiteBCipher.ECDHE_ECDSA);
-                configuration.allowedSuiteBCiphers.set(
-                        WifiConfiguration.SuiteBCipher.ECDHE_RSA);
-                configuration.requirePMF = true;
+                configuration.setSecurityParams(WifiConfiguration.SECURITY_TYPE_EAP_SUITE_B);
                 configuration.enterpriseConfig = mWpa3EnterpriseConfig;
             } else if (mIsEnhancedOpen) { // OWE network
-                configuration.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.OWE);
-                // PMF mandatory.
-                configuration.requirePMF = true;
+                configuration.setSecurityParams(WifiConfiguration.SECURITY_TYPE_OWE);
             } else { // Open network
-                configuration.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE);
+                configuration.setSecurityParams(WifiConfiguration.SECURITY_TYPE_OPEN);
             }
         }
 
@@ -330,7 +301,6 @@ public final class WifiNetworkSpecifier extends NetworkSpecifier implements Parc
          */
         private WifiConfiguration buildWifiConfiguration() {
             final WifiConfiguration wifiConfiguration = new WifiConfiguration();
-            setDefaultsInWifiConfiguration(wifiConfiguration);
             // WifiConfiguration.SSID needs quotes around unicode SSID.
             if (mSsidPatternMatcher.getType() == PatternMatcher.PATTERN_LITERAL) {
                 wifiConfiguration.SSID = "\"" + mSsidPatternMatcher.getPath() + "\"";
@@ -421,7 +391,7 @@ public final class WifiNetworkSpecifier extends NetworkSpecifier implements Parc
          *      .setSsidPattern(new PatternMatcher("test", PatterMatcher.PATTERN_PREFIX))
          *      .setBssidPattern(MacAddress.fromString("10:03:23:00:00:00"),
          *                       MacAddress.fromString("ff:ff:ff:00:00:00"))
-         *      .buildNetworkSpecifier()
+         *      .build()
          * final NetworkRequest request =
          *      new NetworkRequest.Builder()
          *      .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
@@ -442,7 +412,7 @@ public final class WifiNetworkSpecifier extends NetworkSpecifier implements Parc
          * @return Instance of {@link NetworkSpecifier}.
          * @throws IllegalStateException on invalid params set.
          */
-        public NetworkSpecifier build() {
+        public @NonNull WifiNetworkSpecifier build() {
             if (!hasSetAnyPattern()) {
                 throw new IllegalStateException("one of setSsidPattern/setSsid/setBssidPattern/"
                         + "setBssid should be invoked for specifier");
@@ -529,7 +499,7 @@ public final class WifiNetworkSpecifier extends NetworkSpecifier implements Parc
         this.requestorPackageName = requestorPackageName;
     }
 
-    public static final Creator<WifiNetworkSpecifier> CREATOR =
+    public static final @NonNull Creator<WifiNetworkSpecifier> CREATOR =
             new Creator<WifiNetworkSpecifier>() {
                 @Override
                 public WifiNetworkSpecifier createFromParcel(Parcel in) {

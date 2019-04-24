@@ -26,12 +26,13 @@ import android.content.Context;
 import android.metrics.LogMaker;
 import android.os.UserHandle;
 import android.service.notification.StatusBarNotification;
-import android.support.test.filters.SmallTest;
 import android.support.test.metricshelper.MetricsAsserts;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
 import android.testing.TestableLooper.RunWithLooper;
 import android.view.ViewGroup;
+
+import androidx.test.filters.SmallTest;
 
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
@@ -41,6 +42,7 @@ import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.notification.ActivityLaunchAnimator;
 import com.android.systemui.statusbar.notification.NotificationAlertingManager;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
+import com.android.systemui.statusbar.notification.collection.NotificationRowBinderImpl;
 import com.android.systemui.statusbar.notification.row.ActivatableNotificationView;
 import com.android.systemui.statusbar.notification.stack.NotificationListContainer;
 
@@ -74,7 +76,8 @@ public class StatusBarNotificationPresenterTest extends SysuiTestCase {
                 statusBarWindowView, mock(NotificationListContainerViewGroup.class),
                 mock(DozeScrimController.class), mock(ScrimController.class),
                 mock(ActivityLaunchAnimator.class), mock(StatusBarKeyguardViewManager.class),
-                mock(NotificationAlertingManager.class));
+                mock(NotificationAlertingManager.class),
+                mock(NotificationRowBinderImpl.class));
     }
 
     @Test

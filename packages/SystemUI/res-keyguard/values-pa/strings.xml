@@ -34,6 +34,7 @@
     <string name="keyguard_password_wrong_pin_code" msgid="6535018036285012028">"ਗਲਤ ਪਿੰਨ ਕੋਡ।"</string>
     <string name="keyguard_sim_error_message_short" msgid="592109500618448312">"ਅਵੈਧ ਕਾਰਡ।"</string>
     <string name="keyguard_charged" msgid="3316115607283493413">"ਪੂਰਾ ਚਾਰਜ"</string>
+    <string name="keyguard_plugged_in_wireless" msgid="3004717438401575235">"<xliff:g id="PERCENTAGE">%s</xliff:g> • ਵਾਇਰਲੈੱਸ ਤੌਰ \'ਤੇ ਚਾਰਜ ਹੋ ਰਿਹਾ ਹੈ"</string>
     <string name="keyguard_plugged_in" msgid="3161102098900158923">"<xliff:g id="PERCENTAGE">%s</xliff:g> • ਚਾਰਜ ਹੋ ਰਿਹਾ ਹੈ"</string>
     <string name="keyguard_plugged_in_charging_fast" msgid="3684592786276709342">"<xliff:g id="PERCENTAGE">%s</xliff:g> • ਤੇਜ਼ੀ ਨਾਲ ਚਾਰਜ ਹੋ ਰਿਹਾ ਹੈ"</string>
     <string name="keyguard_plugged_in_charging_slowly" msgid="509533586841478405">"<xliff:g id="PERCENTAGE">%s</xliff:g> • ਹੌਲੀ-ਹੌਲੀ ਚਾਰਜ ਹੋ ਰਿਹਾ ਹੈ"</string>
@@ -150,7 +151,10 @@
       <item quantity="one">ਸਿਮ ਹੁਣ ਬੰਦ ਹੋ ਗਿਆ ਹੈ। ਜਾਰੀ ਰੱਖਣ ਲਈ PUK ਕੋਡ ਦਾਖਲ ਕਰੋ। ਸਿਮ ਦੇ ਪੱਕੇ ਤੌਰ \'ਤੇ ਬੇਕਾਰ ਹੋ ਜਾਣ ਤੋਂ ਪਹਿਲਾਂ ਤੁਹਾਡੇ ਕੋਲ <xliff:g id="_NUMBER_1">%d</xliff:g> ਕੋਸ਼ਿਸ਼ ਬਾਕੀ ਹੈ। ਵੇਰਵਿਆਂ ਲਈ ਕੈਰੀਅਰ ਨੂੰ ਸੰਪਰਕ ਕਰੋ।</item>
       <item quantity="other">ਸਿਮ ਹੁਣ ਬੰਦ ਹੋ ਗਿਆ ਹੈ। ਜਾਰੀ ਰੱਖਣ ਲਈ PUK ਕੋਡ ਦਾਖਲ ਕਰੋ। ਸਿਮ ਦੇ ਪੱਕੇ ਤੌਰ \'ਤੇ ਬੇਕਾਰ ਹੋ ਜਾਣ ਤੋਂ ਪਹਿਲਾਂ ਤੁਹਾਡੇ ਕੋਲ <xliff:g id="_NUMBER_1">%d</xliff:g> ਕੋਸ਼ਿਸ਼ਾਂ ਬਾਕੀ ਹਨ। ਵੇਰਵਿਆਂ ਲਈ ਕੈਰੀਅਰ ਨੂੰ ਸੰਪਰਕ ਕਰੋ।</item>
     </plurals>
-    <string name="type_clock_header" msgid="4786545441902447636">"ਸਮਾਂ"</string>
+    <plurals name="type_clock_header" formatted="false" msgid="6782840450655632763">
+      <item quantity="one">"<annotation name="color">"ਸਮਾਂ"</annotation>\n"^1\n^2</item>
+      <item quantity="other">"<annotation name="color">"ਸਮਾਂ"</annotation>\n"^1\n^2</item>
+    </plurals>
   <string-array name="type_clock_hours">
     <item msgid="3543074812389379830">"ਬਾਰਾਂ"</item>
     <item msgid="7389464214252023751">"ਇੱਕ"</item>
@@ -167,15 +171,15 @@
   </string-array>
   <string-array name="type_clock_minutes">
     <item msgid="8322049385467207985">"ਵਜੇ"</item>
-    <item msgid="8837126587669001578">"ਇੱਕ"</item>
-    <item msgid="4294343372940455660">"ਦੋ"</item>
-    <item msgid="7129166637707421536">"ਤਿੰਨ"</item>
-    <item msgid="7579404865008788673">"ਚਾਰ"</item>
-    <item msgid="3873924689207380586">"ਪੰਜ"</item>
-    <item msgid="4849565597850069377">"ਛੇ"</item>
-    <item msgid="4404219424523572364">"ਸੱਤ"</item>
-    <item msgid="8740481214764087329">"ਅੱਠ"</item>
-    <item msgid="1713216865806811237">"ਨੌ"</item>
+    <item msgid="2091812961809760681">"ਓਹੋ ਇੱਕ"</item>
+    <item msgid="1496435384877290709">"ਓਹੋ ਦੋ"</item>
+    <item msgid="881846472976674129">"ਓਹੋ ਤਿੰਨ"</item>
+    <item msgid="2784477043911540584">"ਓਹੋ ਚਾਰ"</item>
+    <item msgid="1610928853656700614">"ਓਹੋ ਪੰਜ"</item>
+    <item msgid="2317806244043886658">"ਓਹੋ ਛੇ"</item>
+    <item msgid="3318687539120971327">"ਓਹੋ ਸੱਤ"</item>
+    <item msgid="5701600693712102348">"ਓਹੋ ਅੱਠ"</item>
+    <item msgid="3247381605947372495">"ਓਹੋ ਨੌਂ"</item>
     <item msgid="3508406095411245038">"ਦਸ"</item>
     <item msgid="7161996337755311711">"ਗਿਆਰਾਂ"</item>
     <item msgid="4044549963329624197">"ਬਾਰਾਂ"</item>

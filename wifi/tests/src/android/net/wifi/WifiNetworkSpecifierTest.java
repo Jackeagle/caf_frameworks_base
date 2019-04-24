@@ -69,16 +69,6 @@ public class WifiNetworkSpecifierTest {
         assertEquals(MacAddress.ALL_ZEROS_ADDRESS, wifiNetworkSpecifier.bssidPatternMatcher.second);
         assertTrue(wifiNetworkSpecifier.wifiConfiguration.allowedKeyManagement
                 .get(WifiConfiguration.KeyMgmt.NONE));
-        assertTrue(wifiNetworkSpecifier.wifiConfiguration.allowedProtocols
-                .get(WifiConfiguration.Protocol.RSN));
-        assertTrue(wifiNetworkSpecifier.wifiConfiguration.allowedAuthAlgorithms
-                .get(WifiConfiguration.AuthAlgorithm.OPEN));
-        assertTrue(wifiNetworkSpecifier.wifiConfiguration.allowedPairwiseCiphers
-                .get(WifiConfiguration.PairwiseCipher.CCMP));
-        assertTrue(wifiNetworkSpecifier.wifiConfiguration.allowedGroupCiphers
-                .get(WifiConfiguration.GroupCipher.CCMP));
-        assertTrue(wifiNetworkSpecifier.wifiConfiguration.allowedGroupCiphers
-                .get(WifiConfiguration.GroupCipher.TKIP));
     }
 
     /**
@@ -105,16 +95,6 @@ public class WifiNetworkSpecifierTest {
                 wifiNetworkSpecifier.bssidPatternMatcher.second);
         assertTrue(wifiNetworkSpecifier.wifiConfiguration.allowedKeyManagement
                 .get(WifiConfiguration.KeyMgmt.WPA_PSK));
-        assertTrue(wifiNetworkSpecifier.wifiConfiguration.allowedProtocols
-                .get(WifiConfiguration.Protocol.RSN));
-        assertTrue(wifiNetworkSpecifier.wifiConfiguration.allowedAuthAlgorithms
-                .get(WifiConfiguration.AuthAlgorithm.OPEN));
-        assertTrue(wifiNetworkSpecifier.wifiConfiguration.allowedPairwiseCiphers
-                .get(WifiConfiguration.PairwiseCipher.CCMP));
-        assertTrue(wifiNetworkSpecifier.wifiConfiguration.allowedGroupCiphers
-                .get(WifiConfiguration.GroupCipher.CCMP));
-        assertTrue(wifiNetworkSpecifier.wifiConfiguration.allowedGroupCiphers
-                .get(WifiConfiguration.GroupCipher.TKIP));
         assertEquals("\"" + TEST_PRESHARED_KEY + "\"",
                 wifiNetworkSpecifier.wifiConfiguration.preSharedKey);
     }
@@ -134,7 +114,7 @@ public class WifiNetworkSpecifierTest {
                 .setSsid(TEST_SSID)
                 .setBssid(MacAddress.fromString(TEST_BSSID))
                 .setWpa2EnterpriseConfig(enterpriseConfig)
-                .setIsHiddenSsid()
+                .setIsHiddenSsid(true)
                 .build();
 
         assertTrue(specifier instanceof WifiNetworkSpecifier);
@@ -150,16 +130,6 @@ public class WifiNetworkSpecifierTest {
                 .get(WifiConfiguration.KeyMgmt.WPA_EAP));
         assertTrue(wifiNetworkSpecifier.wifiConfiguration.allowedKeyManagement
                 .get(WifiConfiguration.KeyMgmt.IEEE8021X));
-        assertTrue(wifiNetworkSpecifier.wifiConfiguration.allowedProtocols
-                .get(WifiConfiguration.Protocol.RSN));
-        assertTrue(wifiNetworkSpecifier.wifiConfiguration.allowedAuthAlgorithms
-                .get(WifiConfiguration.AuthAlgorithm.OPEN));
-        assertTrue(wifiNetworkSpecifier.wifiConfiguration.allowedPairwiseCiphers
-                .get(WifiConfiguration.PairwiseCipher.CCMP));
-        assertTrue(wifiNetworkSpecifier.wifiConfiguration.allowedGroupCiphers
-                .get(WifiConfiguration.GroupCipher.CCMP));
-        assertTrue(wifiNetworkSpecifier.wifiConfiguration.allowedGroupCiphers
-                .get(WifiConfiguration.GroupCipher.TKIP));
         assertTrue(wifiNetworkSpecifier.wifiConfiguration.hiddenSSID);
         assertEquals(enterpriseConfig.getEapMethod(),
                 wifiNetworkSpecifier.wifiConfiguration.enterpriseConfig.getEapMethod());
@@ -308,7 +278,7 @@ public class WifiNetworkSpecifierTest {
         new WifiNetworkSpecifier.Builder()
                 .setBssidPattern(MacAddress.fromString(TEST_BSSID_OUI_BASE_ADDRESS),
                         MacAddress.fromString(TEST_BSSID_OUI_MASK))
-                .setIsHiddenSsid()
+                .setIsHiddenSsid(true)
                 .build();
     }
 
@@ -335,7 +305,7 @@ public class WifiNetworkSpecifierTest {
     public void testWifiNetworkSpecifierBuilderWithSsidMatchPatternForHiddenNetwork() {
         new WifiNetworkSpecifier.Builder()
                 .setSsidPattern(new PatternMatcher(TEST_SSID, PATTERN_PREFIX))
-                .setIsHiddenSsid()
+                .setIsHiddenSsid(true)
                 .build();
     }
 
@@ -371,14 +341,14 @@ public class WifiNetworkSpecifierTest {
     /**
      * Ensure {@link WifiNetworkSpecifier.Builder#build()} throws an exception
      * when both {@link WifiNetworkSpecifier.Builder#setWpa3Passphrase(String)} and
-     * {@link WifiNetworkSpecifier.Builder#setIsEnhancedOpen()} are invoked.
+     * {@link WifiNetworkSpecifier.Builder#setIsEnhancedOpen(boolean)} are invoked.
      */
     @Test(expected = IllegalStateException.class)
     public void testWifiNetworkSpecifierBuilderWithBothWpa3PasphraseAndEnhancedOpen() {
         new WifiNetworkSpecifier.Builder()
                 .setSsidPattern(new PatternMatcher(TEST_SSID, PATTERN_LITERAL))
                 .setWpa3Passphrase(TEST_PRESHARED_KEY)
-                .setIsEnhancedOpen()
+                .setIsEnhancedOpen(true)
                 .build();
     }
 

@@ -1475,7 +1475,7 @@ public abstract class ColorSpace {
                 x -> absRcpResponse(x, 1 / 1.055, 0.055 / 1.055, 1 / 12.92, 0.04045, 2.4),
                 x -> absResponse(x, 1 / 1.055, 0.055 / 1.055, 1 / 12.92, 0.04045, 2.4),
                 -0.799f, 2.399f,
-                null, // FIXME: Use SRGB_TRANSFER_PARAMETERS
+                SRGB_TRANSFER_PARAMETERS,
                 Named.EXTENDED_SRGB.ordinal()
         );
         sNamedColorSpaces[Named.LINEAR_EXTENDED_SRGB.ordinal()] = new ColorSpace.Rgb(
@@ -1806,6 +1806,45 @@ public abstract class ColorSpace {
         // LMS is a diagonal matrix stored as a float[3]
         float[] LMS = { dstLMS[0] / srcLMS[0], dstLMS[1] / srcLMS[1], dstLMS[2] / srcLMS[2] };
         return mul3x3(inverse3x3(matrix), mul3x3Diag(LMS, matrix));
+    }
+
+    /**
+     * <p>Computes the chromaticity coordinates of a specified correlated color
+     * temperature (CCT) on the Planckian locus. The specified CCT must be
+     * greater than 0. A meaningful CCT range is [1667, 25000].</p>
+     *
+     * <p>The transform is computed using the methods in Kang et
+     * al., <i>Design of Advanced Color - Temperature Control System for HDTV
+     * Applications</i>, Journal of Korean Physical Society 41, 865-871
+     * (2002).</p>
+     *
+     * @param cct The correlated color temperature, in Kelvin
+     * @return Corresponding XYZ values
+     * @throws IllegalArgumentException If cct is invalid
+     *
+     * @hide
+     */
+    @NonNull
+    @Size(3)
+    public static float[] cctToXyz(@IntRange(from = 1) int cct) {
+        if (cct < 1) {
+            throw new IllegalArgumentException("Temperature must be greater than 0");
+        }
+
+        final float icct = 1e3f / cct;
+        final float icct2 = icct * icct;
+        final float x = cct <= 4000.0f ?
+            0.179910f + 0.8776956f * icct - 0.2343589f * icct2 - 0.2661239f * icct2 * icct :
+            0.240390f + 0.2226347f * icct + 2.1070379f * icct2 - 3.0258469f * icct2 * icct;
+
+        final float x2 = x * x;
+        final float y = cct <= 2222.0f ?
+            -0.20219683f + 2.18555832f * x - 1.34811020f * x2 - 1.1063814f * x2 * x :
+            cct <= 4000.0f ?
+            -0.16748867f + 2.09137015f * x - 1.37418593f * x2 - 0.9549476f * x2 * x :
+            -0.37001483f + 3.75112997f * x - 5.8733867f * x2 + 3.0817580f * x2 * x;
+
+        return xyYToXyz(new float[] {x, y});
     }
 
     /**

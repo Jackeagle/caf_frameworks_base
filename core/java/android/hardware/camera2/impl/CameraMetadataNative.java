@@ -350,7 +350,7 @@ public class CameraMetadataNative implements Parcelable {
         return newObject;
     }
 
-    public static final Parcelable.Creator<CameraMetadataNative> CREATOR =
+    public static final @android.annotation.NonNull Parcelable.Creator<CameraMetadataNative> CREATOR =
             new Parcelable.Creator<CameraMetadataNative>() {
         @Override
         public CameraMetadataNative createFromParcel(Parcel in) {
@@ -1113,8 +1113,10 @@ public class CameraMetadataNative implements Parcelable {
                         depthStreamDurationList.get(i), depthStreamStallList.get(i), depthScData);
             }
 
-            if ((scData.streamConfigurationArray == null) &&
-                    (depthScData.streamConfigurationArray == null)) {
+            if ((scData.streamConfigurationArray == null ||
+                    scData.streamConfigurationArray.length == 0) &&
+                    (depthScData.streamConfigurationArray == null ||
+                     depthScData.streamConfigurationArray.length == 0)) {
                 recommendedConfigurations.add(null);
                 continue;
             }
@@ -1125,6 +1127,7 @@ public class CameraMetadataNative implements Parcelable {
             switch (i) {
                 case RecommendedStreamConfigurationMap.USECASE_PREVIEW:
                 case RecommendedStreamConfigurationMap.USECASE_RAW:
+                case RecommendedStreamConfigurationMap.USECASE_LOW_LATENCY_SNAPSHOT:
                 case RecommendedStreamConfigurationMap.USECASE_VIDEO_SNAPSHOT:
                     map = new StreamConfigurationMap(scData.streamConfigurationArray,
                             scData.minDurationArray, scData.stallDurationArray,
@@ -1133,6 +1136,9 @@ public class CameraMetadataNative implements Parcelable {
                             /*dynamicDepthConfigurations*/ null,
                             /*dynamicDepthMinFrameDurations*/ null,
                             /*dynamicDepthStallDurations*/ null,
+                            /*heicconfiguration*/ null,
+                            /*heicminduration*/ null,
+                            /*heicstallduration*/ null,
                             /*highspeedvideoconfigurations*/ null,
                             /*inputoutputformatsmap*/ null, listHighResolution, supportsPrivate[i]);
                     break;
@@ -1144,6 +1150,9 @@ public class CameraMetadataNative implements Parcelable {
                             /*dynamicDepthConfigurations*/ null,
                             /*dynamicDepthMinFrameDurations*/ null,
                             /*dynamicDepthStallDurations*/ null,
+                            /*heicconfiguration*/ null,
+                            /*heicminduration*/ null,
+                            /*heicstallduration*/ null,
                             highSpeedVideoConfigurations,
                             /*inputoutputformatsmap*/ null, listHighResolution, supportsPrivate[i]);
                     break;
@@ -1155,6 +1164,9 @@ public class CameraMetadataNative implements Parcelable {
                             /*dynamicDepthConfigurations*/ null,
                             /*dynamicDepthMinFrameDurations*/ null,
                             /*dynamicDepthStallDurations*/ null,
+                            /*heicconfiguration*/ null,
+                            /*heicminduration*/ null,
+                            /*heicstallduration*/ null,
                             /*highSpeedVideoConfigurations*/ null,
                             inputOutputFormatsMap, listHighResolution, supportsPrivate[i]);
                     break;
@@ -1166,6 +1178,9 @@ public class CameraMetadataNative implements Parcelable {
                             /*dynamicDepthConfigurations*/ null,
                             /*dynamicDepthMinFrameDurations*/ null,
                             /*dynamicDepthStallDurations*/ null,
+                            /*heicconfiguration*/ null,
+                            /*heicminduration*/ null,
+                            /*heicstallduration*/ null,
                             /*highSpeedVideoConfigurations*/ null,
                             /*inputOutputFormatsMap*/ null, listHighResolution, supportsPrivate[i]);
             }
@@ -1230,6 +1245,12 @@ public class CameraMetadataNative implements Parcelable {
                 CameraCharacteristics.DEPTH_AVAILABLE_DYNAMIC_DEPTH_MIN_FRAME_DURATIONS);
         StreamConfigurationDuration[] dynamicDepthStallDurations = getBase(
                 CameraCharacteristics.DEPTH_AVAILABLE_DYNAMIC_DEPTH_STALL_DURATIONS);
+        StreamConfiguration[] heicConfigurations = getBase(
+                CameraCharacteristics.HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS);
+        StreamConfigurationDuration[] heicMinFrameDurations = getBase(
+                CameraCharacteristics.HEIC_AVAILABLE_HEIC_MIN_FRAME_DURATIONS);
+        StreamConfigurationDuration[] heicStallDurations = getBase(
+                CameraCharacteristics.HEIC_AVAILABLE_HEIC_STALL_DURATIONS);
         HighSpeedVideoConfiguration[] highSpeedVideoConfigurations = getBase(
                 CameraCharacteristics.CONTROL_AVAILABLE_HIGH_SPEED_VIDEO_CONFIGURATIONS);
         ReprocessFormatsMap inputOutputFormatsMap = getBase(
@@ -1239,7 +1260,9 @@ public class CameraMetadataNative implements Parcelable {
                 configurations, minFrameDurations, stallDurations,
                 depthConfigurations, depthMinFrameDurations, depthStallDurations,
                 dynamicDepthConfigurations, dynamicDepthMinFrameDurations,
-                dynamicDepthStallDurations, highSpeedVideoConfigurations, inputOutputFormatsMap,
+                dynamicDepthStallDurations, heicConfigurations,
+                heicMinFrameDurations, heicStallDurations,
+                highSpeedVideoConfigurations, inputOutputFormatsMap,
                 listHighResolution);
     }
 

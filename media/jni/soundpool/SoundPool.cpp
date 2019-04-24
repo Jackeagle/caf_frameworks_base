@@ -17,8 +17,9 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "SoundPool"
 
+#include <chrono>
 #include <inttypes.h>
-
+#include <thread>
 #include <utils/Log.h>
 
 #define USE_SHARED_MEM_BUFFER
@@ -26,7 +27,6 @@
 #include <media/AudioTrack.h>
 #include "SoundPool.h"
 #include "SoundPoolThread.h"
-#include <media/AudioPolicyHelper.h>
 #include <media/NdkMediaCodec.h>
 #include <media/NdkMediaExtractor.h>
 #include <media/NdkMediaFormat.h>
@@ -746,7 +746,8 @@ void SoundChannel::play(const sp<Sample>& sample, int nextChannelID, float leftV
         // initialize track
         size_t afFrameCount;
         uint32_t afSampleRate;
-        audio_stream_type_t streamType = audio_attributes_to_stream_type(mSoundPool->attributes());
+        audio_stream_type_t streamType =
+                AudioSystem::attributesToStreamType(*mSoundPool->attributes());
         if (AudioSystem::getOutputFrameCount(&afFrameCount, streamType) != NO_ERROR) {
             afFrameCount = kDefaultFrameCount;
         }
@@ -967,6 +968,12 @@ bool SoundChannel::doStop_l()
     if (mState != IDLE) {
         setVolume_l(0, 0);
         ALOGV("stop");
+        // Since we're forcibly halting the previously playing content,
+        // we sleep here to ensure the volume is ramped down before we stop the track.
+        // Ideally the sleep time is the mixer period, or an approximation thereof
+        // (Fast vs Normal tracks are different).
+        // TODO: consider pausing instead of stop here.
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
         mAudioTrack->stop();
         mPrevSampleID = mSample->sampleID();
         mSample.clear();

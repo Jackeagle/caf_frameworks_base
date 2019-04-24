@@ -2091,6 +2091,40 @@
              Corresponds to {@link android.view.Window#setNavigationBarDividerColor(int)}. -->
         <attr name="navigationBarDividerColor" format="color" />
 
+        <!-- Sets whether the system should ensure that the status bar has enough
+             contrast when a fully transparent background is requested.
+
+             <p>If set to this value, the system will determine whether a scrim is necessary
+             to ensure that the status bar has enough contrast with the contents of
+             this app, and set an appropriate effective bar background color accordingly.
+
+             <p>When the status bar color has a non-zero alpha value, the value of this
+             attribute has no effect.
+
+             <p>If the app does not target at least {@link android.os.Build.VERSION_CODES#Q Q},
+             this attribute is ignored.
+
+             @see android.view.Window#setEnsureStatusBarContrastWhenTransparent 
+             @hide pendingAPI -->
+        <attr name="ensureStatusBarContrastWhenTransparent" format="boolean" />
+
+        <!-- Sets whether the system should ensure that the navigation bar has enough
+             contrast when a fully transparent background is requested.
+
+             <p>If set to this value, the system will determine whether a scrim is necessary
+             to ensure that the navigation bar has enough contrast with the contents of
+             this app, and set an appropriate effective bar background color accordingly.
+
+             <p>When the navigation bar color has a non-zero alpha value, the value of this
+             attribute has no effect.
+
+             <p>If the app does not target at least {@link android.os.Build.VERSION_CODES#Q Q},
+             this attribute is ignored.
+
+             @see android.view.Window#setEnsureNavigationBarContrastWhenTransparent
+             @hide pendingApi -->
+        <attr name="ensureNavigationBarContrastWhenTransparent" format="boolean" />
+
         <!-- The duration, in milliseconds, of the window background fade duration
              when transitioning into or away from an Activity when called with an
              Activity Transition. Corresponds to
@@ -2426,6 +2460,8 @@
         </attr>
 
         <attr name="__removed3" />
+        <attr name="__removed4" />
+        <attr name="__removed5" />
 
         <!-- Describes the content of a view so that a autofill service can fill in the appropriate
              data. Multiple hints can be combined in a comma separated list or an array of strings
@@ -4347,14 +4383,18 @@
         <attr name="indeterminate" format="boolean" />
         <!-- Restricts to ONLY indeterminate mode (state-keeping progress mode will not work). -->
         <attr name="indeterminateOnly" format="boolean" />
-        <!-- Drawable used for the indeterminate mode. -->
+        <!-- Drawable used for the indeterminate mode. One that implements Animatable offers more
+             control over the animation.-->
         <attr name="indeterminateDrawable" format="reference" />
         <!-- Drawable used for the progress mode. -->
         <attr name="progressDrawable" format="reference" />
-        <!-- Duration of the indeterminate animation. -->
+        <!-- Duration of the indeterminate animation. Only affects the indeterminate animation
+             if the indeterminate Drawable does not implement
+             android.graphics.drawable.Animatable. -->
         <attr name="indeterminateDuration" format="integer" min="1" />
-        <!-- Defines how the indeterminate mode should behave when the progress
-        reaches max. -->
+        <!-- Defines how the indeterminate mode should behave when the progress reaches max. Only
+             affects the indeterminate animation if the indeterminate Drawable does not implement
+             android.graphics.drawable.Animatable. -->
         <attr name="indeterminateBehavior">
             <!-- Progress starts over from 0. -->
             <enum name="repeat" value="1" />
@@ -4365,6 +4405,9 @@
         <attr name="maxWidth" />
         <attr name="minHeight" format="dimension" />
         <attr name="maxHeight" />
+        <!-- Sets the acceleration curve for the indeterminate animation. Defaults to a linear
+             interpolation. Only affects the indeterminate animation if the indeterminate Drawable
+             does not implement android.graphics.drawable.Animatable.-->
         <attr name="interpolator" format="reference" />
         <!-- Timeout between frames of animation in milliseconds.
              {@deprecated Not used by the framework}. -->
@@ -6479,6 +6522,9 @@
         <!-- Special option for window animations: show the wallpaper behind when running this
              animation. -->
         <attr name="showWallpaper" format="boolean" />
+        <!-- Special option for window animations: whether window should have rounded corners.
+             @see ScreenDecorationsUtils#getWindowCornerRadius(Resources) -->
+        <attr name="hasRoundedCorners" format="boolean" />
     </declare-styleable>
 
     <declare-styleable name="AnimationSet">
@@ -7995,7 +8041,8 @@
 
         <!-- Indicates that this wallpaper service can support multiple engines to render on each
              surface independently. An example use case is a multi-display set-up where the
-             wallpaper service can render surfaces to each of the connected displays. -->
+             wallpaper service can render surfaces to each of the connected displays. Corresponds to
+             {@link android.app.WallpaperInfo#supportsMultipleDisplays()} -->
         <attr name="supportsMultipleDisplays" format="boolean" />
 
     </declare-styleable>
@@ -8095,7 +8142,7 @@
 
     <!-- Use <code>autofill-service</code> as the root tag of the XML resource that describes a
          {@link android.service.autofill.AutofillService}, which is referenced from its
-         {@link android.service.autofill#SERVICE_META_DATA} meta-data entry.
+         {@link android.service.autofill.AutofillService#SERVICE_META_DATA} meta-data entry.
     -->
     <declare-styleable name="AutofillService">
         <!-- Fully qualified class name of an activity that allows the user to modify
@@ -8118,6 +8165,23 @@
              android.content.pm.PackageInfo#getLongVersionCode()} for the target package.
         -->
         <attr name="maxLongVersionCode" format="string" />
+    </declare-styleable>
+
+    <!-- =============================== -->
+    <!-- Content Capture attributes -->
+    <!-- =============================== -->
+    <eat-comment />
+
+    <!-- Use <code>content-capture-service</code> as the root tag of the XML resource that describes
+         a {@link android.service.contentcapture.ContentCaptureService}, which is referenced from
+         its {@link android.service.contentcapture.ContentCaptureService#SERVICE_META_DATA}
+         meta-data entry.
+         @hide @SystemApi
+    -->
+    <declare-styleable name="ContentCaptureService">
+        <!-- Fully qualified class name of an activity that allows the user to modify
+             the settings for this service. -->
+        <attr name="settingsActivity" />
     </declare-styleable>
 
     <!-- =============================== -->
@@ -8950,6 +9014,10 @@
         <!-- @hide From Theme.navigationBarColor, used for the TaskDescription navigation bar
                    color. -->
         <attr name="navigationBarColor"/>
+        <!-- @hide From Window.ensureStatusBarContrastWhenTransparent -->
+        <attr name="ensureStatusBarContrastWhenTransparent"/>
+        <!-- @hide From Window.ensureNavigationBarContrastWhenTransparent -->
+        <attr name="ensureNavigationBarContrastWhenTransparent"/>
     </declare-styleable>
 
     <declare-styleable name="Shortcut">

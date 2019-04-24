@@ -57,6 +57,8 @@ import androidx.test.InstrumentationRegistry;
 import androidx.test.filters.SmallTest;
 import androidx.test.runner.AndroidJUnit4;
 
+import com.android.server.backup.utils.RandomAccessFileUtils;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -80,7 +82,7 @@ public class TrampolineTest {
     private static final String CURRENT_PASSWORD = "current_password";
     private static final String NEW_PASSWORD = "new_password";
     private static final String ENCRYPTION_PASSWORD = "encryption_password";
-    private static final String DATA_MANAGEMENT_LABEL = "data_management_label";
+    private static final CharSequence DATA_MANAGEMENT_LABEL = "data_management_label";
     private static final String DESTINATION_STRING = "destination_string";
     private static final String[] PACKAGE_NAMES =
             new String[]{"some.package.name._1", "some.package.name._2"};
@@ -93,6 +95,7 @@ public class TrampolineTest {
             new ComponentName("package2", "class2")
     };
     private static final int NON_USER_SYSTEM = UserHandle.USER_SYSTEM + 1;
+    private static final int UNSTARTED_NON_USER_SYSTEM = UserHandle.USER_SYSTEM + 2;
 
     @UserIdInt
     private int mUserId;
@@ -124,7 +127,6 @@ public class TrampolineTest {
     private TrampolineTestable mTrampoline;
     private File mTestDir;
     private File mSuppressFile;
-    private File mActivatedFile;
 
     @Before
     public void setUp() throws Exception {
@@ -138,6 +140,7 @@ public class TrampolineTest {
 
         when(mUserManagerMock.getUserInfo(UserHandle.USER_SYSTEM)).thenReturn(mUserInfoMock);
         when(mUserManagerMock.getUserInfo(NON_USER_SYSTEM)).thenReturn(mUserInfoMock);
+        when(mUserManagerMock.getUserInfo(UNSTARTED_NON_USER_SYSTEM)).thenReturn(mUserInfoMock);
 
         TrampolineTestable.sBackupManagerServiceMock = mBackupManagerServiceMock;
         TrampolineTestable.sCallingUserId = UserHandle.USER_SYSTEM;
@@ -151,16 +154,31 @@ public class TrampolineTest {
         mSuppressFile = new File(mTestDir, "suppress");
         TrampolineTestable.sSuppressFile = mSuppressFile;
 
-        mActivatedFile = new File(mTestDir, "activate-" + NON_USER_SYSTEM);
-        TrampolineTestable.sActivatedFiles.append(NON_USER_SYSTEM, mActivatedFile);
+        setUpStateFilesForNonSystemUser(NON_USER_SYSTEM);
+        setUpStateFilesForNonSystemUser(UNSTARTED_NON_USER_SYSTEM);
 
         mTrampoline = new TrampolineTestable(mContextMock);
+    }
+
+    private void setUpStateFilesForNonSystemUser(int userId) {
+        File activatedFile = new File(mTestDir, "activate-" + userId);
+        TrampolineTestable.sActivatedFiles.append(userId, activatedFile);
+        File rememberActivatedFile = new File(mTestDir, "rem-activate-" + userId);
+        TrampolineTestable.sRememberActivatedFiles.append(userId, rememberActivatedFile);
     }
 
     @After
     public void tearDown() throws Exception {
         mSuppressFile.delete();
-        mActivatedFile.delete();
+        deleteFiles(TrampolineTestable.sActivatedFiles);
+        deleteFiles(TrampolineTestable.sRememberActivatedFiles);
+    }
+
+    private void deleteFiles(SparseArray<File> files) {
+        int numFiles = files.size();
+        for (int i = 0; i < numFiles; i++) {
+            files.valueAt(i).delete();
+        }
     }
 
     @Test
@@ -237,6 +255,16 @@ public class TrampolineTest {
         mTrampoline.setBackupServiceActive(NON_USER_SYSTEM, true);
 
         assertTrue(mTrampoline.isBackupServiceActive(NON_USER_SYSTEM));
+    }
+
+    @Test
+    public void
+            isBackupServiceActive_forUnstartedNonSystemUser_returnsTrueWhenSystemAndUserActivated()
+            throws Exception {
+        mTrampoline.initializeService();
+        mTrampoline.setBackupServiceActive(UNSTARTED_NON_USER_SYSTEM, true);
+
+        assertTrue(mTrampoline.isBackupServiceActive(UNSTARTED_NON_USER_SYSTEM));
     }
 
     @Test
@@ -408,6 +436,37 @@ public class TrampolineTest {
         assertTrue(mTrampoline.isBackupServiceActive(NON_USER_SYSTEM));
         assertFalse(mTrampoline.isBackupServiceActive(otherUser));
         activateFile.delete();
+    }
+
+    @Test
+    public void setBackupServiceActive_forNonSystemUser_remembersActivated() {
+        mTrampoline.initializeService();
+
+        mTrampoline.setBackupServiceActive(NON_USER_SYSTEM, true);
+
+        assertTrue(RandomAccessFileUtils.readBoolean(
+                TrampolineTestable.sRememberActivatedFiles.get(NON_USER_SYSTEM), false));
+    }
+
+    @Test
+    public void setBackupServiceActiveFalse_forNonSystemUser_remembersActivated() {
+        mTrampoline.initializeService();
+
+        mTrampoline.setBackupServiceActive(NON_USER_SYSTEM, false);
+
+        assertFalse(RandomAccessFileUtils.readBoolean(
+                TrampolineTestable.sRememberActivatedFiles.get(NON_USER_SYSTEM), true));
+    }
+
+    @Test
+    public void setBackupServiceActiveTwice_forNonSystemUser_remembersLastActivated() {
+        mTrampoline.initializeService();
+
+        mTrampoline.setBackupServiceActive(NON_USER_SYSTEM, true);
+        mTrampoline.setBackupServiceActive(NON_USER_SYSTEM, false);
+
+        assertFalse(RandomAccessFileUtils.readBoolean(
+                TrampolineTestable.sRememberActivatedFiles.get(NON_USER_SYSTEM), true));
     }
 
     @Test
@@ -1071,8 +1130,8 @@ public class TrampolineTest {
     }
 
     @Test
-    public void getDataManagementLabel_calledBeforeInitialize_ignored() throws Exception {
-        assertNull(mTrampoline.getDataManagementLabel(TRANSPORT_NAME));
+    public void getDataManagementLabelForUser_calledBeforeInitialize_ignored() throws Exception {
+        assertNull(mTrampoline.getDataManagementLabelForUser(mUserId, TRANSPORT_NAME));
         verifyNoMoreInteractions(mBackupManagerServiceMock);
     }
 
@@ -1085,17 +1144,6 @@ public class TrampolineTest {
         assertEquals(
                 DATA_MANAGEMENT_LABEL,
                 mTrampoline.getDataManagementLabelForUser(mUserId, TRANSPORT_NAME));
-        verify(mBackupManagerServiceMock).getDataManagementLabel(mUserId, TRANSPORT_NAME);
-    }
-
-    @Test
-    public void getDataManagementLabel_forwarded() throws Exception {
-        TrampolineTestable.sCallingUserId = mUserId;
-        when(mBackupManagerServiceMock.getDataManagementLabel(mUserId, TRANSPORT_NAME)).thenReturn(
-                DATA_MANAGEMENT_LABEL);
-        mTrampoline.initializeService();
-
-        assertEquals(DATA_MANAGEMENT_LABEL, mTrampoline.getDataManagementLabel(TRANSPORT_NAME));
         verify(mBackupManagerServiceMock).getDataManagementLabel(mUserId, TRANSPORT_NAME);
     }
 
@@ -1291,6 +1339,7 @@ public class TrampolineTest {
         static BackupManagerService sBackupManagerServiceMock = null;
         static File sSuppressFile = null;
         static SparseArray<File> sActivatedFiles = new SparseArray<>();
+        static SparseArray<File> sRememberActivatedFiles = new SparseArray<>();
         static UserManager sUserManagerMock = null;
         private int mCreateServiceCallsCount = 0;
 
@@ -1311,6 +1360,11 @@ public class TrampolineTest {
         @Override
         protected File getSuppressFileForSystemUser() {
             return sSuppressFile;
+        }
+
+        @Override
+        protected File getRememberActivatedFileForNonSystemUser(int userId) {
+            return sRememberActivatedFiles.get(userId);
         }
 
         @Override

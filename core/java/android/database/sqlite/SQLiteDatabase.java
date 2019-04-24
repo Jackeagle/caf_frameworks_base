@@ -266,12 +266,17 @@ public final class SQLiteDatabase extends SQLiteClosable {
      */
     public static final int ENABLE_WRITE_AHEAD_LOGGING = 0x20000000;
 
+
+    // Note: The below value was only used on Android Pie.
+    // public static final int DISABLE_COMPATIBILITY_WAL = 0x40000000;
+
     /**
-     * Open flag: Flag for {@link #openDatabase} to disable Compatibility WAL when opening database.
+     * Open flag: Flag for {@link #openDatabase} to enable the legacy Compatibility WAL when opening
+     * database.
      *
      * @hide
      */
-    public static final int DISABLE_COMPATIBILITY_WAL = 0x40000000;
+    public static final int ENABLE_LEGACY_COMPATIBILITY_WAL = 0x80000000;
 
     /**
      * Absolute max value that can be set by {@link #setMaxSqlCacheSize(int)}.
@@ -309,10 +314,8 @@ public final class SQLiteDatabase extends SQLiteClosable {
         mConfigurationLocked.idleConnectionTimeoutMs = effectiveTimeoutMs;
         mConfigurationLocked.journalMode = journalMode;
         mConfigurationLocked.syncMode = syncMode;
-        if (!SQLiteGlobal.isCompatibilityWalSupported() || (
-                SQLiteCompatibilityWalFlags.areFlagsSet() && !SQLiteCompatibilityWalFlags
-                        .isCompatibilityWalSupported())) {
-            mConfigurationLocked.openFlags |= DISABLE_COMPATIBILITY_WAL;
+        if (SQLiteCompatibilityWalFlags.isLegacyCompatibilityWalEnabled()) {
+            mConfigurationLocked.openFlags |= ENABLE_LEGACY_COMPATIBILITY_WAL;
         }
     }
 
@@ -2123,15 +2126,18 @@ public final class SQLiteDatabase extends SQLiteClosable {
             throwIfNotOpenLocked();
 
             final int oldFlags = mConfigurationLocked.openFlags;
-            final boolean walDisabled = (oldFlags & ENABLE_WRITE_AHEAD_LOGGING) == 0;
-            final boolean compatibilityWalDisabled = (oldFlags & DISABLE_COMPATIBILITY_WAL) != 0;
-            if (walDisabled && compatibilityWalDisabled) {
+            final boolean walEnabled = (oldFlags & ENABLE_WRITE_AHEAD_LOGGING) != 0;
+            final boolean compatibilityWalEnabled =
+                    (oldFlags & ENABLE_LEGACY_COMPATIBILITY_WAL) != 0;
+            // WAL was never enabled for this database, so there's nothing left to do.
+            if (!walEnabled && !compatibilityWalEnabled) {
                 return;
             }
 
+            // If an app explicitly disables WAL, it takes priority over any directive
+            // to use the legacy "compatibility WAL" mode.
             mConfigurationLocked.openFlags &= ~ENABLE_WRITE_AHEAD_LOGGING;
-            // If an app explicitly disables WAL, compatibility mode should be disabled too
-            mConfigurationLocked.openFlags |= DISABLE_COMPATIBILITY_WAL;
+            mConfigurationLocked.openFlags &= ~ENABLE_LEGACY_COMPATIBILITY_WAL;
 
             try {
                 mConnectionPoolLocked.reconfigure(mConfigurationLocked);
@@ -2649,26 +2655,24 @@ public final class SQLiteDatabase extends SQLiteClosable {
              * Sets the maximum number of milliseconds that SQLite connection is allowed to be idle
              * before it is closed and removed from the pool.
              *
-             * <p>DO NOT USE this method unless you fully understand the implication
-             * of what it does.
-             * A connection timeout allows the system to internally close a connection to a SQLite
-             * database after a given timeout.
-             * This is good for reducing app's memory consumption, but it has
-             * side effects that are hard to predict. For example, SQLite internally maintains
-             * a lot of "per-connection" states that apps can typically modify with a {@code PRAGMA}
-             * statement, and such states will be reset once the connection is closed.
-             * The system does not provide a callback that would allow apps to
-             * reconfigure a newly created connection and thus there's no way to re-configure
-             * connections when they're re-made internally. Do not use it unless you're sure
-             * your app uses no per-connection states.
+             * <p><b>DO NOT USE</b> this method.
+             * This feature has negative side effects that are very hard to foresee.
+             * <p>A connection timeout allows the system to internally close a connection to
+             * a SQLite database after a given timeout, which is good for reducing app's memory
+             * consumption.
+             * <b>However</b> the side effect is it <b>will reset all of SQLite's per-connection
+             * states</b>, which are typically modified with a {@code PRAGMA} statement, and
+             * these states <b>will not be restored</b> when a connection is re-established
+             * internally, and the system does not provide a callback for an app to reconfigure a
+             * connection.
+             * This feature may only be used if an app relies on none of such per-connection states.
              *
              * @param idleConnectionTimeoutMs timeout in milliseconds. Use {@link Long#MAX_VALUE}
              * to allow unlimited idle connections.
              *
              * @see SQLiteOpenHelper#setIdleConnectionTimeout(long)
              *
-             * @deprecated DO NOT USE this method unless you fully understand the implication
-             * of what it does.
+             * @deprecated DO NOT USE this method. See the javadoc for the details.
              */
             @NonNull
             @Deprecated

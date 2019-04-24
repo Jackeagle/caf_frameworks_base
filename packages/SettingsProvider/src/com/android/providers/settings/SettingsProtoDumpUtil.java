@@ -457,6 +457,9 @@ class SettingsProtoDumpUtil {
         dumpSetting(s, p,
                 Settings.Global.DEBUG_VIEW_ATTRIBUTES,
                 GlobalSettingsProto.Debug.VIEW_ATTRIBUTES);
+        dumpSetting(s, p,
+                Settings.Global.DEBUG_VIEW_ATTRIBUTES_APPLICATION_PACKAGE,
+                GlobalSettingsProto.Debug.VIEW_ATTRIBUTES_APPLICATION_PACKAGE);
         p.end(debugToken);
 
         final long defaultToken = p.start(GlobalSettingsProto.DEFAULT);
@@ -683,6 +686,9 @@ class SettingsProtoDumpUtil {
                 Settings.Global.GPU_DEBUG_LAYERS,
                 GlobalSettingsProto.Gpu.DEBUG_LAYERS);
         dumpSetting(s, p,
+                Settings.Global.GLOBAL_SETTINGS_ANGLE_DEBUG_PACKAGE,
+                GlobalSettingsProto.Gpu.ANGLE_DEBUG_PACKAGE);
+        dumpSetting(s, p,
                 Settings.Global.GLOBAL_SETTINGS_ANGLE_GL_DRIVER_ALL_ANGLE,
                 GlobalSettingsProto.Gpu.ANGLE_GL_DRIVER_ALL_ANGLE);
         dumpSetting(s, p,
@@ -694,6 +700,9 @@ class SettingsProtoDumpUtil {
         dumpSetting(s, p,
                 Settings.Global.GLOBAL_SETTINGS_ANGLE_WHITELIST,
                 GlobalSettingsProto.Gpu.ANGLE_WHITELIST);
+        dumpSetting(s, p,
+                Settings.Global.GLOBAL_SETTINGS_SHOW_ANGLE_IN_USE_DIALOG_BOX,
+                GlobalSettingsProto.Gpu.SHOW_ANGLE_IN_USE_DIALOG);
         dumpSetting(s, p,
                 Settings.Global.GPU_DEBUG_LAYER_APP,
                 GlobalSettingsProto.Gpu.DEBUG_LAYER_APP);
@@ -715,6 +724,12 @@ class SettingsProtoDumpUtil {
         dumpSetting(s, p,
                 Settings.Global.GAME_DRIVER_WHITELIST,
                 GlobalSettingsProto.Gpu.GAME_DRIVER_WHITELIST);
+        dumpSetting(s, p,
+                Settings.Global.GAME_DRIVER_BLACKLISTS,
+                GlobalSettingsProto.Gpu.GAME_DRIVER_BLACKLISTS);
+        dumpSetting(s, p,
+                Settings.Global.GAME_DRIVER_SPHAL_LIBRARIES,
+                GlobalSettingsProto.Gpu.GAME_DRIVER_SPHAL_LIBRARIES);
         p.end(gpuToken);
 
         final long hdmiToken = p.start(GlobalSettingsProto.HDMI);
@@ -832,7 +847,7 @@ class SettingsProtoDumpUtil {
                 Settings.Global.LOW_POWER_MODE_TRIGGER_LEVEL_MAX,
                 GlobalSettingsProto.LowPowerMode.TRIGGER_LEVEL_MAX);
         dumpSetting(s, p,
-                Settings.Global.AUTOMATIC_POWER_SAVER_MODE,
+                Settings.Global.AUTOMATIC_POWER_SAVE_MODE,
                 GlobalSettingsProto.LowPowerMode.AUTOMATIC_POWER_SAVER_MODE);
         dumpSetting(s, p,
                 Settings.Global.LOW_POWER_MODE_STICKY,
@@ -1221,11 +1236,6 @@ class SettingsProtoDumpUtil {
         dumpSetting(s, p,
                 Settings.Global.SMS_SHORT_CODES_UPDATE_METADATA_URL,
                 GlobalSettingsProto.Sms.SHORT_CODES_UPDATE_METADATA_URL);
-        dumpSetting(s, p,
-                Settings.Global.SMS_ACCESS_RESTRICTION_ENABLED,
-                GlobalSettingsProto.Sms.ACCESS_RESTRICTION_ENABLED);
-        p.end(smsToken);
-
         final long soundsToken = p.start(GlobalSettingsProto.SOUNDS);
         dumpSetting(s, p,
                 Settings.Global.CAR_DOCK_SOUND,
@@ -1341,11 +1351,11 @@ class SettingsProtoDumpUtil {
                 Settings.Global.SHOW_TEMPERATURE_WARNING,
                 GlobalSettingsProto.TemperatureWarning.SHOW_TEMPERATURE_WARNING);
         dumpSetting(s, p,
+                Settings.Global.SHOW_USB_TEMPERATURE_ALARM,
+                GlobalSettingsProto.TemperatureWarning.SHOW_USB_TEMPERATURE_ALARM);
+        dumpSetting(s, p,
                 Settings.Global.WARNING_TEMPERATURE,
                 GlobalSettingsProto.TemperatureWarning.WARNING_TEMPERATURE_LEVEL);
-        dumpSetting(s, p,
-                Settings.Global.USB_ALARM_TEMPERATURE,
-                GlobalSettingsProto.TemperatureWarning.USB_ALARM_TEMPERATURE_LEVEL);
         p.end(tempWarningToken);
 
         final long tetherToken = p.start(GlobalSettingsProto.TETHER);
@@ -1369,6 +1379,9 @@ class SettingsProtoDumpUtil {
         dumpSetting(s, p,
                 Settings.Global.TEXT_CLASSIFIER_CONSTANTS,
                 GlobalSettingsProto.TEXT_CLASSIFIER_CONSTANTS);
+        dumpSetting(s, p,
+                Settings.Global.TEXT_CLASSIFIER_ACTION_MODEL_PARAMS,
+                GlobalSettingsProto.TEXT_CLASSIFIER_ACTION_MODEL_PARAMS);
         dumpSetting(s, p,
                 Settings.Global.THEATER_MODE_ON,
                 GlobalSettingsProto.THEATER_MODE_ON);
@@ -1904,6 +1917,36 @@ class SettingsProtoDumpUtil {
         dumpSetting(s, p,
                 Settings.Secure.ENHANCED_VOICE_PRIVACY_ENABLED,
                 SecureSettingsProto.ENHANCED_VOICE_PRIVACY_ENABLED);
+
+        final long gestureToken = p.start(SecureSettingsProto.GESTURE);
+        dumpSetting(s, p,
+                Settings.Secure.AWARE_ENABLED,
+                SecureSettingsProto.Gesture.AWARE_ENABLED);
+
+        dumpSetting(s, p,
+                Settings.Secure.SILENCE_ALARMS_GESTURE_COUNT,
+                SecureSettingsProto.Gesture.SILENCE_ALARMS_COUNT);
+        dumpSetting(s, p,
+                Settings.Secure.SILENCE_CALL_GESTURE_COUNT,
+                SecureSettingsProto.Gesture.SILENCE_CALLS_COUNT);
+        dumpSetting(s, p,
+                Settings.Secure.SILENCE_GESTURE,
+                SecureSettingsProto.Gesture.SILENCE_ENABLED);
+        dumpSetting(s, p,
+                Settings.Secure.SILENCE_NOTIFICATION_GESTURE_COUNT,
+                SecureSettingsProto.Gesture.SILENCE_NOTIFICATION_COUNT);
+        dumpSetting(s, p,
+                Settings.Secure.SILENCE_TIMER_GESTURE_COUNT,
+                SecureSettingsProto.Gesture.SILENCE_TIMER_COUNT);
+
+        dumpSetting(s, p,
+                Settings.Secure.SKIP_GESTURE_COUNT,
+                SecureSettingsProto.Gesture.SKIP_COUNT);
+        dumpSetting(s, p,
+                Settings.Secure.SKIP_GESTURE,
+                SecureSettingsProto.Gesture.SKIP_ENABLED);
+        p.end(gestureToken);
+
         dumpSetting(s, p,
                 Settings.Secure.IMMERSIVE_MODE_CONFIRMATIONS,
                 SecureSettingsProto.IMMERSIVE_MODE_CONFIRMATIONS);
@@ -1962,6 +2005,9 @@ class SettingsProtoDumpUtil {
         dumpSetting(s, p,
                 Settings.Secure.LOCATION_CHANGER,
                 SecureSettingsProto.Location.CHANGER);
+        dumpSetting(s, p,
+                Settings.Secure.LOCATION_PERMISSIONS_UPGRADE_TO_Q_MODE,
+                SecureSettingsProto.Location.PERMISSIONS_UPGRADE_TO_Q_MODE);
         p.end(locationToken);
 
         final long locationAccessCheckToken = p.start(SecureSettingsProto.LOCATION_ACCESS_CHECK);
@@ -2078,6 +2124,9 @@ class SettingsProtoDumpUtil {
         dumpSetting(s, p,
                 Settings.Secure.NOTIFICATION_BADGING,
                 SecureSettingsProto.Notification.BADGING);
+        dumpSetting(s, p,
+                Settings.Secure.NOTIFICATION_BUBBLES,
+                SecureSettingsProto.Notification.BUBBLES);
         dumpSetting(s, p,
                 Settings.Secure.SHOW_NOTE_ABOUT_NOTIFICATION_HIDING,
                 SecureSettingsProto.Notification.SHOW_NOTE_ABOUT_NOTIFICATION_HIDING);
@@ -2263,6 +2312,9 @@ class SettingsProtoDumpUtil {
                 Settings.Secure.SYSTEM_NAVIGATION_KEYS_ENABLED,
                 SecureSettingsProto.SYSTEM_NAVIGATION_KEYS_ENABLED);
         dumpSetting(s, p,
+                Settings.Secure.THEME_CUSTOMIZATION_OVERLAY_PACKAGES,
+                SecureSettingsProto.THEME_CUSTOMIZATION_OVERLAY_PACKAGES);
+        dumpSetting(s, p,
                 Settings.Secure.TRUST_AGENTS_INITIALIZED,
                 SecureSettingsProto.TRUST_AGENTS_INITIALIZED);
 
@@ -2356,12 +2408,6 @@ class SettingsProtoDumpUtil {
                 Settings.Secure.WAKE_GESTURE_ENABLED,
                 SecureSettingsProto.WAKE_GESTURE_ENABLED);
 
-        final long launcherToken = p.start(SecureSettingsProto.LAUNCHER);
-        dumpSetting(s, p,
-                Settings.Secure.SWIPE_UP_TO_SWITCH_APPS_ENABLED,
-                SecureSettingsProto.Launcher.SWIPE_UP_TO_SWITCH_APPS_ENABLED);
-        p.end(launcherToken);
-
         final long zenToken = p.start(SecureSettingsProto.ZEN);
         dumpSetting(s, p,
                 Settings.Secure.ZEN_DURATION,
@@ -2379,22 +2425,6 @@ class SettingsProtoDumpUtil {
                 Settings.Secure.ZEN_SETTINGS_SUGGESTION_VIEWED,
                 SecureSettingsProto.Zen.SETTINGS_SUGGESTION_VIEWED);
         p.end(zenToken);
-
-        dumpSetting(s, p,
-                Settings.Secure.SKIP_GESTURE,
-                SecureSettingsProto.SKIP_GESTURE_ENABLED);
-
-        dumpSetting(s, p,
-                Settings.Secure.SILENCE_GESTURE,
-                SecureSettingsProto.SILENCE_GESTURE_ENABLED);
-
-        dumpSetting(s, p,
-                Settings.Secure.THEME_CUSTOMIZATION_OVERLAY_PACKAGES,
-                SecureSettingsProto.THEME_CUSTOMIZATION_OVERLAY_PACKAGES);
-
-        dumpSetting(s, p,
-                Settings.Secure.AWARE_ENABLED,
-                SecureSettingsProto.AWARE_ENABLED);
 
         // Please insert new settings using the same order as in SecureSettingsProto.
         p.end(token);

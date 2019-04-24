@@ -16,13 +16,11 @@
 
 package com.android.server.wm;
 
-import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
-import static android.app.WindowConfiguration.WINDOWING_MODE_SPLIT_SCREEN_SECONDARY;
-import static android.content.ActivityInfoProto.SCREEN_ORIENTATION_UNSPECIFIED;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_BEHIND;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSET;
+import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
 import static android.view.WindowManager.LayoutParams.FIRST_APPLICATION_WINDOW;
 import static android.view.WindowManager.LayoutParams.FIRST_SUB_WINDOW;
 import static android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD;
@@ -42,27 +40,30 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
+import static org.mockito.Mockito.verify;
 
-import android.graphics.Point;
+import android.content.res.Configuration;
 import android.graphics.Rect;
 import android.platform.test.annotations.Presubmit;
+import android.view.Display;
 import android.view.Surface;
 import android.view.WindowManager;
 
-import androidx.test.filters.FlakyTest;
 import androidx.test.filters.SmallTest;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 /**
  * Tests for the {@link AppWindowToken} class.
  *
  * Build/Install/Run:
- *  atest FrameworksServicesTests:AppWindowTokenTests
+ *  atest WmTests:AppWindowTokenTests
  */
-@FlakyTest(bugId = 68267650)
 @SmallTest
 @Presubmit
 public class AppWindowTokenTests extends WindowTestsBase {
@@ -166,6 +167,8 @@ public class AppWindowTokenTests extends WindowTestsBase {
         mDisplayContent.updateOrientationFromAppTokens(
                 mDisplayContent.getRequestedOverrideConfiguration(),
                 null /* freezeThisOneIfNeeded */, false /* forceUpdate */);
+        // In this test, DC will not get config update. Set the waiting flag to false.
+        mDisplayContent.mWaitingForConfig = false;
         mWm.mRoot.performSurfacePlacement(false /* recoveringMemory */);
         assertEquals(SCREEN_ORIENTATION_REVERSE_LANDSCAPE, mDisplayContent.getLastOrientation());
         assertTrue(appWindow.mResizeReported);
@@ -208,6 +211,46 @@ public class AppWindowTokenTests extends WindowTestsBase {
         // Prevent the next rotation from being deferred by animation.
         mWm.mAnimator.setScreenRotationAnimationLocked(mDisplayContent.getDisplayId(), null);
         mWm.mRoot.performSurfacePlacement(false /* recoveringMemory */);
+    }
+
+    @Test
+    public void testSizeCompatBounds() {
+        final Rect fixedBounds = mToken.getRequestedOverrideConfiguration().windowConfiguration
+                .getBounds();
+        fixedBounds.set(0, 0, 1200, 1600);
+        mToken.getRequestedOverrideConfiguration().windowConfiguration.setAppBounds(fixedBounds);
+        final Configuration newParentConfig = mTask.getConfiguration();
+
+        // Change the size of the container to two times smaller with insets.
+        newParentConfig.windowConfiguration.setAppBounds(200, 0, 800, 800);
+        final Rect containerAppBounds = newParentConfig.windowConfiguration.getAppBounds();
+        final Rect containerBounds = newParentConfig.windowConfiguration.getBounds();
+        containerBounds.set(0, 0, 600, 800);
+        mToken.onConfigurationChanged(newParentConfig);
+
+        assertTrue(mToken.inSizeCompatMode());
+        assertEquals(containerAppBounds, mToken.getBounds());
+        assertEquals((float) containerAppBounds.width() / fixedBounds.width(),
+                mToken.getSizeCompatScale(), 0.0001f /* delta */);
+
+        // Change the width of the container to two times bigger.
+        containerAppBounds.set(0, 0, 2400, 1600);
+        containerBounds.set(containerAppBounds);
+        mToken.onConfigurationChanged(newParentConfig);
+
+        assertTrue(mToken.inSizeCompatMode());
+        // Don't scale up, so the bounds keep the same as the fixed width.
+        assertEquals(fixedBounds.width(), mToken.getBounds().width());
+        // Assert the position is horizontal center.
+        assertEquals((containerAppBounds.width() - fixedBounds.width()) / 2,
+                mToken.getBounds().left);
+        assertEquals(1f, mToken.getSizeCompatScale(), 0.0001f  /* delta */);
+
+        // Change the width of the container to fit the fixed bounds.
+        containerBounds.set(0, 0, 1200, 2000);
+        mToken.onConfigurationChanged(newParentConfig);
+        // Assert don't use fixed bounds because the region is enough.
+        assertFalse(mToken.inSizeCompatMode());
     }
 
     @Test
@@ -257,7 +300,6 @@ public class AppWindowTokenTests extends WindowTestsBase {
     }
 
     @Test
-    @FlakyTest(detail = "Promote once confirmed non-flaky")
     public void testStuckExitingWindow() {
         final WindowState closingWindow = createWindow(null, FIRST_APPLICATION_WINDOW,
                 "closingWindow");
@@ -286,6 +328,46 @@ public class AppWindowTokenTests extends WindowTestsBase {
 
         // Reset display frozen state
         mWm.mDisplayFrozen = false;
+    }
+
+    @Test
+    public void testReportOrientationChangeOnVisibilityChange() {
+        synchronized (mWm.mGlobalLock) {
+            mToken.setOrientation(SCREEN_ORIENTATION_LANDSCAPE);
+
+            mDisplayContent.getDisplayRotation().setFixedToUserRotation(
+                    DisplayRotation.FIXED_TO_USER_ROTATION_ENABLED);
+
+            doReturn(Configuration.ORIENTATION_LANDSCAPE).when(mToken.mActivityRecord)
+                    .getRequestedConfigurationOrientation();
+
+            mTask.mTaskRecord = Mockito.mock(TaskRecord.class, RETURNS_DEEP_STUBS);
+            mToken.commitVisibility(null, false /* visible */, TRANSIT_UNSET,
+                    true /* performLayout */, false /* isVoiceInteraction */);
+        }
+
+        verify(mTask.mTaskRecord).onConfigurationChanged(any(Configuration.class));
+    }
+
+    @Test
+    public void testReportOrientationChangeOnOpeningClosingAppChange() {
+        synchronized (mWm.mGlobalLock) {
+            mToken.setOrientation(SCREEN_ORIENTATION_LANDSCAPE);
+
+            mDisplayContent.getDisplayRotation().setFixedToUserRotation(
+                    DisplayRotation.FIXED_TO_USER_ROTATION_ENABLED);
+            mDisplayContent.getDisplayInfo().state = Display.STATE_ON;
+            mDisplayContent.prepareAppTransition(WindowManager.TRANSIT_ACTIVITY_CLOSE,
+                    false /* alwaysKeepCurrent */, 0 /* flags */, true /* forceOverride */);
+
+            doReturn(Configuration.ORIENTATION_LANDSCAPE).when(mToken.mActivityRecord)
+                    .getRequestedConfigurationOrientation();
+
+            mTask.mTaskRecord = Mockito.mock(TaskRecord.class, RETURNS_DEEP_STUBS);
+            mToken.setVisibility(false, false);
+        }
+
+        verify(mTask.mTaskRecord).onConfigurationChanged(any(Configuration.class));
     }
 
     @Test
@@ -384,36 +466,11 @@ public class AppWindowTokenTests extends WindowTestsBase {
         // bottom one.
         tokenTop.setVisibility(false, false);
         tokenBottom.transferStartingWindowFromHiddenAboveTokenIfNeeded();
+        waitUntilHandlersIdle();
 
         // Assert that the bottom window now has the starting window.
         assertNoStartingWindow(tokenTop);
         assertHasStartingWindow(tokenBottom);
-    }
-
-    @Test
-    public void testTransitionAnimationPositionAndBounds() {
-        final Rect stackBounds = new Rect(
-                0/* left */, 0 /* top */, 1000 /* right */, 1000 /* bottom */);
-        final Rect taskBounds = new Rect(
-                100/* left */, 200 /* top */, 600 /* right */, 600 /* bottom */);
-        mStack.setBounds(stackBounds);
-        mTask.setBounds(taskBounds);
-
-        mTask.setWindowingMode(WINDOWING_MODE_FREEFORM);
-        assertTransitionAnimationPositionAndBounds(taskBounds.left, taskBounds.top, stackBounds);
-
-        mTask.setWindowingMode(WINDOWING_MODE_SPLIT_SCREEN_SECONDARY);
-        assertTransitionAnimationPositionAndBounds(stackBounds.left, stackBounds.top, stackBounds);
-    }
-
-    private void assertTransitionAnimationPositionAndBounds(int expectedX, int expectedY,
-            Rect expectedBounds) {
-        final Point outPosition = new Point();
-        final Rect outBounds = new Rect();
-        mToken.getAnimationBounds(outPosition, outBounds);
-        assertEquals(expectedX, outPosition.x);
-        assertEquals(expectedY, outPosition.y);
-        assertEquals(expectedBounds, outBounds);
     }
 
     private void assertHasStartingWindow(AppWindowToken atoken) {

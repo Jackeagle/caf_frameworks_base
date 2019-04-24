@@ -31,6 +31,7 @@
 #include "renderthread/RenderThread.h"
 #include "utils/Macros.h"
 #include "utils/TimeUtils.h"
+#include "utils/TraceUtils.h"
 
 #include <ui/GraphicBuffer.h>
 
@@ -161,6 +162,7 @@ void RenderProxy::buildLayer(RenderNode* node) {
 }
 
 bool RenderProxy::copyLayerInto(DeferredLayerUpdater* layer, SkBitmap& bitmap) {
+    ATRACE_NAME("TextureView#getBitmap");
     auto& thread = RenderThread::getInstance();
     return thread.queue().runSync([&]() -> bool {
         return thread.readback().copyLayerInto(layer, &bitmap) == CopyResult::Success;
@@ -310,6 +312,12 @@ void RenderProxy::setForceDark(bool enable) {
     mRenderThread.queue().post([this, enable]() { mContext->setForceDark(enable); });
 }
 
+void RenderProxy::setRenderAheadDepth(int renderAhead) {
+    mRenderThread.queue().post([ context = mContext, renderAhead ] {
+        context->setRenderAheadDepth(renderAhead);
+    });
+}
+
 int RenderProxy::copySurfaceInto(sp<Surface>& surface, int left, int top, int right, int bottom,
                                  SkBitmap* bitmap) {
     auto& thread = RenderThread::getInstance();
@@ -346,6 +354,7 @@ void RenderProxy::prepareToDraw(Bitmap& bitmap) {
 }
 
 int RenderProxy::copyHWBitmapInto(Bitmap* hwBitmap, SkBitmap* bitmap) {
+    ATRACE_NAME("HardwareBitmap readback");
     RenderThread& thread = RenderThread::getInstance();
     if (gettid() == thread.getTid()) {
         // TODO: fix everything that hits this. We should never be triggering a readback ourselves.
@@ -378,6 +387,14 @@ void RenderProxy::releaseVDAtlasEntries() {
         if (thread.getGrContext() != nullptr) {
             thread.cacheManager().acquireVectorDrawableAtlas()->delayedReleaseEntries();
         }
+    });
+}
+
+void RenderProxy::preload() {
+    // Create RenderThread object and start the thread. Then preload Vulkan/EGL driver.
+    auto& thread = RenderThread::getInstance();
+    thread.queue().post([&thread]() {
+        thread.preload();
     });
 }
 

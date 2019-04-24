@@ -34,6 +34,7 @@
     <string name="keyguard_password_wrong_pin_code" msgid="6535018036285012028">"Kode PIN salah."</string>
     <string name="keyguard_sim_error_message_short" msgid="592109500618448312">"Kartu Tidak Valid"</string>
     <string name="keyguard_charged" msgid="3316115607283493413">"Terisi penuh"</string>
+    <string name="keyguard_plugged_in_wireless" msgid="3004717438401575235">"<xliff:g id="PERCENTAGE">%s</xliff:g> • Mengisi Daya Secara Nirkabel"</string>
     <string name="keyguard_plugged_in" msgid="3161102098900158923">"<xliff:g id="PERCENTAGE">%s</xliff:g> • Mengisi daya"</string>
     <string name="keyguard_plugged_in_charging_fast" msgid="3684592786276709342">"<xliff:g id="PERCENTAGE">%s</xliff:g> • Mengisi daya dengan cepat"</string>
     <string name="keyguard_plugged_in_charging_slowly" msgid="509533586841478405">"<xliff:g id="PERCENTAGE">%s</xliff:g> • Mengisi daya dengan lambat"</string>
@@ -150,7 +151,10 @@
       <item quantity="other">SIM kini dinonaktifkan. Masukkan kode PUK untuk melanjutkan. Tersisa <xliff:g id="_NUMBER_1">%d</xliff:g> percobaan sebelum SIM tidak dapat digunakan secara permanen. Hubungi operator untuk mengetahui detailnya.</item>
       <item quantity="one">SIM kini dinonaktifkan. Masukkan kode PUK untuk melanjutkan. Tersisa <xliff:g id="_NUMBER_0">%d</xliff:g> percobaan sebelum SIM tidak dapat digunakan secara permanen. Hubungi operator untuk mengetahui detailnya.</item>
     </plurals>
-    <string name="type_clock_header" msgid="4786545441902447636">"Pukul"</string>
+    <plurals name="type_clock_header" formatted="false" msgid="6782840450655632763">
+      <item quantity="other">"<annotation name="color">"Pukul"</annotation>\n"^1\n^2</item>
+      <item quantity="one">"<annotation name="color">"Pukul"</annotation>\n"^1\n^2</item>
+    </plurals>
   <string-array name="type_clock_hours">
     <item msgid="3543074812389379830">"Dua Belas"</item>
     <item msgid="7389464214252023751">"Satu"</item>
@@ -167,15 +171,15 @@
   </string-array>
   <string-array name="type_clock_minutes">
     <item msgid="8322049385467207985">"Tepat"</item>
-    <item msgid="8837126587669001578">"Satu"</item>
-    <item msgid="4294343372940455660">"Dua"</item>
-    <item msgid="7129166637707421536">"Tiga"</item>
-    <item msgid="7579404865008788673">"Empat"</item>
-    <item msgid="3873924689207380586">"Lima"</item>
-    <item msgid="4849565597850069377">"Enam"</item>
-    <item msgid="4404219424523572364">"Tujuh"</item>
-    <item msgid="8740481214764087329">"Delapan"</item>
-    <item msgid="1713216865806811237">"Sembilan"</item>
+    <item msgid="2091812961809760681">"Oh Satu"</item>
+    <item msgid="1496435384877290709">"Oh Dua"</item>
+    <item msgid="881846472976674129">"Oh Tiga"</item>
+    <item msgid="2784477043911540584">"Oh Empat"</item>
+    <item msgid="1610928853656700614">"Oh Lima"</item>
+    <item msgid="2317806244043886658">"Oh Enam"</item>
+    <item msgid="3318687539120971327">"Oh Tujuh"</item>
+    <item msgid="5701600693712102348">"Oh Delapan"</item>
+    <item msgid="3247381605947372495">"Oh Sembilan"</item>
     <item msgid="3508406095411245038">"Sepuluh"</item>
     <item msgid="7161996337755311711">"Sebelas"</item>
     <item msgid="4044549963329624197">"Dua Belas"</item>

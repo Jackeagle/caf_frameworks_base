@@ -34,6 +34,7 @@
     <string name="keyguard_password_wrong_pin_code" msgid="6535018036285012028">"PIN-код туура эмес."</string>
     <string name="keyguard_sim_error_message_short" msgid="592109500618448312">"SIM-карта жараксыз."</string>
     <string name="keyguard_charged" msgid="3316115607283493413">"Толук кубатталды"</string>
+    <string name="keyguard_plugged_in_wireless" msgid="3004717438401575235">"<xliff:g id="PERCENTAGE">%s</xliff:g> • Зымсыз кубатталууда"</string>
     <string name="keyguard_plugged_in" msgid="3161102098900158923">"<xliff:g id="PERCENTAGE">%s</xliff:g> • Кубатталууда"</string>
     <string name="keyguard_plugged_in_charging_fast" msgid="3684592786276709342">"<xliff:g id="PERCENTAGE">%s</xliff:g> • Тез кубатталууда"</string>
     <string name="keyguard_plugged_in_charging_slowly" msgid="509533586841478405">"<xliff:g id="PERCENTAGE">%s</xliff:g> • Жай кубатталууда"</string>
@@ -150,7 +151,10 @@
       <item quantity="other">SIM-карта азыр жарактан чыкты. Улантуу үчүн PUK-кодду киргизиңиз. SIM-картанын биротоло жарактан чыгарына <xliff:g id="_NUMBER_1">%d</xliff:g> аракет калды. Чоо-жайын билүү үчүн байланыш операторуна кайрылыңыз.</item>
       <item quantity="one">SIM-карта азыр жарактан чыкты. Улантуу үчүн PUK-кодду киргизиңиз. SIM-картанын биротоло жарактан чыгаарына <xliff:g id="_NUMBER_0">%d</xliff:g> аракет калды. Чоо-жайын билүү үчүн байланыш операторуна кайрылыңыз.</item>
     </plurals>
-    <string name="type_clock_header" msgid="4786545441902447636">"Саат"</string>
+    <plurals name="type_clock_header" formatted="false" msgid="6782840450655632763">
+      <item quantity="other">"<annotation name="color">"–"</annotation>\n"^1\n^2</item>
+      <item quantity="one">"<annotation name="color">"–"</annotation>\n"^1\n^2</item>
+    </plurals>
   <string-array name="type_clock_hours">
     <item msgid="3543074812389379830">"Он эки"</item>
     <item msgid="7389464214252023751">"Бир"</item>
@@ -167,15 +171,15 @@
   </string-array>
   <string-array name="type_clock_minutes">
     <item msgid="8322049385467207985">"Саат"</item>
-    <item msgid="8837126587669001578">"Ноль бир"</item>
-    <item msgid="4294343372940455660">"Ноль эки"</item>
-    <item msgid="7129166637707421536">"Ноль үч"</item>
-    <item msgid="7579404865008788673">"Ноль төрт"</item>
-    <item msgid="3873924689207380586">"Ноль беш"</item>
-    <item msgid="4849565597850069377">"Ноль алты"</item>
-    <item msgid="4404219424523572364">"Ноль жети"</item>
-    <item msgid="8740481214764087329">"Ноль сегиз"</item>
-    <item msgid="1713216865806811237">"Ноль тогуз"</item>
+    <item msgid="2091812961809760681">"Ноль бир"</item>
+    <item msgid="1496435384877290709">"Ноль эки"</item>
+    <item msgid="881846472976674129">"Ноль үч"</item>
+    <item msgid="2784477043911540584">"Ноль төрт"</item>
+    <item msgid="1610928853656700614">"Ноль беш"</item>
+    <item msgid="2317806244043886658">"Ноль алты"</item>
+    <item msgid="3318687539120971327">"Ноль жети"</item>
+    <item msgid="5701600693712102348">"Ноль сегиз"</item>
+    <item msgid="3247381605947372495">"Ноль тогуз"</item>
     <item msgid="3508406095411245038">"Он"</item>
     <item msgid="7161996337755311711">"Он бир"</item>
     <item msgid="4044549963329624197">"Он эки"</item>

@@ -33,6 +33,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
 import android.content.pm.UserInfo;
+import android.os.UserHandle;
 import android.os.UserManager;
 import android.util.IntArray;
 import android.util.Xml;
@@ -113,10 +114,10 @@ public class NotificationAssistantsTest extends UiServiceTestCase {
 
     @Test
     public void testXmlUpgrade() {
-        mAssistants.ensureAssistant();
+        mAssistants.resetDefaultAssistantsIfNecessary();
 
         //once per user
-        verify(mNm, times(mUm.getUsers().size())).readDefaultAssistant(anyInt());
+        verify(mNm, times(mUm.getUsers().size())).setDefaultAssistantForUser(anyInt());
     }
 
     @Test
@@ -129,9 +130,9 @@ public class NotificationAssistantsTest extends UiServiceTestCase {
         parser.setInput(new BufferedInputStream(
                 new ByteArrayInputStream(xml.toString().getBytes())), null);
         parser.nextTag();
-        mAssistants.readXml(parser, null);
+        mAssistants.readXml(parser, null, false, UserHandle.USER_ALL);
 
-        verify(mNm, never()).readDefaultAssistant(anyInt());
+        verify(mNm, never()).setDefaultAssistantForUser(anyInt());
         verify(mAssistants, times(1)).addApprovedList(
                 new ComponentName("b", "b").flattenToString(),10, true);
     }
@@ -142,13 +143,13 @@ public class NotificationAssistantsTest extends UiServiceTestCase {
         ComponentName component2 = ComponentName.unflattenFromString("package/Component2");
         mAssistants.setPackageOrComponentEnabled(component1.flattenToString(), mZero.id, true,
                 true);
-        verify(mINm, never()).setNotificationAssistantAccessGrantedForUser(any(ComponentName.class),
-                eq(mZero.id), anyBoolean());
+        verify(mNm, never()).setNotificationAssistantAccessGrantedForUserInternal(
+                any(ComponentName.class), eq(mZero.id), anyBoolean());
 
         mAssistants.setPackageOrComponentEnabled(component2.flattenToString(), mZero.id, true,
                 true);
-        verify(mINm, times(1)).setNotificationAssistantAccessGrantedForUser(component1, mZero.id,
-                false);
+        verify(mNm, times(1)).setNotificationAssistantAccessGrantedForUserInternal(
+                component1, mZero.id, false);
     }
 
     @Test
@@ -158,7 +159,7 @@ public class NotificationAssistantsTest extends UiServiceTestCase {
                 true);
         mAssistants.setPackageOrComponentEnabled(component1.flattenToString(), mZero.id, true,
                 true);
-        verify(mINm, never()).setNotificationAssistantAccessGrantedForUser(any(ComponentName.class),
-                eq(mZero.id), anyBoolean());
+        verify(mNm, never()).setNotificationAssistantAccessGrantedForUserInternal(
+                any(ComponentName.class), eq(mZero.id), anyBoolean());
     }
 }

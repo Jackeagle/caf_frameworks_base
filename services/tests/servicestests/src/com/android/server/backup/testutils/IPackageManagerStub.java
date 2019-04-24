@@ -213,7 +213,8 @@ public class IPackageManagerStub implements IPackageManager {
 
     @Override
     public void updatePermissionFlags(String permissionName, String packageName, int flagMask,
-        int flagValues, int userId) throws RemoteException {
+            int flagValues, boolean checkAdjustPolicyFlagPermission, int userId)
+            throws RemoteException {
 
     }
 
@@ -221,6 +222,24 @@ public class IPackageManagerStub implements IPackageManager {
     public void updatePermissionFlagsForAllApps(int flagMask, int flagValues, int userId)
         throws RemoteException {
 
+    }
+
+    @Override
+    public List<String> getWhitelistedRestrictedPermissions(String packageName, int flags,
+            int userId) throws RemoteException {
+        return null;
+    }
+
+    @Override
+    public boolean addWhitelistedRestrictedPermission(String packageName, String permission,
+            int whitelistFlags, int userId) throws RemoteException {
+        return false;
+    }
+
+    @Override
+    public boolean removeWhitelistedRestrictedPermission(String packageName, String permission,
+            int whitelistFlags, int userId) throws RemoteException {
+        return false;
     }
 
     @Override
@@ -556,16 +575,6 @@ public class IPackageManagerStub implements IPackageManager {
     }
 
     @Override
-    public byte[] getPermissionGrantBackup(int userId) throws RemoteException {
-        return new byte[0];
-    }
-
-    @Override
-    public void restorePermissionGrants(byte[] backup, int userId) throws RemoteException {
-
-    }
-
-    @Override
     public ComponentName getHomeActivities(List<ResolveInfo> outHomeCandidates)
         throws RemoteException {
         return null;
@@ -867,7 +876,7 @@ public class IPackageManagerStub implements IPackageManager {
     }
 
     @Override
-    public boolean isUpgrade() throws RemoteException {
+    public boolean isDeviceUpgrading() throws RemoteException {
         return false;
     }
 
@@ -1077,6 +1086,12 @@ public class IPackageManagerStub implements IPackageManager {
     }
 
     @Override
+    public ParceledListSlice getDeclaredSharedLibraries(String packageName, int flags, int userId)
+            throws RemoteException {
+        return null;
+    }
+
+    @Override
     public boolean canRequestPackageInstalls(String packageName, int userId)
         throws RemoteException {
         return false;
@@ -1147,7 +1162,12 @@ public class IPackageManagerStub implements IPackageManager {
     }
 
     @Override
-    public String getContentCaptureServicePackageName() throws RemoteException {
+    public String getSystemCaptionsServicePackageName() throws RemoteException {
+        return null;
+    }
+
+    @Override
+    public String getAttentionServicePackageName() throws RemoteException {
         return null;
     }
 
@@ -1178,6 +1198,16 @@ public class IPackageManagerStub implements IPackageManager {
     @Override
     public ModuleInfo getModuleInfo(String packageName, int flags) throws RemoteException {
         return null;
+    }
+
+    @Override
+    public int getRuntimePermissionsVersion(int userId) throws RemoteException {
+        return 0;
+    }
+
+    @Override
+    public void setRuntimePermissionsVersion(int version, int userId) throws RemoteException {
+
     }
 
     @Override

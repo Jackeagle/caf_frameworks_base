@@ -24,6 +24,7 @@ import android.service.notification.StatusBarNotification;
 import android.hardware.biometrics.IBiometricServiceReceiverInternal;
 
 import com.android.internal.statusbar.IStatusBar;
+import com.android.internal.statusbar.RegisterStatusBarResult;
 import com.android.internal.statusbar.StatusBarIcon;
 import com.android.internal.statusbar.StatusBarIconList;
 import com.android.internal.statusbar.NotificationVisibility;
@@ -31,16 +32,21 @@ import com.android.internal.statusbar.NotificationVisibility;
 /** @hide */
 interface IStatusBarService
 {
+    @UnsupportedAppUsage
     void expandNotificationsPanel();
+    @UnsupportedAppUsage
     void collapsePanels();
     void togglePanel();
+    @UnsupportedAppUsage
     void disable(int what, IBinder token, String pkg);
     void disableForUser(int what, IBinder token, String pkg, int userId);
     void disable2(int what, IBinder token, String pkg);
     void disable2ForUser(int what, IBinder token, String pkg, int userId);
     int[] getDisableFlags(IBinder token, int userId);
     void setIcon(String slot, String iconPackage, int iconId, int iconLevel, String contentDescription);
+    @UnsupportedAppUsage
     void setIconVisibility(String slot, boolean visible);
+    @UnsupportedAppUsage
     void removeIcon(String slot);
     // TODO(b/117478341): support back button change when IME is showing on a external display.
     void setImeWindowStatus(in IBinder token, int vis, int backDisposition,
@@ -49,10 +55,7 @@ interface IStatusBarService
 
     // ---- Methods below are for use by the status bar policy services ----
     // You need the STATUS_BAR_SERVICE permission
-    void registerStatusBar(IStatusBar callbacks, out List<String> iconSlots,
-            out List<StatusBarIcon> iconList,
-            out int[] switches, out List<IBinder> binders, out Rect fullscreenStackBounds,
-            out Rect dockedStackBounds);
+    RegisterStatusBarResult registerStatusBar(IStatusBar callbacks);
     void onPanelRevealed(boolean clearNotificationEffects, int numItems);
     void onPanelHidden();
     // Mark current notifications as "seen" and stop ringing, vibrating, blinking.
@@ -69,8 +72,9 @@ interface IStatusBarService
     void onNotificationExpansionChanged(in String key, in boolean userAction, in boolean expanded, in int notificationLocation);
     void onNotificationDirectReplied(String key);
     void onNotificationSmartSuggestionsAdded(String key, int smartReplyCount, int smartActionCount,
-            boolean generatedByAsssistant);
-    void onNotificationSmartReplySent(in String key, in int replyIndex, in CharSequence reply, boolean generatedByAssistant, in int notificationLocation);
+            boolean generatedByAsssistant, boolean editBeforeSending);
+    void onNotificationSmartReplySent(in String key, in int replyIndex, in CharSequence reply,
+            in int notificationLocation, boolean modifiedBeforeSending);
     void onNotificationSettingsViewed(String key);
     void setSystemUiVisibility(int displayId, int vis, int mask, String cause);
 
@@ -86,6 +90,7 @@ interface IStatusBarService
     void addTile(in ComponentName tile);
     void remTile(in ComponentName tile);
     void clickTile(in ComponentName tile);
+    @UnsupportedAppUsage
     void handleSystemKey(in int key);
 
     /**

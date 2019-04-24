@@ -29,7 +29,6 @@ import android.util.Log;
 import android.util.Pair;
 
 import java.io.FileDescriptor;
-import java.io.IOException;
 import java.math.BigInteger;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
@@ -50,30 +49,16 @@ public class NetworkUtils {
     private static final String TAG = "NetworkUtils";
 
     /**
-     * Attaches a socket filter that accepts DHCP packets to the given socket.
+     * Attaches a socket filter that drops all of incoming packets.
+     * @param fd the socket's {@link FileDescriptor}.
      */
-    @UnsupportedAppUsage
-    public native static void attachDhcpFilter(FileDescriptor fd) throws SocketException;
+    public static native void attachDropAllBPFFilter(FileDescriptor fd) throws SocketException;
 
     /**
-     * Attaches a socket filter that accepts ICMPv6 router advertisements to the given socket.
+     * Detaches a socket filter.
      * @param fd the socket's {@link FileDescriptor}.
-     * @param packetType the hardware address type, one of ARPHRD_*.
      */
-    @UnsupportedAppUsage
-    public native static void attachRaFilter(FileDescriptor fd, int packetType) throws SocketException;
-
-    /**
-     * Attaches a socket filter that accepts L2-L4 signaling traffic required for IP connectivity.
-     *
-     * This includes: all ARP, ICMPv6 RS/RA/NS/NA messages, and DHCPv4 exchanges.
-     *
-     * @param fd the socket's {@link FileDescriptor}.
-     * @param packetType the hardware address type, one of ARPHRD_*.
-     */
-    @UnsupportedAppUsage
-    public native static void attachControlPacketFilter(FileDescriptor fd, int packetType)
-            throws SocketException;
+    public static native void detachBPFFilter(FileDescriptor fd) throws SocketException;
 
     /**
      * Configures a socket for receiving ICMPv6 router solicitations and sending advertisements.
@@ -165,15 +150,19 @@ public class NetworkUtils {
     public static native byte[] resNetworkResult(FileDescriptor fd) throws ErrnoException;
 
     /**
-     * Add an entry into the ARP cache.
+     * DNS resolver series jni method.
+     * Attempts to cancel the in-progress query associated with the {@code fd}.
      */
-    public static void addArpEntry(Inet4Address ipv4Addr, MacAddress ethAddr, String ifname,
-            FileDescriptor fd) throws IOException {
-        addArpEntry(ethAddr.toByteArray(), ipv4Addr.getAddress(), ifname, fd);
-    }
+    public static native void resNetworkCancel(FileDescriptor fd);
 
-    private static native void addArpEntry(byte[] ethAddr, byte[] netAddr, String ifname,
-            FileDescriptor fd) throws IOException;
+    /**
+     * Get the tcp repair window associated with the {@code fd}.
+     *
+     * @param fd the tcp socket's {@link FileDescriptor}.
+     * @return a {@link TcpRepairWindow} object indicates tcp window size.
+     */
+    public static native TcpRepairWindow getTcpRepairWindow(FileDescriptor fd)
+            throws ErrnoException;
 
     /**
      * @see Inet4AddressUtils#intToInet4AddressHTL(int)

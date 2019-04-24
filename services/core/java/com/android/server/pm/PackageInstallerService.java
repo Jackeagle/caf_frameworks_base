@@ -27,11 +27,10 @@ import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PackageDeleteObserver;
 import android.app.PackageInstallObserver;
+import android.app.admin.DevicePolicyEventLogger;
 import android.app.admin.DevicePolicyManagerInternal;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.IntentSender;
 import android.content.IntentSender.SendIntentException;
 import android.content.pm.ApplicationInfo;
@@ -61,6 +60,7 @@ import android.os.RemoteException;
 import android.os.SELinux;
 import android.os.UserManager;
 import android.os.storage.StorageManager;
+import android.stats.devicepolicy.DevicePolicyEnums;
 import android.system.ErrnoException;
 import android.system.Os;
 import android.text.TextUtils;
@@ -84,7 +84,7 @@ import com.android.internal.util.ImageUtils;
 import com.android.internal.util.IndentingPrintWriter;
 import com.android.server.IoThread;
 import com.android.server.LocalServices;
-import com.android.server.pm.permission.PermissionManagerInternal;
+import com.android.server.pm.permission.PermissionManagerServiceInternal;
 
 import libcore.io.IoUtils;
 
@@ -123,6 +123,8 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
 
     /** Automatically destroy sessions older than this */
     private static final long MAX_AGE_MILLIS = 3 * DateUtils.DAY_IN_MILLIS;
+    /** Automatically destroy staged sessions that have not changed state in this time */
+    private static final long MAX_TIME_SINCE_UPDATE_MILLIS = 7 * DateUtils.DAY_IN_MILLIS;
     /** Upper bound on number of active sessions for a UID */
     private static final long MAX_ACTIVE_SESSIONS = 1024;
     /** Upper bound on number of historical sessions for a UID */
@@ -130,8 +132,9 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
 
     private final Context mContext;
     private final PackageManagerService mPm;
+    private final ApexManager mApexManager;
     private final StagingManager mStagingManager;
-    private final PermissionManagerInternal mPermissionManager;
+    private final PermissionManagerServiceInternal mPermissionManager;
 
     private AppOpsManager mAppOps;
 
@@ -140,7 +143,7 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
 
     private final Callbacks mCallbacks;
 
-    private volatile boolean mBootCompleted = false;
+    private volatile boolean mOkToSendBroadcasts = false;
 
     /**
      * File storing persisted {@link #mSessions} metadata.
@@ -186,10 +189,10 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
         }
     };
 
-    public PackageInstallerService(Context context, PackageManagerService pm) {
+    public PackageInstallerService(Context context, PackageManagerService pm, ApexManager am) {
         mContext = context;
         mPm = pm;
-        mPermissionManager = LocalServices.getService(PermissionManagerInternal.class);
+        mPermissionManager = LocalServices.getService(PermissionManagerServiceInternal.class);
 
         mInstallThread = new HandlerThread(TAG);
         mInstallThread.start();
@@ -204,27 +207,18 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
         mSessionsDir = new File(Environment.getDataSystemDirectory(), "install_sessions");
         mSessionsDir.mkdirs();
 
-        mStagingManager = new StagingManager(pm, this);
+        mApexManager = am;
+
+        mStagingManager = new StagingManager(this, am, context);
     }
 
-    private void setBootCompleted()  {
-        mBootCompleted = true;
-    }
-
-    boolean isBootCompleted()  {
-        return mBootCompleted;
+    boolean okToSendBroadcasts()  {
+        return mOkToSendBroadcasts;
     }
 
     public void systemReady() {
         mAppOps = mContext.getSystemService(AppOpsManager.class);
 
-        mContext.registerReceiver(new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                setBootCompleted();
-                mContext.unregisterReceiver(this);
-            }
-        }, new IntentFilter(Intent.ACTION_BOOT_COMPLETED));
         synchronized (mSessions) {
             readSessionsLocked();
 
@@ -267,6 +261,16 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
         for (PackageInstallerSession session : stagedSessionsToRestore) {
             mStagingManager.restoreSession(session);
         }
+        // Broadcasts are not sent while we restore sessions on boot, since no processes would be
+        // ready to listen to them. From now on, we greedily assume that broadcasts requests are
+        // safe to send out. The worst that can happen is that a broadcast is attempted before
+        // ActivityManagerService completes its own systemReady(), in which case it will be rejected
+        // with an otherwise harmless exception.
+        // A more appropriate way to do this would be to wait until the correct  boot phase is
+        // reached, but since we are not a SystemService we can't override onBootPhase.
+        // Waiting on the BOOT_COMPLETED broadcast can take several minutes, so that's not a viable
+        // way either.
+        mOkToSendBroadcasts = true;
     }
 
     @GuardedBy("mSessions")
@@ -355,11 +359,19 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
                         }
 
                         final long age = System.currentTimeMillis() - session.createdMillis;
-
+                        final long timeSinceUpdate =
+                                System.currentTimeMillis() - session.getUpdatedMillis();
                         final boolean valid;
-                        if (age >= MAX_AGE_MILLIS) {
-                            Slog.w(TAG, "Abandoning old session first created at "
-                                    + session.createdMillis);
+                        if (session.isStaged()) {
+                            if (timeSinceUpdate >= MAX_TIME_SINCE_UPDATE_MILLIS
+                                    && session.isStagedAndInTerminalState()) {
+                                valid = false;
+                            } else {
+                                valid = true;
+                            }
+                        } else if (age >= MAX_AGE_MILLIS) {
+                            Slog.w(TAG, "Abandoning old session created at "
+                                        + session.createdMillis);
                             valid = false;
                         } else {
                             valid = true;
@@ -383,6 +395,11 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
             Slog.wtf(TAG, "Failed reading install sessions", e);
         } finally {
             IoUtils.closeQuietly(fis);
+        }
+        // After all of the sessions were loaded, they are ready to be sealed and validated
+        for (int i = 0; i < mSessions.size(); ++i) {
+            PackageInstallerSession session = mSessions.valueAt(i);
+            session.sealAndValidateIfNecessary();
         }
     }
 
@@ -481,6 +498,29 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
             }
         }
 
+        if (Build.IS_DEBUGGABLE || isDowngradeAllowedForCaller(callingUid)) {
+            params.installFlags |= PackageManager.INSTALL_ALLOW_DOWNGRADE;
+        } else {
+            params.installFlags &= ~PackageManager.INSTALL_ALLOW_DOWNGRADE;
+            params.installFlags &= ~PackageManager.INSTALL_REQUEST_DOWNGRADE;
+        }
+
+        boolean isApex = (params.installFlags & PackageManager.INSTALL_APEX) != 0;
+        if (params.isStaged || isApex) {
+            mContext.enforceCallingOrSelfPermission(Manifest.permission.INSTALL_PACKAGES, TAG);
+        }
+
+        if (isApex) {
+            if (!mApexManager.isApexSupported()) {
+                throw new IllegalArgumentException(
+                    "This device doesn't support the installation of APEX files");
+            }
+            if (!params.isStaged) {
+                throw new IllegalArgumentException(
+                    "APEX files can only be installed as part of a staged session.");
+            }
+        }
+
         if (!params.isMultiPackage) {
             // Only system components can circumvent runtime permissions when installing.
             if ((params.installFlags & PackageManager.INSTALL_GRANT_RUNTIME_PERMISSIONS) != 0
@@ -489,6 +529,16 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
                 throw new SecurityException("You need the "
                         + "android.permission.INSTALL_GRANT_RUNTIME_PERMISSIONS permission "
                         + "to use the PackageManager.INSTALL_GRANT_RUNTIME_PERMISSIONS flag");
+            }
+
+            // Only system components can circumvent restricted whitelisting when installing.
+            if ((params.installFlags
+                    & PackageManager.INSTALL_ALL_WHITELIST_RESTRICTED_PERMISSIONS) != 0
+                    && mContext.checkCallingOrSelfPermission(Manifest.permission
+                    .WHITELIST_RESTRICTED_PERMISSIONS) == PackageManager.PERMISSION_DENIED) {
+                throw new SecurityException("You need the "
+                        + "android.permission.WHITELIST_RESTRICTED_PERMISSIONS permission to"
+                        + " use the PackageManager.INSTALL_WHITELIST_RESTRICTED_PERMISSIONS flag");
             }
 
             // Defensively resize giant app icons
@@ -567,8 +617,8 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
         session = new PackageInstallerSession(mInternalCallback, mContext, mPm, this,
                 mInstallThread.getLooper(), mStagingManager, sessionId, userId,
                 installerPackageName, callingUid, params, createdMillis, stageDir, stageCid, false,
-                false, null, SessionInfo.INVALID_ID, false, false, false, SessionInfo.NO_ERROR,
-                "");
+                false, false, null, SessionInfo.INVALID_ID, false, false, false,
+                SessionInfo.STAGED_SESSION_NO_ERROR, "");
 
         synchronized (mSessions) {
             mSessions.put(sessionId, session);
@@ -580,6 +630,11 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
         mCallbacks.notifySessionCreated(session.sessionId, session.userId);
         writeSessionsAsync();
         return sessionId;
+    }
+
+    private boolean isDowngradeAllowedForCaller(int callingUid) {
+        return callingUid == Process.SYSTEM_UID || callingUid == Process.ROOT_UID
+                || callingUid == Process.SHELL_UID;
     }
 
     @Override
@@ -788,6 +843,10 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
             } finally {
                 Binder.restoreCallingIdentity(ident);
             }
+            DevicePolicyEventLogger
+                    .createEvent(DevicePolicyEnums.UNINSTALL_PACKAGE)
+                    .setAdmin(callerPackageName)
+                    .write();
         } else {
             ApplicationInfo appInfo = mPm.getApplicationInfo(callerPackageName, 0, userId);
             if (appInfo.targetSdkVersion >= Build.VERSION_CODES.P) {
@@ -801,6 +860,13 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
             intent.putExtra(PackageInstaller.EXTRA_CALLBACK, adapter.getBinder().asBinder());
             adapter.onUserActionRequired(intent);
         }
+    }
+
+    @Override
+    public void installExistingPackage(String packageName, int installFlags, int installReason,
+            IntentSender statusReceiver, int userId) {
+        mPm.installExistingPackageAsUser(packageName, userId, installFlags, installReason,
+                statusReceiver);
     }
 
     @Override
@@ -1161,8 +1227,9 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
         }
 
         public void onStagedSessionChanged(PackageInstallerSession session) {
+            session.markUpdated();
             writeSessionsAsync();
-            if (mBootCompleted) {
+            if (mOkToSendBroadcasts) {
                 mPm.sendSessionUpdatedBroadcast(session.generateInfo(false),
                         session.userId);
             }

@@ -97,7 +97,6 @@ import android.app.servertransaction.LaunchActivityItem;
 import android.app.servertransaction.PauseActivityItem;
 import android.app.servertransaction.ResumeActivityItem;
 import android.content.ComponentName;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
@@ -171,15 +170,20 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
     // How long we can hold the launch wake lock before giving up.
     static final int LAUNCH_TIMEOUT = 10 * 1000;
 
+    /** How long we wait until giving up on the activity telling us it released the top state. */
+    static final int TOP_RESUMED_STATE_LOSS_TIMEOUT = 500;
+
     static final int IDLE_TIMEOUT_MSG = FIRST_SUPERVISOR_STACK_MSG;
     static final int IDLE_NOW_MSG = FIRST_SUPERVISOR_STACK_MSG + 1;
     static final int RESUME_TOP_ACTIVITY_MSG = FIRST_SUPERVISOR_STACK_MSG + 2;
     static final int SLEEP_TIMEOUT_MSG = FIRST_SUPERVISOR_STACK_MSG + 3;
     static final int LAUNCH_TIMEOUT_MSG = FIRST_SUPERVISOR_STACK_MSG + 4;
     static final int LAUNCH_TASK_BEHIND_COMPLETE = FIRST_SUPERVISOR_STACK_MSG + 12;
+    static final int RESTART_ACTIVITY_PROCESS_TIMEOUT_MSG = FIRST_SUPERVISOR_STACK_MSG + 13;
     static final int REPORT_MULTI_WINDOW_MODE_CHANGED_MSG = FIRST_SUPERVISOR_STACK_MSG + 14;
     static final int REPORT_PIP_MODE_CHANGED_MSG = FIRST_SUPERVISOR_STACK_MSG + 15;
     static final int REPORT_HOME_CHANGED_MSG = FIRST_SUPERVISOR_STACK_MSG + 16;
+    static final int TOP_RESUMED_STATE_LOSS_TIMEOUT_MSG = FIRST_SUPERVISOR_STACK_MSG + 17;
 
     // Used to indicate that windows of activities should be preserved during the resize.
     static final boolean PRESERVE_WINDOWS = true;
@@ -264,12 +268,6 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
      */
     private final SparseIntArray mCurTaskIdForUser = new SparseIntArray(20);
 
-    /** List of activities that are waiting for a new activity to become visible before completing
-     * whatever operation they are supposed to do. */
-    // TODO: Remove mActivitiesWaitingForVisibleActivity list and just remove activity from
-    // mStoppingActivities when something else comes up.
-    final ArrayList<ActivityRecord> mActivitiesWaitingForVisibleActivity = new ArrayList<>();
-
     /** List of processes waiting to find out when a specific activity becomes visible. */
     private final ArrayList<WaitInfo> mWaitingForActivityVisible = new ArrayList<>();
 
@@ -301,6 +299,18 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
      */
     final ArrayList<ActivityRecord> mNoAnimActivities = new ArrayList<>();
 
+    /**
+     * Cached value of the topmost resumed activity in the system. Updated when new activity is
+     * resumed.
+     */
+    private ActivityRecord mTopResumedActivity;
+
+    /**
+     * Flag indicating whether we're currently waiting for the previous top activity to handle the
+     * loss of the state and report back before making new activity top resumed.
+     */
+    private boolean mTopResumedActivityWaitingForPrev;
+
     /** The target stack bounds for the picture-in-picture mode changed that we need to report to
      * the application */
     Rect mPipModeChangedTargetStackBounds;
@@ -318,14 +328,14 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
      * receivers to launch an activity and get that to run before the device
      * goes back to sleep.
      */
-    PowerManager.WakeLock mLaunchingActivity;
+    PowerManager.WakeLock mLaunchingActivityWakeLock;
 
     /**
      * Set when the system is going to sleep, until we have
      * successfully paused the current activity and released our wake lock.
      * At that point the system is allowed to actually sleep.
      */
-    PowerManager.WakeLock mGoingToSleep;
+    PowerManager.WakeLock mGoingToSleepWakeLock;
 
     /**
      * Temporary rect used during docked stack resize calculation so we don't need to create a new
@@ -440,8 +450,15 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
     }
 
     void onSystemReady() {
-        mPersisterQueue.startPersisting();
         mLaunchParamsPersister.onSystemReady();
+    }
+
+    void onUserUnlocked(int userId) {
+        // Only start persisting when the first user is unlocked. The method call is
+        // idempotent so there is no side effect to call it again when the second user is
+        // unlocked.
+        mPersisterQueue.startPersisting();
+        mLaunchParamsPersister.onUnlockUser(userId);
     }
 
     public ActivityMetricsLogger getActivityMetricsLogger() {
@@ -467,11 +484,11 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
      * initialized.  So we initialize our wakelocks afterwards.
      */
     void initPowerManagement() {
-        mPowerManager = (PowerManager)mService.mContext.getSystemService(Context.POWER_SERVICE);
-        mGoingToSleep = mPowerManager
+        mPowerManager = mService.mContext.getSystemService(PowerManager.class);
+        mGoingToSleepWakeLock = mPowerManager
                 .newWakeLock(PARTIAL_WAKE_LOCK, "ActivityManager-Sleep");
-        mLaunchingActivity = mPowerManager.newWakeLock(PARTIAL_WAKE_LOCK, "*launch*");
-        mLaunchingActivity.setReferenceCounted(false);
+        mLaunchingActivityWakeLock = mPowerManager.newWakeLock(PARTIAL_WAKE_LOCK, "*launch*");
+        mLaunchingActivityWakeLock.setReferenceCounted(false);
     }
 
     void setWindowManager(WindowManagerService wm) {
@@ -535,20 +552,11 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
         // This could happen, for example, if we are trimming activities
         // down to the max limit while they are still waiting to finish.
         mFinishingActivities.remove(r);
-        mActivitiesWaitingForVisibleActivity.remove(r);
 
-        for (int i = mWaitingForActivityVisible.size() - 1; i >= 0; --i) {
-            if (mWaitingForActivityVisible.get(i).matches(r.mActivityComponent)) {
-                mWaitingForActivityVisible.remove(i);
-            }
-        }
+        stopWaitingForActivityVisible(r);
     }
 
-    void reportActivityVisibleLocked(ActivityRecord r) {
-        sendWaitingVisibleReportLocked(r);
-    }
-
-    void sendWaitingVisibleReportLocked(ActivityRecord r) {
+    void stopWaitingForActivityVisible(ActivityRecord r) {
         boolean changed = false;
         for (int i = mWaitingForActivityVisible.size() - 1; i >= 0; --i) {
             final WaitInfo w = mWaitingForActivityVisible.get(i);
@@ -845,7 +853,6 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
 
                 // Schedule transaction.
                 mService.getLifecycleManager().scheduleTransaction(clientTransaction);
-                mRootActivityContainer.updateTopResumedActivityIfNeeded();
 
                 if ((proc.mInfo.privateFlags & ApplicationInfo.PRIVATE_FLAG_CANT_SAVE_STATE) != 0
                         && mService.mHasHeavyWeightFeature) {
@@ -979,12 +986,20 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
             r.notifyUnknownVisibilityLaunched();
         }
 
-        // Post message to start process to avoid possible deadlock of calling into AMS with the
-        // ATMS lock held.
-        final Message msg = PooledLambda.obtainMessage(
-                ActivityManagerInternal::startProcess, mService.mAmInternal, r.processName,
-                r.info.applicationInfo, knownToBeDead, "activity", r.intent.getComponent());
-        mService.mH.sendMessage(msg);
+        try {
+            if (Trace.isTagEnabled(TRACE_TAG_ACTIVITY_MANAGER)) {
+                Trace.traceBegin(TRACE_TAG_ACTIVITY_MANAGER, "dispatchingStartProcess:"
+                        + r.processName);
+            }
+            // Post message to start process to avoid possible deadlock of calling into AMS with the
+            // ATMS lock held.
+            final Message msg = PooledLambda.obtainMessage(
+                    ActivityManagerInternal::startProcess, mService.mAmInternal, r.processName,
+                    r.info.applicationInfo, knownToBeDead, "activity", r.intent.getComponent());
+            mService.mH.sendMessage(msg);
+        } finally {
+            Trace.traceEnd(TRACE_TAG_ACTIVITY_MANAGER);
+        }
     }
 
     boolean checkStartAnyActivityPermission(Intent intent, ActivityInfo aInfo, String resultWho,
@@ -1206,14 +1221,14 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
     }
 
     void setLaunchSource(int uid) {
-        mLaunchingActivity.setWorkSource(new WorkSource(uid));
+        mLaunchingActivityWakeLock.setWorkSource(new WorkSource(uid));
     }
 
     void acquireLaunchWakelock() {
         if (VALIDATE_WAKE_LOCK_CALLER && Binder.getCallingUid() != Process.myUid()) {
             throw new IllegalStateException("Calling must be system uid");
         }
-        mLaunchingActivity.acquire();
+        mLaunchingActivityWakeLock.acquire();
         if (!mHandler.hasMessages(LAUNCH_TIMEOUT_MSG)) {
             // To be safe, don't allow the wake lock to be held for too long.
             mHandler.sendEmptyMessageDelayed(LAUNCH_TIMEOUT_MSG, LAUNCH_TIMEOUT);
@@ -1295,13 +1310,13 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
                 mService.scheduleAppGcsLocked();
             }
 
-            if (mLaunchingActivity.isHeld()) {
+            if (mLaunchingActivityWakeLock.isHeld()) {
                 mHandler.removeMessages(LAUNCH_TIMEOUT_MSG);
                 if (VALIDATE_WAKE_LOCK_CALLER &&
                         Binder.getCallingUid() != Process.myUid()) {
                     throw new IllegalStateException("Calling must be system uid");
                 }
-                mLaunchingActivity.release();
+                mLaunchingActivityWakeLock.release();
             }
             mRootActivityContainer.ensureActivitiesVisible(null, 0, !PRESERVE_WINDOWS);
         }
@@ -1965,13 +1980,13 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
 
     void goingToSleepLocked() {
         scheduleSleepTimeout();
-        if (!mGoingToSleep.isHeld()) {
-            mGoingToSleep.acquire();
-            if (mLaunchingActivity.isHeld()) {
+        if (!mGoingToSleepWakeLock.isHeld()) {
+            mGoingToSleepWakeLock.acquire();
+            if (mLaunchingActivityWakeLock.isHeld()) {
                 if (VALIDATE_WAKE_LOCK_CALLER && Binder.getCallingUid() != Process.myUid()) {
                     throw new IllegalStateException("Calling must be system uid");
                 }
-                mLaunchingActivity.release();
+                mLaunchingActivityWakeLock.release();
                 mHandler.removeMessages(LAUNCH_TIMEOUT_MSG);
             }
         }
@@ -2013,8 +2028,8 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
 
     void comeOutOfSleepIfNeededLocked() {
         removeSleepTimeouts();
-        if (mGoingToSleep.isHeld()) {
-            mGoingToSleep.release();
+        if (mGoingToSleepWakeLock.isHeld()) {
+            mGoingToSleepWakeLock.release();
         }
     }
 
@@ -2044,8 +2059,8 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
 
         removeSleepTimeouts();
 
-        if (mGoingToSleep.isHeld()) {
-            mGoingToSleep.release();
+        if (mGoingToSleepWakeLock.isHeld()) {
+            mGoingToSleepWakeLock.release();
         }
         if (mService.mShuttingDown) {
             mService.mGlobalLock.notifyAll();
@@ -2119,28 +2134,27 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
         final boolean nowVisible = mRootActivityContainer.allResumedActivitiesVisible();
         for (int activityNdx = mStoppingActivities.size() - 1; activityNdx >= 0; --activityNdx) {
             ActivityRecord s = mStoppingActivities.get(activityNdx);
-            boolean waitingVisible = mActivitiesWaitingForVisibleActivity.contains(s);
+
+            final boolean animating = s.mAppWindowToken.isSelfAnimating();
+
             if (DEBUG_STATES) Slog.v(TAG, "Stopping " + s + ": nowVisible=" + nowVisible
-                    + " waitingVisible=" + waitingVisible + " finishing=" + s.finishing);
-            if (waitingVisible && nowVisible) {
-                mActivitiesWaitingForVisibleActivity.remove(s);
-                waitingVisible = false;
-                if (s.finishing) {
-                    // If this activity is finishing, it is sitting on top of
-                    // everyone else but we now know it is no longer needed...
-                    // so get rid of it.  Otherwise, we need to go through the
-                    // normal flow and hide it once we determine that it is
-                    // hidden by the activities in front of it.
-                    if (DEBUG_STATES) Slog.v(TAG, "Before stopping, can hide: " + s);
-                    s.setVisibility(false);
-                }
+                    + " animating=" + animating + " finishing=" + s.finishing);
+            if (nowVisible && s.finishing) {
+
+                // If this activity is finishing, it is sitting on top of
+                // everyone else but we now know it is no longer needed...
+                // so get rid of it.  Otherwise, we need to go through the
+                // normal flow and hide it once we determine that it is
+                // hidden by the activities in front of it.
+                if (DEBUG_STATES) Slog.v(TAG, "Before stopping, can hide: " + s);
+                s.setVisibility(false);
             }
             if (remove) {
                 final ActivityStack stack = s.getActivityStack();
                 final boolean shouldSleepOrShutDown = stack != null
                         ? stack.shouldSleepOrShutDownActivities()
                         : mService.isSleepingOrShuttingDownLocked();
-                if (!waitingVisible || shouldSleepOrShutDown) {
+                if (!animating || shouldSleepOrShutDown) {
                     if (!processPausingActivities && s.isState(PAUSING)) {
                         // Defer processing pausing activities in this iteration and reschedule
                         // a delayed idle to reprocess it again
@@ -2155,9 +2169,6 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
                     }
                     stops.add(s);
 
-                    // Make sure to remove it in all cases in case we entered this block with
-                    // shouldSleepOrShutDown
-                    mActivitiesWaitingForVisibleActivity.remove(s);
                     mStoppingActivities.remove(activityNdx);
                 }
             }
@@ -2289,6 +2300,73 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
         mHandler.sendEmptyMessage(IDLE_NOW_MSG);
     }
 
+    /**
+     * Updates the record of top resumed activity when it changes and handles reporting of the
+     * state changes to previous and new top activities. It will immediately dispatch top resumed
+     * state loss message to previous top activity (if haven't done it already). After the previous
+     * activity releases the top state and reports back, message about acquiring top state will be
+     * sent to the new top resumed activity.
+     */
+    void updateTopResumedActivityIfNeeded() {
+        final ActivityRecord prevTopActivity = mTopResumedActivity;
+        final ActivityStack topStack = mRootActivityContainer.getTopDisplayFocusedStack();
+        if (topStack == null || topStack.mResumedActivity == prevTopActivity) {
+            return;
+        }
+
+        // Ask previous activity to release the top state.
+        final boolean prevActivityReceivedTopState =
+                prevTopActivity != null && !mTopResumedActivityWaitingForPrev;
+        // mTopResumedActivityWaitingForPrev == true at this point would mean that an activity
+        // before the prevTopActivity one hasn't reported back yet. So server never sent the top
+        // resumed state change message to prevTopActivity.
+        if (prevActivityReceivedTopState
+                && prevTopActivity.scheduleTopResumedActivityChanged(false /* onTop */)) {
+            scheduleTopResumedStateLossTimeout(prevTopActivity);
+            mTopResumedActivityWaitingForPrev = true;
+        }
+
+        // Update the current top activity.
+        mTopResumedActivity = topStack.mResumedActivity;
+        scheduleTopResumedActivityStateIfNeeded();
+    }
+
+    /** Schedule top resumed state change if previous top activity already reported back. */
+    private void scheduleTopResumedActivityStateIfNeeded() {
+        if (mTopResumedActivity != null && !mTopResumedActivityWaitingForPrev) {
+            mTopResumedActivity.scheduleTopResumedActivityChanged(true /* onTop */);
+        }
+    }
+
+    /**
+     * Limit the time given to the app to report handling of the state loss.
+     */
+    private void scheduleTopResumedStateLossTimeout(ActivityRecord r) {
+        final Message msg = mHandler.obtainMessage(TOP_RESUMED_STATE_LOSS_TIMEOUT_MSG);
+        msg.obj = r;
+        r.topResumedStateLossTime = SystemClock.uptimeMillis();
+        mHandler.sendMessageDelayed(msg, TOP_RESUMED_STATE_LOSS_TIMEOUT);
+        if (DEBUG_STATES) Slog.v(TAG_STATES, "Waiting for top state to be released by " + r);
+    }
+
+    /**
+     * Handle a loss of top resumed state by an activity - update internal state and inform next top
+     * activity if needed.
+     */
+    void handleTopResumedStateReleased(boolean timeout) {
+        if (DEBUG_STATES) {
+            Slog.v(TAG_STATES, "Top resumed state released "
+                    + (timeout ? " (due to timeout)" : " (transition complete)"));
+        }
+        mHandler.removeMessages(TOP_RESUMED_STATE_LOSS_TIMEOUT_MSG);
+        if (!mTopResumedActivityWaitingForPrev) {
+            // Top resumed activity state loss already handled.
+            return;
+        }
+        mTopResumedActivityWaitingForPrev = false;
+        scheduleTopResumedActivityStateIfNeeded();
+    }
+
     void removeTimeoutsForActivityLocked(ActivityRecord r) {
         if (DEBUG_IDLE) Slog.d(TAG_IDLE, "removeTimeoutsForActivity: Callers="
                 + Debug.getCallers(4));
@@ -2308,6 +2386,16 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
     final void scheduleSleepTimeout() {
         removeSleepTimeouts();
         mHandler.sendEmptyMessageDelayed(SLEEP_TIMEOUT_MSG, SLEEP_TIMEOUT);
+    }
+
+    void removeRestartTimeouts(ActivityRecord r) {
+        mHandler.removeMessages(RESTART_ACTIVITY_PROCESS_TIMEOUT_MSG, r);
+    }
+
+    final void scheduleRestartTimeout(ActivityRecord r) {
+        removeRestartTimeouts(r);
+        mHandler.sendMessageDelayed(mHandler.obtainMessage(RESTART_ACTIVITY_PROCESS_TIMEOUT_MSG, r),
+                WindowManagerService.WINDOW_FREEZE_TIMEOUT_DURATION);
     }
 
     void handleNonResizableTaskIfNeeded(TaskRecord task, int preferredWindowingMode,
@@ -2333,51 +2421,66 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
             if (!task.canBeLaunchedOnDisplay(actualDisplayId)) {
                 throw new IllegalStateException("Task resolved to incompatible display");
             }
+
+            final ActivityDisplay preferredDisplay =
+                    mRootActivityContainer.getActivityDisplay(preferredDisplayId);
+
+            final boolean singleTaskInstance = preferredDisplay != null
+                    && preferredDisplay.isSingleTaskInstance();
+
             if (preferredDisplayId != actualDisplayId) {
+                // Suppress the warning toast if the preferredDisplay was set to singleTask.
+                // The singleTaskInstance displays will only contain one task and any attempt to
+                // launch new task will re-route to the default display.
+                if (singleTaskInstance) {
+                    mService.getTaskChangeNotificationController()
+                            .notifyActivityLaunchOnSecondaryDisplayRerouted(task.getTaskInfo(),
+                                    preferredDisplayId);
+                    return;
+                }
+
                 Slog.w(TAG, "Failed to put " + task + " on display " + preferredDisplayId);
                 // Display a warning toast that we failed to put a task on a secondary display.
                 mService.getTaskChangeNotificationController()
-                        .notifyActivityLaunchOnSecondaryDisplayFailed();
-                return;
-            } else if (!forceNonResizable && handleForcedResizableTask(task,
-                    FORCED_RESIZEABLE_REASON_SECONDARY_DISPLAY)) {
-                return;
+                        .notifyActivityLaunchOnSecondaryDisplayFailed(task.getTaskInfo(),
+                                preferredDisplayId);
+            } else if (!forceNonResizable) {
+                handleForcedResizableTaskIfNeeded(task, FORCED_RESIZEABLE_REASON_SECONDARY_DISPLAY);
             }
+            // The information about not support secondary display should already be notified, we
+            // don't want to show another message on default display about split-screen. And it may
+            // be the case that a resizable activity is launched on a non-resizable task.
+            return;
         }
 
         if (!task.supportsSplitScreenWindowingMode() || forceNonResizable) {
-            // Display a warning toast that we tried to put an app that doesn't support split-screen
-            // in split-screen.
-            mService.getTaskChangeNotificationController().notifyActivityDismissingDockedStack();
-
             // Dismiss docked stack. If task appeared to be in docked stack but is not resizable -
             // we need to move it to top of fullscreen stack, otherwise it will be covered.
 
             final ActivityStack dockedStack =
                     task.getStack().getDisplay().getSplitScreenPrimaryStack();
             if (dockedStack != null) {
+                // Display a warning toast that we tried to put an app that doesn't support
+                // split-screen in split-screen.
+                mService.getTaskChangeNotificationController()
+                        .notifyActivityDismissingDockedStack();
                 moveTasksToFullscreenStackLocked(dockedStack, actualStack == dockedStack);
             }
             return;
         }
 
-        handleForcedResizableTask(task, FORCED_RESIZEABLE_REASON_SPLIT_SCREEN);
+        handleForcedResizableTaskIfNeeded(task, FORCED_RESIZEABLE_REASON_SPLIT_SCREEN);
     }
 
-    /**
-     * @return {@code true} if the top activity of the task is forced to be resizable and the user
-     *         was notified about activity being forced resized.
-     */
-    private boolean handleForcedResizableTask(TaskRecord task, int reason) {
+    /** Notifies that the top activity of the task is forced to be resizeable. */
+    private void handleForcedResizableTaskIfNeeded(TaskRecord task, int reason) {
         final ActivityRecord topActivity = task.getTopActivity();
-        if (topActivity != null && topActivity.isNonResizableOrForcedResizable()
-                && !topActivity.noDisplay) {
-            final String packageName = topActivity.appInfo.packageName;
-            mService.getTaskChangeNotificationController().notifyActivityForcedResizable(
-                    task.taskId, reason, packageName);
-            return true;
+        if (topActivity == null || topActivity.noDisplay
+                || !topActivity.isNonResizableOrForcedResizable()) {
+            return;
         }
-        return false;
+        mService.getTaskChangeNotificationController().notifyActivityForcedResizable(
+                task.taskId, reason, topActivity.appInfo.packageName);
     }
 
     void activityRelaunchedLocked(IBinder token) {
@@ -2456,7 +2559,8 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
     }
 
     void wakeUp(String reason) {
-        mPowerManager.wakeUp(SystemClock.uptimeMillis(), "android.server.am:TURN_ON:" + reason);
+        mPowerManager.wakeUp(SystemClock.uptimeMillis(), PowerManager.WAKE_REASON_APPLICATION,
+                "android.server.am:TURN_ON:" + reason);
     }
 
     /**
@@ -2539,13 +2643,13 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
                 } break;
                 case LAUNCH_TIMEOUT_MSG: {
                     synchronized (mService.mGlobalLock) {
-                        if (mLaunchingActivity.isHeld()) {
+                        if (mLaunchingActivityWakeLock.isHeld()) {
                             Slog.w(TAG, "Launch timeout has expired, giving up wake lock!");
                             if (VALIDATE_WAKE_LOCK_CALLER
                                     && Binder.getCallingUid() != Process.myUid()) {
                                 throw new IllegalStateException("Calling must be system uid");
                             }
-                            mLaunchingActivity.release();
+                            mLaunchingActivityWakeLock.release();
                         }
                     }
                 } break;
@@ -2557,6 +2661,22 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
                         }
                     }
                 } break;
+                case RESTART_ACTIVITY_PROCESS_TIMEOUT_MSG: {
+                    final ActivityRecord r = (ActivityRecord) msg.obj;
+                    String processName = null;
+                    int uid = 0;
+                    synchronized (mService.mGlobalLock) {
+                        if (r.attachedToProcess()
+                                && r.isState(ActivityStack.ActivityState.RESTARTING_PROCESS)) {
+                            processName = r.app.mName;
+                            uid = r.app.mUid;
+                        }
+                    }
+                    if (processName != null) {
+                        mService.mAmInternal.killProcess(processName, uid,
+                                "restartActivityProcessTimeout");
+                    }
+                } break;
                 case REPORT_HOME_CHANGED_MSG: {
                     synchronized (mService.mGlobalLock) {
                         mHandler.removeMessages(REPORT_HOME_CHANGED_MSG);
@@ -2564,8 +2684,18 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
                         // Start home activities on displays with no activities.
                         mRootActivityContainer.startHomeOnEmptyDisplays("homeChanged");
                     }
-                }
-                break;
+                } break;
+                case TOP_RESUMED_STATE_LOSS_TIMEOUT_MSG: {
+                    ActivityRecord r = (ActivityRecord) msg.obj;
+                    Slog.w(TAG, "Activity top resumed state loss timeout for " + r);
+                    synchronized (mService.mGlobalLock) {
+                        if (r.hasProcess()) {
+                            mService.logAppTooSlow(r.app, r.topResumedStateLossTime,
+                                    "top state loss for " + r);
+                        }
+                    }
+                    handleTopResumedStateReleased(true /* timeout */);
+                } break;
             }
         }
     }
@@ -2594,6 +2724,9 @@ public class ActivityStackSupervisor implements RecentTasks.Callbacks {
         if (activityOptions != null) {
             activityType = activityOptions.getLaunchActivityType();
             windowingMode = activityOptions.getLaunchWindowingMode();
+            if (activityOptions.freezeRecentTasksReordering()) {
+                mRecentTasks.setFreezeTaskListReordering();
+            }
         }
         if (activityType == ACTIVITY_TYPE_HOME || activityType == ACTIVITY_TYPE_RECENTS) {
             throw new IllegalArgumentException("startActivityFromRecents: Task "

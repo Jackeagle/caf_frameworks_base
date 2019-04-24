@@ -22,6 +22,7 @@ import android.app.backup.IFullBackupRestoreObserver;
 import android.app.backup.IRestoreSession;
 import android.app.backup.ISelectBackupTransportCallback;
 import android.os.ParcelFileDescriptor;
+import android.os.UserHandle;
 import android.content.Intent;
 import android.content.ComponentName;
 
@@ -53,6 +54,7 @@ interface IBackupManager {
     /**
      * {@link android.app.backup.IBackupManager.dataChangedForUser} for the calling user id.
      */
+    @UnsupportedAppUsage
     void dataChanged(String packageName);
 
     /**
@@ -72,6 +74,7 @@ interface IBackupManager {
     /**
      * {@link android.app.backup.IBackupManager.clearBackupDataForUser} for the calling user id.
      */
+    @UnsupportedAppUsage
     void clearBackupData(String transportName, String packageName);
 
     /**
@@ -154,6 +157,7 @@ interface IBackupManager {
     /**
      * {@link android.app.backup.IBackupManager.setBackupEnabledForUser} for the calling user id.
      */
+    @UnsupportedAppUsage
     void setBackupEnabled(boolean isEnabled);
 
     /**
@@ -177,6 +181,7 @@ interface IBackupManager {
     /**
      * {@link android.app.backup.IBackupManager.setAutoRestoreForUser} for the calling user id.
      */
+    @UnsupportedAppUsage
     void setAutoRestore(boolean doAutoRestore);
 
     /**
@@ -193,6 +198,7 @@ interface IBackupManager {
     /**
      * {@link android.app.backup.IBackupManager.isBackupEnabledForUser} for the calling user id.
      */
+    @UnsupportedAppUsage
     boolean isBackupEnabled();
 
     /**
@@ -321,6 +327,7 @@ interface IBackupManager {
      * {@link android.app.backup.IBackupManager.acknowledgeFullBackupOrRestoreForUser} for the
      * calling user id.
      */
+    @UnsupportedAppUsage
     void acknowledgeFullBackupOrRestore(int token, boolean allow,
             in String curPassword, in String encryptionPassword,
             IFullBackupRestoreObserver observer);
@@ -346,16 +353,16 @@ interface IBackupManager {
      *     {@link Context#startActivity} in order to launch the transport's data-management UI. It
      *     may be {@code null} if the transport does not offer any user-facing data
      *     management UI.
-     * @param dataManagementLabel A {@link String} to be used as the label for the transport's data
-     *     management affordance. This MUST be {@code null} when dataManagementIntent is
-     *     {@code null} and MUST NOT be {@code null} when dataManagementIntent is not {@code null}.
+     * @param dataManagementLabel A {@link CharSequence} to be used as the label for the transport's
+     *     data management affordance. This MUST be {@code null} when dataManagementIntent is {@code
+     *     null} and MUST NOT be {@code null} when dataManagementIntent is not {@code null}.
      * @throws SecurityException If the UID of the calling process differs from the package UID of
      *     {@code transportComponent} or if the caller does NOT have BACKUP permission.
      */
     void updateTransportAttributesForUser(int userId, in ComponentName transportComponent,
             in String name,
             in Intent configurationIntent, in String currentDestinationString,
-            in Intent dataManagementIntent, in String dataManagementLabel);
+            in Intent dataManagementIntent, in CharSequence dataManagementLabel);
 
     /**
      * Identify the currently selected transport.  Callers must hold the
@@ -370,6 +377,7 @@ interface IBackupManager {
     /**
      * {@link android.app.backup.IBackupManager.getCurrentTransportForUser} for the calling user id.
      */
+    @UnsupportedAppUsage
     String getCurrentTransport();
 
      /**
@@ -396,6 +404,7 @@ interface IBackupManager {
     /**
      * {@link android.app.backup.IBackupManager.listAllTransportsForUser} for the calling user id.
      */
+    @UnsupportedAppUsage
     String[] listAllTransports();
 
     /**
@@ -433,6 +442,7 @@ interface IBackupManager {
      * {@link android.app.backup.IBackupManager.selectBackupTransportForUser} for the calling user
      * id.
      */
+    @UnsupportedAppUsage
     String selectBackupTransport(String transport);
 
     /**
@@ -515,13 +525,7 @@ interface IBackupManager {
      *
      * @param userId User id for which the manage-data menu label should be reported.
      */
-    String getDataManagementLabelForUser(int userId, String transport);
-
-    /**
-     * {@link android.app.backup.IBackupManager.getDataManagementLabelForUser} for the calling user
-     * id.
-     */
-    String getDataManagementLabel(String transport);
+    CharSequence getDataManagementLabelForUser(int userId, String transport);
 
     /**
      * Begin a restore session.  Either or both of packageName and transportID
@@ -589,6 +593,7 @@ interface IBackupManager {
      * @param whichUser User handle of the defined user whose backup active state
      *     is being queried.
      */
+    @UnsupportedAppUsage
     boolean isBackupServiceActive(int whichUser);
 
     /**
@@ -685,4 +690,24 @@ interface IBackupManager {
      * {@link android.app.backup.IBackupManager.cancelBackups} for the calling user id.
      */
     void cancelBackups();
+
+    /**
+     * Returns a {@link UserHandle} for the user that has {@code ancestralSerialNumber} as the serial
+     * number of the it's ancestral work profile.
+     *
+     * <p> The ancestral work profile is set by {@link #setAncestralSerialNumber(long)}
+     * and it corresponds to the profile that was used to restore to the callers profile.
+     */
+    UserHandle getUserForAncestralSerialNumber(in long ancestralSerialNumber);
+
+    /**
+     * Sets the ancestral work profile for the calling user.
+     *
+     * <p> The ancestral work profile corresponds to the profile that was used to restore to the
+     * callers profile.
+     *
+     * <p>Callers must hold the android.permission.BACKUP permission to use this method.
+     */
+    void setAncestralSerialNumber(in long ancestralSerialNumber);
+
 }

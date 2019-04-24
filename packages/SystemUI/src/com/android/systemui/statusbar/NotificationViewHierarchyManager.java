@@ -22,8 +22,11 @@ import android.os.Trace;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 
 import com.android.systemui.R;
+import com.android.systemui.bubbles.BubbleData;
+import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.statusbar.notification.NotificationEntryManager;
 import com.android.systemui.statusbar.notification.VisualStabilityManager;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
@@ -61,7 +64,7 @@ public class NotificationViewHierarchyManager {
     protected final NotificationLockscreenUserManager mLockscreenUserManager;
     protected final NotificationGroupManager mGroupManager;
     protected final VisualStabilityManager mVisualStabilityManager;
-    private final StatusBarStateController mStatusBarStateController;
+    private final SysuiStatusBarStateController mStatusBarStateController;
     private final NotificationEntryManager mEntryManager;
 
     // Lazy
@@ -73,6 +76,7 @@ public class NotificationViewHierarchyManager {
      * possible.
      */
     private final boolean mAlwaysExpandNonGroupedNotification;
+    private final BubbleData mBubbleData;
 
     private NotificationPresenter mPresenter;
     private NotificationListContainer mListContainer;
@@ -84,16 +88,18 @@ public class NotificationViewHierarchyManager {
             VisualStabilityManager visualStabilityManager,
             StatusBarStateController statusBarStateController,
             NotificationEntryManager notificationEntryManager,
-            Lazy<ShadeController> shadeController) {
+            Lazy<ShadeController> shadeController,
+            BubbleData bubbleData) {
         mLockscreenUserManager = notificationLockscreenUserManager;
         mGroupManager = groupManager;
         mVisualStabilityManager = visualStabilityManager;
-        mStatusBarStateController = statusBarStateController;
+        mStatusBarStateController = (SysuiStatusBarStateController) statusBarStateController;
         mEntryManager = notificationEntryManager;
         mShadeController = shadeController;
         Resources res = context.getResources();
         mAlwaysExpandNonGroupedNotification =
                 res.getBoolean(R.bool.config_alwaysExpandNonGroupedNotifications);
+        mBubbleData = bubbleData;
     }
 
     public void setUpWithPresenter(NotificationPresenter presenter,
@@ -113,7 +119,8 @@ public class NotificationViewHierarchyManager {
         final int N = activeNotifications.size();
         for (int i = 0; i < N; i++) {
             NotificationEntry ent = activeNotifications.get(i);
-            if (ent.isRowDismissed() || ent.isRowRemoved()) {
+            if (ent.isRowDismissed() || ent.isRowRemoved()
+                    || (mBubbleData.getBubble(ent.key) != null && !ent.showInShadeWhenBubble())) {
                 // we don't want to update removed notifications because they could
                 // temporarily become children if they were isolated before.
                 continue;
@@ -184,6 +191,11 @@ public class NotificationViewHierarchyManager {
             if (v.getParent() == null) {
                 mVisualStabilityManager.notifyViewAddition(v);
                 mListContainer.addContainerView(v);
+            } else if (!mListContainer.containsView(v)) {
+                // the view is added somewhere else. Let's make sure
+                // the ordering works properly below, by excluding these
+                toShow.remove(v);
+                i--;
             }
         }
 

@@ -35,6 +35,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.os.RemoteException;
+import android.platform.test.annotations.Presubmit;
 import android.support.test.uiautomator.UiDevice;
 import android.text.TextUtils;
 
@@ -76,6 +77,7 @@ public class TaskStackChangedListenerTest {
     }
 
     @Test
+    @Presubmit
     public void testTaskStackChanged_afterFinish() throws Exception {
         registerTaskStackChangedListener(new TaskStackListener() {
             @Override
@@ -87,7 +89,8 @@ public class TaskStackChangedListenerTest {
         });
 
         Context context = getInstrumentation().getContext();
-        context.startActivity(new Intent(context, ActivityA.class));
+        context.startActivity(
+                new Intent(context, ActivityA.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         UiDevice.getInstance(getInstrumentation()).waitForIdle();
         synchronized (sLock) {
             assertTrue(sTaskStackChangedCalled);
@@ -96,6 +99,7 @@ public class TaskStackChangedListenerTest {
     }
 
     @Test
+    @Presubmit
     public void testTaskDescriptionChanged() throws Exception {
         final Object[] params = new Object[2];
         final CountDownLatch latch = new CountDownLatch(1);
@@ -117,13 +121,18 @@ public class TaskStackChangedListenerTest {
                 }
             }
         });
-        final Activity activity = startTestActivity(ActivityTaskDescriptionChange.class);
+
+        int taskId;
+        synchronized (sLock) {
+            taskId = startTestActivity(ActivityTaskDescriptionChange.class).getTaskId();
+        }
         waitForCallback(latch);
-        assertEquals(activity.getTaskId(), params[0]);
+        assertEquals(taskId, params[0]);
         assertEquals("Test Label", ((TaskDescription) params[1]).getLabel());
     }
 
     @Test
+    @Presubmit
     public void testActivityRequestedOrientationChanged() throws Exception {
         final int[] params = new int[2];
         final CountDownLatch latch = new CountDownLatch(1);
@@ -136,9 +145,12 @@ public class TaskStackChangedListenerTest {
                 latch.countDown();
             }
         });
-        final Activity activity = startTestActivity(ActivityRequestedOrientationChange.class);
+        int taskId;
+        synchronized (sLock) {
+            taskId = startTestActivity(ActivityRequestedOrientationChange.class).getTaskId();
+        }
         waitForCallback(latch);
-        assertEquals(activity.getTaskId(), params[0]);
+        assertEquals(taskId, params[0]);
         assertEquals(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT, params[1]);
     }
 
@@ -146,6 +158,7 @@ public class TaskStackChangedListenerTest {
      * Tests for onTaskCreated, onTaskMovedToFront, onTaskRemoved and onTaskRemovalStarted.
      */
     @Test
+    @Presubmit
     public void testTaskChangeCallBacks() throws Exception {
         final Object[] params = new Object[2];
         final CountDownLatch taskCreatedLaunchLatch = new CountDownLatch(1);
@@ -200,6 +213,7 @@ public class TaskStackChangedListenerTest {
 
         // Test for onTaskRemovalStarted.
         assertEquals(1, taskRemovalStartedLatch.getCount());
+        assertEquals(1, taskRemovedLatch.getCount());
         activity.finishAndRemoveTask();
         waitForCallback(taskRemovalStartedLatch);
         // onTaskRemovalStarted happens before the activity's window is removed.
@@ -207,7 +221,6 @@ public class TaskStackChangedListenerTest {
         assertEquals(id, params[0]);
 
         // Test for onTaskRemoved.
-        assertEquals(1, taskRemovedLatch.getCount());
         waitForCallback(taskRemovedLatch);
         assertEquals(id, params[0]);
         waitForCallback(onDetachedFromWindowLatch);
@@ -221,7 +234,8 @@ public class TaskStackChangedListenerTest {
         final ActivityMonitor monitor = new ActivityMonitor(activityClass.getName(), null, false);
         getInstrumentation().addMonitor(monitor);
         final Context context = getInstrumentation().getContext();
-        context.startActivity(new Intent(context, activityClass));
+        context.startActivity(
+                new Intent(context, activityClass).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         final TestActivity activity = (TestActivity) monitor.waitForActivityWithTimeout(1000);
         if (activity == null) {
             throw new RuntimeException("Timed out waiting for Activity");
@@ -237,7 +251,7 @@ public class TaskStackChangedListenerTest {
 
     private void waitForCallback(CountDownLatch latch) {
         try {
-            final boolean result = latch.await(2, TimeUnit.SECONDS);
+            final boolean result = latch.await(4, TimeUnit.SECONDS);
             if (!result) {
                 throw new RuntimeException("Timed out waiting for task stack change notification");
             }
@@ -316,7 +330,11 @@ public class TaskStackChangedListenerTest {
         protected void onPostResume() {
             super.onPostResume();
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-            finish();
+            synchronized (sLock) {
+                // Hold the lock to ensure no one is trying to access fields of this Activity in
+                // this test.
+                finish();
+            }
         }
     }
 
@@ -325,7 +343,11 @@ public class TaskStackChangedListenerTest {
         protected void onPostResume() {
             super.onPostResume();
             setTaskDescription(new TaskDescription("Test Label"));
-            finish();
+            synchronized (sLock) {
+                // Hold the lock to ensure no one is trying to access fields of this Activity in
+                // this test.
+                finish();
+            }
         }
     }
 

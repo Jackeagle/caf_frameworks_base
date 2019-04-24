@@ -19,10 +19,6 @@ package com.android.server.pm;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DEFAULT;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED;
-import static android.content.pm.PackageManager.FLAG_PERMISSION_REVOKE_ON_UPGRADE;
-import static android.content.pm.PackageManager.FLAG_PERMISSION_REVOKE_WHEN_REQUESTED;
-import static android.content.pm.PackageManager.FLAG_PERMISSION_USER_FIXED;
-import static android.content.pm.PackageManager.FLAG_PERMISSION_USER_SET;
 import static android.content.pm.PackageManager.INSTALL_FAILED_INSUFFICIENT_STORAGE;
 import static android.content.pm.PackageManager.INSTALL_FAILED_SHARED_USER_INCOMPATIBLE;
 import static android.content.pm.PackageManager.INTENT_FILTER_DOMAIN_VERIFICATION_STATUS_ALWAYS;
@@ -36,6 +32,7 @@ import static com.android.server.pm.PackageManagerService.PLATFORM_PACKAGE_NAME;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.UserIdInt;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -63,6 +60,7 @@ import android.os.Message;
 import android.os.PatternMatcher;
 import android.os.PersistableBundle;
 import android.os.Process;
+import android.os.SELinux;
 import android.os.SystemClock;
 import android.os.UserHandle;
 import android.os.UserManager;
@@ -249,23 +247,6 @@ public final class Settings {
     private static final String ATTR_SDK_VERSION = "sdkVersion";
     private static final String ATTR_DATABASE_VERSION = "databaseVersion";
 
-    // Bookkeeping for restored permission grants
-    private static final String TAG_RESTORED_RUNTIME_PERMISSIONS = "restored-perms";
-    // package name: ATTR_PACKAGE_NAME
-    private static final String TAG_PERMISSION_ENTRY = "perm";
-    // permission name: ATTR_NAME
-    // permission granted (boolean): ATTR_GRANTED
-    private static final String ATTR_USER_SET = "set";
-    private static final String ATTR_USER_FIXED = "fixed";
-    private static final String ATTR_REVOKE_ON_UPGRADE = "rou";
-    private static final String ATTR_REVOKE_WHEN_REQUESTED = "rwr";
-
-    // Flag mask of restored permission grants that are applied at install time
-    private static final int USER_RUNTIME_GRANT_MASK =
-            FLAG_PERMISSION_USER_SET
-            | FLAG_PERMISSION_USER_FIXED
-            | FLAG_PERMISSION_REVOKE_ON_UPGRADE;
-
     private final Object mLock;
 
     private final RuntimePermissionPersistence mRuntimePermissionsPersistence;
@@ -302,26 +283,6 @@ public final class Settings {
         int appId;
         int[] excludedUserIds;
     }
-
-    // Bookkeeping for restored user permission grants
-    final class RestoredPermissionGrant {
-        String permissionName;
-        boolean granted;
-        int grantBits;
-
-        RestoredPermissionGrant(String name, boolean isGranted, int theGrantBits) {
-            permissionName = name;
-            granted = isGranted;
-            grantBits = theGrantBits;
-        }
-    }
-
-    // This would be more compact as a flat array of restored grants or something, but we
-    // may have quite a few, especially during early device lifetime, and avoiding all those
-    // linear lookups will be important.
-    private final SparseArray<ArrayMap<String, ArraySet<RestoredPermissionGrant>>>
-            mRestoredUserGrants =
-                new SparseArray<ArrayMap<String, ArraySet<RestoredPermissionGrant>>>();
 
     private static int mFirstAvailableUid = 0;
 
@@ -459,43 +420,6 @@ public final class Settings {
 
     String addRenamedPackageLPw(String pkgName, String origPkgName) {
         return mRenamedPackages.put(pkgName, origPkgName);
-    }
-
-    void applyPendingPermissionGrantsLPw(String packageName, int userId) {
-        ArrayMap<String, ArraySet<RestoredPermissionGrant>> grantsByPackage =
-                mRestoredUserGrants.get(userId);
-        if (grantsByPackage == null || grantsByPackage.size() == 0) {
-            return;
-        }
-
-        ArraySet<RestoredPermissionGrant> grants = grantsByPackage.get(packageName);
-        if (grants == null || grants.size() == 0) {
-            return;
-        }
-
-        final PackageSetting ps = mPackages.get(packageName);
-        if (ps == null) {
-            Slog.e(TAG, "Can't find supposedly installed package " + packageName);
-            return;
-        }
-        final PermissionsState perms = ps.getPermissionsState();
-
-        for (RestoredPermissionGrant grant : grants) {
-            BasePermission bp = mPermissions.getPermission(grant.permissionName);
-            if (bp != null) {
-                if (grant.granted) {
-                    perms.grantRuntimePermission(bp, userId);
-                }
-                perms.updatePermissionFlags(bp, userId, USER_RUNTIME_GRANT_MASK, grant.grantBits);
-            }
-        }
-
-        // And remove it from the pending-grant bookkeeping
-        grantsByPackage.remove(packageName);
-        if (grantsByPackage.size() < 1) {
-            mRestoredUserGrants.remove(userId);
-        }
-        writeRuntimePermissionsForUserLPr(userId, false);
     }
 
     public boolean canPropagatePermissionToInstantApp(String permName) {
@@ -853,7 +777,8 @@ public final class Settings {
                 | ApplicationInfo.PRIVATE_FLAG_OEM
                 | ApplicationInfo.PRIVATE_FLAG_VENDOR
                 | ApplicationInfo.PRIVATE_FLAG_PRODUCT
-                | ApplicationInfo.PRIVATE_FLAG_PRODUCT_SERVICES);
+                | ApplicationInfo.PRIVATE_FLAG_PRODUCT_SERVICES
+                | ApplicationInfo.PRIVATE_FLAG_ODM);
         pkgSetting.pkgFlags |= pkgFlags & ApplicationInfo.FLAG_SYSTEM;
         pkgSetting.pkgPrivateFlags |=
                 pkgPrivateFlags & ApplicationInfo.PRIVATE_FLAG_PRIVILEGED;
@@ -865,6 +790,8 @@ public final class Settings {
                 pkgPrivateFlags & ApplicationInfo.PRIVATE_FLAG_PRODUCT;
         pkgSetting.pkgPrivateFlags |=
                 pkgPrivateFlags & ApplicationInfo.PRIVATE_FLAG_PRODUCT_SERVICES;
+        pkgSetting.pkgPrivateFlags |=
+                pkgPrivateFlags & ApplicationInfo.PRIVATE_FLAG_ODM;
         pkgSetting.primaryCpuAbiString = primaryCpuAbi;
         pkgSetting.secondaryCpuAbiString = secondaryCpuAbi;
         if (childPkgNames != null) {
@@ -994,13 +921,13 @@ public final class Settings {
     }
 
     /*
-     * Update the shared user setting when a package using
-     * specifying the shared user id is removed. The gids
-     * associated with each permission of the deleted package
-     * are removed from the shared user's gid list only if its
-     * not in use by other permissions of packages in the
-     * shared user setting.
+     * Update the shared user setting when a package with a shared user id is removed. The gids
+     * associated with each permission of the deleted package are removed from the shared user'
+     * gid list only if its not in use by other permissions of packages in the shared user setting.
+     *
+     * @return the affected user id
      */
+    @UserIdInt
     int updateSharedUserPermsLPw(PackageSetting deletedPs, int userId) {
         if ((deletedPs == null) || (deletedPs.pkg == null)) {
             Slog.i(PackageManagerService.TAG,
@@ -1015,6 +942,7 @@ public final class Settings {
 
         SharedUserSetting sus = deletedPs.sharedUser;
 
+        int affectedUserId = UserHandle.USER_NULL;
         // Update permissions
         for (String eachPerm : deletedPs.pkg.requestedPermissions) {
             BasePermission bp = mPermissions.getPermission(eachPerm);
@@ -1057,21 +985,26 @@ public final class Settings {
             // Try to revoke as an install permission which is for all users.
             // The package is gone - no need to keep flags for applying policy.
             permissionsState.updatePermissionFlags(bp, userId,
-                    PackageManager.MASK_PERMISSION_FLAGS, 0);
+                    PackageManager.MASK_PERMISSION_FLAGS_ALL, 0);
 
             if (permissionsState.revokeInstallPermission(bp) ==
                     PermissionsState.PERMISSION_OPERATION_SUCCESS_GIDS_CHANGED) {
-                return UserHandle.USER_ALL;
+                affectedUserId = UserHandle.USER_ALL;
             }
 
             // Try to revoke as an install permission which is per user.
             if (permissionsState.revokeRuntimePermission(bp, userId) ==
                     PermissionsState.PERMISSION_OPERATION_SUCCESS_GIDS_CHANGED) {
-                return userId;
+                if (affectedUserId == UserHandle.USER_NULL) {
+                    affectedUserId = userId;
+                } else if (affectedUserId != userId) {
+                    // Multiple users affected.
+                    affectedUserId = UserHandle.USER_ALL;
+                }
             }
         }
 
-        return UserHandle.USER_NULL;
+        return affectedUserId;
     }
 
     int removePackageLPw(String name) {
@@ -1327,21 +1260,8 @@ public final class Settings {
         return result;
     }
 
-    boolean setDefaultBrowserPackageNameLPw(String packageName, int userId) {
-        if (userId == UserHandle.USER_ALL) {
-            return false;
-        }
-        if (packageName != null) {
-            mDefaultBrowserApp.put(userId, packageName);
-        } else {
-            mDefaultBrowserApp.remove(userId);
-        }
-        writePackageRestrictionsLPr(userId);
-        return true;
-    }
-
-    String getDefaultBrowserPackageNameLPw(int userId) {
-        return (userId == UserHandle.USER_ALL) ? null : mDefaultBrowserApp.get(userId);
+    String removeDefaultBrowserPackageNameLPw(int userId) {
+        return (userId == UserHandle.USER_ALL) ? null : mDefaultBrowserApp.removeReturnOld(userId);
     }
 
     boolean setDefaultDialerPackageNameLPw(String packageName, int userId) {
@@ -1393,12 +1313,20 @@ public final class Settings {
 
     boolean areDefaultRuntimePermissionsGrantedLPr(int userId) {
         return mRuntimePermissionsPersistence
-                .areDefaultRuntimPermissionsGrantedLPr(userId);
+                .areDefaultRuntimePermissionsGrantedLPr(userId);
     }
 
     void onDefaultRuntimePermissionsGrantedLPr(int userId) {
         mRuntimePermissionsPersistence
                 .onDefaultRuntimePermissionsGrantedLPr(userId);
+    }
+
+    int getDefaultRuntimePermissionsVersionLPr(int userId) {
+        return mRuntimePermissionsPersistence.getVersionLPr(userId);
+    }
+
+    void setDefaultRuntimePermissionsVersionLPr(int version, int userId) {
+        mRuntimePermissionsPersistence.setVersionLPr(version, userId);
     }
 
     public VersionInfo findOrCreateVersion(String volumeUuid) {
@@ -1995,13 +1923,6 @@ public final class Settings {
         }
     }
 
-    // Specifically for backup/restore
-    public void processRestoredPermissionGrantLPr(String pkgName, String permission,
-            boolean isGranted, int restoredFlagSet, int userId) {
-        mRuntimePermissionsPersistence.rememberRestoredUserGrantLPr(
-                pkgName, permission, isGranted, restoredFlagSet, userId);
-    }
-
     void writeDefaultAppsLPr(XmlSerializer serializer, int userId)
             throws IllegalArgumentException, IllegalStateException, IOException {
         serializer.startTag(null, TAG_DEFAULT_APPS);
@@ -2263,7 +2184,7 @@ public final class Settings {
                         XmlUtils.skipCurrentTag(parser);
                     } else {
                         permissionsState.updatePermissionFlags(bp, UserHandle.USER_ALL,
-                                PackageManager.MASK_PERMISSION_FLAGS, flags);
+                                PackageManager.MASK_PERMISSION_FLAGS_ALL, flags);
                     }
                 } else {
                     if (permissionsState.revokeInstallPermission(bp) ==
@@ -2272,7 +2193,7 @@ public final class Settings {
                         XmlUtils.skipCurrentTag(parser);
                     } else {
                         permissionsState.updatePermissionFlags(bp, UserHandle.USER_ALL,
-                                PackageManager.MASK_PERMISSION_FLAGS, flags);
+                                PackageManager.MASK_PERMISSION_FLAGS_ALL, flags);
                     }
                 }
             } else {
@@ -2741,6 +2662,24 @@ public final class Settings {
     }
 
     void writePackageListLPr(int creatingUserId) {
+        String filename = mPackageListFilename.getAbsolutePath();
+        String ctx = SELinux.fileSelabelLookup(filename);
+        if (ctx == null) {
+            Slog.wtf(TAG, "Failed to get SELinux context for " +
+                mPackageListFilename.getAbsolutePath());
+        }
+
+        if (!SELinux.setFSCreateContext(ctx)) {
+            Slog.wtf(TAG, "Failed to set packages.list SELinux context");
+        }
+        try {
+            writePackageListLPrInternal(creatingUserId);
+        } finally {
+            SELinux.setFSCreateContext(null);
+        }
+    }
+
+    private void writePackageListLPrInternal(int creatingUserId) {
         // Only derive GIDs for active users (not dying)
         final List<UserInfo> users = UserManagerService.getInstance().getUsers(true);
         int[] userIds = new int[users.size()];
@@ -2791,6 +2730,7 @@ public final class Settings {
                 // seinfo     - seinfo label for the app (assigned at install time)
                 // gids       - supplementary gids this app launches with
                 // profileableFromShellFlag  - 0 or 1 if the package is profileable from shell.
+                // longVersionCode - integer version of the package.
                 //
                 // NOTE: We prefer not to expose all ApplicationInfo flags for now.
                 //
@@ -2818,6 +2758,8 @@ public final class Settings {
                 }
                 sb.append(" ");
                 sb.append(ai.isProfileableByShell() ? "1" : "0");
+                sb.append(" ");
+                sb.append(String.valueOf(ai.longVersionCode));
                 sb.append("\n");
                 writer.append(sb);
             }
@@ -4470,6 +4412,8 @@ public final class Settings {
             ApplicationInfo.PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE, "PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE",
             ApplicationInfo.PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION, "PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION",
             ApplicationInfo.PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_UNRESIZEABLE, "PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_UNRESIZEABLE",
+            ApplicationInfo.PRIVATE_FLAG_ALLOW_AUDIO_PLAYBACK_CAPTURE, "ALLOW_AUDIO_PLAYBACK_CAPTURE",
+            ApplicationInfo.PRIVATE_FLAG_ALLOW_EXTERNAL_STORAGE_SANDBOX, "ALLOW_EXTERNAL_STORAGE_SANDBOX",
             ApplicationInfo.PRIVATE_FLAG_BACKUP_IN_FOREGROUND, "BACKUP_IN_FOREGROUND",
             ApplicationInfo.PRIVATE_FLAG_CANT_SAVE_STATE, "CANT_SAVE_STATE",
             ApplicationInfo.PRIVATE_FLAG_DEFAULT_TO_DEVICE_PROTECTED_STORAGE, "DEFAULT_TO_DEVICE_PROTECTED_STORAGE",
@@ -4487,6 +4431,7 @@ public final class Settings {
             ApplicationInfo.PRIVATE_FLAG_PRODUCT, "PRODUCT",
             ApplicationInfo.PRIVATE_FLAG_PRODUCT_SERVICES, "PRODUCT_SERVICES",
             ApplicationInfo.PRIVATE_FLAG_VIRTUAL_PRELOAD, "VIRTUAL_PRELOAD",
+            ApplicationInfo.PRIVATE_FLAG_ODM, "ODM",
     };
 
     void dumpVersionLPr(IndentingPrintWriter pw) {
@@ -4790,7 +4735,13 @@ public final class Settings {
                         && !permissionNames.contains(perm)) {
                     continue;
                 }
-                pw.print(prefix); pw.print("    "); pw.println(perm);
+                pw.print(prefix); pw.print("    "); pw.print(perm);
+                final BasePermission bp = mPermissions.getPermission(perm);
+                if (bp != null && bp.isRestricted()) {
+                    pw.println(": restricted=true");
+                } else {
+                    pw.println();
+                }
             }
         }
 
@@ -5027,51 +4978,6 @@ public final class Settings {
         pw.print(mReadMessages.toString());
     }
 
-    void dumpRestoredPermissionGrantsLPr(PrintWriter pw, DumpState dumpState) {
-        if (mRestoredUserGrants.size() > 0) {
-            pw.println();
-            pw.println("Restored (pending) permission grants:");
-            for (int userIndex = 0; userIndex < mRestoredUserGrants.size(); userIndex++) {
-                ArrayMap<String, ArraySet<RestoredPermissionGrant>> grantsByPackage =
-                        mRestoredUserGrants.valueAt(userIndex);
-                if (grantsByPackage != null && grantsByPackage.size() > 0) {
-                    final int userId = mRestoredUserGrants.keyAt(userIndex);
-                    pw.print("  User "); pw.println(userId);
-
-                    for (int pkgIndex = 0; pkgIndex < grantsByPackage.size(); pkgIndex++) {
-                        ArraySet<RestoredPermissionGrant> grants = grantsByPackage.valueAt(pkgIndex);
-                        if (grants != null && grants.size() > 0) {
-                            final String pkgName = grantsByPackage.keyAt(pkgIndex);
-                            pw.print("    "); pw.print(pkgName); pw.println(" :");
-
-                            for (RestoredPermissionGrant g : grants) {
-                                pw.print("      ");
-                                pw.print(g.permissionName);
-                                if (g.granted) {
-                                    pw.print(" GRANTED");
-                                }
-                                if ((g.grantBits&FLAG_PERMISSION_USER_SET) != 0) {
-                                    pw.print(" user_set");
-                                }
-                                if ((g.grantBits&FLAG_PERMISSION_USER_FIXED) != 0) {
-                                    pw.print(" user_fixed");
-                                }
-                                if ((g.grantBits&FLAG_PERMISSION_REVOKE_ON_UPGRADE) != 0) {
-                                    pw.print(" revoke_on_upgrade");
-                                }
-                                if ((g.grantBits & FLAG_PERMISSION_REVOKE_WHEN_REQUESTED) != 0) {
-                                    pw.print(" revoke_when_requested");
-                                }
-                                pw.println();
-                            }
-                        }
-                    }
-                }
-            }
-            pw.println();
-        }
-    }
-
     private static void dumpSplitNames(PrintWriter pw, PackageParser.Package pkg) {
         if (pkg == null) {
             pw.print("unknown");
@@ -5131,7 +5037,10 @@ public final class Settings {
             final int flag = 1 << Integer.numberOfTrailingZeros(flags);
             flags &= ~flag;
             flagsString.append(PackageManager.permissionFlagToString(flag));
-            flagsString.append(' ');
+            if (flags != 0) {
+                flagsString.append('|');
+            }
+
         }
         if (flagsString != null) {
             flagsString.append(']');
@@ -5193,6 +5102,8 @@ public final class Settings {
         private static final long WRITE_PERMISSIONS_DELAY_MILLIS = 200;
         private static final long MAX_WRITE_PERMISSIONS_DELAY_MILLIS = 2000;
 
+        private static final int INITIAL_VERSION = 0;
+
         private final Handler mHandler = new MyHandler();
 
         private final Object mPersistenceLock;
@@ -5203,6 +5114,10 @@ public final class Settings {
         @GuardedBy("mLock")
         // The mapping keys are user ids.
         private final SparseLongArray mLastNotWrittenMutationTimesMillis = new SparseLongArray();
+
+        @GuardedBy("mLock")
+        // The mapping keys are user ids.
+        private final SparseIntArray mVersions = new SparseIntArray();
 
         @GuardedBy("mLock")
         // The mapping keys are user ids.
@@ -5217,7 +5132,18 @@ public final class Settings {
         }
 
         @GuardedBy("Settings.this.mLock")
-        public boolean areDefaultRuntimPermissionsGrantedLPr(int userId) {
+        int getVersionLPr(int userId) {
+            return mVersions.get(userId);
+        }
+
+        @GuardedBy("Settings.this.mLock")
+        void setVersionLPr(int version, int userId) {
+            mVersions.put(userId, version);
+            writePermissionsForUserAsyncLPr(userId);
+        }
+
+        @GuardedBy("Settings.this.mLock")
+        public boolean areDefaultRuntimePermissionsGrantedLPr(int userId) {
             return mDefaultPermissionsGranted.get(userId);
         }
 
@@ -5314,6 +5240,9 @@ public final class Settings {
 
                 serializer.startTag(null, TAG_RUNTIME_PERMISSIONS);
 
+                final int version = mVersions.get(userId, INITIAL_VERSION);
+                serializer.attribute(null, ATTR_VERSION, Integer.toString(version));
+
                 String fingerprint = mFingerprints.get(userId);
                 if (fingerprint != null) {
                     serializer.attribute(null, ATTR_FINGERPRINT, fingerprint);
@@ -5340,55 +5269,6 @@ public final class Settings {
                 }
 
                 serializer.endTag(null, TAG_RUNTIME_PERMISSIONS);
-
-                // Now any restored permission grants that are waiting for the apps
-                // in question to be installed.  These are stored as per-package
-                // TAG_RESTORED_RUNTIME_PERMISSIONS blocks, each containing some
-                // number of individual permission grant entities.
-                if (mRestoredUserGrants.get(userId) != null) {
-                    ArrayMap<String, ArraySet<RestoredPermissionGrant>> restoredGrants =
-                            mRestoredUserGrants.get(userId);
-                    if (restoredGrants != null) {
-                        final int pkgCount = restoredGrants.size();
-                        for (int i = 0; i < pkgCount; i++) {
-                            final ArraySet<RestoredPermissionGrant> pkgGrants =
-                                    restoredGrants.valueAt(i);
-                            if (pkgGrants != null && pkgGrants.size() > 0) {
-                                final String pkgName = restoredGrants.keyAt(i);
-                                serializer.startTag(null, TAG_RESTORED_RUNTIME_PERMISSIONS);
-                                serializer.attribute(null, ATTR_PACKAGE_NAME, pkgName);
-
-                                final int N = pkgGrants.size();
-                                for (int z = 0; z < N; z++) {
-                                    RestoredPermissionGrant g = pkgGrants.valueAt(z);
-                                    serializer.startTag(null, TAG_PERMISSION_ENTRY);
-                                    serializer.attribute(null, ATTR_NAME, g.permissionName);
-
-                                    if (g.granted) {
-                                        serializer.attribute(null, ATTR_GRANTED, "true");
-                                    }
-
-                                    if ((g.grantBits&FLAG_PERMISSION_USER_SET) != 0) {
-                                        serializer.attribute(null, ATTR_USER_SET, "true");
-                                    }
-                                    if ((g.grantBits&FLAG_PERMISSION_USER_FIXED) != 0) {
-                                        serializer.attribute(null, ATTR_USER_FIXED, "true");
-                                    }
-                                    if ((g.grantBits&FLAG_PERMISSION_REVOKE_ON_UPGRADE) != 0) {
-                                        serializer.attribute(null, ATTR_REVOKE_ON_UPGRADE, "true");
-                                    }
-                                    if ((g.grantBits & FLAG_PERMISSION_REVOKE_WHEN_REQUESTED)
-                                            != 0) {
-                                        serializer.attribute(null, ATTR_REVOKE_WHEN_REQUESTED,
-                                                "true");
-                                    }
-                                    serializer.endTag(null, TAG_PERMISSION_ENTRY);
-                                }
-                                serializer.endTag(null, TAG_RESTORED_RUNTIME_PERMISSIONS);
-                            }
-                        }
-                    }
-                }
 
                 serializer.endDocument();
                 destination.finishWrite(out);
@@ -5420,6 +5300,7 @@ public final class Settings {
             }
 
             mDefaultPermissionsGranted.delete(userId);
+            mVersions.delete(userId);
             mFingerprints.remove(userId);
         }
 
@@ -5431,7 +5312,7 @@ public final class Settings {
                 if (bp != null) {
                     permissionsState.revokeRuntimePermission(bp, userId);
                     permissionsState.updatePermissionFlags(bp, userId,
-                            PackageManager.MASK_PERMISSION_FLAGS, 0);
+                            PackageManager.MASK_PERMISSION_FLAGS_ALL, 0);
                 }
             }
         }
@@ -5468,29 +5349,6 @@ public final class Settings {
             }
         }
 
-        // Backup/restore support
-
-        public void rememberRestoredUserGrantLPr(String pkgName, String permission,
-                boolean isGranted, int restoredFlagSet, int userId) {
-            // This change will be remembered at write-settings time
-            ArrayMap<String, ArraySet<RestoredPermissionGrant>> grantsByPackage =
-                    mRestoredUserGrants.get(userId);
-            if (grantsByPackage == null) {
-                grantsByPackage = new ArrayMap<String, ArraySet<RestoredPermissionGrant>>();
-                mRestoredUserGrants.put(userId, grantsByPackage);
-            }
-
-            ArraySet<RestoredPermissionGrant> grants = grantsByPackage.get(pkgName);
-            if (grants == null) {
-                grants = new ArraySet<RestoredPermissionGrant>();
-                grantsByPackage.put(pkgName, grants);
-            }
-
-            RestoredPermissionGrant grant = new RestoredPermissionGrant(permission,
-                    isGranted, restoredFlagSet);
-            grants.add(grant);
-        }
-
         // Private internals
 
         @GuardedBy("Settings.this.mLock")
@@ -5506,6 +5364,9 @@ public final class Settings {
 
                 switch (parser.getName()) {
                     case TAG_RUNTIME_PERMISSIONS: {
+                        int version = XmlUtils.readIntAttribute(parser, ATTR_VERSION,
+                                INITIAL_VERSION);
+                        mVersions.put(userId, version);
                         String fingerprint = parser.getAttributeValue(null, ATTR_FINGERPRINT);
                         mFingerprints.put(userId, fingerprint);
                         final boolean defaultsGranted = Build.FINGERPRINT.equals(fingerprint);
@@ -5532,50 +5393,6 @@ public final class Settings {
                             continue;
                         }
                         parsePermissionsLPr(parser, sus.getPermissionsState(), userId);
-                    } break;
-
-                    case TAG_RESTORED_RUNTIME_PERMISSIONS: {
-                        final String pkgName = parser.getAttributeValue(null, ATTR_PACKAGE_NAME);
-                        parseRestoredRuntimePermissionsLPr(parser, pkgName, userId);
-                    } break;
-                }
-            }
-        }
-
-        private void parseRestoredRuntimePermissionsLPr(XmlPullParser parser,
-                final String pkgName, final int userId) throws IOException, XmlPullParserException {
-            final int outerDepth = parser.getDepth();
-            int type;
-            while ((type = parser.next()) != XmlPullParser.END_DOCUMENT
-                    && (type != XmlPullParser.END_TAG || parser.getDepth() > outerDepth)) {
-                if (type == XmlPullParser.END_TAG || type == XmlPullParser.TEXT) {
-                    continue;
-                }
-
-                switch (parser.getName()) {
-                    case TAG_PERMISSION_ENTRY: {
-                        final String permName = parser.getAttributeValue(null, ATTR_NAME);
-                        final boolean isGranted = "true".equals(
-                                parser.getAttributeValue(null, ATTR_GRANTED));
-
-                        int permBits = 0;
-                        if ("true".equals(parser.getAttributeValue(null, ATTR_USER_SET))) {
-                            permBits |= FLAG_PERMISSION_USER_SET;
-                        }
-                        if ("true".equals(parser.getAttributeValue(null, ATTR_USER_FIXED))) {
-                            permBits |= FLAG_PERMISSION_USER_FIXED;
-                        }
-                        if ("true".equals(parser.getAttributeValue(null, ATTR_REVOKE_ON_UPGRADE))) {
-                            permBits |= FLAG_PERMISSION_REVOKE_ON_UPGRADE;
-                        }
-                        if ("true".equals(parser.getAttributeValue(null,
-                                ATTR_REVOKE_WHEN_REQUESTED))) {
-                            permBits |= FLAG_PERMISSION_REVOKE_WHEN_REQUESTED;
-                        }
-
-                        if (isGranted || permBits != 0) {
-                            rememberRestoredUserGrantLPr(pkgName, permName, isGranted, permBits, userId);
-                        }
                     } break;
                 }
             }
@@ -5612,10 +5429,10 @@ public final class Settings {
                         if (granted) {
                             permissionsState.grantRuntimePermission(bp, userId);
                             permissionsState.updatePermissionFlags(bp, userId,
-                                        PackageManager.MASK_PERMISSION_FLAGS, flags);
+                                        PackageManager.MASK_PERMISSION_FLAGS_ALL, flags);
                         } else {
                             permissionsState.updatePermissionFlags(bp, userId,
-                                    PackageManager.MASK_PERMISSION_FLAGS, flags);
+                                    PackageManager.MASK_PERMISSION_FLAGS_ALL, flags);
                         }
 
                     } break;

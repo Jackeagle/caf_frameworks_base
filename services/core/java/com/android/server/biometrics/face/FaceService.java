@@ -32,18 +32,24 @@ import android.hardware.biometrics.IBiometricServiceLockoutResetCallback;
 import android.hardware.biometrics.IBiometricServiceReceiverInternal;
 import android.hardware.biometrics.face.V1_0.IBiometricsFace;
 import android.hardware.biometrics.face.V1_0.IBiometricsFaceClientCallback;
+import android.hardware.biometrics.face.V1_0.OptionalBool;
 import android.hardware.biometrics.face.V1_0.Status;
 import android.hardware.face.Face;
 import android.hardware.face.FaceManager;
 import android.hardware.face.IFaceService;
 import android.hardware.face.IFaceServiceReceiver;
 import android.os.Binder;
+import android.os.Build;
 import android.os.Environment;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.SELinux;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.UserManager;
+import android.service.restricted_image.RestrictedImageProto;
+import android.service.restricted_image.RestrictedImageSetProto;
+import android.service.restricted_image.RestrictedImagesDumpProto;
 import android.util.Slog;
 import android.util.proto.ProtoOutputStream;
 
@@ -51,9 +57,12 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.util.DumpUtils;
 import com.android.server.SystemServerInitThreadPool;
+import com.android.server.biometrics.AuthenticationClient;
 import com.android.server.biometrics.BiometricServiceBase;
 import com.android.server.biometrics.BiometricUtils;
+import com.android.server.biometrics.EnumerateClient;
 import com.android.server.biometrics.Metrics;
+import com.android.server.biometrics.RemovalClient;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -79,8 +88,6 @@ public class FaceService extends BiometricServiceBase {
     private static final String FACE_DATA_DIR = "facedata";
     private static final String ACTION_LOCKOUT_RESET =
             "com.android.server.biometrics.face.ACTION_LOCKOUT_RESET";
-    private static final int MAX_FAILED_ATTEMPTS_LOCKOUT_TIMED = 3;
-    private static final int MAX_FAILED_ATTEMPTS_LOCKOUT_PERMANENT = 12;
     private static final int CHALLENGE_TIMEOUT_SEC = 600; // 10 minutes
 
     private final class FaceAuthClient extends AuthenticationClientImpl {
@@ -96,6 +103,25 @@ public class FaceService extends BiometricServiceBase {
         protected int statsModality() {
             return FaceService.this.statsModality();
         }
+
+        @Override
+        public boolean shouldFrameworkHandleLockout() {
+            return false;
+        }
+
+        @Override
+        public boolean onAuthenticated(BiometricAuthenticator.Identifier identifier,
+                boolean authenticated, ArrayList<Byte> token) {
+            final boolean result = super.onAuthenticated(identifier, authenticated, token);
+
+            // For face, the authentication lifecycle ends either when
+            // 1) Authenticated == true
+            // 2) Error occurred
+            // 3) Authenticated == false
+            // Fingerprint currently does not end when the third condition is met which is a bug,
+            // but let's leave it as-is for now.
+            return result || !authenticated;
+        }
     }
 
     /**
@@ -106,6 +132,7 @@ public class FaceService extends BiometricServiceBase {
         /**
          * The following methods contain common code which is shared in biometrics/common.
          */
+
         @Override // Binder call
         public long generateChallenge(IBinder token) {
             checkPermission(MANAGE_BIOMETRIC);
@@ -139,7 +166,7 @@ public class FaceService extends BiometricServiceBase {
                 }
             };
 
-            enrollInternal(client, UserHandle.getCallingUserId());
+            enrollInternal(client, mCurrentUserId);
         }
 
         @Override // Binder call
@@ -168,6 +195,7 @@ public class FaceService extends BiometricServiceBase {
                 String opPackageName, int cookie, int callingUid, int callingPid,
                 int callingUserId) {
             checkPermission(USE_BIOMETRIC_INTERNAL);
+            updateActiveGroup(groupId, opPackageName);
             final boolean restricted = true; // BiometricPrompt is always restricted
             final AuthenticationClientImpl client = new FaceAuthClient(getContext(),
                     mDaemonWrapper, mHalDeviceId, token,
@@ -215,15 +243,14 @@ public class FaceService extends BiometricServiceBase {
             }
 
             final boolean restricted = isRestricted();
-            final RemovalClientImpl client = new RemovalClientImpl(getContext(), mDaemonWrapper,
-                    mHalDeviceId, token, new ServiceListenerImpl(receiver), faceId, 0 /* groupId */,
-                    userId, restricted, token.toString()) {
+            final RemovalClient client = new RemovalClient(getContext(), getMetrics(),
+                    mDaemonWrapper, mHalDeviceId, token, new ServiceListenerImpl(receiver), faceId,
+                    0 /* groupId */, userId, restricted, token.toString(), getBiometricUtils()) {
                 @Override
                 protected int statsModality() {
                     return FaceService.this.statsModality();
                 }
             };
-            client.setShouldNotifyUserActivity(true);
             removeInternal(client);
         }
 
@@ -233,9 +260,9 @@ public class FaceService extends BiometricServiceBase {
             checkPermission(MANAGE_BIOMETRIC);
 
             final boolean restricted = isRestricted();
-            final EnumerateClientImpl client = new EnumerateClientImpl(getContext(), mDaemonWrapper,
-                    mHalDeviceId, token, new ServiceListenerImpl(receiver), userId, userId,
-                    restricted, getContext().getOpPackageName()) {
+            final EnumerateClient client = new EnumerateClient(getContext(), getMetrics(),
+                    mDaemonWrapper, mHalDeviceId, token, new ServiceListenerImpl(receiver), userId,
+                    userId, restricted, getContext().getOpPackageName()) {
                 @Override
                 protected int statsModality() {
                     return FaceService.this.statsModality();
@@ -259,7 +286,9 @@ public class FaceService extends BiometricServiceBase {
 
             final long ident = Binder.clearCallingIdentity();
             try {
-                if (args.length > 0 && "--proto".equals(args[0])) {
+                if (args.length == 1 && "--restricted_image".equals(args[0])) {
+                    dumpRestrictedImage(fd);
+                } else if (args.length > 0 && "--proto".equals(args[0])) {
                     dumpProto(fd);
                 } else {
                     dumpInternal(pw);
@@ -316,7 +345,7 @@ public class FaceService extends BiometricServiceBase {
                 return null;
             }
 
-            return FaceService.this.getEnrolledFaces(userId);
+            return FaceService.this.getEnrolledTemplates(userId);
         }
 
         @Override // Binder call
@@ -353,45 +382,78 @@ public class FaceService extends BiometricServiceBase {
         }
 
         @Override // Binder call
-        public void resetTimeout(byte[] token) {
+        public void resetLockout(byte[] token) {
             checkPermission(MANAGE_BIOMETRIC);
-            // TODO: confirm security token when we move timeout management into the HAL layer.
-            mHandler.post(mResetFailedAttemptsForCurrentUserRunnable);
+
+            if (!FaceService.this.hasEnrolledBiometrics(mCurrentUserId)) {
+                Slog.w(TAG, "Ignoring lockout reset, no templates enrolled");
+                return;
+            }
+
+            try {
+                mDaemonWrapper.resetLockout(token);
+            } catch (RemoteException e) {
+                Slog.e(getTag(), "Unable to reset lockout", e);
+            }
         }
 
         @Override
-        public int setFeature(int feature, boolean enabled, final byte[] token) {
+        public void setFeature(int feature, boolean enabled, final byte[] token,
+                IFaceServiceReceiver receiver) {
             checkPermission(MANAGE_BIOMETRIC);
 
-            final ArrayList<Byte> byteToken = new ArrayList<>();
-            for (int i = 0; i < token.length; i++) {
-                byteToken.add(token[i]);
-            }
+            mHandler.post(() -> {
+                if (!FaceService.this.hasEnrolledBiometrics(mCurrentUserId)) {
+                    Slog.e(TAG, "No enrolled biometrics while setting feature: " + feature);
+                    return;
+                }
 
-            int result;
-            try {
-                result = mDaemon != null ? mDaemon.setFeature(feature, enabled, byteToken)
-                        : Status.INTERNAL_ERROR;
-            } catch (RemoteException e) {
-                Slog.e(getTag(), "Unable to set feature: " + feature + " to enabled:" + enabled,
-                        e);
-                result = Status.INTERNAL_ERROR;
-            }
+                final ArrayList<Byte> byteToken = new ArrayList<>();
+                for (int i = 0; i < token.length; i++) {
+                    byteToken.add(token[i]);
+                }
 
-            return result;
+                // TODO: Support multiple faces
+                final int faceId = getFirstTemplateForUser(mCurrentUserId);
+
+                if (mDaemon != null) {
+                    try {
+                        final int result = mDaemon.setFeature(feature, enabled, byteToken, faceId);
+                        receiver.onFeatureSet(result == Status.OK, feature);
+                    } catch (RemoteException e) {
+                        Slog.e(getTag(), "Unable to set feature: " + feature
+                                        + " to enabled:" + enabled, e);
+                    }
+                }
+            });
+
         }
 
         @Override
-        public boolean getFeature(int feature) {
+        public void getFeature(int feature, IFaceServiceReceiver receiver) {
             checkPermission(MANAGE_BIOMETRIC);
 
-            boolean result = true;
-            try {
-                result = mDaemon != null ? mDaemon.getFeature(feature) : true;
-            } catch (RemoteException e) {
-                Slog.e(getTag(), "Unable to getRequireAttention", e);
-            }
-            return result;
+            mHandler.post(() -> {
+                // This should ideally return tri-state, but the user isn't shown settings unless
+                // they are enrolled so it's fine for now.
+                if (!FaceService.this.hasEnrolledBiometrics(mCurrentUserId)) {
+                    Slog.e(TAG, "No enrolled biometrics while getting feature: " + feature);
+                    return;
+                }
+
+                // TODO: Support multiple faces
+                final int faceId = getFirstTemplateForUser(mCurrentUserId);
+
+                if (mDaemon != null) {
+                    try {
+                        OptionalBool result = mDaemon.getFeature(feature, faceId);
+                        receiver.onFeatureGet(result.status == Status.OK, feature, result.value);
+                    } catch (RemoteException e) {
+                        Slog.e(getTag(), "Unable to getRequireAttention", e);
+                    }
+                }
+            });
+
         }
 
         @Override
@@ -405,6 +467,15 @@ public class FaceService extends BiometricServiceBase {
                     Slog.e(getTag(), "Unable to send userActivity", e);
                 }
             }
+        }
+
+        // TODO: Support multiple faces
+        private int getFirstTemplateForUser(int user) {
+            final List<Face> faces = FaceService.this.getEnrolledTemplates(user);
+            if (!faces.isEmpty()) {
+                return faces.get(0).getBiometricId();
+            }
+            return 0;
         }
     }
 
@@ -510,7 +581,8 @@ public class FaceService extends BiometricServiceBase {
         public void onEnumerated(BiometricAuthenticator.Identifier identifier, int remaining)
                 throws RemoteException {
             if (mFaceServiceReceiver != null) {
-
+                mFaceServiceReceiver.onEnumerated(identifier.getDeviceId(),
+                        identifier.getBiometricId(), remaining);
             }
         }
     }
@@ -519,75 +591,115 @@ public class FaceService extends BiometricServiceBase {
 
     @GuardedBy("this")
     private IBiometricsFace mDaemon;
-    private long mHalDeviceId;
+    // One of the AuthenticationClient constants
+    private int mCurrentUserLockoutMode;
 
     /**
      * Receives callbacks from the HAL.
      */
     private IBiometricsFaceClientCallback mDaemonCallback =
             new IBiometricsFaceClientCallback.Stub() {
-                @Override
-                public void onEnrollResult(final long deviceId, int faceId, int userId,
-                        int remaining) {
-                    mHandler.post(() -> {
-                        final Face face = new Face(getBiometricUtils()
-                                .getUniqueName(getContext(), userId), faceId, deviceId);
-                        FaceService.super.handleEnrollResult(face, remaining);
-                    });
+        @Override
+        public void onEnrollResult(final long deviceId, int faceId, int userId,
+                int remaining) {
+            mHandler.post(() -> {
+                final Face face = new Face(getBiometricUtils()
+                        .getUniqueName(getContext(), userId), faceId, deviceId);
+                FaceService.super.handleEnrollResult(face, remaining);
+            });
+        }
+
+        @Override
+        public void onAcquired(final long deviceId, final int userId,
+                final int acquiredInfo,
+                final int vendorCode) {
+            mHandler.post(() -> {
+                FaceService.super.handleAcquired(deviceId, acquiredInfo, vendorCode);
+            });
+        }
+
+        @Override
+        public void onAuthenticated(final long deviceId, final int faceId, final int userId,
+                ArrayList<Byte> token) {
+            mHandler.post(() -> {
+                Face face = new Face("", faceId, deviceId);
+                FaceService.super.handleAuthenticated(face, token);
+            });
+        }
+
+        @Override
+        public void onError(final long deviceId, final int userId, final int error,
+                final int vendorCode) {
+            mHandler.post(() -> {
+                FaceService.super.handleError(deviceId, error, vendorCode);
+
+                // TODO: this chunk of code should be common to all biometric services
+                if (error == BiometricConstants.BIOMETRIC_ERROR_HW_UNAVAILABLE) {
+                    // If we get HW_UNAVAILABLE, try to connect again later...
+                    Slog.w(TAG, "Got ERROR_HW_UNAVAILABLE; try reconnecting next client.");
+                    synchronized (this) {
+                        mDaemon = null;
+                        mHalDeviceId = 0;
+                        mCurrentUserId = UserHandle.USER_NULL;
+                    }
+                }
+            });
+        }
+
+        @Override
+        public void onRemoved(final long deviceId, ArrayList<Integer> faceIds, final int userId) {
+            mHandler.post(() -> {
+                if (!faceIds.isEmpty()) {
+                    for (int i = 0; i < faceIds.size(); i++) {
+                        final Face face = new Face("", faceIds.get(i), deviceId);
+                        // Convert to old behavior
+                        FaceService.super.handleRemoved(face, faceIds.size() - i - 1);
+                    }
+                } else {
+                    final Face face = new Face("", 0 /* identifier */, deviceId);
+                    FaceService.super.handleRemoved(face, 0 /* remaining */);
                 }
 
-                @Override
-                public void onAcquired(final long deviceId, final int userId,
-                        final int acquiredInfo,
-                        final int vendorCode) {
-                    mHandler.post(() -> {
-                        FaceService.super.handleAcquired(deviceId, acquiredInfo, vendorCode);
-                    });
-                }
+            });
+        }
 
-                @Override
-                public void onAuthenticated(final long deviceId, final int faceId, final int userId,
-                        ArrayList<Byte> token) {
-                    mHandler.post(() -> {
-                        Face face = new Face("", faceId, deviceId);
-                        FaceService.super.handleAuthenticated(face, token);
-                    });
+        @Override
+        public void onEnumerate(long deviceId, ArrayList<Integer> faceIds, int userId)
+                throws RemoteException {
+            mHandler.post(() -> {
+                if (!faceIds.isEmpty()) {
+                    for (int i = 0; i < faceIds.size(); i++) {
+                        final Face face = new Face("", faceIds.get(i), deviceId);
+                        // Convert to old old behavior
+                        FaceService.super.handleEnumerate(face, faceIds.size() - i - 1);
+                    }
+                } else {
+                    // For face, the HIDL contract is to receive an empty list when there are no
+                    // templates enrolled. Send a null identifier since we don't consume them
+                    // anywhere, and send remaining == 0 to plumb this with existing common code.
+                    FaceService.super.handleEnumerate(null /* identifier */, 0);
                 }
+            });
+        }
 
-                @Override
-                public void onError(final long deviceId, final int userId, final int error,
-                        final int vendorCode) {
-                    mHandler.post(() -> {
-                        FaceService.super.handleError(deviceId, error, vendorCode);
+        @Override
+        public void onLockoutChanged(long duration) {
+            Slog.d(TAG, "onLockoutChanged: " + duration);
+            if (duration == 0) {
+                mCurrentUserLockoutMode = AuthenticationClient.LOCKOUT_NONE;
+            } else if (duration == Long.MAX_VALUE) {
+                mCurrentUserLockoutMode = AuthenticationClient.LOCKOUT_PERMANENT;
+            } else {
+                mCurrentUserLockoutMode = AuthenticationClient.LOCKOUT_TIMED;
+            }
 
-                        // TODO: this chunk of code should be common to all biometric services
-                        if (error == BiometricConstants.BIOMETRIC_ERROR_HW_UNAVAILABLE) {
-                            // If we get HW_UNAVAILABLE, try to connect again later...
-                            Slog.w(TAG, "Got ERROR_HW_UNAVAILABLE; try reconnecting next client.");
-                            synchronized (this) {
-                                mDaemon = null;
-                                mHalDeviceId = 0;
-                                mCurrentUserId = UserHandle.USER_NULL;
-                            }
-                        }
-                    });
+            mHandler.post(() -> {
+                if (duration == 0) {
+                    notifyLockoutResetMonitors();
                 }
-
-                @Override
-                public void onRemoved(final long deviceId, final int faceId, final int userId,
-                        final int remaining) {
-                    mHandler.post(() -> {
-                        final Face face = new Face("", faceId, deviceId);
-                        FaceService.super.handleRemoved(face, remaining);
-                    });
-                }
-
-                @Override
-                public void onEnumerate(long deviceId, ArrayList<Integer> faceIds, int userId)
-                        throws RemoteException {
-                    // TODO
-                }
-            };
+            });
+        }
+    };
 
     /**
      * Wraps the HAL-specific code and is passed to the ClientMonitor implementations so that they
@@ -646,8 +758,21 @@ public class FaceService extends BiometricServiceBase {
             for (int i = 0; i < cryptoToken.length; i++) {
                 token.add(cryptoToken[i]);
             }
-            // TODO: plumb requireAttention down from framework
             return daemon.enroll(token, timeout, disabledFeatures);
+        }
+
+        @Override
+        public void resetLockout(byte[] cryptoToken) throws RemoteException {
+            IBiometricsFace daemon = getFaceDaemon();
+            if (daemon == null) {
+                Slog.w(TAG, "resetLockout(): no face HAL!");
+                return;
+            }
+            final ArrayList<Byte> token = new ArrayList<>();
+            for (int i = 0; i < cryptoToken.length; i++) {
+                token.add(cryptoToken[i]);
+            }
+            daemon.resetLockout(token);
         }
     };
 
@@ -669,18 +794,13 @@ public class FaceService extends BiometricServiceBase {
     }
 
     @Override
+    protected DaemonWrapper getDaemonWrapper() {
+        return mDaemonWrapper;
+    }
+
+    @Override
     protected BiometricUtils getBiometricUtils() {
         return FaceUtils.getInstance();
-    }
-
-    @Override
-    protected int getFailedAttemptsLockoutTimed() {
-        return MAX_FAILED_ATTEMPTS_LOCKOUT_TIMED;
-    }
-
-    @Override
-    protected int getFailedAttemptsLockoutPermanent() {
-        return MAX_FAILED_ATTEMPTS_LOCKOUT_PERMANENT;
     }
 
     @Override
@@ -692,9 +812,9 @@ public class FaceService extends BiometricServiceBase {
     protected boolean hasReachedEnrollmentLimit(int userId) {
         final int limit = getContext().getResources().getInteger(
                 com.android.internal.R.integer.config_faceMaxTemplatesPerUser);
-        final int enrolled = FaceService.this.getEnrolledFaces(userId).size();
+        final int enrolled = FaceService.this.getEnrolledTemplates(userId).size();
         if (enrolled >= limit) {
-            Slog.w(TAG, "Too many faces registered");
+            Slog.w(TAG, "Too many faces registered, user: " + userId);
             return true;
         }
         return false;
@@ -704,6 +824,8 @@ public class FaceService extends BiometricServiceBase {
     public void serviceDied(long cookie) {
         super.serviceDied(cookie);
         mDaemon = null;
+
+        mCurrentUserId = UserHandle.USER_NULL; // Force updateActiveGroup() to re-evaluate
     }
 
     @Override
@@ -758,7 +880,9 @@ public class FaceService extends BiometricServiceBase {
 
     @Override
     protected void handleUserSwitching(int userId) {
-        updateActiveGroup(userId, null);
+        super.handleUserSwitching(userId);
+        // Will be updated when we get the callback from HAL
+        mCurrentUserLockoutMode = AuthenticationClient.LOCKOUT_NONE;
     }
 
     @Override
@@ -777,13 +901,17 @@ public class FaceService extends BiometricServiceBase {
     @Override
     protected void checkUseBiometricPermission() {
         // noop for Face. The permission checks are all done on the incoming binder call.
-        // TODO: Perhaps do the same in FingerprintService
     }
 
     @Override
     protected boolean checkAppOps(int uid, String opPackageName) {
         return mAppOps.noteOp(AppOpsManager.OP_USE_BIOMETRIC, uid, opPackageName)
                 == AppOpsManager.MODE_ALLOWED;
+    }
+
+    @Override
+    protected List<Face> getEnrolledTemplates(int userId) {
+        return getBiometricUtils().getBiometricsForUser(getContext(), userId);
     }
 
     @Override
@@ -794,6 +922,11 @@ public class FaceService extends BiometricServiceBase {
     @Override
     protected int statsModality() {
         return BiometricsProtoEnums.MODALITY_FACE;
+    }
+
+    @Override
+    protected int getLockoutMode() {
+        return mCurrentUserLockoutMode;
     }
 
     /** Gets the face daemon */
@@ -825,6 +958,7 @@ public class FaceService extends BiometricServiceBase {
             if (mHalDeviceId != 0) {
                 loadAuthenticatorIds();
                 updateActiveGroup(ActivityManager.getCurrentUser(), null);
+                doTemplateCleanupForUser(ActivityManager.getCurrentUser());
             } else {
                 Slog.w(TAG, "Failed to open Face HAL!");
                 MetricsLogger.count(getContext(), "faced_openhal_error", 1);
@@ -860,10 +994,6 @@ public class FaceService extends BiometricServiceBase {
             Slog.e(TAG, "startRevokeChallenge failed", e);
         }
         return 0;
-    }
-
-    private List<Face> getEnrolledFaces(int userId) {
-        return getBiometricUtils().getBiometricsForUser(getContext(), userId);
     }
 
     private void dumpInternal(PrintWriter pw) {
@@ -946,5 +1076,82 @@ public class FaceService extends BiometricServiceBase {
         proto.flush();
         mPerformanceMap.clear();
         mCryptoPerformanceMap.clear();
+    }
+
+    private void dumpRestrictedImage(FileDescriptor fd) {
+        // WARNING: CDD restricts image data from leaving TEE unencrypted on
+        //          production devices:
+        // [C-1-10] MUST not allow unencrypted access to identifiable biometric
+        //          data or any data derived from it (such as embeddings) to the
+        //         Application Processor outside the context of the TEE.
+        //  As such, this API should only be enabled for testing purposes on
+        //  engineering and userdebug builds.  All modules in the software stack
+        //  MUST enforce final build products do NOT have this functionality.
+        //  Additionally, the following check MUST NOT be removed.
+        if (!(Build.IS_ENG || Build.IS_USERDEBUG)) {
+            return;
+        }
+
+        // Additionally, this flag allows turning off face for a device
+        // (either permanently through the build or on an individual device).
+        if (SystemProperties.getBoolean("ro.face.disable_debug_data", false)
+                || SystemProperties.getBoolean("persist.face.disable_debug_data", false)) {
+            return;
+        }
+
+        final ProtoOutputStream proto = new ProtoOutputStream(fd);
+
+        final long setToken = proto.start(RestrictedImagesDumpProto.SETS);
+
+        // Name of the service
+        proto.write(RestrictedImageSetProto.CATEGORY, "face");
+
+        // Individual images
+        for (int i = 0; i < 5; i++) {
+            final long imageToken = proto.start(RestrictedImageSetProto.IMAGES);
+            proto.write(RestrictedImageProto.MIME_TYPE, "image/png");
+            proto.write(RestrictedImageProto.IMAGE_DATA, new byte[] {
+                    // png image data
+                    -119,   80,   78,   71,   13,   10,   26,   10,
+                       0,    0,    0,   13,   73,   72,   68,   82,
+                       0,    0,    0,  100,    0,    0,    0,  100,
+                       1,    3,    0,    0,    0,   74,   44,    7,
+                      23,    0,    0,    0,    4,  103,   65,   77,
+                      65,    0,    0,  -79, -113,   11,   -4,   97,
+                       5,    0,    0,    0,    1,  115,   82,   71,
+                      66,    0,  -82,  -50,   28,  -23,    0,    0,
+                       0,    6,   80,   76,   84,   69,   -1,   -1,
+                      -1,    0,    0,    0,   85,  -62,  -45,  126,
+                       0,    0,    0, -115,   73,   68,   65,   84,
+                      56,  -53,  -19,  -46,  -79,   17, -128,   32,
+                      12,    5,  -48,  120,   22, -106, -116,  -32,
+                      40,  -84,  101, -121,  -93,   57,   10,   35,
+                      88,   82,  112,  126,    3,  -60,  104,    6,
+                    -112,   70,  127,  -59,  -69,  -53,   29,   33,
+                    -127,  -24,   79,  -49,  -52,  -15,   41,   36,
+                      34, -105,   85,  124,  -14,   88,   27,    6,
+                      28,   68,    1,   82,   62,   22,  -95, -108,
+                      55,  -95,   40,   -9, -110,  -12,   98, -107,
+                      76,  -41, -105,  -62,  -50,  111,  -60,   46,
+                     -14,   -4,   24,  -89,   42, -103,   16,   63,
+                     -72,  -11,  -15,   48,  -62,  102,  -44,  102,
+                     -73,  -56,   56,  -21, -128,   92,  -70, -124,
+                     117,  -46,  -67,  -77,   82,   80,  121,  -44,
+                     -56,  116,   93,  -45,  -90,   -5,  -29,  -24,
+                     -83,  -75,   52,  -34,   55,  -22,  102,  -21,
+                    -105, -124,  -23,   71,   87,   -7,  -25,  -59,
+                    -100,  -73,  -92, -122,   -7, -109,  -49,  -80,
+                     -89,    0,    0,    0,    0,   73,   69,   78,
+                      68,  -82,   66,   96, -126
+            });
+            // proto.write(RestrictedImageProto.METADATA, flattened_protobuf);
+            proto.end(imageToken);
+        }
+
+        // Face service metadata
+        // proto.write(RestrictedImageSetProto.METADATA, flattened_protobuf);
+
+        proto.end(setToken);
+        proto.flush();
     }
 }

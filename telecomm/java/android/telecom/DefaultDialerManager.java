@@ -16,13 +16,11 @@ package android.telecom;
 
 import android.app.ActivityManager;
 import android.app.role.RoleManager;
-import android.app.role.RoleManagerCallback;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
-import android.content.pm.ServiceInfo;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Binder;
@@ -35,9 +33,11 @@ import com.android.internal.util.CollectionUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 
 /**
  * Class for managing the default dialer application that will receive incoming calls, and be
@@ -76,11 +76,18 @@ public class DefaultDialerManager {
             int user) {
         long identity = Binder.clearCallingIdentity();
         try {
-            RoleManagerCallback.Future cb = new RoleManagerCallback.Future();
+            CompletableFuture<Void> future = new CompletableFuture<>();
+            Consumer<Boolean> callback = successful -> {
+                if (successful) {
+                    future.complete(null);
+                } else {
+                    future.completeExceptionally(new RuntimeException());
+                }
+            };
             context.getSystemService(RoleManager.class).addRoleHolderAsUser(
-                    RoleManager.ROLE_DIALER, packageName, UserHandle.of(user),
-                    AsyncTask.THREAD_POOL_EXECUTOR, cb);
-            cb.get(5, TimeUnit.SECONDS);
+                    RoleManager.ROLE_DIALER, packageName, 0, UserHandle.of(user),
+                    AsyncTask.THREAD_POOL_EXECUTOR, callback);
+            future.get(5, TimeUnit.SECONDS);
             return true;
         } catch (InterruptedException | ExecutionException | TimeoutException e) {
             Slog.e(TAG, "Failed to set default dialer to " + packageName + " for user " + user, e);
@@ -163,9 +170,7 @@ public class DefaultDialerManager {
 
         final Intent dialIntentWithTelScheme = new Intent(Intent.ACTION_DIAL);
         dialIntentWithTelScheme.setData(Uri.fromParts(PhoneAccount.SCHEME_TEL, "", null));
-        packageNames = filterByIntent(context, packageNames, dialIntentWithTelScheme, userId);
-        packageNames = requireInCallService(packageNames, userId, context);
-        return packageNames;
+        return filterByIntent(context, packageNames, dialIntentWithTelScheme, userId);
     }
 
     public static List<String> getInstalledDialerApplications(Context context) {
@@ -223,35 +228,6 @@ public class DefaultDialerManager {
         return result;
     }
 
-    private static List<String> requireInCallService(List<String> packageNames, int userId,
-            Context context) {
-        if (packageNames == null || packageNames.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        final Intent intent = new Intent(InCallService.SERVICE_INTERFACE);
-        final List<ResolveInfo> resolveInfoList = context.getPackageManager()
-                .queryIntentServicesAsUser(intent, PackageManager.GET_META_DATA, userId);
-        final List<String> result = new ArrayList<>();
-        final int length = resolveInfoList.size();
-        for (int i = 0; i < length; i++) {
-            final ServiceInfo info = resolveInfoList.get(i).serviceInfo;
-            if (info == null || info.metaData == null) {
-                continue;
-            }
-            if (!info.metaData.getBoolean(TelecomManager.METADATA_IN_CALL_SERVICE_UI)) {
-                continue;
-            }
-            if (info.metaData.getBoolean(TelecomManager.METADATA_IN_CALL_SERVICE_CAR_MODE_UI)) {
-                continue;
-            }
-            if (packageNames.contains(info.packageName) && !result.contains(info.packageName)) {
-                result.add(info.packageName);
-            }
-        }
-
-        return result;
-    }
 
     private static TelecomManager getTelecomManager(Context context) {
         return (TelecomManager) context.getSystemService(Context.TELECOM_SERVICE);

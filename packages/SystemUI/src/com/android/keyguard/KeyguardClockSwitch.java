@@ -1,9 +1,22 @@
 package com.android.keyguard;
 
+import static com.android.systemui.util.InjectionInflationController.VIEW_CONTEXT;
+
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.AnimatorSet;
+import android.animation.ValueAnimator;
+import android.app.WallpaperManager;
 import android.content.Context;
 import android.graphics.Paint;
 import android.graphics.Paint.Style;
+import android.transition.ChangeBounds;
+import android.transition.Transition;
+import android.transition.TransitionManager;
+import android.transition.TransitionValues;
 import android.util.AttributeSet;
+import android.util.MathUtils;
+import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
@@ -12,13 +25,22 @@ import android.widget.TextClock;
 
 import androidx.annotation.VisibleForTesting;
 
+import com.android.internal.colorextraction.ColorExtractor;
+import com.android.internal.colorextraction.ColorExtractor.OnColorsChangedListener;
 import com.android.keyguard.clock.ClockManager;
-import com.android.systemui.Dependency;
+import com.android.systemui.Interpolators;
+import com.android.systemui.colorextraction.SysuiColorExtractor;
 import com.android.systemui.plugins.ClockPlugin;
+import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.statusbar.StatusBarState;
-import com.android.systemui.statusbar.StatusBarStateController;
 
+import java.io.FileDescriptor;
+import java.io.PrintWriter;
+import java.util.Arrays;
 import java.util.TimeZone;
+
+import javax.inject.Inject;
+import javax.inject.Named;
 
 /**
  * Switch to show plugin clock when plugin is connected, otherwise it will show default clock.
@@ -26,58 +48,100 @@ import java.util.TimeZone;
 public class KeyguardClockSwitch extends RelativeLayout {
 
     /**
+     * Controller used to track StatusBar state to know when to show the big_clock_container.
+     */
+    private final StatusBarStateController mStatusBarStateController;
+
+    /**
+     * Color extractor used to apply colors from wallpaper to custom clock faces.
+     */
+    private final SysuiColorExtractor mSysuiColorExtractor;
+
+    /**
+     * Manager used to know when to show a custom clock face.
+     */
+    private final ClockManager mClockManager;
+
+    /**
+     * Layout transition that scales the default clock face.
+     */
+    private final Transition mTransition;
+
+    /**
      * Optional/alternative clock injected via plugin.
      */
     private ClockPlugin mClockPlugin;
+
     /**
      * Default clock.
      */
     private TextClock mClockView;
+
     /**
      * Frame for default and custom clock.
      */
     private FrameLayout mSmallClockFrame;
+
     /**
      * Container for big custom clock.
      */
     private ViewGroup mBigClockContainer;
+
     /**
-     * Status area (date and other stuff) shown below the clock. Plugin can decide whether
-     * or not to show it below the alternate clock.
+     * Status area (date and other stuff) shown below the clock. Plugin can decide whether or not to
+     * show it below the alternate clock.
      */
     private View mKeyguardStatusArea;
+
     /**
      * Maintain state so that a newly connected plugin can be initialized.
      */
     private float mDarkAmount;
 
+    /**
+     * If the Keyguard Slice has a header (big center-aligned text.)
+     */
+    private boolean mShowingHeader;
+    private boolean mSupportsDarkText;
+    private int[] mColorPalette;
+
+    /**
+     * Track the state of the status bar to know when to hide the big_clock_container.
+     */
+    private int mStatusBarState;
+
     private final StatusBarStateController.StateListener mStateListener =
             new StatusBarStateController.StateListener() {
                 @Override
                 public void onStateChanged(int newState) {
-                    if (mBigClockContainer == null) {
-                        return;
-                    }
-                    if (newState == StatusBarState.SHADE) {
-                        if (mBigClockContainer.getVisibility() == View.VISIBLE) {
-                            mBigClockContainer.setVisibility(View.INVISIBLE);
-                        }
-                    } else {
-                        if (mBigClockContainer.getVisibility() == View.INVISIBLE) {
-                            mBigClockContainer.setVisibility(View.VISIBLE);
-                        }
-                    }
+                    mStatusBarState = newState;
+                    updateBigClockVisibility();
                 }
-    };
+            };
 
     private ClockManager.ClockChangedListener mClockChangedListener = this::setClockPlugin;
 
-    public KeyguardClockSwitch(Context context) {
-        this(context, null);
-    }
+    /**
+     * Listener for changes to the color palette.
+     *
+     * The color palette changes when the wallpaper is changed.
+     */
+    private final OnColorsChangedListener mColorsListener = (extractor, which) -> {
+        if ((which & WallpaperManager.FLAG_LOCK) != 0) {
+            updateColors();
+        }
+    };
 
-    public KeyguardClockSwitch(Context context, AttributeSet attrs) {
+    @Inject
+    public KeyguardClockSwitch(@Named(VIEW_CONTEXT) Context context, AttributeSet attrs,
+            StatusBarStateController statusBarStateController, SysuiColorExtractor colorExtractor,
+            ClockManager clockManager) {
         super(context, attrs);
+        mStatusBarStateController = statusBarStateController;
+        mStatusBarState = mStatusBarStateController.getState();
+        mSysuiColorExtractor = colorExtractor;
+        mClockManager = clockManager;
+        mTransition = new ClockBoundsTransition();
     }
 
     /**
@@ -98,15 +162,19 @@ public class KeyguardClockSwitch extends RelativeLayout {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        Dependency.get(ClockManager.class).addOnClockChangedListener(mClockChangedListener);
-        Dependency.get(StatusBarStateController.class).addCallback(mStateListener);
+        mClockManager.addOnClockChangedListener(mClockChangedListener);
+        mStatusBarStateController.addCallback(mStateListener);
+        mSysuiColorExtractor.addOnColorsChangedListener(mColorsListener);
+        updateColors();
     }
 
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
-        Dependency.get(ClockManager.class).removeOnClockChangedListener(mClockChangedListener);
-        Dependency.get(StatusBarStateController.class).removeCallback(mStateListener);
+        mClockManager.removeOnClockChangedListener(mClockChangedListener);
+        mStatusBarStateController.removeCallback(mStateListener);
+        mSysuiColorExtractor.removeOnColorsChangedListener(mColorsListener);
+        setClockPlugin(null);
     }
 
     private void setClockPlugin(ClockPlugin plugin) {
@@ -118,8 +186,9 @@ public class KeyguardClockSwitch extends RelativeLayout {
             }
             if (mBigClockContainer != null) {
                 mBigClockContainer.removeAllViews();
-                mBigClockContainer.setVisibility(View.GONE);
+                updateBigClockVisibility();
             }
+            mClockPlugin.onDestroyView();
             mClockPlugin = null;
         }
         if (plugin == null) {
@@ -138,7 +207,7 @@ public class KeyguardClockSwitch extends RelativeLayout {
         View bigClockView = plugin.getBigClockView();
         if (bigClockView != null && mBigClockContainer != null) {
             mBigClockContainer.addView(bigClockView);
-            mBigClockContainer.setVisibility(View.VISIBLE);
+            updateBigClockVisibility();
         }
         // Hide default clock.
         if (!plugin.shouldShowStatusArea()) {
@@ -149,6 +218,9 @@ public class KeyguardClockSwitch extends RelativeLayout {
         mClockPlugin.setStyle(getPaint().getStyle());
         mClockPlugin.setTextColor(getCurrentTextColor());
         mClockPlugin.setDarkAmount(mDarkAmount);
+        if (mColorPalette != null) {
+            mClockPlugin.setColorPalette(mSupportsDarkText, mColorPalette);
+        }
     }
 
     /**
@@ -159,10 +231,10 @@ public class KeyguardClockSwitch extends RelativeLayout {
             View bigClockView = mClockPlugin.getBigClockView();
             if (bigClockView != null) {
                 container.addView(bigClockView);
-                container.setVisibility(View.VISIBLE);
             }
         }
         mBigClockContainer = container;
+        updateBigClockVisibility();
     }
 
     /**
@@ -203,6 +275,7 @@ public class KeyguardClockSwitch extends RelativeLayout {
 
     /**
      * Set the amount (ratio) that the device has transitioned to doze.
+     *
      * @param darkAmount Amount of transition to doze: 1f for doze and 0f for awake.
      */
     public void setDarkAmount(float darkAmount) {
@@ -224,16 +297,13 @@ public class KeyguardClockSwitch extends RelativeLayout {
         return mClockView.getTextSize();
     }
 
+    /**
+     * Refresh the time of the clock, due to either time tick broadcast or doze time tick alarm.
+     */
     public void refresh() {
         mClockView.refresh();
-    }
-
-    /**
-     * Notifies that time tick alarm from doze service fired.
-     */
-    public void dozeTimeTick() {
         if (mClockPlugin != null) {
-            mClockPlugin.dozeTimeTick();
+            mClockPlugin.onTimeTick();
         }
     }
 
@@ -246,13 +316,134 @@ public class KeyguardClockSwitch extends RelativeLayout {
         }
     }
 
-    @VisibleForTesting (otherwise = VisibleForTesting.NONE)
+    private void updateColors() {
+        ColorExtractor.GradientColors colors = mSysuiColorExtractor.getColors(
+                WallpaperManager.FLAG_LOCK, true);
+        mSupportsDarkText = colors.supportsDarkText();
+        mColorPalette = colors.getColorPalette();
+        if (mClockPlugin != null) {
+            mClockPlugin.setColorPalette(mSupportsDarkText, mColorPalette);
+        }
+    }
+
+    private void updateBigClockVisibility() {
+        if (mBigClockContainer == null) {
+            return;
+        }
+        final boolean inDisplayState = mStatusBarState == StatusBarState.KEYGUARD
+                || mStatusBarState == StatusBarState.SHADE_LOCKED;
+        final int visibility =
+                inDisplayState && mBigClockContainer.getChildCount() != 0 ? View.VISIBLE
+                        : View.GONE;
+        if (mBigClockContainer.getVisibility() != visibility) {
+            mBigClockContainer.setVisibility(visibility);
+        }
+    }
+
+    /**
+     * Sets if the keyguard slice is showing a center-aligned header. We need a smaller clock in
+     * these
+     * cases.
+     */
+    public void setKeyguardShowingHeader(boolean hasHeader) {
+        if (mShowingHeader == hasHeader || hasCustomClock()) {
+            return;
+        }
+        mShowingHeader = hasHeader;
+
+        TransitionManager.beginDelayedTransition((ViewGroup) mClockView.getParent(), mTransition);
+        int fontSize = mContext.getResources().getDimensionPixelSize(mShowingHeader
+                ? R.dimen.widget_small_font_size : R.dimen.widget_big_font_size);
+        int paddingBottom = mContext.getResources().getDimensionPixelSize(mShowingHeader
+                ? R.dimen.widget_vertical_padding_clock : R.dimen.header_subtitle_padding);
+        mClockView.setTextSize(TypedValue.COMPLEX_UNIT_PX, fontSize);
+        mClockView.setPadding(mClockView.getPaddingLeft(), mClockView.getPaddingTop(),
+                mClockView.getPaddingRight(), paddingBottom);
+    }
+
+    @VisibleForTesting(otherwise = VisibleForTesting.NONE)
     ClockManager.ClockChangedListener getClockChangedListener() {
         return mClockChangedListener;
     }
 
-    @VisibleForTesting (otherwise = VisibleForTesting.NONE)
+    @VisibleForTesting(otherwise = VisibleForTesting.NONE)
     StatusBarStateController.StateListener getStateListener() {
         return mStateListener;
+    }
+
+    public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
+        pw.println("KeyguardClockSwitch:");
+        pw.println("  mClockPlugin: " + mClockPlugin);
+        pw.println("  mClockView: " + mClockView);
+        pw.println("  mSmallClockFrame: " + mSmallClockFrame);
+        pw.println("  mBigClockContainer: " + mBigClockContainer);
+        pw.println("  mKeyguardStatusArea: " + mKeyguardStatusArea);
+        pw.println("  mDarkAmount: " + mDarkAmount);
+        pw.println("  mShowingHeader: " + mShowingHeader);
+        pw.println("  mSupportsDarkText: " + mSupportsDarkText);
+        pw.println("  mColorPalette: " + Arrays.toString(mColorPalette));
+    }
+
+    /**
+     * Special layout transition that scales the clock view as its bounds change, to make it look
+     * like
+     * the text is shrinking.
+     */
+    private class ClockBoundsTransition extends ChangeBounds {
+
+        ClockBoundsTransition() {
+            setDuration(KeyguardSliceView.DEFAULT_ANIM_DURATION / 2);
+            setInterpolator(Interpolators.LINEAR_OUT_SLOW_IN);
+        }
+
+        @Override
+        public Animator createAnimator(ViewGroup sceneRoot, TransitionValues startValues,
+                TransitionValues endValues) {
+            Animator animator = super.createAnimator(sceneRoot, startValues, endValues);
+            if (animator == null || startValues.view != mClockView) {
+                return animator;
+            }
+
+            ValueAnimator boundsAnimator = null;
+            if (animator instanceof AnimatorSet) {
+                Animator first = ((AnimatorSet) animator).getChildAnimations().get(0);
+                if (first instanceof ValueAnimator) {
+                    boundsAnimator = (ValueAnimator) first;
+                }
+            } else if (animator instanceof ValueAnimator) {
+                boundsAnimator = (ValueAnimator) animator;
+            }
+
+            if (boundsAnimator != null) {
+                float bigFontSize = mContext.getResources()
+                        .getDimensionPixelSize(R.dimen.widget_big_font_size);
+                float smallFontSize = mContext.getResources()
+                        .getDimensionPixelSize(R.dimen.widget_small_font_size);
+                float startScale = mShowingHeader
+                        ? bigFontSize / smallFontSize : smallFontSize / bigFontSize;
+                boundsAnimator.addUpdateListener(animation -> {
+                    float scale = MathUtils.lerp(startScale, 1f /* stop */,
+                            animation.getAnimatedFraction());
+                    mClockView.setPivotX(mClockView.getWidth() / 2f);
+                    mClockView.setPivotY(0);
+                    mClockView.setScaleX(scale);
+                    mClockView.setScaleY(scale);
+                });
+                boundsAnimator.addListener(new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationEnd(Animator animator) {
+                        mClockView.setScaleX(1f);
+                        mClockView.setScaleY(1f);
+                    }
+
+                    @Override
+                    public void onAnimationCancel(Animator animator) {
+                        onAnimationEnd(animator);
+                    }
+                });
+            }
+
+            return animator;
+        }
     }
 }

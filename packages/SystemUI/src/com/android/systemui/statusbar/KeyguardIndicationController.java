@@ -47,7 +47,8 @@ import com.android.settingslib.Utils;
 import com.android.systemui.Dependency;
 import com.android.systemui.Interpolators;
 import com.android.systemui.R;
-import com.android.systemui.statusbar.StatusBarStateController.StateListener;
+import com.android.systemui.plugins.statusbar.StatusBarStateController;
+import com.android.systemui.plugins.statusbar.StatusBarStateController.StateListener;
 import com.android.systemui.statusbar.phone.KeyguardIndicationTextView;
 import com.android.systemui.statusbar.phone.LockIcon;
 import com.android.systemui.statusbar.phone.StatusBarKeyguardViewManager;
@@ -82,7 +83,7 @@ public class KeyguardIndicationController implements StateListener {
 
     private final int mSlowThreshold;
     private final int mFastThreshold;
-    private LockIcon mLockIcon;
+    private final LockIcon mLockIcon;
     private StatusBarKeyguardViewManager mStatusBarKeyguardViewManager;
 
     private String mRestingIndication;
@@ -129,7 +130,7 @@ public class KeyguardIndicationController implements StateListener {
                 mTextView.getTextColors() : ColorStateList.valueOf(Color.WHITE);
         mDisclosure = indicationArea.findViewById(R.id.keyguard_indication_enterprise_disclosure);
         mLockIcon = lockIcon;
-        mWakeLock = new SettableWakeLock(wakeLock);
+        mWakeLock = new SettableWakeLock(wakeLock, TAG);
 
         Resources res = context.getResources();
         mSlowThreshold = res.getInteger(R.integer.config_chargingSlowlyThreshold);
@@ -307,11 +308,23 @@ public class KeyguardIndicationController implements StateListener {
             // Walk down a precedence-ordered list of what indication
             // should be shown based on user or device state
             if (mDozing) {
+                // When dozing we ignore any text color and use white instead, because
+                // colors can be hard to read in low brightness.
+                mTextView.setTextColor(Color.WHITE);
                 if (!TextUtils.isEmpty(mTransientIndication)) {
-                    mTextView.setTextColor(Color.WHITE);
                     mTextView.switchIndication(mTransientIndication);
+                } else if (mPowerPluggedIn) {
+                    String indication = computePowerIndication();
+                    if (animate) {
+                        animateText(mTextView, indication);
+                    } else {
+                        mTextView.switchIndication(indication);
+                    }
+                } else {
+                    String percentage = NumberFormat.getPercentInstance()
+                            .format(mBatteryLevel / 100f);
+                    mTextView.switchIndication(percentage);
                 }
-                updateAlphas();
                 return;
             }
 
@@ -349,14 +362,6 @@ public class KeyguardIndicationController implements StateListener {
                 mTextView.switchIndication(mRestingIndication);
                 mTextView.setTextColor(mInitialTextColorState);
             }
-        }
-    }
-
-    private void updateAlphas() {
-        if (!TextUtils.isEmpty(mTransientIndication)) {
-            mTextView.setAlpha(1f);
-        } else {
-            mTextView.setAlpha(1f - mDarkAmount);
         }
     }
 
@@ -423,22 +428,28 @@ public class KeyguardIndicationController implements StateListener {
         final boolean hasChargingTime = chargingTimeRemaining > 0;
 
         int chargingId;
-        switch (mChargingSpeed) {
-            case KeyguardUpdateMonitor.BatteryStatus.CHARGING_FAST:
-                chargingId = hasChargingTime
-                        ? R.string.keyguard_indication_charging_time_fast
-                        : R.string.keyguard_plugged_in_charging_fast;
-                break;
-            case KeyguardUpdateMonitor.BatteryStatus.CHARGING_SLOWLY:
-                chargingId = hasChargingTime
-                        ? R.string.keyguard_indication_charging_time_slowly
-                        : R.string.keyguard_plugged_in_charging_slowly;
-                break;
-            default:
-                chargingId = hasChargingTime
-                        ? R.string.keyguard_indication_charging_time
-                        : R.string.keyguard_plugged_in;
-                break;
+        if (mPowerPluggedInWired) {
+            switch (mChargingSpeed) {
+                case KeyguardUpdateMonitor.BatteryStatus.CHARGING_FAST:
+                    chargingId = hasChargingTime
+                            ? R.string.keyguard_indication_charging_time_fast
+                            : R.string.keyguard_plugged_in_charging_fast;
+                    break;
+                case KeyguardUpdateMonitor.BatteryStatus.CHARGING_SLOWLY:
+                    chargingId = hasChargingTime
+                            ? R.string.keyguard_indication_charging_time_slowly
+                            : R.string.keyguard_plugged_in_charging_slowly;
+                    break;
+                default:
+                    chargingId = hasChargingTime
+                            ? R.string.keyguard_indication_charging_time
+                            : R.string.keyguard_plugged_in;
+                    break;
+            }
+        } else {
+            chargingId = hasChargingTime
+                    ? R.string.keyguard_indication_charging_time_wireless
+                    : R.string.keyguard_plugged_in_wireless;
         }
 
         String percentage = NumberFormat.getPercentInstance()
@@ -516,14 +527,6 @@ public class KeyguardIndicationController implements StateListener {
         pw.println("  computePowerIndication(): " + computePowerIndication());
     }
 
-    public void setDarkAmount(float darkAmount) {
-        if (mDarkAmount == darkAmount) {
-            return;
-        }
-        mDarkAmount = darkAmount;
-        updateAlphas();
-    }
-
     @Override
     public void onStateChanged(int newState) {
         // don't care
@@ -536,7 +539,6 @@ public class KeyguardIndicationController implements StateListener {
 
     protected class BaseKeyguardCallback extends KeyguardUpdateMonitorCallback {
         public static final int HIDE_DELAY_MS = 5000;
-        private int mLastSuccessiveErrorMessage = -1;
 
         @Override
         public void onRefreshBatteryInfo(KeyguardUpdateMonitor.BatteryStatus status) {
@@ -574,21 +576,14 @@ public class KeyguardIndicationController implements StateListener {
             if (!updateMonitor.isUnlockingWithBiometricAllowed()) {
                 return;
             }
-            ColorStateList errorColorState = Utils.getColorError(mContext);
+            animatePadlockError();
             if (mStatusBarKeyguardViewManager.isBouncerShowing()) {
                 mStatusBarKeyguardViewManager.showBouncerMessage(helpString,
-                        errorColorState);
+                        mInitialTextColorState);
             } else if (updateMonitor.isScreenOn()) {
-                mLockIcon.setTransientBiometricsError(true);
-                showTransientIndication(helpString, errorColorState);
+                showTransientIndication(helpString);
                 hideTransientIndicationDelayed(TRANSIENT_BIOMETRIC_ERROR_TIMEOUT);
-                mHandler.removeMessages(MSG_CLEAR_BIOMETRIC_MSG);
-                mHandler.sendMessageDelayed(mHandler.obtainMessage(MSG_CLEAR_BIOMETRIC_MSG),
-                        TRANSIENT_BIOMETRIC_ERROR_TIMEOUT);
             }
-            // Help messages indicate that there was actually a try since the last error, so those
-            // are not two successive error messages anymore.
-            mLastSuccessiveErrorMessage = -1;
         }
 
         @Override
@@ -598,24 +593,23 @@ public class KeyguardIndicationController implements StateListener {
             if (shouldSuppressBiometricError(msgId, biometricSourceType, updateMonitor)) {
                 return;
             }
-            ColorStateList errorColorState = Utils.getColorError(mContext);
+            animatePadlockError();
             if (mStatusBarKeyguardViewManager.isBouncerShowing()) {
-                // When swiping up right after receiving a biometric error, the bouncer calls
-                // authenticate leading to the same message being shown again on the bouncer.
-                // We want to avoid this, as it may confuse the user when the message is too
-                // generic.
-                if (mLastSuccessiveErrorMessage != msgId) {
-                    mStatusBarKeyguardViewManager.showBouncerMessage(errString,
-                            errorColorState);
-                }
+                mStatusBarKeyguardViewManager.showBouncerMessage(errString, mInitialTextColorState);
             } else if (updateMonitor.isScreenOn()) {
-                showTransientIndication(errString, errorColorState);
+                showTransientIndication(errString);
                 // We want to keep this message around in case the screen was off
                 hideTransientIndicationDelayed(HIDE_DELAY_MS);
             } else {
                 mMessageToShowOnScreenOn = errString;
             }
-            mLastSuccessiveErrorMessage = msgId;
+        }
+
+        private void animatePadlockError() {
+            mLockIcon.setTransientBiometricsError(true);
+            mHandler.removeMessages(MSG_CLEAR_BIOMETRIC_MSG);
+            mHandler.sendMessageDelayed(mHandler.obtainMessage(MSG_CLEAR_BIOMETRIC_MSG),
+                    TRANSIENT_BIOMETRIC_ERROR_TIMEOUT);
         }
 
         private boolean shouldSuppressBiometricError(int msgId,
@@ -659,6 +653,9 @@ public class KeyguardIndicationController implements StateListener {
         public void onBiometricRunningStateChanged(boolean running,
                 BiometricSourceType biometricSourceType) {
             if (running) {
+                // Let's hide any previous messages when authentication starts, otherwise
+                // multiple auth attempts would overlap.
+                hideTransientIndication();
                 mMessageToShowOnScreenOn = null;
             }
         }
@@ -666,13 +663,7 @@ public class KeyguardIndicationController implements StateListener {
         @Override
         public void onBiometricAuthenticated(int userId, BiometricSourceType biometricSourceType) {
             super.onBiometricAuthenticated(userId, biometricSourceType);
-            mLastSuccessiveErrorMessage = -1;
-        }
-
-        @Override
-        public void onBiometricAuthFailed(BiometricSourceType biometricSourceType) {
-            super.onBiometricAuthFailed(biometricSourceType);
-            mLastSuccessiveErrorMessage = -1;
+            mHandler.sendEmptyMessage(MSG_HIDE_TRANSIENT);
         }
 
         @Override
@@ -680,6 +671,11 @@ public class KeyguardIndicationController implements StateListener {
             if (mVisible) {
                 updateIndication(false);
             }
+        }
+
+        @Override
+        public void onKeyguardBouncerChanged(boolean bouncer) {
+            mLockIcon.setBouncerVisible(bouncer);
         }
     };
 }

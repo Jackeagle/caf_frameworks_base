@@ -34,6 +34,7 @@
     <string name="keyguard_password_wrong_pin_code" msgid="6535018036285012028">"Cod PIN incorect."</string>
     <string name="keyguard_sim_error_message_short" msgid="592109500618448312">"Card nevalid"</string>
     <string name="keyguard_charged" msgid="3316115607283493413">"Complet încărcată"</string>
+    <string name="keyguard_plugged_in_wireless" msgid="3004717438401575235">"<xliff:g id="PERCENTAGE">%s</xliff:g> • Încărcare Wireless"</string>
     <string name="keyguard_plugged_in" msgid="3161102098900158923">"<xliff:g id="PERCENTAGE">%s</xliff:g> • Se încarcă"</string>
     <string name="keyguard_plugged_in_charging_fast" msgid="3684592786276709342">"<xliff:g id="PERCENTAGE">%s</xliff:g> • Se încarcă rapid"</string>
     <string name="keyguard_plugged_in_charging_slowly" msgid="509533586841478405">"<xliff:g id="PERCENTAGE">%s</xliff:g> • Se încarcă lent"</string>
@@ -158,7 +159,11 @@
       <item quantity="other">Cardul SIM este dezactivat acum. Introduceți codul PUK pentru a continua. V-au mai rămas <xliff:g id="_NUMBER_1">%d</xliff:g> de încercări până când cardul SIM va deveni inutilizabil definitiv. Contactați operatorul pentru detalii.</item>
       <item quantity="one">Cardul SIM este dezactivat acum. Introduceți codul PUK pentru a continua. V-a mai rămas <xliff:g id="_NUMBER_0">%d</xliff:g> încercare până când cardul SIM va deveni inutilizabil definitiv. Contactați operatorul pentru detalii.</item>
     </plurals>
-    <string name="type_clock_header" msgid="4786545441902447636">"Este"</string>
+    <plurals name="type_clock_header" formatted="false" msgid="6782840450655632763">
+      <item quantity="few">"<annotation name="color">"Este"</annotation>\n"^1\n^2</item>
+      <item quantity="other">"<annotation name="color">"Este"</annotation>\n"^1\n^2</item>
+      <item quantity="one">"<annotation name="color">"Este"</annotation>\n"^1\n^2</item>
+    </plurals>
   <string-array name="type_clock_hours">
     <item msgid="3543074812389379830">"Douăsprezece"</item>
     <item msgid="7389464214252023751">"Unu"</item>
@@ -175,15 +180,15 @@
   </string-array>
   <string-array name="type_clock_minutes">
     <item msgid="8322049385467207985">"."</item>
-    <item msgid="8837126587669001578">"și unu"</item>
-    <item msgid="4294343372940455660">"și două"</item>
-    <item msgid="7129166637707421536">"și trei"</item>
-    <item msgid="7579404865008788673">"și patru"</item>
-    <item msgid="3873924689207380586">"și cinci"</item>
-    <item msgid="4849565597850069377">"și șase"</item>
-    <item msgid="4404219424523572364">"și șapte"</item>
-    <item msgid="8740481214764087329">"și opt"</item>
-    <item msgid="1713216865806811237">"și nouă"</item>
+    <item msgid="2091812961809760681">"Ora unu"</item>
+    <item msgid="1496435384877290709">"Ora două"</item>
+    <item msgid="881846472976674129">"Ora trei"</item>
+    <item msgid="2784477043911540584">"Ora patru"</item>
+    <item msgid="1610928853656700614">"Ora cinci"</item>
+    <item msgid="2317806244043886658">"Ora șase"</item>
+    <item msgid="3318687539120971327">"Ora șapte"</item>
+    <item msgid="5701600693712102348">"Ora opt"</item>
+    <item msgid="3247381605947372495">"Ora nouă"</item>
     <item msgid="3508406095411245038">"Zece"</item>
     <item msgid="7161996337755311711">"Unsprezece"</item>
     <item msgid="4044549963329624197">"Douăsprezece"</item>

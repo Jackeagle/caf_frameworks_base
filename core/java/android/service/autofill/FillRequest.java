@@ -71,6 +71,14 @@ public final class FillRequest implements Parcelable {
      */
     public static final int FLAG_COMPATIBILITY_MODE_REQUEST = 0x2;
 
+    // Private flags below start from the highest-significative bit (0x80000000)
+    /**
+     * Request was only triggered for augmented autofill.
+     *
+     * @hide
+     */
+    public static final int FLAG_AUGMENTED_AUTOFILL_REQUEST = 0x80000000;
+
     /** @hide */
     public static final int INVALID_REQUEST_ID = Integer.MIN_VALUE;
 
@@ -115,7 +123,8 @@ public final class FillRequest implements Parcelable {
     /**
      * Gets the flags associated with this request.
      *
-     * @see #FLAG_MANUAL_REQUEST
+     * @return any combination of {@link #FLAG_MANUAL_REQUEST} and
+     *         {@link #FLAG_COMPATIBILITY_MODE_REQUEST}.
      */
     public @RequestFlags int getFlags() {
         return mFlags;
@@ -167,7 +176,7 @@ public final class FillRequest implements Parcelable {
         parcel.writeInt(mFlags);
     }
 
-    public static final Parcelable.Creator<FillRequest> CREATOR =
+    public static final @android.annotation.NonNull Parcelable.Creator<FillRequest> CREATOR =
             new Parcelable.Creator<FillRequest>() {
         @Override
         public FillRequest createFromParcel(Parcel parcel) {

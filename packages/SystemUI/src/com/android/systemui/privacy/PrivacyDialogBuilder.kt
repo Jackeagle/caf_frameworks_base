@@ -18,11 +18,10 @@ import android.content.Context
 import android.graphics.drawable.Drawable
 import com.android.systemui.R
 
-class PrivacyDialogBuilder(val context: Context, itemsList: List<PrivacyItem>) {
+class PrivacyDialogBuilder(private val context: Context, itemsList: List<PrivacyItem>) {
 
     val appsAndTypes: List<Pair<PrivacyApplication, List<PrivacyType>>>
     val types: List<PrivacyType>
-    val app: PrivacyApplication?
     private val separator = context.getString(R.string.ongoing_privacy_dialog_separator)
     private val lastSeparator = context.getString(R.string.ongoing_privacy_dialog_last_separator)
 
@@ -32,8 +31,6 @@ class PrivacyDialogBuilder(val context: Context, itemsList: List<PrivacyItem>) {
                 .sortedWith(compareBy({ -it.second.size }, // Sort by number of AppOps
                         { it.second.min() })) // Sort by "smallest" AppOpp (Location is largest)
         types = itemsList.map { it.privacyType }.distinct().sorted()
-        val singleApp = appsAndTypes.size == 1
-        app = if (singleApp) appsAndTypes[0].first else null
     }
 
     fun generateIconsForApp(types: List<PrivacyType>): List<Drawable> {
@@ -54,15 +51,6 @@ class PrivacyDialogBuilder(val context: Context, itemsList: List<PrivacyItem>) {
             0 -> ""
             1 -> types[0].getName(context)
             else -> types.map { it.getName(context) }.joinWithAnd().toString()
-        }
-    }
-
-    fun getDialogTitle(): String {
-        if (app != null) {
-            return context.getString(R.string.ongoing_privacy_dialog_single_app_title, joinTypes())
-        } else {
-            return context.getString(R.string.ongoing_privacy_dialog_multiple_apps_title,
-                    joinTypes())
         }
     }
 }

@@ -125,13 +125,11 @@ public final class TextLinks implements Parcelable {
     /**
      * Returns the extended data.
      *
-     * <p><b>NOTE: </b>Each call to this method returns a new bundle copy so clients should
-     * prefer to hold a reference to the returned bundle rather than frequently calling this
-     * method.
+     * <p><b>NOTE: </b>Do not modify this bundle.
      */
     @NonNull
     public Bundle getExtras() {
-        return mExtras.deepCopy();
+        return mExtras;
     }
 
     /**
@@ -180,7 +178,7 @@ public final class TextLinks implements Parcelable {
         dest.writeBundle(mExtras);
     }
 
-    public static final Parcelable.Creator<TextLinks> CREATOR =
+    public static final @android.annotation.NonNull Parcelable.Creator<TextLinks> CREATOR =
             new Parcelable.Creator<TextLinks>() {
                 @Override
                 public TextLinks createFromParcel(Parcel in) {
@@ -315,7 +313,7 @@ public final class TextLinks implements Parcelable {
             return new TextLink(start, end, entityConfidence, extras, null /* urlSpan */);
         }
 
-        public static final Parcelable.Creator<TextLink> CREATOR =
+        public static final @android.annotation.NonNull Parcelable.Creator<TextLink> CREATOR =
                 new Parcelable.Creator<TextLink>() {
                     @Override
                     public TextLink createFromParcel(Parcel in) {
@@ -413,13 +411,11 @@ public final class TextLinks implements Parcelable {
         /**
          * Returns the extended data.
          *
-         * <p><b>NOTE: </b>Each call to this method returns a new bundle copy so clients should
-         * prefer to hold a reference to the returned bundle rather than frequently calling this
-         * method.
+         * <p><b>NOTE: </b>Do not modify this bundle.
          */
         @NonNull
         public Bundle getExtras() {
-            return mExtras.deepCopy();
+            return mExtras;
         }
 
         /**
@@ -528,7 +524,7 @@ public final class TextLinks implements Parcelable {
             return request;
         }
 
-        public static final Parcelable.Creator<Request> CREATOR =
+        public static final @android.annotation.NonNull Parcelable.Creator<Request> CREATOR =
                 new Parcelable.Creator<Request>() {
                     @Override
                     public Request createFromParcel(Parcel in) {
@@ -692,6 +688,7 @@ public final class TextLinks implements Parcelable {
          *
          * @return this builder
          */
+        @NonNull
         public Builder setExtras(@Nullable Bundle extras) {
             mExtras = extras;
             return this;

@@ -33,7 +33,11 @@ import android.media.IVolumeController;
 import android.media.PlayerBase;
 import android.media.VolumePolicy;
 import android.media.audiopolicy.AudioPolicyConfig;
+import android.media.audiopolicy.AudioProductStrategies;
+import android.media.audiopolicy.AudioVolumeGroups;
 import android.media.audiopolicy.IAudioPolicyCallback;
+import android.media.projection.IMediaProjection;
+import android.net.Uri;
 
 /**
  * {@hide}
@@ -63,6 +67,7 @@ interface IAudioService {
 
     void adjustStreamVolume(int streamType, int direction, int flags, String callingPackage);
 
+    @UnsupportedAppUsage
     void setStreamVolume(int streamType, int index, int flags, String callingPackage);
 
     boolean isStreamMute(int streamType);
@@ -73,13 +78,27 @@ interface IAudioService {
 
     void setMasterMute(boolean mute, int flags, String callingPackage, int userId);
 
+    @UnsupportedAppUsage
     int getStreamVolume(int streamType);
 
     int getStreamMinVolume(int streamType);
 
+    @UnsupportedAppUsage
     int getStreamMaxVolume(int streamType);
 
+    AudioVolumeGroups listAudioVolumeGroups();
+
+    void setVolumeIndexForAttributes(in AudioAttributes aa, int index, int flags, String callingPackage);
+
+    int getVolumeIndexForAttributes(in AudioAttributes aa);
+
+    int getMaxVolumeIndexForAttributes(in AudioAttributes aa);
+
+    int getMinVolumeIndexForAttributes(in AudioAttributes aa);
+
     int getLastAudibleStreamVolume(int streamType);
+
+    AudioProductStrategies getAudioProductStrategies();
 
     void setMicrophoneMute(boolean on, String callingPackage, int userId);
 
@@ -153,9 +172,10 @@ interface IAudioService {
 
     void handleBluetoothA2dpDeviceConfigChange(in BluetoothDevice device);
 
-    int handleBluetoothA2dpActiveDeviceChange(in BluetoothDevice device,
+    void handleBluetoothA2dpActiveDeviceChange(in BluetoothDevice device,
             int state, int profile, boolean suppressNoisyIntent, int a2dpVolume);
 
+    @UnsupportedAppUsage
     AudioRoutesInfo startWatchingRoutes(in IAudioRoutesObserver observer);
 
     boolean isCameraSoundForced();
@@ -176,9 +196,12 @@ interface IAudioService {
 
     String registerAudioPolicy(in AudioPolicyConfig policyConfig,
             in IAudioPolicyCallback pcb, boolean hasFocusListener, boolean isFocusPolicy,
-            boolean isVolumeController);
+            boolean isTestFocusPolicy,
+            boolean isVolumeController, in IMediaProjection projection);
 
     oneway void unregisterAudioPolicyAsync(in IAudioPolicyCallback pcb);
+
+    void unregisterAudioPolicy(in IAudioPolicyCallback pcb);
 
     int addMixForPolicy(in AudioPolicyConfig policyConfig, in IAudioPolicyCallback pcb);
 
@@ -209,10 +232,10 @@ interface IAudioService {
 
     oneway void playerHasOpPlayAudio(in int piid, in boolean hasOpPlayAudio);
 
-    int setBluetoothHearingAidDeviceConnectionState(in BluetoothDevice device,
+    void setBluetoothHearingAidDeviceConnectionState(in BluetoothDevice device,
             int state, boolean suppressNoisyIntent, int musicDevice);
 
-    int setBluetoothA2dpDeviceConnectionStateSuppressNoisyIntent(in BluetoothDevice device,
+    void setBluetoothA2dpDeviceConnectionStateSuppressNoisyIntent(in BluetoothDevice device,
             int state, int profile, boolean suppressNoisyIntent, int a2dpVolume);
 
     oneway void setFocusRequestResultFromExtPolicy(in AudioFocusInfo afi, int requestResult,
@@ -228,6 +251,8 @@ interface IAudioService {
              in String[] deviceAddresses);
 
     int removeUidDeviceAffinity(in IAudioPolicyCallback pcb, in int uid);
+
+    boolean hasHapticChannels(in Uri uri);
 
     // WARNING: read warning at top of file, new methods that need to be used by native
     // code via IAudioManager.h need to be added to the top section.

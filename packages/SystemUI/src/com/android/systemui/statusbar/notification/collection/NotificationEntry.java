@@ -21,6 +21,7 @@ import static android.app.Notification.CATEGORY_CALL;
 import static android.app.Notification.CATEGORY_EVENT;
 import static android.app.Notification.CATEGORY_MESSAGE;
 import static android.app.Notification.CATEGORY_REMINDER;
+import static android.app.Notification.FLAG_BUBBLE;
 import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_AMBIENT;
 import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_FULL_SCREEN_INTENT;
 import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_NOTIFICATION_LIST;
@@ -40,6 +41,7 @@ import android.os.SystemClock;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.SnoozeCriterion;
 import android.service.notification.StatusBarNotification;
+import android.text.TextUtils;
 import android.util.ArraySet;
 import android.view.View;
 import android.widget.ImageView;
@@ -50,12 +52,13 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.statusbar.StatusBarIcon;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.ContrastColorUtil;
+import com.android.systemui.R;
 import com.android.systemui.statusbar.InflationTask;
 import com.android.systemui.statusbar.StatusBarIconView;
 import com.android.systemui.statusbar.notification.InflationException;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
+import com.android.systemui.statusbar.notification.row.NotificationContentInflater.InflationFlag;
 import com.android.systemui.statusbar.notification.row.NotificationGuts;
-import com.android.systemui.statusbar.notification.row.NotificationInflater;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -105,6 +108,14 @@ public final class NotificationEntry {
     /** Smart replies provided by the NotificationAssistantService. */
     @NonNull
     public CharSequence[] systemGeneratedSmartReplies = new CharSequence[0];
+
+    /**
+     * If {@link android.app.RemoteInput#getEditChoicesBeforeSending} is enabled, and the user is
+     * currently editing a choice (smart reply), then this field contains the information about the
+     * suggestion being edited. Otherwise <code>null</code>.
+     */
+    public EditedSuggestionInfo editedSuggestionInfo;
+
     @VisibleForTesting
     public int suppressedVisualEffects;
     public boolean suspended;
@@ -138,9 +149,10 @@ public final class NotificationEntry {
     private boolean hasSentReply;
 
     /**
-     * Whether this notification should be displayed as a bubble.
+     * Whether this notification has been approved globally, at the app level, and at the channel
+     * level for bubbling.
      */
-    private boolean mIsBubble;
+    public boolean canBubble;
 
     /**
      * Whether this notification should be shown in the shade when it is also displayed as a bubble.
@@ -189,6 +201,7 @@ public final class NotificationEntry {
                 : ranking.getSmartReplies().toArray(new CharSequence[0]);
         suppressedVisualEffects = ranking.getSuppressedVisualEffects();
         suspended = ranking.isSuspended();
+        canBubble = ranking.canBubble();
     }
 
     public void setInterruption() {
@@ -207,12 +220,8 @@ public final class NotificationEntry {
         this.mHighPriority = highPriority;
     }
 
-    public void setIsBubble(boolean bubbleable) {
-        mIsBubble = bubbleable;
-    }
-
     public boolean isBubble() {
-        return mIsBubble;
+        return (notification.getNotification().flags & FLAG_BUBBLE) != 0;
     }
 
     public void setBubbleDismissed(boolean userDismissed) {
@@ -386,6 +395,72 @@ public final class NotificationEntry {
     }
 
     /**
+     * Returns our best guess for the most relevant text summary of the latest update to this
+     * notification, based on its type. Returns null if there should not be an update message.
+     */
+    public CharSequence getUpdateMessage(Context context) {
+        final Notification underlyingNotif = notification.getNotification();
+        final Class<? extends Notification.Style> style = underlyingNotif.getNotificationStyle();
+
+        try {
+            if (Notification.BigTextStyle.class.equals(style)) {
+                // Return the big text, it is big so probably important. If it's not there use the
+                // normal text.
+                CharSequence bigText =
+                        underlyingNotif.extras.getCharSequence(Notification.EXTRA_BIG_TEXT);
+                return !TextUtils.isEmpty(bigText)
+                        ? bigText
+                        : underlyingNotif.extras.getCharSequence(Notification.EXTRA_TEXT);
+            } else if (Notification.MessagingStyle.class.equals(style)) {
+                final List<Notification.MessagingStyle.Message> messages =
+                        Notification.MessagingStyle.Message.getMessagesFromBundleArray(
+                                (Parcelable[]) underlyingNotif.extras.get(
+                                        Notification.EXTRA_MESSAGES));
+
+                final Notification.MessagingStyle.Message latestMessage =
+                        Notification.MessagingStyle.findLatestIncomingMessage(messages);
+
+                if (latestMessage != null) {
+                    final CharSequence personName = latestMessage.getSenderPerson() != null
+                            ? latestMessage.getSenderPerson().getName()
+                            : null;
+
+                    // Prepend the sender name if available since group chats also use messaging
+                    // style.
+                    if (!TextUtils.isEmpty(personName)) {
+                        return context.getResources().getString(
+                                R.string.notification_summary_message_format,
+                                personName,
+                                latestMessage.getText());
+                    } else {
+                        return latestMessage.getText();
+                    }
+                }
+            } else if (Notification.InboxStyle.class.equals(style)) {
+                CharSequence[] lines =
+                        underlyingNotif.extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES);
+
+                // Return the last line since it should be the most recent.
+                if (lines != null && lines.length > 0) {
+                    return lines[lines.length - 1];
+                }
+            } else if (Notification.MediaStyle.class.equals(style)) {
+                // Return nothing, media updates aren't typically useful as a text update.
+                return null;
+            } else {
+                // Default to text extra.
+                return underlyingNotif.extras.getCharSequence(Notification.EXTRA_TEXT);
+            }
+        } catch (ClassCastException | NullPointerException | ArrayIndexOutOfBoundsException e) {
+            // No use crashing, we'll just return null and the caller will assume there's no update
+            // message.
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    /**
      * Abort all existing inflation tasks
      */
     public void abortTask() {
@@ -500,7 +575,7 @@ public final class NotificationEntry {
         if (row != null) row.resetUserExpansion();
     }
 
-    public void freeContentViewWhenSafe(@NotificationInflater.InflationFlag int inflationFlag) {
+    public void freeContentViewWhenSafe(@InflationFlag int inflationFlag) {
         if (row != null) row.freeContentViewWhenSafe(inflationFlag);
     }
 
@@ -528,14 +603,6 @@ public final class NotificationEntry {
         return row == null || row.isRemoved();
     }
 
-    /**
-     * @return {@code true} if the row is null or dismissed
-     */
-    public boolean isDismissed() {
-        //TODO: recycling
-        return row == null || row.isDismissed();
-    }
-
     public boolean isRowPinned() {
         return row != null && row.isPinned();
     }
@@ -555,6 +622,12 @@ public final class NotificationEntry {
     public void setHeadsUp(boolean shouldHeadsUp) {
         if (row != null) row.setHeadsUp(shouldHeadsUp);
     }
+
+
+    public void setAmbientGoingAway(boolean goingAway) {
+        if (row != null) row.setAmbientGoingAway(goingAway);
+    }
+
 
     public boolean mustStayOnScreen() {
         return row != null && row.mustStayOnScreen();
@@ -607,10 +680,6 @@ public final class NotificationEntry {
         return null;
     }
 
-    public boolean hasLowPriorityStateUpdated() {
-        return row != null && row.hasLowPriorityStateUpdated();
-    }
-
     public void removeRow() {
         if (row != null) row.setRemoved();
     }
@@ -633,10 +702,6 @@ public final class NotificationEntry {
 
     public boolean isChildInGroup() {
         return parent == null;
-    }
-
-    public void setLowPriorityStateUpdated(boolean updated) {
-        if (row != null) row.setLowPriorityStateUpdated(updated);
     }
 
     /**
@@ -745,5 +810,24 @@ public final class NotificationEntry {
 
     private static boolean isCategory(String category, Notification n) {
         return Objects.equals(n.category, category);
+    }
+
+    /** Information about a suggestion that is being edited. */
+    public static class EditedSuggestionInfo {
+
+        /**
+         * The value of the suggestion (before any user edits).
+         */
+        public final CharSequence originalText;
+
+        /**
+         * The index of the suggestion that is being edited.
+         */
+        public final int index;
+
+        public EditedSuggestionInfo(CharSequence originalText, int index) {
+            this.originalText = originalText;
+            this.index = index;
+        }
     }
 }

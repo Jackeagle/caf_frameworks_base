@@ -83,6 +83,7 @@ import android.util.Pair;
 import android.util.Slog;
 import android.util.SparseArray;
 import android.util.SparseBooleanArray;
+import android.util.SparseIntArray;
 import android.util.SparseLongArray;
 import android.util.StatsLog;
 import android.util.TimeUtils;
@@ -195,6 +196,7 @@ class AlarmManagerService extends SystemService {
     private final Injector mInjector;
     int mBroadcastRefCount = 0;
     PowerManager.WakeLock mWakeLock;
+    SparseIntArray mAlarmsPerUid = new SparseIntArray();
     ArrayList<Alarm> mPendingNonWakeupAlarms = new ArrayList<>();
     ArrayList<InFlight> mInFlight = new ArrayList<>();
     private final ArrayList<AlarmManagerInternal.InFlightListener> mInFlightListeners =
@@ -393,6 +395,8 @@ class AlarmManagerService extends SystemService {
         @VisibleForTesting
         static final String KEY_LISTENER_TIMEOUT = "listener_timeout";
         @VisibleForTesting
+        static final String KEY_MAX_ALARMS_PER_UID = "max_alarms_per_uid";
+        @VisibleForTesting
         static final String KEY_APP_STANDBY_QUOTAS_ENABLED = "app_standby_quotas_enabled";
         private static final String KEY_APP_STANDBY_WINDOW = "app_standby_window";
         @VisibleForTesting
@@ -420,6 +424,7 @@ class AlarmManagerService extends SystemService {
         private static final long DEFAULT_ALLOW_WHILE_IDLE_LONG_TIME = 9*60*1000;
         private static final long DEFAULT_ALLOW_WHILE_IDLE_WHITELIST_DURATION = 10*1000;
         private static final long DEFAULT_LISTENER_TIMEOUT = 5 * 1000;
+        private static final int DEFAULT_MAX_ALARMS_PER_UID = 500;
         private static final boolean DEFAULT_APP_STANDBY_QUOTAS_ENABLED = true;
         private static final long DEFAULT_APP_STANDBY_WINDOW = 60 * 60 * 1000;  // 1 hr
         /**
@@ -461,6 +466,8 @@ class AlarmManagerService extends SystemService {
 
         // Direct alarm listener callback timeout
         public long LISTENER_TIMEOUT = DEFAULT_LISTENER_TIMEOUT;
+        public int MAX_ALARMS_PER_UID = DEFAULT_MAX_ALARMS_PER_UID;
+
         public boolean APP_STANDBY_QUOTAS_ENABLED = DEFAULT_APP_STANDBY_QUOTAS_ENABLED;
 
         public long APP_STANDBY_WINDOW = DEFAULT_APP_STANDBY_WINDOW;
@@ -549,6 +556,15 @@ class AlarmManagerService extends SystemService {
                     APP_STANDBY_QUOTAS[i] = mParser.getInt(KEYS_APP_STANDBY_QUOTAS[i],
                             Math.min(APP_STANDBY_QUOTAS[i - 1], DEFAULT_APP_STANDBY_QUOTAS[i]));
                 }
+
+                MAX_ALARMS_PER_UID = mParser.getInt(KEY_MAX_ALARMS_PER_UID,
+                        DEFAULT_MAX_ALARMS_PER_UID);
+                if (MAX_ALARMS_PER_UID < DEFAULT_MAX_ALARMS_PER_UID) {
+                    Slog.w(TAG, "Cannot set " + KEY_MAX_ALARMS_PER_UID + " lower than "
+                            + DEFAULT_MAX_ALARMS_PER_UID);
+                    MAX_ALARMS_PER_UID = DEFAULT_MAX_ALARMS_PER_UID;
+                }
+
                 updateAllowWhileIdleWhitelistDurationLocked();
             }
         }
@@ -589,6 +605,9 @@ class AlarmManagerService extends SystemService {
             pw.print(KEY_ALLOW_WHILE_IDLE_WHITELIST_DURATION); pw.print("=");
             TimeUtils.formatDuration(ALLOW_WHILE_IDLE_WHITELIST_DURATION, pw);
             pw.println();
+
+            pw.print(KEY_MAX_ALARMS_PER_UID); pw.print("=");
+            pw.println(MAX_ALARMS_PER_UID);
 
             for (int i = 0; i < KEYS_APP_STANDBY_DELAY.length; i++) {
                 pw.print(KEYS_APP_STANDBY_DELAY[i]); pw.print("=");
@@ -671,12 +690,6 @@ class AlarmManagerService extends SystemService {
 
         final ArrayList<Alarm> alarms = new ArrayList<Alarm>();
 
-        Batch() {
-            start = 0;
-            end = Long.MAX_VALUE;
-            flags = 0;
-        }
-
         Batch(Alarm seed) {
             start = seed.whenElapsed;
             end = clampPositive(seed.maxWhenElapsed);
@@ -728,11 +741,16 @@ class AlarmManagerService extends SystemService {
             return newStart;
         }
 
+        /**
+         * Remove an alarm from this batch.
+         * <p> <b> Should be used only while re-ordering the alarm within the service </b> as it
+         * does not update {@link #mAlarmsPerUid}
+         */
         boolean remove(Alarm alarm) {
-            return remove(a -> (a == alarm));
+            return remove(a -> (a == alarm), true);
         }
 
-        boolean remove(Predicate<Alarm> predicate) {
+        boolean remove(Predicate<Alarm> predicate, boolean reOrdering) {
             boolean didRemove = false;
             long newStart = 0;  // recalculate endpoints as we go
             long newEnd = Long.MAX_VALUE;
@@ -741,6 +759,9 @@ class AlarmManagerService extends SystemService {
                 Alarm alarm = alarms.get(i);
                 if (predicate.test(alarm)) {
                     alarms.remove(i);
+                    if (!reOrdering) {
+                        decrementAlarmCount(alarm.uid);
+                    }
                     didRemove = true;
                     if (alarm.alarmClock != null) {
                         mNextAlarmClockMayChange = true;
@@ -1676,6 +1697,8 @@ class AlarmManagerService extends SystemService {
             return;
         }
 
+        type = fixTypeIfAuto(type);
+
         // Sanity check the window length.  This will catch people mistakenly
         // trying to pass an end-of-window timestamp rather than a duration.
         if (windowLength > AlarmManager.INTERVAL_HALF_DAY) {
@@ -1734,6 +1757,15 @@ class AlarmManagerService extends SystemService {
                         + " tElapsed=" + triggerElapsed + " maxElapsed=" + maxElapsed
                         + " interval=" + interval + " flags=0x" + Integer.toHexString(flags));
             }
+            if (mAlarmsPerUid.get(callingUid, 0) >= mConstants.MAX_ALARMS_PER_UID) {
+                final String errorMsg =
+                        "Maximum limit of concurrent alarms " + mConstants.MAX_ALARMS_PER_UID
+                                + " reached for uid: " + UserHandle.formatUid(callingUid)
+                                + ", callingPackage: " + callingPackage;
+                // STOPSHIP (b/128866264): Just to catch breakages. Remove before final release.
+                Slog.wtf(TAG, errorMsg);
+                throw new UnsupportedOperationException(errorMsg);
+            }
             setImplLocked(type, triggerAtTime, triggerElapsed, windowLength, maxElapsed,
                     interval, operation, directReceiver, listenerTag, flags, true, workSource,
                     alarmClock, callingUid, callingPackage);
@@ -1756,6 +1788,7 @@ class AlarmManagerService extends SystemService {
         } catch (RemoteException e) {
         }
         removeLocked(operation, directReceiver);
+        incrementAlarmCount(a.uid);
         setImplLocked(a, false, doValidate);
     }
 
@@ -1778,6 +1811,21 @@ class AlarmManagerService extends SystemService {
             index = NEVER_INDEX;
         }
         return mConstants.APP_STANDBY_QUOTAS[index];
+    }
+
+    /**
+     * In case of cars, we need to avoid scheduling wakeup alarms, since we don't want the system
+     * to wake up from suspend arbitrarily to perform app work.
+     */
+    private int fixTypeIfAuto(int type) {
+        if (mInjector.isAutomotive()) {
+            if (type == AlarmManager.ELAPSED_REALTIME_WAKEUP) {
+                type = AlarmManager.ELAPSED_REALTIME;
+            } else if (type == AlarmManager.RTC_WAKEUP) {
+                type = AlarmManager.RTC;
+            }
+        }
+        return type;
     }
 
     /**
@@ -1991,6 +2039,11 @@ class AlarmManagerService extends SystemService {
      */
     private final class LocalService implements AlarmManagerInternal {
         @Override
+        public boolean isIdling() {
+            return isIdlingImpl();
+        }
+
+        @Override
         public void removeAlarmsForUid(int uid) {
             synchronized (mLock) {
                 removeLocked(uid);
@@ -2178,6 +2231,7 @@ class AlarmManagerService extends SystemService {
             pw.print("  mLastTickSet="); pw.println(sdf.format(new Date(mLastTickSet)));
             pw.print("  mLastTickAdded="); pw.println(sdf.format(new Date(mLastTickAdded)));
             pw.print("  mLastTickRemoved="); pw.println(sdf.format(new Date(mLastTickRemoved)));
+            pw.print("  mIsAutomotive="); pw.println(mInjector.isAutomotive());
 
             if (RECORD_ALARMS_IN_HISTORY) {
                 pw.println();
@@ -2192,7 +2246,6 @@ class AlarmManagerService extends SystemService {
                             ? sdf.format(new Date(nowRTC - (nowELAPSED - time)))
                             : "-");
                 } while (i != mNextTickHistory);
-                pw.println();
             }
 
             SystemServiceManager ssm = LocalServices.getService(SystemServiceManager.class);
@@ -2300,6 +2353,18 @@ class AlarmManagerService extends SystemService {
             if (!blocked) {
                 pw.println("    none");
             }
+            pw.println();
+            pw.print("  Pending alarms per uid: [");
+            for (int i = 0; i < mAlarmsPerUid.size(); i++) {
+                if (i > 0) {
+                    pw.print(", ");
+                }
+                UserHandle.formatUid(pw, mAlarmsPerUid.keyAt(i));
+                pw.print(":");
+                pw.print(mAlarmsPerUid.valueAt(i));
+            }
+            pw.println("]");
+            pw.println();
 
             mAppWakeupHistory.dump(pw, "  ", nowELAPSED);
 
@@ -2823,6 +2888,12 @@ class AlarmManagerService extends SystemService {
         }
     }
 
+    private boolean isIdlingImpl() {
+        synchronized (mLock) {
+            return mPendingIdleUntil != null;
+        }
+    }
+
     AlarmManager.AlarmClockInfo getNextAlarmClockImpl(int userId) {
         synchronized (mLock) {
             return mNextAlarmClockForUser.get(userId);
@@ -3035,7 +3106,7 @@ class AlarmManagerService extends SystemService {
         final Predicate<Alarm> whichAlarms = (Alarm a) -> a.matches(operation, directReceiver);
         for (int i = mAlarmBatches.size() - 1; i >= 0; i--) {
             Batch b = mAlarmBatches.get(i);
-            didRemove |= b.remove(whichAlarms);
+            didRemove |= b.remove(whichAlarms, false);
             if (b.size() == 0) {
                 mAlarmBatches.remove(i);
             }
@@ -3087,7 +3158,7 @@ class AlarmManagerService extends SystemService {
         final Predicate<Alarm> whichAlarms = (Alarm a) -> a.uid == uid;
         for (int i = mAlarmBatches.size() - 1; i >= 0; i--) {
             Batch b = mAlarmBatches.get(i);
-            didRemove |= b.remove(whichAlarms);
+            didRemove |= b.remove(whichAlarms, false);
             if (b.size() == 0) {
                 mAlarmBatches.remove(i);
             }
@@ -3134,7 +3205,7 @@ class AlarmManagerService extends SystemService {
         final boolean oldHasTick = haveBatchesTimeTickAlarm(mAlarmBatches);
         for (int i = mAlarmBatches.size() - 1; i >= 0; i--) {
             Batch b = mAlarmBatches.get(i);
-            didRemove |= b.remove(whichAlarms);
+            didRemove |= b.remove(whichAlarms, false);
             if (b.size() == 0) {
                 mAlarmBatches.remove(i);
             }
@@ -3172,6 +3243,7 @@ class AlarmManagerService extends SystemService {
         }
     }
 
+    // Only called for ephemeral apps
     void removeForStoppedLocked(final int uid) {
         if (uid == Process.SYSTEM_UID) {
             Slog.wtf(TAG, "removeForStoppedLocked: Shouldn't for UID=" + uid);
@@ -3189,7 +3261,7 @@ class AlarmManagerService extends SystemService {
         };
         for (int i = mAlarmBatches.size() - 1; i >= 0; i--) {
             Batch b = mAlarmBatches.get(i);
-            didRemove |= b.remove(whichAlarms);
+            didRemove |= b.remove(whichAlarms, false);
             if (b.size() == 0) {
                 mAlarmBatches.remove(i);
             }
@@ -3226,7 +3298,7 @@ class AlarmManagerService extends SystemService {
                 (Alarm a) -> UserHandle.getUserId(a.creatorUid) == userHandle;
         for (int i = mAlarmBatches.size() - 1; i >= 0; i--) {
             Batch b = mAlarmBatches.get(i);
-            didRemove |= b.remove(whichAlarms);
+            didRemove |= b.remove(whichAlarms, false);
             if (b.size() == 0) {
                 mAlarmBatches.remove(i);
             }
@@ -3396,8 +3468,7 @@ class AlarmManagerService extends SystemService {
         return mConstants.ALLOW_WHILE_IDLE_LONG_TIME;
     }
 
-    boolean triggerAlarmsLocked(ArrayList<Alarm> triggerList, final long nowELAPSED,
-            final long nowRTC) {
+    boolean triggerAlarmsLocked(ArrayList<Alarm> triggerList, final long nowELAPSED) {
         boolean hasWakeup = false;
         // batches are temporally sorted, so we need only pull from the
         // start of the list until we either empty it or hit a batch
@@ -3772,6 +3843,7 @@ class AlarmManagerService extends SystemService {
                 Slog.w(TAG, "Failure sending alarm.", e);
             }
             Trace.traceEnd(Trace.TRACE_TAG_POWER);
+            decrementAlarmCount(alarm.uid);
         }
     }
 
@@ -3784,9 +3856,12 @@ class AlarmManagerService extends SystemService {
     static class Injector {
         private long mNativeData;
         private Context mContext;
+        private final boolean mIsAutomotive;
 
         Injector(Context context) {
             mContext = context;
+            mIsAutomotive = context.getPackageManager().hasSystemFeature(
+                PackageManager.FEATURE_AUTOMOTIVE);
         }
 
         void init() {
@@ -3874,6 +3949,10 @@ class AlarmManagerService extends SystemService {
 
         ClockReceiver getClockReceiver(AlarmManagerService service) {
             return service.new ClockReceiver();
+        }
+
+        boolean isAutomotive() {
+            return mIsAutomotive;
         }
     }
 
@@ -3973,7 +4052,7 @@ class AlarmManagerService extends SystemService {
                         }
 
                         mLastTrigger = nowELAPSED;
-                        boolean hasWakeup = triggerAlarmsLocked(triggerList, nowELAPSED, nowRTC);
+                        boolean hasWakeup = triggerAlarmsLocked(triggerList, nowELAPSED);
                         if (!hasWakeup && checkAllowNonWakeupDelayLocked(nowELAPSED)) {
                             // if there are no wakeup alarms and the screen is off, we can
                             // delay what we have so far until the future.
@@ -4095,11 +4174,14 @@ class AlarmManagerService extends SystemService {
         public void handleMessage(Message msg) {
             switch (msg.what) {
                 case ALARM_EVENT: {
+                    // This code is used when the kernel timer driver is not available, which
+                    // shouldn't happen. Here, we try our best to simulate it, which may be useful
+                    // when porting Android to a new device. Note that we can't wake up a device
+                    // this way, so WAKE_UP alarms will be delivered only when the device is awake.
                     ArrayList<Alarm> triggerList = new ArrayList<Alarm>();
                     synchronized (mLock) {
-                        final long nowRTC = mInjector.getCurrentTimeMillis();
                         final long nowELAPSED = mInjector.getElapsedRealtime();
-                        triggerAlarmsLocked(triggerList, nowELAPSED, nowRTC);
+                        triggerAlarmsLocked(triggerList, nowELAPSED);
                         updateNextAlarmClockLocked();
                     }
 
@@ -4115,6 +4197,7 @@ class AlarmManagerService extends SystemService {
                                 removeImpl(alarm.operation, null);
                             }
                         }
+                        decrementAlarmCount(alarm.uid);
                     }
                     break;
                 }
@@ -4708,7 +4791,6 @@ class AlarmManagerService extends SystemService {
                 mAppWakeupHistory.recordAlarmForPackage(alarm.sourcePackage,
                         UserHandle.getUserId(alarm.creatorUid), nowELAPSED);
             }
-
             final BroadcastStats bs = inflight.mBroadcastStats;
             bs.count++;
             if (bs.nesting == 0) {
@@ -4732,6 +4814,27 @@ class AlarmManagerService extends SystemService {
                 ActivityManager.noteWakeupAlarm(
                         alarm.operation, alarm.workSource, alarm.uid, alarm.packageName,
                         alarm.statsTag);
+            }
+        }
+    }
+
+    private void incrementAlarmCount(int uid) {
+        final int uidIndex = mAlarmsPerUid.indexOfKey(uid);
+        if (uidIndex >= 0) {
+            mAlarmsPerUid.setValueAt(uidIndex, mAlarmsPerUid.valueAt(uidIndex) + 1);
+        } else {
+            mAlarmsPerUid.put(uid, 1);
+        }
+    }
+
+    private void decrementAlarmCount(int uid) {
+        final int uidIndex = mAlarmsPerUid.indexOfKey(uid);
+        if (uidIndex >= 0) {
+            final int newCount = mAlarmsPerUid.valueAt(uidIndex) - 1;
+            if (newCount > 0) {
+                mAlarmsPerUid.setValueAt(uidIndex, newCount);
+            } else {
+                mAlarmsPerUid.removeAt(uidIndex);
             }
         }
     }

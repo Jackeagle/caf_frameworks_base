@@ -26,16 +26,26 @@ import android.os.Handler
 import android.os.UserHandle
 import android.os.UserManager
 import com.android.internal.annotations.VisibleForTesting
-import com.android.systemui.Dependency
+import com.android.systemui.Dependency.BG_HANDLER_NAME
+import com.android.systemui.Dependency.MAIN_HANDLER_NAME
+import com.android.systemui.R
 import com.android.systemui.appops.AppOpItem
 import com.android.systemui.appops.AppOpsController
-import com.android.systemui.R
+import com.android.systemui.Dumpable
+import java.io.FileDescriptor
+import java.io.PrintWriter
 import java.lang.ref.WeakReference
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 
 @Singleton
-class PrivacyItemController @Inject constructor(val context: Context) {
+class PrivacyItemController @Inject constructor(
+        val context: Context,
+        private val appOpsController: AppOpsController,
+        @Named(MAIN_HANDLER_NAME) private val uiHandler: Handler,
+        @Named(BG_HANDLER_NAME) private val bgHandler: Handler
+) : Dumpable {
 
     companion object {
         val OPS = intArrayOf(AppOpsManager.OP_CAMERA,
@@ -48,23 +58,22 @@ class PrivacyItemController @Inject constructor(val context: Context) {
         const val TAG = "PrivacyItemController"
         const val SYSTEM_UID = 1000
     }
-    private var privacyList = emptyList<PrivacyItem>()
 
-    @Suppress("DEPRECATION")
-    private val appOpsController = Dependency.get(AppOpsController::class.java)
+    @VisibleForTesting
+    internal var privacyList = emptyList<PrivacyItem>()
+        @Synchronized get() = field.toList() // Returns a shallow copy of the list
+        @Synchronized set
+
     private val userManager = context.getSystemService(UserManager::class.java)
     private var currentUserIds = emptyList<Int>()
-    @Suppress("DEPRECATION")
-    private val bgHandler = Handler(Dependency.get(Dependency.BG_LOOPER))
-    @Suppress("DEPRECATION")
-    private val uiHandler = Dependency.get(Dependency.MAIN_HANDLER)
     private var listening = false
     val systemApp =
             PrivacyApplication(context.getString(R.string.device_services), SYSTEM_UID, context)
     private val callbacks = mutableListOf<WeakReference<Callback>>()
 
     private val notifyChanges = Runnable {
-        callbacks.forEach { it.get()?.privacyChanged(privacyList) }
+        val list = privacyList
+        callbacks.forEach { it.get()?.privacyChanged(list) }
     }
 
     private val updateListAndNotifyChanges = Runnable {
@@ -150,8 +159,10 @@ class PrivacyItemController @Inject constructor(val context: Context) {
     }
 
     private fun updatePrivacyList() {
-        privacyList = currentUserIds.flatMap { appOpsController.getActiveAppOpsForUser(it) }
+
+        val list = currentUserIds.flatMap { appOpsController.getActiveAppOpsForUser(it) }
                 .mapNotNull { toPrivacyItem(it) }.distinct()
+        privacyList = list
     }
 
     private fun toPrivacyItem(appOpItem: AppOpItem): PrivacyItem? {
@@ -186,6 +197,24 @@ class PrivacyItemController @Inject constructor(val context: Context) {
     ) : Runnable {
         override fun run() {
             callback?.privacyChanged(list)
+        }
+    }
+
+    override fun dump(fd: FileDescriptor?, pw: PrintWriter?, args: Array<out String>?) {
+        pw?.println("PrivacyItemController state:")
+        pw?.println("  Listening: $listening")
+        pw?.println("  Current user ids: $currentUserIds")
+        pw?.println("  Privacy Items:")
+        privacyList.forEach {
+            pw?.print("    ")
+            pw?.println(it.toString())
+        }
+        pw?.println("  Callbacks:")
+        callbacks.forEach {
+            it.get()?.let {
+                pw?.print("    ")
+                pw?.println(it.toString())
+            }
         }
     }
 }

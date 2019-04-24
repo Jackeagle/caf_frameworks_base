@@ -333,7 +333,7 @@ public class OtaDexoptService extends IOtaDexopt.Stub {
         PackageDexOptimizer optimizer = new OTADexoptPackageDexOptimizer(
                 collectingInstaller, mPackageManagerService.mInstallLock, mContext);
 
-        optimizer.performDexOpt(pkg, pkg.usesLibraryInfos,
+        optimizer.performDexOpt(pkg,
                 null /* ISAs */,
                 null /* CompilerStats.PackageStats */,
                 mPackageManagerService.getDexManager().getPackageUseInfoOrDefault(pkg.packageName),
@@ -353,7 +353,7 @@ public class OtaDexoptService extends IOtaDexopt.Stub {
             throw new IllegalStateException("Should not be ota-dexopting when trying to move.");
         }
 
-        if (!mPackageManagerService.isUpgrade()) {
+        if (!mPackageManagerService.isDeviceUpgrading()) {
             Slog.d(TAG, "No upgrade, skipping A/B artifacts check.");
             return;
         }

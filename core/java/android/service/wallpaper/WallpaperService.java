@@ -72,6 +72,7 @@ import com.android.internal.view.BaseSurfaceHolder;
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 /**
@@ -320,7 +321,7 @@ public abstract class WallpaperService extends Service {
             public void resized(Rect frame, Rect overscanInsets, Rect contentInsets,
                     Rect visibleInsets, Rect stableInsets, Rect outsets, boolean reportDraw,
                     MergedConfiguration mergedConfiguration, Rect backDropRect, boolean forceLayout,
-                    boolean alwaysConsumeNavBar, int displayId,
+                    boolean alwaysConsumeSystemBars, int displayId,
                     DisplayCutout.ParcelableWrapper displayCutout) {
                 Message msg = mCaller.obtainMessageIO(MSG_WINDOW_RESIZED,
                         reportDraw ? 1 : 0, outsets);
@@ -1068,9 +1069,13 @@ public abstract class WallpaperService extends Service {
          * For multiple display environment, multiple engines can be created to render on each
          * display, but these displays may have different densities. Use this context to get the
          * corresponding resources for currently display, avoiding the context of the service.
+         * <p>
+         * The display context will never be {@code null} after
+         * {@link Engine#onCreate(SurfaceHolder)} has been called.
          *
          * @return A {@link Context} for current display.
          */
+        @Nullable
         public Context getDisplayContext() {
             return mDisplayContext;
         }
@@ -1305,6 +1310,7 @@ public abstract class WallpaperService extends Service {
         final int mDisplayId;
         final DisplayManager mDisplayManager;
         final Display mDisplay;
+        private final AtomicBoolean mDetached = new AtomicBoolean();
 
         Engine mEngine;
 
@@ -1395,8 +1401,23 @@ public abstract class WallpaperService extends Service {
             mCaller.sendMessage(msg);
         }
 
+        public void detach() {
+            mDetached.set(true);
+        }
+
+        private void doDetachEngine() {
+            mActiveEngines.remove(mEngine);
+            mEngine.detach();
+        }
+
         @Override
         public void executeMessage(Message message) {
+            if (mDetached.get()) {
+                if (mActiveEngines.contains(mEngine)) {
+                    doDetachEngine();
+                }
+                return;
+            }
             switch (message.what) {
                 case DO_ATTACH: {
                     try {
@@ -1412,8 +1433,7 @@ public abstract class WallpaperService extends Service {
                     return;
                 }
                 case DO_DETACH: {
-                    mActiveEngines.remove(mEngine);
-                    mEngine.detach();
+                    doDetachEngine();
                     return;
                 }
                 case DO_SET_DESIRED_SIZE: {
@@ -1493,6 +1513,7 @@ public abstract class WallpaperService extends Service {
      */
     class IWallpaperServiceWrapper extends IWallpaperService.Stub {
         private final WallpaperService mTarget;
+        private IWallpaperEngineWrapper mEngineWrapper;
 
         public IWallpaperServiceWrapper(WallpaperService context) {
             mTarget = context;
@@ -1502,8 +1523,13 @@ public abstract class WallpaperService extends Service {
         public void attach(IWallpaperConnection conn, IBinder windowToken,
                 int windowType, boolean isPreview, int reqWidth, int reqHeight, Rect padding,
                 int displayId) {
-            new IWallpaperEngineWrapper(mTarget, conn, windowToken,
+            mEngineWrapper = new IWallpaperEngineWrapper(mTarget, conn, windowToken,
                     windowType, isPreview, reqWidth, reqHeight, padding, displayId);
+        }
+
+        @Override
+        public void detach() {
+            mEngineWrapper.detach();
         }
     }
 

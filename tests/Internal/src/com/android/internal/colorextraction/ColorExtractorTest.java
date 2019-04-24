@@ -27,9 +27,10 @@ import android.app.WallpaperColors;
 import android.app.WallpaperManager;
 import android.content.Context;
 import android.graphics.Color;
-import android.support.test.InstrumentationRegistry;
-import android.support.test.filters.SmallTest;
-import android.support.test.runner.AndroidJUnit4;
+
+import androidx.test.InstrumentationRegistry;
+import androidx.test.filters.SmallTest;
+import androidx.test.runner.AndroidJUnit4;
 
 import com.android.internal.colorextraction.ColorExtractor.GradientColors;
 import com.android.internal.colorextraction.types.ExtractionType;
@@ -56,7 +57,7 @@ public class ColorExtractorTest {
     @Test
     public void ColorExtractor_extractWhenInitialized() {
         ExtractionType type = mock(Tonal.class);
-        new ColorExtractor(mContext, type);
+        new ColorExtractor(mContext, type, true);
         // 1 for lock and 1 for system
         verify(type, times(2))
                 .extractInto(any(), any(), any(), any());
@@ -83,7 +84,7 @@ public class ColorExtractorTest {
                     outGradientColorsDark.set(colorsExpectedDark);
                     outGradientColorsExtraDark.set(colorsExpectedExtraDark);
                 };
-        ColorExtractor extractor = new ColorExtractor(mContext, type);
+        ColorExtractor extractor = new ColorExtractor(mContext, type, true);
 
         GradientColors colors = extractor.getColors(WallpaperManager.FLAG_SYSTEM,
                 ColorExtractor.TYPE_NORMAL);
@@ -98,7 +99,7 @@ public class ColorExtractorTest {
     public void addOnColorsChangedListener_invokesListener() {
         ColorExtractor.OnColorsChangedListener mockedListeners =
                 mock(ColorExtractor.OnColorsChangedListener.class);
-        ColorExtractor extractor = new ColorExtractor(mContext, new Tonal(mContext));
+        ColorExtractor extractor = new ColorExtractor(mContext, new Tonal(mContext), true);
         extractor.addOnColorsChangedListener(mockedListeners);
 
         extractor.onColorsChanged(new WallpaperColors(Color.valueOf(Color.RED), null, null),

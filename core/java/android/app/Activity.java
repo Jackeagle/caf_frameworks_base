@@ -65,11 +65,13 @@ import android.net.Uri;
 import android.os.BadParcelableException;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.GraphicsEnvironment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Parcelable;
 import android.os.PersistableBundle;
+import android.os.Process;
 import android.os.RemoteException;
 import android.os.ServiceManager.ServiceNotFoundException;
 import android.os.StrictMode;
@@ -125,17 +127,20 @@ import android.view.autofill.AutofillPopupWindow;
 import android.view.autofill.IAutofillWindowPresenter;
 import android.view.contentcapture.ContentCaptureContext;
 import android.view.contentcapture.ContentCaptureManager;
-import android.view.contentcapture.ContentCaptureSession;
+import android.view.contentcapture.ContentCaptureManager.ContentCaptureClient;
 import android.widget.AdapterView;
 import android.widget.Toast;
 import android.widget.Toolbar;
 
+import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.app.IVoiceInteractor;
 import com.android.internal.app.ToolbarActionBar;
 import com.android.internal.app.WindowDecorActionBar;
 import com.android.internal.policy.PhoneWindow;
+
+import dalvik.system.VMRuntime;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -153,8 +158,9 @@ import java.util.List;
  * creating a window for you in which you can place your UI with
  * {@link #setContentView}.  While activities are often presented to the user
  * as full-screen windows, they can also be used in other ways: as floating
- * windows (via a theme with {@link android.R.attr#windowIsFloating} set)
- * or embedded inside of another activity (using {@link ActivityGroup}).
+ * windows (via a theme with {@link android.R.attr#windowIsFloating} set),
+ * <a href="https://developer.android.com/guide/topics/ui/multi-window">
+ * Multi-Window mode</a> or embedded into other windows.
  *
  * There are two methods almost all subclasses of Activity will implement:
  *
@@ -165,10 +171,11 @@ import java.util.List;
  *     to retrieve the widgets in that UI that you need to interact with
  *     programmatically.
  *
- *     <li> {@link #onPause} is where you deal with the user leaving your
- *     activity.  Most importantly, any changes made by the user should at this
- *     point be committed (usually to the
- *     {@link android.content.ContentProvider} holding the data).
+ *     <li> {@link #onPause} is where you deal with the user pausing active
+ *     interaction with the activity. Any changes made by the user should at
+ *     this point be committed (usually to the
+ *     {@link android.content.ContentProvider} holding the data). In this
+ *     state the activity is still visible on screen.
  * </ul>
  *
  * <p>To be of use with {@link android.content.Context#startActivity Context.startActivity()}, all
@@ -216,32 +223,31 @@ import java.util.List;
  * <a name="ActivityLifecycle"></a>
  * <h3>Activity Lifecycle</h3>
  *
- * <p>Activities in the system are managed as an <em>activity stack</em>.
- * When a new activity is started, it is placed on the top of the stack
- * and becomes the running activity -- the previous activity always remains
+ * <p>Activities in the system are managed as
+ * <a href="https://developer.android.com/guide/components/activities/tasks-and-back-stack">
+ * activity stacks</a>. When a new activity is started, it is usually placed on the top of the
+ * current stack and becomes the running activity -- the previous activity always remains
  * below it in the stack, and will not come to the foreground again until
- * the new activity exits.</p>
+ * the new activity exits. There can be one or multiple activity stacks visible
+ * on screen.</p>
  *
  * <p>An activity has essentially four states:</p>
  * <ul>
- *     <li> If an activity is in the foreground of the screen (at the top of
- *         the stack),
- *         it is <em>active</em> or  <em>running</em>. </li>
- *     <li>If an activity has lost focus but is still visible (that is, a new non-full-sized
- *         or transparent activity has focus on top of your activity), it
- *         is <em>paused</em>. A paused activity is completely alive (it
- *         maintains all state and member information and remains attached to
- *         the window manager), but can be killed by the system in extreme
- *         low memory situations.
+ *     <li>If an activity is in the foreground of the screen (at the highest position of the topmost
+ *         stack), it is <em>active</em> or <em>running</em>. This is usually the activity that the
+ *         user is currently interacting with.</li>
+ *     <li>If an activity has lost focus but is still presented to the user, it is <em>visible</em>.
+ *         It is possible if a new non-full-sized or transparent activity has focus on top of your
+ *         activity, another activity has higher position in multi-window mode, or the activity
+ *         itself is not focusable in current windowing mode. Such activity is completely alive (it
+ *         maintains all state and member information and remains attached to the window manager).
  *     <li>If an activity is completely obscured by another activity,
- *         it is <em>stopped</em>. It still retains all state and member information,
- *         however, it is no longer visible to the user so its window is hidden
- *         and it will often be killed by the system when memory is needed
- *         elsewhere.</li>
- *     <li>If an activity is paused or stopped, the system can drop the activity
- *         from memory by either asking it to finish, or simply killing its
- *         process.  When it is displayed again to the user, it must be
- *         completely restarted and restored to its previous state.</li>
+ *         it is <em>stopped</em> or <em>hidden</em>. It still retains all state and member
+ *         information, however, it is no longer visible to the user so its window is hidden
+ *         and it will often be killed by the system when memory is needed elsewhere.</li>
+ *     <li>The system can drop the activity from memory by either asking it to finish,
+ *         or simply killing its process, making it <em>destroyed</em>. When it is displayed again
+ *         to the user, it must be completely restarted and restored to its previous state.</li>
  * </ul>
  *
  * <p>The following diagram shows the important state paths of an Activity.
@@ -279,7 +285,7 @@ import java.util.List;
  * <li>The <b>foreground lifetime</b> of an activity happens between a call to
  * {@link android.app.Activity#onResume} until a corresponding call to
  * {@link android.app.Activity#onPause}.  During this time the activity is
- * in front of all other activities and interacting with the user.  An activity
+ * in visible, active and interacting with the user.  An activity
  * can frequently go between the resumed and paused states -- for example when
  * the device goes to sleep, when an activity result is delivered, when a new
  * intent is delivered -- so the code in these methods should be fairly
@@ -292,7 +298,8 @@ import java.util.List;
  * activities will implement {@link android.app.Activity#onCreate}
  * to do their initial setup; many will also implement
  * {@link android.app.Activity#onPause} to commit changes to data and
- * otherwise prepare to stop interacting with the user.  You should always
+ * prepare to pause interacting with the user, and {@link android.app.Activity#onStop}
+ * to handle no longer being visible on screen. You should always
  * call up to your superclass when implementing these methods.</p>
  *
  * </p>
@@ -360,17 +367,17 @@ import java.util.List;
  *         <td align="left" border="0">{@link android.app.Activity#onResume onResume()}</td>
  *         <td>Called when the activity will start
  *             interacting with the user.  At this point your activity is at
- *             the top of the activity stack, with user input going to it.
+ *             the top of its activity stack, with user input going to it.
  *             <p>Always followed by <code>onPause()</code>.</td>
  *         <td align="center">No</td>
  *         <td align="center"><code>onPause()</code></td>
  *     </tr>
  *
  *     <tr><td align="left" border="0">{@link android.app.Activity#onPause onPause()}</td>
- *         <td>Called when the system is about to start resuming a previous
- *             activity.  This is typically used to commit unsaved changes to
- *             persistent data, stop animations and other things that may be consuming
- *             CPU, etc.  Implementations of this method must be very quick because
+ *         <td>Called when the activity loses foreground state, is no longer focusable or before
+ *             transition to stopped/hidden or destroyed state. The activity is still visible to
+ *             user, so it's recommended to keep it visually active and continue updating the UI.
+ *             Implementations of this method must be very quick because
  *             the next activity will not be resumed until this method returns.
  *             <p>Followed by either <code>onResume()</code> if the activity
  *             returns back to the front, or <code>onStop()</code> if it becomes
@@ -381,11 +388,10 @@ import java.util.List;
  *     </tr>
  *
  *     <tr><td colspan="2" align="left" border="0">{@link android.app.Activity#onStop onStop()}</td>
- *         <td>Called when the activity is no longer visible to the user, because
- *             another activity has been resumed and is covering this one.  This
- *             may happen either because a new activity is being started, an existing
- *             one is being brought in front of this one, or this one is being
- *             destroyed.
+ *         <td>Called when the activity is no longer visible to the user.  This may happen either
+ *             because a new activity is being started on top, an existing one is being brought in
+ *             front of this one, or this one is being destroyed. This is typically used to stop
+ *             animations and refreshing the UI, etc.
  *             <p>Followed by either <code>onRestart()</code> if
  *             this activity is coming back to interact with the user, or
  *             <code>onDestroy()</code> if this activity is going away.</td>
@@ -442,8 +448,9 @@ import java.util.List;
  * <p>For those methods that are not marked as being killable, the activity's
  * process will not be killed by the system starting from the time the method
  * is called and continuing after it returns.  Thus an activity is in the killable
- * state, for example, between after <code>onPause()</code> to the start of
- * <code>onResume()</code>.</p>
+ * state, for example, between after <code>onStop()</code> to the start of
+ * <code>onResume()</code>. Keep in mind that under extreme memory pressure the
+ * system can kill the application process at any time.</p>
  *
  * <a name="ConfigurationChanges"></a>
  * <h3>Configuration Changes</h3>
@@ -578,8 +585,8 @@ import java.util.List;
  * <p>This model is designed to prevent data loss when a user is navigating
  * between activities, and allows the system to safely kill an activity (because
  * system resources are needed somewhere else) at any time after it has been
- * paused.  Note this implies
- * that the user pressing BACK from your activity does <em>not</em>
+ * stopped (or paused on platform versions before {@link android.os.Build.VERSION_CODES#HONEYCOMB}).
+ * Note this implies that the user pressing BACK from your activity does <em>not</em>
  * mean "cancel" -- it means to leave the activity with its current contents
  * saved away.  Canceling edits in an activity must be provided through
  * some other mechanism, such as an explicit "revert" or "undo" option.</p>
@@ -680,11 +687,12 @@ import java.util.List;
  * reached a memory paging state, so this is required in order to keep the user
  * interface responsive.
  * <li> <p>A <b>visible activity</b> (an activity that is visible to the user
- * but not in the foreground, such as one sitting behind a foreground dialog)
+ * but not in the foreground, such as one sitting behind a foreground dialog
+ * or next to other activities in multi-window mode)
  * is considered extremely important and will not be killed unless that is
  * required to keep the foreground activity running.
  * <li> <p>A <b>background activity</b> (an activity that is not visible to
- * the user and has been paused) is no longer critical, so the system may
+ * the user and has been stopped) is no longer critical, so the system may
  * safely kill its process to reclaim memory for other foreground or
  * visible processes.  If its process needs to be killed, when the user navigates
  * back to the activity (making it visible on the screen again), its
@@ -716,7 +724,7 @@ public class Activity extends ContextThemeWrapper
         Window.Callback, KeyEvent.Callback,
         OnCreateContextMenuListener, ComponentCallbacks2,
         Window.OnWindowDismissedCallback, WindowControllerCallback,
-        AutofillManager.AutofillClient {
+        AutofillManager.AutofillClient, ContentCaptureManager.ContentCaptureClient {
     private static final String TAG = "Activity";
     private static final boolean DEBUG_LIFECYCLE = false;
 
@@ -813,8 +821,6 @@ public class Activity extends ContextThemeWrapper
     /** {@code true} if the activity lifecycle is in a state which supports picture-in-picture.
      * This only affects the client-side exception, the actual state check still happens in AMS. */
     private boolean mCanEnterPictureInPicture = false;
-    /** true if the activity is going through a transient pause */
-    /*package*/ boolean mTemporaryPause = false;
     /** true if the activity is being destroyed in order to recreate it with a new configuration */
     /*package*/ boolean mChangingConfigurations = false;
     @UnsupportedAppUsage
@@ -1036,15 +1042,15 @@ public class Activity extends ContextThemeWrapper
     }
 
     /** @hide */ private static final int CONTENT_CAPTURE_START = 1;
-    /** @hide */ private static final int CONTENT_CAPTURE_PAUSE = 2;
-    /** @hide */ private static final int CONTENT_CAPTURE_RESUME = 3;
+    /** @hide */ private static final int CONTENT_CAPTURE_RESUME = 2;
+    /** @hide */ private static final int CONTENT_CAPTURE_PAUSE = 3;
     /** @hide */ private static final int CONTENT_CAPTURE_STOP = 4;
 
     /** @hide */
     @IntDef(prefix = { "CONTENT_CAPTURE_" }, value = {
             CONTENT_CAPTURE_START,
-            CONTENT_CAPTURE_PAUSE,
             CONTENT_CAPTURE_RESUME,
+            CONTENT_CAPTURE_PAUSE,
             CONTENT_CAPTURE_STOP
     })
     @Retention(RetentionPolicy.SOURCE)
@@ -1054,10 +1060,10 @@ public class Activity extends ContextThemeWrapper
         switch (type) {
             case CONTENT_CAPTURE_START:
                 return "START";
-            case CONTENT_CAPTURE_PAUSE:
-                return "PAUSE";
             case CONTENT_CAPTURE_RESUME:
                 return "RESUME";
+            case CONTENT_CAPTURE_PAUSE:
+                return "PAUSE";
             case CONTENT_CAPTURE_STOP:
                 return "STOP";
             default:
@@ -1084,16 +1090,16 @@ public class Activity extends ContextThemeWrapper
                             & WindowManager.LayoutParams.FLAG_SECURE) != 0) {
                         flags |= ContentCaptureContext.FLAG_DISABLED_BY_FLAG_SECURE;
                     }
-                    cm.onActivityStarted(mToken, getComponentName(), flags);
-                    break;
-                case CONTENT_CAPTURE_PAUSE:
-                    cm.flush(ContentCaptureSession.FLUSH_REASON_ACTIVITY_PAUSED);
+                    cm.onActivityCreated(mToken, getComponentName(), flags);
                     break;
                 case CONTENT_CAPTURE_RESUME:
-                    cm.flush(ContentCaptureSession.FLUSH_REASON_ACTIVITY_RESUMED);
+                    cm.onActivityResumed();
+                    break;
+                case CONTENT_CAPTURE_PAUSE:
+                    cm.onActivityPaused();
                     break;
                 case CONTENT_CAPTURE_STOP:
-                    cm.onActivityStopped();
+                    cm.onActivityDestroyed();
                     break;
                 default:
                     Log.wtf(TAG, "Invalid @ContentCaptureNotificationType: " + type);
@@ -1108,7 +1114,7 @@ public class Activity extends ContextThemeWrapper
         super.attachBaseContext(newBase);
         if (newBase != null) {
             newBase.setAutofillClient(this);
-            newBase.setContentCaptureSupported(true);
+            newBase.setContentCaptureOptions(getContentCaptureOptions());
         }
     }
 
@@ -1120,8 +1126,8 @@ public class Activity extends ContextThemeWrapper
 
     /** @hide */
     @Override
-    public boolean isContentCaptureSupported() {
-        return true;
+    public final ContentCaptureClient getContentCaptureClient() {
+        return this;
     }
 
     /**
@@ -1658,6 +1664,8 @@ public class Activity extends ContextThemeWrapper
         }
 
         mCalled = true;
+
+        notifyContentCaptureManagerIfNeeded(CONTENT_CAPTURE_START);
     }
 
     /**
@@ -1679,7 +1687,12 @@ public class Activity extends ContextThemeWrapper
     /**
      * Called after {@link #onCreate} &mdash; or after {@link #onRestart} when
      * the activity had been stopped, but is now again being displayed to the
-     * user.  It will be followed by {@link #onResume}.
+     * user. It will usually be followed by {@link #onResume}. This is a good place to begin
+     * drawing visual elements, running animations, etc.
+     *
+     * <p>You can call {@link #finish} from within this function, in
+     * which case {@link #onStop} will be immediately called after {@link #onStart} without the
+     * lifecycle transitions in-between ({@link #onResume}, {@link #onPause}, etc) executing.
      *
      * <p><em>Derived classes must call through to the super class's
      * implementation of this method.  If they do not, an exception will be
@@ -1701,7 +1714,6 @@ public class Activity extends ContextThemeWrapper
         if (mAutoFillResetNeeded) {
             getAutofillManager().onVisibleForAutofill();
         }
-        notifyContentCaptureManagerIfNeeded(CONTENT_CAPTURE_START);
     }
 
     /**
@@ -1746,14 +1758,15 @@ public class Activity extends ContextThemeWrapper
 
     /**
      * Called after {@link #onRestoreInstanceState}, {@link #onRestart}, or
-     * {@link #onPause}, for your activity to start interacting with the user.
-     * This is a good place to begin animations, open exclusive-access devices
-     * (such as the camera), etc.
+     * {@link #onPause}, for your activity to start interacting with the user. This is an indicator
+     * that the activity became active and ready to receive input. It is on top of an activity stack
+     * and visible to user.
      *
-     * <p>Keep in mind that onResume is not the best indicator that your activity
-     * is visible to the user; a system window such as the keyguard may be in
-     * front.  Use {@link #onWindowFocusChanged} to know for certain that your
-     * activity is visible to the user (for example, to resume a game).
+     * <p>On platform versions prior to {@link android.os.Build.VERSION_CODES#Q} this is also a good
+     * place to try to open exclusive-access devices or to get access to singleton resources.
+     * Starting  with {@link android.os.Build.VERSION_CODES#Q} there can be multiple resumed
+     * activities in the system simultaneously, so {@link #onTopResumedActivityChanged(boolean)}
+     * should be used for that purpose instead.
      *
      * <p><em>Derived classes must call through to the super class's
      * implementation of this method.  If they do not, an exception will be
@@ -1763,6 +1776,7 @@ public class Activity extends ContextThemeWrapper
      * @see #onRestart
      * @see #onPostResume
      * @see #onPause
+     * @see #onTopResumedActivityChanged(boolean)
      */
     @CallSuper
     protected void onResume() {
@@ -1784,8 +1798,10 @@ public class Activity extends ContextThemeWrapper
                 }
             }
         }
-        mCalled = true;
+
         notifyContentCaptureManagerIfNeeded(CONTENT_CAPTURE_RESUME);
+
+        mCalled = true;
     }
 
     /**
@@ -1809,7 +1825,7 @@ public class Activity extends ContextThemeWrapper
     }
 
     /**
-     * Called when activity gets or looses the top resumed position in the system.
+     * Called when activity gets or loses the top resumed position in the system.
      *
      * <p>Starting with {@link android.os.Build.VERSION_CODES#Q} multiple activities can be resumed
      * at the same time in multi-window and multi-display modes. This callback should be used
@@ -1974,8 +1990,12 @@ public class Activity extends ContextThemeWrapper
      * called on the existing instance with the Intent that was used to
      * re-launch it.
      *
-     * <p>An activity will always be paused before receiving a new intent, so
-     * you can count on {@link #onResume} being called after this method.
+     * <p>An activity can never receive a new intent in the resumed state. You can count on
+     * {@link #onResume} being called after this method, though not necessarily immediately after
+     * the completion this callback. If the activity was resumed, it will be paused and new intent
+     * will be delivered, followed by {@link #onResume}. If the activity wasn't in the resumed
+     * state, then new intent can be delivered immediately, with {@link #onResume()} called
+     * sometime later when activity becomes active again.
      *
      * <p>Note that {@link #getIntent} still returns the original Intent.  You
      * can use {@link #setIntent} to update it to this new Intent.
@@ -2041,14 +2061,13 @@ public class Activity extends ContextThemeWrapper
      * returns to activity A, the state of the user interface can be restored
      * via {@link #onCreate} or {@link #onRestoreInstanceState}.
      *
-     * <p>Do not confuse this method with activity lifecycle callbacks such as
-     * {@link #onPause}, which is always called when an activity is being placed
-     * in the background or on its way to destruction, or {@link #onStop} which
-     * is called before destruction.  One example of when {@link #onPause} and
-     * {@link #onStop} is called and not this method is when a user navigates back
-     * from activity B to activity A: there is no need to call {@link #onSaveInstanceState}
-     * on B because that particular instance will never be restored, so the
-     * system avoids calling it.  An example when {@link #onPause} is called and
+     * <p>Do not confuse this method with activity lifecycle callbacks such as {@link #onPause},
+     * which is always called when the user no longer actively interacts with an activity, or
+     * {@link #onStop} which is called when activity becomes invisible. One example of when
+     * {@link #onPause} and {@link #onStop} is called and not this method is when a user navigates
+     * back from activity B to activity A: there is no need to call {@link #onSaveInstanceState}
+     * on B because that particular instance will never be restored,
+     * so the system avoids calling it.  An example when {@link #onPause} is called and
      * not {@link #onSaveInstanceState} is when activity B is launched in front of activity A:
      * the system may avoid calling {@link #onSaveInstanceState} on activity A if it isn't
      * killed during the lifetime of B since the state of the user interface of
@@ -2147,9 +2166,8 @@ public class Activity extends ContextThemeWrapper
 
 
     /**
-     * Called as part of the activity lifecycle when an activity is going into
-     * the background, but has not (yet) been killed.  The counterpart to
-     * {@link #onResume}.
+     * Called as part of the activity lifecycle when the user no longer actively interacts with the
+     * activity, but it is still visible on screen. The counterpart to {@link #onResume}.
      *
      * <p>When activity B is launched in front of activity A, this callback will
      * be invoked on A.  B will not be created until A's {@link #onPause} returns,
@@ -2159,22 +2177,20 @@ public class Activity extends ContextThemeWrapper
      * activity is editing, to present a "edit in place" model to the user and
      * making sure nothing is lost if there are not enough resources to start
      * the new activity without first killing this one.  This is also a good
-     * place to do things like stop animations and other things that consume a
-     * noticeable amount of CPU in order to make the switch to the next activity
-     * as fast as possible, or to close resources that are exclusive access
-     * such as the camera.
+     * place to stop things that consume a noticeable amount of CPU in order to
+     * make the switch to the next activity as fast as possible.
      *
-     * <p>In situations where the system needs more memory it may kill paused
-     * processes to reclaim resources.  Because of this, you should be sure
-     * that all of your state is saved by the time you return from
-     * this function.  In general {@link #onSaveInstanceState} is used to save
-     * per-instance state in the activity and this method is used to store
-     * global persistent data (in content providers, files, etc.)
+     * <p>On platform versions prior to {@link android.os.Build.VERSION_CODES#Q} this is also a good
+     * place to try to close exclusive-access devices or to release access to singleton resources.
+     * Starting with {@link android.os.Build.VERSION_CODES#Q} there can be multiple resumed
+     * activities in the system at the same time, so {@link #onTopResumedActivityChanged(boolean)}
+     * should be used for that purpose instead.
      *
-     * <p>After receiving this call you will usually receive a following call
-     * to {@link #onStop} (after the next activity has been resumed and
-     * displayed), however in some cases there will be a direct call back to
-     * {@link #onResume} without going through the stopped state.
+     * <p>If an activity is launched on top, after receiving this call you will usually receive a
+     * following call to {@link #onStop} (after the next activity has been resumed and displayed
+     * above). However in some cases there will be a direct call back to {@link #onResume} without
+     * going through the stopped state. An activity can also rest in paused state in some cases when
+     * in multi-window mode, still visible to user.
      *
      * <p><em>Derived classes must call through to the super class's
      * implementation of this method.  If they do not, an exception will be
@@ -2201,8 +2217,9 @@ public class Activity extends ContextThemeWrapper
                 mAutoFillIgnoreFirstResumePause = false;
             }
         }
-        mCalled = true;
+
         notifyContentCaptureManagerIfNeeded(CONTENT_CAPTURE_PAUSE);
+        mCalled = true;
     }
 
     /**
@@ -2296,7 +2313,7 @@ public class Activity extends ContextThemeWrapper
     public final void requestShowKeyboardShortcuts() {
         Intent intent = new Intent(Intent.ACTION_SHOW_KEYBOARD_SHORTCUTS);
         intent.setPackage(KEYBOARD_SHORTCUTS_RECEIVER_PKG_NAME);
-        sendBroadcastAsUser(intent, UserHandle.SYSTEM);
+        sendBroadcastAsUser(intent, Process.myUserHandle());
     }
 
     /**
@@ -2305,7 +2322,7 @@ public class Activity extends ContextThemeWrapper
     public final void dismissKeyboardShortcutsHelper() {
         Intent intent = new Intent(Intent.ACTION_DISMISS_KEYBOARD_SHORTCUTS);
         intent.setPackage(KEYBOARD_SHORTCUTS_RECEIVER_PKG_NAME);
-        sendBroadcastAsUser(intent, UserHandle.SYSTEM);
+        sendBroadcastAsUser(intent, Process.myUserHandle());
     }
 
     @Override
@@ -2356,7 +2373,8 @@ public class Activity extends ContextThemeWrapper
     /**
      * Called when you are no longer visible to the user.  You will next
      * receive either {@link #onRestart}, {@link #onDestroy}, or nothing,
-     * depending on later user activity.
+     * depending on later user activity. This is a good place to stop
+     * refreshing UI, running animations and other visual things.
      *
      * <p><em>Derived classes must call through to the super class's
      * implementation of this method.  If they do not, an exception will be
@@ -2391,7 +2409,6 @@ public class Activity extends ContextThemeWrapper
                 getAutofillManager().onPendingSaveUi(AutofillManager.PENDING_UI_OPERATION_CANCEL,
                         mIntent.getIBinderExtra(AutofillManager.EXTRA_RESTORE_SESSION_TOKEN));
             }
-            notifyContentCaptureManagerIfNeeded(CONTENT_CAPTURE_STOP);
         }
         mEnterAnimationComplete = false;
     }
@@ -2463,6 +2480,8 @@ public class Activity extends ContextThemeWrapper
         }
 
         dispatchActivityDestroyed();
+
+        notifyContentCaptureManagerIfNeeded(CONTENT_CAPTURE_STOP);
     }
 
     /**
@@ -2484,6 +2503,7 @@ public class Activity extends ContextThemeWrapper
             try {
                 ActivityTaskManager.getService().reportActivityFullyDrawn(
                         mToken, mRestoredFromBundle);
+                VMRuntime.getRuntime().notifyStartupCompleted();
             } catch (RemoteException e) {
             }
         }
@@ -3521,6 +3541,12 @@ public class Activity extends ContextThemeWrapper
      * Default implementation of {@link KeyEvent.Callback#onKeyLongPress(int, KeyEvent)
      * KeyEvent.Callback.onKeyLongPress()}: always returns false (doesn't handle
      * the event).
+     *
+     * To receive this callback, you must return true from onKeyDown for the current
+     * event stream.
+     *
+     * @see KeyEvent.Callback#onKeyLongPress()
+     * @see KeyEvent.Callback#onKeyLongPress(int, KeyEvent)
      */
     public boolean onKeyLongPress(int keyCode, KeyEvent event) {
         return false;
@@ -3700,18 +3726,18 @@ public class Activity extends ContextThemeWrapper
 
     /**
      * Called when the current {@link Window} of the activity gains or loses
-     * focus.  This is the best indicator of whether this activity is visible
-     * to the user.  The default implementation clears the key tracking
-     * state, so should always be called.
+     * focus. This is the best indicator of whether this activity is the entity
+     * with which the user actively interacts. The default implementation
+     * clears the key tracking state, so should always be called.
      *
      * <p>Note that this provides information about global focus state, which
-     * is managed independently of activity lifecycles.  As such, while focus
+     * is managed independently of activity lifecycle.  As such, while focus
      * changes will generally have some relation to lifecycle changes (an
      * activity that is stopped will not generally get window focus), you
      * should not rely on any particular order between the callbacks here and
      * those in the other lifecycle methods such as {@link #onResume}.
      *
-     * <p>As a general rule, however, a resumed activity will have window
+     * <p>As a general rule, however, a foreground activity will have window
      * focus...  unless it has displayed other dialogs or popups that take
      * input focus, in which case the activity itself will not have focus
      * when the other windows have it.  Likewise, the system may display
@@ -3719,11 +3745,24 @@ public class Activity extends ContextThemeWrapper
      * a system alert) which will temporarily take window input focus without
      * pausing the foreground activity.
      *
+     * <p>Starting with {@link android.os.Build.VERSION_CODES#Q} there can be
+     * multiple resumed activities at the same time in multi-window mode, so
+     * resumed state does not guarantee window focus even if there are no
+     * overlays above.
+     *
+     * <p>If the intent is to know when an activity is the topmost active, the
+     * one the user interacted with last among all activities but not including
+     * non-activity windows like dialogs and popups, then
+     * {@link #onTopResumedActivityChanged(boolean)} should be used. On platform
+     * versions prior to {@link android.os.Build.VERSION_CODES#Q},
+     * {@link #onResume} is the best indicator.
+     *
      * @param hasFocus Whether the window of this activity has focus.
      *
      * @see #hasWindowFocus()
      * @see #onResume
      * @see View#onWindowFocusChanged(boolean)
+     * @see #onTopResumedActivityChanged(boolean)
      */
     public void onWindowFocusChanged(boolean hasFocus) {
     }
@@ -3781,14 +3820,14 @@ public class Activity extends ContextThemeWrapper
 
 
     /**
-     * Moves the activity from {@link WindowConfiguration#WINDOWING_MODE_FREEFORM} windowing mode to
-     * {@link WindowConfiguration#WINDOWING_MODE_FULLSCREEN}.
+     * Moves the activity between {@link WindowConfiguration#WINDOWING_MODE_FREEFORM} windowing mode
+     * and {@link WindowConfiguration#WINDOWING_MODE_FULLSCREEN}.
      *
      * @hide
      */
     @Override
-    public void exitFreeformMode() throws RemoteException {
-        ActivityTaskManager.getService().exitFreeformMode(mToken);
+    public void toggleFreeformWindowingMode() throws RemoteException {
+        ActivityTaskManager.getService().toggleFreeformWindowingMode(mToken);
     }
 
     /**
@@ -4864,6 +4903,17 @@ public class Activity extends ContextThemeWrapper
                 com.android.internal.R.styleable.ActivityTaskDescription_navigationBarColor, 0);
         if (navigationBarColor != 0) {
             mTaskDescription.setNavigationBarColor(navigationBarColor);
+        }
+
+        final int targetSdk = getApplicationInfo().targetSdkVersion;
+        final boolean targetPreQ = targetSdk < Build.VERSION_CODES.Q;
+        if (!targetPreQ) {
+            mTaskDescription.setEnsureStatusBarContrastWhenTransparent(a.getBoolean(
+                    R.styleable.ActivityTaskDescription_ensureStatusBarContrastWhenTransparent,
+                    false));
+            mTaskDescription.setEnsureNavigationBarContrastWhenTransparent(a.getBoolean(
+                    R.styleable.ActivityTaskDescription_ensureNavigationBarContrastWhenTransparent,
+                    true));
         }
 
         a.recycle();
@@ -6458,6 +6508,12 @@ public class Activity extends ContextThemeWrapper
         return getComponentName();
     }
 
+    /** @hide */
+    @Override
+    public final ComponentName contentCaptureClientGetComponentName() {
+        return getComponentName();
+    }
+
     /**
      * Retrieve a {@link SharedPreferences} object for accessing preferences
      * that are private to this activity.  This simply calls the underlying
@@ -7155,7 +7211,8 @@ public class Activity extends ContextThemeWrapper
         mInstrumentation.onEnterAnimationComplete();
         onEnterAnimationComplete();
         if (getWindow() != null && getWindow().getDecorView() != null) {
-            getWindow().getDecorView().getViewTreeObserver().dispatchOnEnterAnimationComplete();
+            View decorView = getWindow().getDecorView();
+            decorView.getViewTreeObserver().dispatchOnEnterAnimationComplete();
         }
     }
 
@@ -7611,7 +7668,8 @@ public class Activity extends ContextThemeWrapper
 
         mWindow.setColorMode(info.colorMode);
 
-        setAutofillCompatibilityEnabled(application.isAutofillCompatibilityEnabled());
+        setAutofillOptions(application.getAutofillOptions());
+        setContentCaptureOptions(application.getContentCaptureOptions());
     }
 
     private void enableAutofillCompatibilityIfNeeded() {
@@ -7706,6 +7764,8 @@ public class Activity extends ContextThemeWrapper
                 }
             }
         }
+
+        GraphicsEnvironment.getInstance().showAngleInUseDialogBox(this);
 
         mActivityTransitionState.enterReady(this);
         dispatchActivityPostStarted();
@@ -8318,7 +8378,7 @@ public class Activity extends ContextThemeWrapper
         try {
             ActivityTaskManager.getService().setDisablePreviewScreenshots(mToken, disable);
         } catch (RemoteException e) {
-            Log.e(TAG, "Failed to call setDisablePreviewScreenshots", e);
+            throw e.rethrowFromSystemServer();
         }
     }
 
@@ -8339,7 +8399,7 @@ public class Activity extends ContextThemeWrapper
         try {
             ActivityTaskManager.getService().setShowWhenLocked(mToken, showWhenLocked);
         } catch (RemoteException e) {
-            Log.e(TAG, "Failed to call setShowWhenLocked", e);
+            throw e.rethrowFromSystemServer();
         }
     }
 
@@ -8356,17 +8416,14 @@ public class Activity extends ContextThemeWrapper
      *                              screen when this activity has another activity behind it with
      *                              the showWhenLock attribute set; {@code false} otherwise.
      * @see #setShowWhenLocked(boolean)
-     * See android.R.attr#inheritShowWhenLocked
-     * @hide
+     * @see android.R.attr#inheritShowWhenLocked
      */
-    @SystemApi
-    @TestApi
     public void setInheritShowWhenLocked(boolean inheritShowWhenLocked) {
         try {
             ActivityTaskManager.getService().setInheritShowWhenLocked(
                     mToken, inheritShowWhenLocked);
         } catch (RemoteException e) {
-            Log.e(TAG, "Failed to call setInheritShowWhenLocked", e);
+            throw e.rethrowFromSystemServer();
         }
     }
 
@@ -8392,7 +8449,7 @@ public class Activity extends ContextThemeWrapper
         try {
             ActivityTaskManager.getService().setTurnScreenOn(mToken, turnScreenOn);
         } catch (RemoteException e) {
-            Log.e(TAG, "Failed to call setTurnScreenOn", e);
+            throw e.rethrowFromSystemServer();
         }
     }
 
@@ -8409,7 +8466,7 @@ public class Activity extends ContextThemeWrapper
         try {
             ActivityTaskManager.getService().registerRemoteAnimations(mToken, definition);
         } catch (RemoteException e) {
-            Log.e(TAG, "Failed to call registerRemoteAnimations", e);
+            throw e.rethrowFromSystemServer();
         }
     }
 

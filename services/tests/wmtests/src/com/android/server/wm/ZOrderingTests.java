@@ -23,14 +23,19 @@ import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_SPLIT_SCREEN_PRIMARY;
 import static android.app.WindowConfiguration.WINDOWING_MODE_SPLIT_SCREEN_SECONDARY;
+import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_ABOVE_SUB_PANEL;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_MEDIA;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_MEDIA_OVERLAY;
+import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_PANEL;
+import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_SUB_PANEL;
 import static android.view.WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
 import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL;
 import static android.view.WindowManager.LayoutParams.TYPE_STATUS_BAR_PANEL;
 import static android.view.WindowManager.LayoutParams.TYPE_STATUS_BAR_SUB_PANEL;
 import static android.view.WindowManager.LayoutParams.TYPE_SYSTEM_OVERLAY;
+
+import static com.android.server.wm.WindowStateAnimator.PRESERVED_SURFACE_LAYER;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -38,12 +43,12 @@ import android.platform.test.annotations.Presubmit;
 import android.view.SurfaceControl;
 import android.view.SurfaceSession;
 
-import androidx.test.filters.FlakyTest;
 import androidx.test.filters.SmallTest;
 
 import org.junit.After;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 
@@ -51,9 +56,8 @@ import java.util.LinkedList;
  * Tests for the {@link DisplayContent#assignChildLayers(SurfaceControl.Transaction)} method.
  *
  * Build/Install/Run:
- *  atest FrameworksServicesTests:ZOrderingTests
+ *  atest WmTests:ZOrderingTests
  */
-@FlakyTest(bugId = 74078662)
 @SmallTest
 @Presubmit
 public class ZOrderingTests extends WindowTestsBase {
@@ -69,7 +73,7 @@ public class ZOrderingTests extends WindowTestsBase {
         public SurfaceControl.Transaction setLayer(SurfaceControl sc, int layer) {
             mRelativeLayersForControl.remove(sc);
             mLayersForControl.put(sc, layer);
-            return super.setLayer(sc, layer);
+            return this;
         }
 
         @Override
@@ -78,7 +82,7 @@ public class ZOrderingTests extends WindowTestsBase {
                 int layer) {
             mRelativeLayersForControl.put(sc, relativeTo);
             mLayersForControl.put(sc, layer);
-            return super.setRelativeLayer(sc, relativeTo, layer);
+            return this;
         }
 
         private int getLayer(SurfaceControl sc) {
@@ -396,6 +400,28 @@ public class ZOrderingTests extends WindowTestsBase {
 
         assertWindowHigher(anyWindow, mediaOverlayChild);
         assertWindowHigher(mediaOverlayChild, child);
+    }
+
+    @Test
+    public void testAssignWindowLayers_ForPostivelyZOrderedSubtype() {
+        final WindowState anyWindow = createWindow("anyWindow");
+        final ArrayList<WindowState> childList = new ArrayList<>();
+        childList.add(createWindow(anyWindow, TYPE_APPLICATION_PANEL, mDisplayContent,
+                "TypeApplicationPanelChild"));
+        childList.add(createWindow(anyWindow, TYPE_APPLICATION_SUB_PANEL, mDisplayContent,
+                "TypeApplicationSubPanelChild"));
+        childList.add(createWindow(anyWindow, TYPE_APPLICATION_ATTACHED_DIALOG, mDisplayContent,
+                "TypeApplicationAttachedDialogChild"));
+        childList.add(createWindow(anyWindow, TYPE_APPLICATION_ABOVE_SUB_PANEL, mDisplayContent,
+                "TypeApplicationAboveSubPanelPanelChild"));
+
+        final LayerRecordingTransaction t = mTransaction;
+        mDisplayContent.assignChildLayers(t);
+
+        for (int i = childList.size() - 1; i >= 0; i--) {
+            assertThat(t.getLayer(childList.get(i).getSurfaceControl()))
+                    .isGreaterThan(PRESERVED_SURFACE_LAYER);
+        }
     }
 
     @Test

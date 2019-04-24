@@ -50,6 +50,7 @@ const int FIELD_ID_ANOMALY_ALARM_STATS = 9;
 const int FIELD_ID_PERIODIC_ALARM_STATS = 12;
 const int FIELD_ID_SYSTEM_SERVER_RESTART = 15;
 const int FIELD_ID_LOGGER_ERROR_STATS = 16;
+const int FIELD_ID_OVERFLOW = 18;
 
 const int FIELD_ID_ATOM_STATS_TAG = 1;
 const int FIELD_ID_ATOM_STATS_COUNT = 2;
@@ -60,6 +61,13 @@ const int FIELD_ID_PERIODIC_ALARMS_REGISTERED = 1;
 const int FIELD_ID_LOG_LOSS_STATS_TIME = 1;
 const int FIELD_ID_LOG_LOSS_STATS_COUNT = 2;
 const int FIELD_ID_LOG_LOSS_STATS_ERROR = 3;
+const int FIELD_ID_LOG_LOSS_STATS_TAG = 4;
+const int FIELD_ID_LOG_LOSS_STATS_UID = 5;
+const int FIELD_ID_LOG_LOSS_STATS_PID = 6;
+
+const int FIELD_ID_OVERFLOW_COUNT = 1;
+const int FIELD_ID_OVERFLOW_MAX_HISTORY = 2;
+const int FIELD_ID_OVERFLOW_MIN_HISTORY = 3;
 
 const int FIELD_ID_CONFIG_STATS_UID = 1;
 const int FIELD_ID_CONFIG_STATS_ID = 2;
@@ -82,6 +90,8 @@ const int FIELD_ID_CONFIG_STATS_METRIC_STATS = 15;
 const int FIELD_ID_CONFIG_STATS_ALERT_STATS = 16;
 const int FIELD_ID_CONFIG_STATS_METRIC_DIMENSION_IN_CONDITION_STATS = 17;
 const int FIELD_ID_CONFIG_STATS_ANNOTATION = 18;
+const int FIELD_ID_CONFIG_STATS_ACTIVATION = 22;
+const int FIELD_ID_CONFIG_STATS_DEACTIVATION = 23;
 const int FIELD_ID_CONFIG_STATS_ANNOTATION_INT64 = 1;
 const int FIELD_ID_CONFIG_STATS_ANNOTATION_INT32 = 2;
 
@@ -181,12 +191,13 @@ void StatsdStats::noteConfigReset(const ConfigKey& key) {
     noteConfigResetInternalLocked(key);
 }
 
-void StatsdStats::noteLogLost(int32_t wallClockTimeSec, int32_t count, int32_t lastError) {
+void StatsdStats::noteLogLost(int32_t wallClockTimeSec, int32_t count, int32_t lastError,
+                              int32_t lastTag, int32_t uid, int32_t pid) {
     lock_guard<std::mutex> lock(mLock);
     if (mLogLossStats.size() == kMaxLoggerErrors) {
         mLogLossStats.pop_front();
     }
-    mLogLossStats.emplace_back(wallClockTimeSec, count, lastError);
+    mLogLossStats.emplace_back(wallClockTimeSec, count, lastError, lastTag, uid, pid);
 }
 
 void StatsdStats::noteBroadcastSent(const ConfigKey& key) {
@@ -206,8 +217,43 @@ void StatsdStats::noteBroadcastSent(const ConfigKey& key, int32_t timeSec) {
     it->second->broadcast_sent_time_sec.push_back(timeSec);
 }
 
+void StatsdStats::noteActiveStatusChanged(const ConfigKey& key, bool activated) {
+    noteActiveStatusChanged(key, activated, getWallClockSec());
+}
+
+void StatsdStats::noteActiveStatusChanged(const ConfigKey& key, bool activated, int32_t timeSec) {
+    lock_guard<std::mutex> lock(mLock);
+    auto it = mConfigStats.find(key);
+    if (it == mConfigStats.end()) {
+        ALOGE("Config key %s not found!", key.ToString().c_str());
+        return;
+    }
+    auto& vec = activated ? it->second->activation_time_sec
+                          : it->second->deactivation_time_sec;
+    if (vec.size() == kMaxTimestampCount) {
+        vec.pop_front();
+    }
+    vec.push_back(timeSec);
+}
+
 void StatsdStats::noteDataDropped(const ConfigKey& key, const size_t totalBytes) {
     noteDataDropped(key, totalBytes, getWallClockSec());
+}
+
+void StatsdStats::noteEventQueueOverflow(int64_t oldestEventTimestampNs) {
+    lock_guard<std::mutex> lock(mLock);
+
+    mOverflowCount++;
+
+    int64_t history = getElapsedRealtimeNs() - oldestEventTimestampNs;
+
+    if (history > mMaxQueueHistoryNs) {
+        mMaxQueueHistoryNs = history;
+    }
+
+    if (history < mMinQueueHistoryNs) {
+        mMinQueueHistoryNs = history;
+    }
 }
 
 void StatsdStats::noteDataDropped(const ConfigKey& key, const size_t totalBytes, int32_t timeSec) {
@@ -423,32 +469,70 @@ void StatsdStats::noteEmptyData(int atomId) {
     mPulledAtomStats[atomId].emptyData++;
 }
 
-void StatsdStats::noteHardDimensionLimitReached(int metricId) {
+void StatsdStats::notePullerCallbackRegistrationChanged(int atomId, bool registered) {
+    lock_guard<std::mutex> lock(mLock);
+    if (registered) {
+        mPulledAtomStats[atomId].registeredCount++;
+    } else {
+        mPulledAtomStats[atomId].unregisteredCount++;
+    }
+}
+
+void StatsdStats::noteHardDimensionLimitReached(int64_t metricId) {
     lock_guard<std::mutex> lock(mLock);
     getAtomMetricStats(metricId).hardDimensionLimitReached++;
 }
 
-void StatsdStats::noteLateLogEventSkipped(int metricId) {
+void StatsdStats::noteLateLogEventSkipped(int64_t metricId) {
     lock_guard<std::mutex> lock(mLock);
     getAtomMetricStats(metricId).lateLogEventSkipped++;
 }
 
-void StatsdStats::noteSkippedForwardBuckets(int metricId) {
+void StatsdStats::noteSkippedForwardBuckets(int64_t metricId) {
     lock_guard<std::mutex> lock(mLock);
     getAtomMetricStats(metricId).skippedForwardBuckets++;
 }
 
-void StatsdStats::noteBadValueType(int metricId) {
+void StatsdStats::noteBadValueType(int64_t metricId) {
     lock_guard<std::mutex> lock(mLock);
     getAtomMetricStats(metricId).badValueType++;
 }
 
-void StatsdStats::noteConditionChangeInNextBucket(int metricId) {
+void StatsdStats::noteBucketDropped(int64_t metricId) {
+    lock_guard<std::mutex> lock(mLock);
+    getAtomMetricStats(metricId).bucketDropped++;
+}
+
+void StatsdStats::noteBucketUnknownCondition(int64_t metricId) {
+    lock_guard<std::mutex> lock(mLock);
+    getAtomMetricStats(metricId).bucketUnknownCondition++;
+}
+
+void StatsdStats::noteConditionChangeInNextBucket(int64_t metricId) {
     lock_guard<std::mutex> lock(mLock);
     getAtomMetricStats(metricId).conditionChangeInNextBucket++;
 }
 
-StatsdStats::AtomMetricStats& StatsdStats::getAtomMetricStats(int metricId) {
+void StatsdStats::noteInvalidatedBucket(int64_t metricId) {
+    lock_guard<std::mutex> lock(mLock);
+    getAtomMetricStats(metricId).invalidatedBucket++;
+}
+
+void StatsdStats::noteBucketCount(int64_t metricId) {
+    lock_guard<std::mutex> lock(mLock);
+    getAtomMetricStats(metricId).bucketCount++;
+}
+
+void StatsdStats::noteBucketBoundaryDelayNs(int64_t metricId, int64_t timeDelayNs) {
+    lock_guard<std::mutex> lock(mLock);
+    AtomMetricStats& pullStats = getAtomMetricStats(metricId);
+    pullStats.maxBucketBoundaryDelayNs =
+            std::max(pullStats.maxBucketBoundaryDelayNs, timeDelayNs);
+    pullStats.minBucketBoundaryDelayNs =
+            std::min(pullStats.minBucketBoundaryDelayNs, timeDelayNs);
+}
+
+StatsdStats::AtomMetricStats& StatsdStats::getAtomMetricStats(int64_t metricId) {
     auto atomMetricStatsIter = mAtomMetricStats.find(metricId);
     if (atomMetricStatsIter != mAtomMetricStats.end()) {
         return atomMetricStatsIter->second;
@@ -471,8 +555,13 @@ void StatsdStats::resetInternalLocked() {
     mPeriodicAlarmRegisteredStats = 0;
     mSystemServerRestartSec.clear();
     mLogLossStats.clear();
+    mOverflowCount = 0;
+    mMinQueueHistoryNs = kInt64Max;
+    mMaxQueueHistoryNs = 0;
     for (auto& config : mConfigStats) {
         config.second->broadcast_sent_time_sec.clear();
+        config.second->activation_time_sec.clear();
+        config.second->deactivation_time_sec.clear();
         config.second->data_drop_time_sec.clear();
         config.second->data_drop_bytes.clear();
         config.second->dump_report_stats.clear();
@@ -495,6 +584,8 @@ void StatsdStats::resetInternalLocked() {
         pullStats.second.dataError = 0;
         pullStats.second.pullTimeout = 0;
         pullStats.second.pullExceedMaxDelay = 0;
+        pullStats.second.registeredCount = 0;
+        pullStats.second.unregisteredCount = 0;
     }
     mAtomMetricStats.clear();
 }
@@ -528,6 +619,14 @@ void StatsdStats::dumpStats(int out) const {
             dprintf(out, "\tbroadcast time: %d\n", broadcastTime);
         }
 
+        for (const int& activationTime : configStats->activation_time_sec) {
+            dprintf(out, "\tactivation time: %d\n", activationTime);
+        }
+
+        for (const int& deactivationTime : configStats->deactivation_time_sec) {
+            dprintf(out, "\tdeactivation time: %d\n", deactivationTime);
+        }
+
         auto dropTimePtr = configStats->data_drop_time_sec.begin();
         auto dropBytesPtr = configStats->data_drop_bytes.begin();
         for (int i = 0; i < (int)configStats->data_drop_time_sec.size();
@@ -554,6 +653,14 @@ void StatsdStats::dumpStats(int out) const {
         for (const auto& broadcastTime : configStats->broadcast_sent_time_sec) {
             dprintf(out, "\tbroadcast time: %s(%lld)\n", buildTimeString(broadcastTime).c_str(),
                     (long long)broadcastTime);
+        }
+
+        for (const int& activationTime : configStats->activation_time_sec) {
+            dprintf(out, "\tactivation time: %d\n", activationTime);
+        }
+
+        for (const int& deactivationTime : configStats->deactivation_time_sec) {
+            dprintf(out, "\tdeactivation time: %d\n", deactivationTime);
         }
 
         auto dropTimePtr = configStats->data_drop_time_sec.begin();
@@ -602,16 +709,19 @@ void StatsdStats::dumpStats(int out) const {
     dprintf(out, "********Pulled Atom stats***********\n");
     for (const auto& pair : mPulledAtomStats) {
         dprintf(out,
-                "Atom %d->(total pull)%ld, (pull from cache)%ld, (min pull interval)%ld \n"
+                "Atom %d->(total pull)%ld, (pull from cache)%ld, "
+                "(pull failed)%ld, (min pull interval)%ld \n"
                 "  (average pull time nanos)%lld, (max pull time nanos)%lld, (average pull delay "
                 "nanos)%lld, "
                 "  (max pull delay nanos)%lld, (data error)%ld\n"
-                "  (pull timeout)%ld, (pull exceed max delay)%ld\n",
+                "  (pull timeout)%ld, (pull exceed max delay)%ld\n"
+                "  (registered count) %ld, (unregistered count) %ld\n",
                 (int)pair.first, (long)pair.second.totalPull, (long)pair.second.totalPullFromCache,
-                (long)pair.second.minPullIntervalSec, (long long)pair.second.avgPullTimeNs,
-                (long long)pair.second.maxPullTimeNs, (long long)pair.second.avgPullDelayNs,
-                (long long)pair.second.maxPullDelayNs, pair.second.dataError,
-                pair.second.pullTimeout, pair.second.pullExceedMaxDelay);
+                (long)pair.second.pullFailed, (long)pair.second.minPullIntervalSec,
+                (long long)pair.second.avgPullTimeNs, (long long)pair.second.maxPullTimeNs,
+                (long long)pair.second.avgPullDelayNs, (long long)pair.second.maxPullDelayNs,
+                pair.second.dataError, pair.second.pullTimeout, pair.second.pullExceedMaxDelay,
+                pair.second.registeredCount, pair.second.unregisteredCount);
     }
 
     if (mAnomalyAlarmRegisteredStats > 0) {
@@ -634,9 +744,15 @@ void StatsdStats::dumpStats(int out) const {
     }
 
     for (const auto& loss : mLogLossStats) {
-        dprintf(out, "Log loss: %lld (wall clock sec) - %d (count) %d (last error)\n",
-                (long long)loss.mWallClockSec, loss.mCount, loss.mLastError);
+        dprintf(out,
+                "Log loss: %lld (wall clock sec) - %d (count), %d (last error), %d (last tag), %d "
+                "(uid), %d (pid)\n",
+                (long long)loss.mWallClockSec, loss.mCount, loss.mLastError, loss.mLastTag,
+                loss.mUid, loss.mPid);
     }
+
+    dprintf(out, "Event queue overflow: %d; MaxHistoryNs: %lld; MinHistoryNs: %lld\n",
+            mOverflowCount, (long long)mMaxQueueHistoryNs, (long long)mMinQueueHistoryNs);
 }
 
 void addConfigStatsToProto(const ConfigStats& configStats, ProtoOutputStream* proto) {
@@ -662,6 +778,16 @@ void addConfigStatsToProto(const ConfigStats& configStats, ProtoOutputStream* pr
     for (const auto& broadcast : configStats.broadcast_sent_time_sec) {
         proto->write(FIELD_TYPE_INT32 | FIELD_ID_CONFIG_STATS_BROADCAST | FIELD_COUNT_REPEATED,
                      broadcast);
+    }
+
+    for (const auto& activation : configStats.activation_time_sec) {
+        proto->write(FIELD_TYPE_INT32 | FIELD_ID_CONFIG_STATS_ACTIVATION | FIELD_COUNT_REPEATED,
+                     activation);
+    }
+
+    for (const auto& deactivation : configStats.deactivation_time_sec) {
+        proto->write(FIELD_TYPE_INT32 | FIELD_ID_CONFIG_STATS_DEACTIVATION | FIELD_COUNT_REPEATED,
+                     deactivation);
     }
 
     for (const auto& drop_time : configStats.data_drop_time_sec) {
@@ -799,6 +925,19 @@ void StatsdStats::dumpStats(std::vector<uint8_t>* output, bool reset) {
         proto.write(FIELD_TYPE_INT32 | FIELD_ID_LOG_LOSS_STATS_TIME, error.mWallClockSec);
         proto.write(FIELD_TYPE_INT32 | FIELD_ID_LOG_LOSS_STATS_COUNT, error.mCount);
         proto.write(FIELD_TYPE_INT32 | FIELD_ID_LOG_LOSS_STATS_ERROR, error.mLastError);
+        proto.write(FIELD_TYPE_INT32 | FIELD_ID_LOG_LOSS_STATS_TAG, error.mLastTag);
+        proto.write(FIELD_TYPE_INT32 | FIELD_ID_LOG_LOSS_STATS_UID, error.mUid);
+        proto.write(FIELD_TYPE_INT32 | FIELD_ID_LOG_LOSS_STATS_PID, error.mPid);
+        proto.end(token);
+    }
+
+    if (mOverflowCount > 0) {
+        uint64_t token = proto.start(FIELD_TYPE_MESSAGE | FIELD_ID_OVERFLOW);
+        proto.write(FIELD_TYPE_INT32 | FIELD_ID_OVERFLOW_COUNT, (int32_t)mOverflowCount);
+        proto.write(FIELD_TYPE_INT64 | FIELD_ID_OVERFLOW_MAX_HISTORY,
+                    (long long)mMaxQueueHistoryNs);
+        proto.write(FIELD_TYPE_INT64 | FIELD_ID_OVERFLOW_MIN_HISTORY,
+                    (long long)mMinQueueHistoryNs);
         proto.end(token);
     }
 
@@ -812,12 +951,12 @@ void StatsdStats::dumpStats(std::vector<uint8_t>* output, bool reset) {
     output->resize(bufferSize);
 
     size_t pos = 0;
-    auto it = proto.data();
-    while (it.readBuffer() != NULL) {
-        size_t toRead = it.currentToRead();
-        std::memcpy(&((*output)[pos]), it.readBuffer(), toRead);
+    sp<android::util::ProtoReader> reader = proto.data();
+    while (reader->readBuffer() != NULL) {
+        size_t toRead = reader->currentToRead();
+        std::memcpy(&((*output)[pos]), reader->readBuffer(), toRead);
         pos += toRead;
-        it.rp()->move(toRead);
+        reader->move(toRead);
     }
 
     if (reset) {

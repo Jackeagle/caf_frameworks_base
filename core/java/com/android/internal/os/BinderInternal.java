@@ -17,6 +17,7 @@
 package com.android.internal.os;
 
 import android.annotation.NonNull;
+import android.annotation.UnsupportedAppUsage;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
@@ -96,9 +97,10 @@ public class BinderInternal {
          * <p>The implementation should never execute a binder call since it is called during a
          * binder transaction.
          *
+         * @param untrustedWorkSourceUid The work source set by the caller.
          * @return the uid of the process to attribute the binder transaction to.
          */
-        int resolveWorkSourceUid();
+        int resolveWorkSourceUid(int untrustedWorkSourceUid);
     }
 
     /**
@@ -156,6 +158,7 @@ public class BinderInternal {
      * an implementation of IServiceManager, which you can use to find
      * other services.
      */
+    @UnsupportedAppUsage
     public static final native IBinder getContextObject();
 
     /**
@@ -167,6 +170,7 @@ public class BinderInternal {
 
     public static final native void setMaxThreads(int numThreads);
 
+    @UnsupportedAppUsage
     static native final void handleGc();
 
     public static void forceGc(String reason) {

@@ -22,7 +22,7 @@
 #include "anomaly/AlarmMonitor.h"
 #include "config/ConfigManager.h"
 #include "external/StatsPullerManager.h"
-#include "logd/LogListener.h"
+#include "logd/LogEventQueue.h"
 #include "packages/UidMap.h"
 #include "shell/ShellSubscriber.h"
 #include "statscompanion_util.h"
@@ -31,6 +31,7 @@
 #include <android/frameworks/stats/1.0/types.h>
 #include <android/os/BnStatsManager.h>
 #include <android/os/IStatsCompanionService.h>
+#include <android/os/IStatsManager.h>
 #include <binder/IResultReceiver.h>
 #include <utils/Looper.h>
 
@@ -51,11 +52,10 @@ namespace statsd {
 using android::hardware::Return;
 
 class StatsService : public BnStatsManager,
-                     public LogListener,
                      public IStats,
                      public IBinder::DeathRecipient {
 public:
-    StatsService(const sp<Looper>& handlerLooper);
+    StatsService(const sp<Looper>& handlerLooper, std::shared_ptr<LogEventQueue> queue);
     virtual ~StatsService();
 
     /** The anomaly alarm registered with AlarmManager won't be updated by less than this. */
@@ -91,7 +91,7 @@ public:
     void Terminate();
 
     /**
-     * Called by LogReader when there's a log event to process.
+     * Test ONLY interface. In real world, StatsService reads from LogEventQueue.
      */
     virtual void OnLogEvent(LogEvent* event);
 
@@ -171,6 +171,31 @@ public:
      * Binder call to get AppBreadcrumbReported atom.
      */
     virtual Status sendAppBreadcrumbAtom(int32_t label, int32_t state) override;
+
+    /**
+     * Binder call to register a callback function for a vendor pulled atom.
+     * Note: this atom must NOT have uid as a field.
+     */
+    virtual Status registerPullerCallback(int32_t atomTag,
+        const sp<android::os::IStatsPullerCallback>& pullerCallback,
+        const String16& packageName) override;
+
+    /**
+     * Binder call to unregister any existing callback function for a vendor pulled atom.
+     */
+    virtual Status unregisterPullerCallback(int32_t atomTag, const String16& packageName) override;
+
+    /**
+     * Binder call to log BinaryPushStateChanged atom.
+     */
+    virtual Status sendBinaryPushStateChangedAtom(
+            const android::String16& trainName, int64_t trainVersionCode, int options,
+            int32_t state, const std::vector<int64_t>& experimentIds) override;
+
+    /**
+     * Binder call to get registered experiment IDs.
+     */
+    virtual Status getRegisteredExperimentIds(std::vector<int64_t>* expIdsOut);
 
     /**
      * Binder call to get SpeakerImpedance atom.
@@ -257,10 +282,19 @@ private:
      */
     void print_cmd_help(int out);
 
+    /* Runs on its dedicated thread to process pushed stats event from socket. */
+    void readLogs();
+
     /**
      * Trigger a broadcast.
      */
     status_t cmd_trigger_broadcast(int outFd, Vector<String8>& args);
+
+
+    /**
+     * Trigger an active configs changed broadcast.
+     */
+    status_t cmd_trigger_active_config_broadcast(int outFd, Vector<String8>& args);
 
     /**
      * Handle the config sub-command.
@@ -328,6 +362,15 @@ private:
     bool getUidFromArgs(const Vector<String8>& args, size_t uidArgIndex, int32_t& uid);
 
     /**
+     * Writes the value of uidSting into uid.
+     * Returns whether the uid is reasonable (type uid_t) and whether
+     * 1. it is equal to the calling uid, or
+     * 2. the device is mEngBuild, or
+     * 3. the caller is AID_ROOT and the uid is AID_SHELL (i.e. ROOT can impersonate SHELL).
+     */
+     bool getUidFromString(const char* uidString, int32_t& uid);
+
+    /**
      * Adds a configuration after checking permissions and obtaining UID from binder call.
      */
     bool addConfigurationChecked(int uid, int64_t key, const vector<uint8_t>& config);
@@ -373,6 +416,8 @@ private:
     bool mEngBuild;
 
     sp<ShellSubscriber> mShellSubscriber;
+
+    std::shared_ptr<LogEventQueue> mEventQueue;
 
     FRIEND_TEST(StatsServiceTest, TestAddConfig_simple);
     FRIEND_TEST(StatsServiceTest, TestAddConfig_empty);

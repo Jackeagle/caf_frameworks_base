@@ -76,6 +76,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.Executor;
 
 final class IntentReceiverLeaked extends AndroidRuntimeException {
     @UnsupportedAppUsage
@@ -232,7 +233,8 @@ public final class LoadedApk {
         mResources = Resources.getSystem();
         mDefaultClassLoader = ClassLoader.getSystemClassLoader();
         mAppComponentFactory = createAppFactory(mApplicationInfo, mDefaultClassLoader);
-        mClassLoader = mAppComponentFactory.instantiateClassLoader(mDefaultClassLoader);
+        mClassLoader = mAppComponentFactory.instantiateClassLoader(mDefaultClassLoader,
+                new ApplicationInfo(mApplicationInfo));
     }
 
     /**
@@ -243,19 +245,15 @@ public final class LoadedApk {
         mApplicationInfo = info;
         mDefaultClassLoader = classLoader;
         mAppComponentFactory = createAppFactory(info, mDefaultClassLoader);
-        mClassLoader = mAppComponentFactory.instantiateClassLoader(mDefaultClassLoader);
+        mClassLoader = mAppComponentFactory.instantiateClassLoader(mDefaultClassLoader,
+                new ApplicationInfo(mApplicationInfo));
     }
 
     private AppComponentFactory createAppFactory(ApplicationInfo appInfo, ClassLoader cl) {
         if (appInfo.appComponentFactory != null && cl != null) {
             try {
-                AppComponentFactory factory = (AppComponentFactory) cl.loadClass(
-                        appInfo.appComponentFactory).newInstance();
-                // Pass a copy of ApplicationInfo to the factory. Copying protects the framework
-                // from apps which would override the factory and change ApplicationInfo contents.
-                // ApplicationInfo is used to set up the default class loader.
-                factory.setApplicationInfo(new ApplicationInfo(appInfo));
-                return factory;
+                return (AppComponentFactory)
+                        cl.loadClass(appInfo.appComponentFactory).newInstance();
             } catch (InstantiationException | IllegalAccessException | ClassNotFoundException e) {
                 Slog.e(TAG, "Unable to instantiate appComponentFactory", e);
             }
@@ -678,7 +676,7 @@ public final class LoadedApk {
 
         // Shared libraries get a null parent: this has the side effect of having canonicalized
         // shared libraries using ApplicationLoaders cache, which is the behavior we want.
-        return ApplicationLoaders.getDefault().getClassLoaderWithSharedLibraries(jars,
+        return ApplicationLoaders.getDefault().getSharedLibraryClassLoaderWithSharedLibraries(jars,
                     mApplicationInfo.targetSdkVersion, isBundledApp, librarySearchPath,
                     libraryPermittedPath, /* parent */ null,
                     /* classLoaderName */ null, sharedLibraries);
@@ -729,8 +727,8 @@ public final class LoadedApk {
                 mDefaultClassLoader = ClassLoader.getSystemClassLoader();
             }
             mAppComponentFactory = createAppFactory(mApplicationInfo, mDefaultClassLoader);
-            mClassLoader = mAppComponentFactory.instantiateClassLoader(mDefaultClassLoader);
-
+            mClassLoader = mAppComponentFactory.instantiateClassLoader(mDefaultClassLoader,
+                    new ApplicationInfo(mApplicationInfo));
             return;
         }
 
@@ -783,6 +781,16 @@ public final class LoadedApk {
             isBundledApp = false;
         }
 
+        // Similar to vendor apks, we should add /product/lib for apks from product partition
+        // and not having /product/lib in the default search path
+        final boolean treatProductApkAsUnbundled = !defaultSearchPaths.contains("/product/lib");
+        if (mApplicationInfo.getCodePath() != null
+                && mApplicationInfo.isProduct() && treatProductApkAsUnbundled
+                // TODO(b/128557860): Change target SDK version when version code R is available.
+                && getTargetSdkVersion() == Build.VERSION_CODES.CUR_DEVELOPMENT) {
+            isBundledApp = false;
+        }
+
         makePaths(mActivityThread, isBundledApp, mApplicationInfo, zipPaths, libPaths);
 
         String libraryPermittedPath = mDataDir;
@@ -821,7 +829,8 @@ public final class LoadedApk {
             }
 
             if (mClassLoader == null) {
-                mClassLoader = mAppComponentFactory.instantiateClassLoader(mDefaultClassLoader);
+                mClassLoader = mAppComponentFactory.instantiateClassLoader(mDefaultClassLoader,
+                        new ApplicationInfo(mApplicationInfo));
             }
 
             return;
@@ -870,8 +879,9 @@ public final class LoadedApk {
             }
         }
 
-        // /vendor/lib, /odm/lib and /product/lib are added to the native lib search
-        // paths of the classloader. Note that this is done AFTER the classloader is
+        // /aepx/com.android.runtime/lib, /vendor/lib, /odm/lib and /product/lib
+        // are added to the native lib search paths of the classloader.
+        // Note that this is done AFTER the classloader is
         // created by ApplicationLoaders.getDefault().getClassLoader(...). The
         // reason is because if we have added the paths when creating the classloader
         // above, the paths are also added to the search path of the linker namespace
@@ -888,8 +898,11 @@ public final class LoadedApk {
         // System.loadLibrary(). In order to prevent the problem, we explicitly
         // add the paths only to the classloader, and not to the native loader
         // (linker namespace).
-        List<String> extraLibPaths = new ArrayList<>(3);
+        List<String> extraLibPaths = new ArrayList<>(4);
         String abiSuffix = VMRuntime.getRuntime().is64Bit() ? "64" : "";
+        if (!defaultSearchPaths.contains("/apex/com.android.runtime/lib")) {
+            extraLibPaths.add("/apex/com.android.runtime/lib" + abiSuffix);
+        }
         if (!defaultSearchPaths.contains("/vendor/lib")) {
             extraLibPaths.add("/vendor/lib" + abiSuffix);
         }
@@ -924,15 +937,19 @@ public final class LoadedApk {
         //
         // It is NOT ok to call this function from the system_server (for any of the packages it
         // loads code from) so we explicitly disallow it there.
-        if (needToSetupJitProfiles && !ActivityThread.isSystem()) {
+        //
+        // It is not ok to call this in a zygote context where mActivityThread is null.
+        if (needToSetupJitProfiles && !ActivityThread.isSystem() && mActivityThread != null) {
             setupJitProfileSupport();
         }
 
         // Call AppComponentFactory to select/create the main class loader of this app.
         // Since this may call code in the app, mDefaultClassLoader must be fully set up
         // before invoking the factory.
+        // Invoke with a copy of ApplicationInfo to protect against the app changing it.
         if (mClassLoader == null) {
-            mClassLoader = mAppComponentFactory.instantiateClassLoader(mDefaultClassLoader);
+            mClassLoader = mAppComponentFactory.instantiateClassLoader(mDefaultClassLoader,
+                    new ApplicationInfo(mApplicationInfo));
         }
     }
 
@@ -1647,6 +1664,16 @@ public final class LoadedApk {
     @UnsupportedAppUsage
     public final IServiceConnection getServiceDispatcher(ServiceConnection c,
             Context context, Handler handler, int flags) {
+        return getServiceDispatcherCommon(c, context, handler, null, flags);
+    }
+
+    public final IServiceConnection getServiceDispatcher(ServiceConnection c,
+            Context context, Executor executor, int flags) {
+        return getServiceDispatcherCommon(c, context, null, executor, flags);
+    }
+
+    private IServiceConnection getServiceDispatcherCommon(ServiceConnection c,
+            Context context, Handler handler, Executor executor, int flags) {
         synchronized (mServices) {
             LoadedApk.ServiceDispatcher sd = null;
             ArrayMap<ServiceConnection, LoadedApk.ServiceDispatcher> map = mServices.get(context);
@@ -1655,7 +1682,11 @@ public final class LoadedApk {
                 sd = map.get(c);
             }
             if (sd == null) {
-                sd = new ServiceDispatcher(c, context, handler, flags);
+                if (executor != null) {
+                    sd = new ServiceDispatcher(c, context, executor, flags);
+                } else {
+                    sd = new ServiceDispatcher(c, context, handler, flags);
+                }
                 if (DEBUG) Slog.d(TAG, "Creating new dispatcher " + sd + " for conn " + c);
                 if (map == null) {
                     map = new ArrayMap<>();
@@ -1663,7 +1694,7 @@ public final class LoadedApk {
                 }
                 map.put(c, sd);
             } else {
-                sd.validate(context, handler);
+                sd.validate(context, handler, executor);
             }
             return sd.getIServiceConnection();
         }
@@ -1740,6 +1771,7 @@ public final class LoadedApk {
         @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
         private final Context mContext;
         private final Handler mActivityThread;
+        private final Executor mActivityExecutor;
         private final ServiceConnectionLeaked mLocation;
         private final int mFlags;
 
@@ -1779,12 +1811,25 @@ public final class LoadedApk {
             mConnection = conn;
             mContext = context;
             mActivityThread = activityThread;
+            mActivityExecutor = null;
             mLocation = new ServiceConnectionLeaked(null);
             mLocation.fillInStackTrace();
             mFlags = flags;
         }
 
-        void validate(Context context, Handler activityThread) {
+        ServiceDispatcher(ServiceConnection conn,
+                Context context, Executor activityExecutor, int flags) {
+            mIServiceConnection = new InnerConnection(this);
+            mConnection = conn;
+            mContext = context;
+            mActivityThread = null;
+            mActivityExecutor = activityExecutor;
+            mLocation = new ServiceConnectionLeaked(null);
+            mLocation.fillInStackTrace();
+            mFlags = flags;
+        }
+
+        void validate(Context context, Handler activityThread, Executor activityExecutor) {
             if (mContext != context) {
                 throw new RuntimeException(
                     "ServiceConnection " + mConnection +
@@ -1796,6 +1841,12 @@ public final class LoadedApk {
                     "ServiceConnection " + mConnection +
                     " registered with differing handler (was " +
                     mActivityThread + " now " + activityThread + ")");
+            }
+            if (mActivityExecutor != activityExecutor) {
+                throw new RuntimeException(
+                    "ServiceConnection " + mConnection +
+                    " registered with differing executor (was " +
+                    mActivityExecutor + " now " + activityExecutor + ")");
             }
         }
 
@@ -1836,7 +1887,9 @@ public final class LoadedApk {
         }
 
         public void connected(ComponentName name, IBinder service, boolean dead) {
-            if (mActivityThread != null) {
+            if (mActivityExecutor != null) {
+                mActivityExecutor.execute(new RunConnection(name, service, 0, dead));
+            } else if (mActivityThread != null) {
                 mActivityThread.post(new RunConnection(name, service, 0, dead));
             } else {
                 doConnected(name, service, dead);
@@ -1844,7 +1897,9 @@ public final class LoadedApk {
         }
 
         public void death(ComponentName name, IBinder service) {
-            if (mActivityThread != null) {
+            if (mActivityExecutor != null) {
+                mActivityExecutor.execute(new RunConnection(name, service, 1, false));
+            } else if (mActivityThread != null) {
                 mActivityThread.post(new RunConnection(name, service, 1, false));
             } else {
                 doDeath(name, service);

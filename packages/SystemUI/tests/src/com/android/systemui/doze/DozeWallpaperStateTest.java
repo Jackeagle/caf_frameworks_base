@@ -24,7 +24,8 @@ import static org.mockito.Mockito.when;
 
 import android.app.IWallpaperManager;
 import android.os.RemoteException;
-import android.support.test.filters.SmallTest;
+
+import androidx.test.filters.SmallTest;
 
 import com.android.systemui.SysuiTestCase;
 import com.android.systemui.statusbar.notification.stack.StackStateAnimator;
@@ -108,10 +109,14 @@ public class DozeWallpaperStateTest extends SysuiTestCase {
     }
 
     @Test
-    public void testTransitionTo_pulseIsAmbientMode() throws RemoteException {
+    public void testTransitionTo_wakeFromPulseIsNotAmbientMode() throws RemoteException {
+        mDozeWallpaperState.transitionTo(DozeMachine.State.DOZE_AOD,
+                DozeMachine.State.DOZE_REQUEST_PULSE);
+        reset(mIWallpaperManager);
+
         mDozeWallpaperState.transitionTo(DozeMachine.State.DOZE_REQUEST_PULSE,
-                DozeMachine.State.DOZE_PULSING);
-        verify(mIWallpaperManager).setInAmbientMode(eq(true), eq(0L));
+                DozeMachine.State.DOZE_PULSING_BRIGHT);
+        verify(mIWallpaperManager).setInAmbientMode(eq(false), anyLong());
     }
 
     @Test

@@ -42,10 +42,13 @@ import android.os.Looper;
 import android.os.UserHandle;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
-import android.support.test.filters.SmallTest;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
+import android.util.ArraySet;
 import android.widget.FrameLayout;
+
+import androidx.annotation.NonNull;
+import androidx.test.filters.SmallTest;
 
 import com.android.internal.logging.MetricsLogger;
 import com.android.systemui.Dependency;
@@ -64,9 +67,11 @@ import com.android.systemui.statusbar.StatusBarIconView;
 import com.android.systemui.statusbar.notification.collection.NotificationData;
 import com.android.systemui.statusbar.notification.collection.NotificationData.KeyguardEnvironment;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
+import com.android.systemui.statusbar.notification.collection.NotificationRowBinder;
+import com.android.systemui.statusbar.notification.collection.NotificationRowBinderImpl;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
+import com.android.systemui.statusbar.notification.row.NotificationContentInflater.InflationFlag;
 import com.android.systemui.statusbar.notification.row.NotificationGutsManager;
-import com.android.systemui.statusbar.notification.row.NotificationInflater;
 import com.android.systemui.statusbar.notification.row.RowInflaterTask;
 import com.android.systemui.statusbar.notification.stack.NotificationListContainer;
 import com.android.systemui.statusbar.phone.NotificationGroupManager;
@@ -84,6 +89,7 @@ import org.mockito.MockitoAnnotations;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -98,10 +104,8 @@ public class NotificationEntryManagerTest extends SysuiTestCase {
     @Mock private KeyguardEnvironment mEnvironment;
     @Mock private ExpandableNotificationRow mRow;
     @Mock private NotificationListContainer mListContainer;
-    @Mock
-    private NotificationEntryListener mEntryListener;
-    @Mock
-    private NotificationRowBinder.BindRowCallback mBindCallback;
+    @Mock private NotificationEntryListener mEntryListener;
+    @Mock private NotificationRowBinderImpl.BindRowCallback mBindCallback;
     @Mock private HeadsUpManager mHeadsUpManager;
     @Mock private NotificationListenerService.RankingMap mRankingMap;
     @Mock private RemoteInputController mRemoteInputController;
@@ -139,7 +143,7 @@ public class NotificationEntryManagerTest extends SysuiTestCase {
 
         @Override
         public void onAsyncInflationFinished(NotificationEntry entry,
-                @NotificationInflater.InflationFlag int inflatedFlags) {
+                @InflationFlag int inflatedFlags) {
             super.onAsyncInflationFinished(entry, inflatedFlags);
 
             mCountDownLatch.countDown();
@@ -166,7 +170,7 @@ public class NotificationEntryManagerTest extends SysuiTestCase {
                     0,
                     NotificationManager.IMPORTANCE_DEFAULT,
                     null, null,
-                    null, null, null, true, sentiment, false, -1, false, null, null);
+                    null, null, null, true, sentiment, false, -1, false, null, null, false);
             return true;
         }).when(mRankingMap).getRanking(eq(key), any(NotificationListenerService.Ranking.class));
     }
@@ -185,7 +189,7 @@ public class NotificationEntryManagerTest extends SysuiTestCase {
                     null, null,
                     null, null, null, true,
                     NotificationListenerService.Ranking.USER_SENTIMENT_NEUTRAL, false, -1,
-                    false, smartActions, null);
+                    false, smartActions, null, false);
             return true;
         }).when(mRankingMap).getRanking(eq(key), any(NotificationListenerService.Ranking.class));
     }
@@ -231,10 +235,12 @@ public class NotificationEntryManagerTest extends SysuiTestCase {
         mEntryManager.setUpWithPresenter(mPresenter, mListContainer, mHeadsUpManager);
         mEntryManager.addNotificationEntryListener(mEntryListener);
 
-        NotificationRowBinder notificationRowBinder = Dependency.get(NotificationRowBinder.class);
+        NotificationRowBinderImpl notificationRowBinder =
+                new NotificationRowBinderImpl(mContext, true /* allowLongPress */);
         notificationRowBinder.setUpWithPresenter(
                 mPresenter, mListContainer, mHeadsUpManager, mEntryManager, mBindCallback);
         notificationRowBinder.setNotificationClicker(mock(NotificationClicker.class));
+        mEntryManager.setRowBinder(notificationRowBinder);
 
         setUserSentiment(mEntry.key, NotificationListenerService.Ranking.USER_SENTIMENT_NEUTRAL);
     }
@@ -341,32 +347,10 @@ public class NotificationEntryManagerTest extends SysuiTestCase {
 
         verify(mPresenter).updateNotificationViews();
         verify(mEntryListener).onEntryRemoved(
-                mEntry, null, false /* removedByUser */);
+                eq(mEntry), any(), eq(false) /* removedByUser */);
         verify(mRow).setRemoved();
 
         assertNull(mEntryManager.getNotificationData().get(mSbn.getKey()));
-    }
-
-    @Test
-    public void testRemoveNotification_blockedByLifetimeExtender() {
-        com.android.systemui.util.Assert.isNotMainThread();
-
-        NotificationLifetimeExtender extender = mock(NotificationLifetimeExtender.class);
-        when(extender.shouldExtendLifetime(mEntry)).thenReturn(true);
-
-        ArrayList<NotificationLifetimeExtender> extenders = mEntryManager.getLifetimeExtenders();
-        extenders.clear();
-        extenders.add(extender);
-
-        mEntry.setRow(mRow);
-        mEntryManager.getNotificationData().add(mEntry);
-
-        mEntryManager.removeNotification(mSbn.getKey(), mRankingMap);
-
-        assertNotNull(mEntryManager.getNotificationData().get(mSbn.getKey()));
-        verify(extender).setShouldManageLifetime(mEntry, true /* shouldManage */);
-        verify(mEntryListener, never()).onEntryRemoved(
-                mEntry, null, false /* removedByUser */);
     }
 
     @Test
@@ -376,7 +360,7 @@ public class NotificationEntryManagerTest extends SysuiTestCase {
         mEntryManager.removeNotification("not_a_real_key", mRankingMap);
 
         verify(mEntryListener, never()).onEntryRemoved(
-                mEntry, null, false /* removedByUser */);
+                eq(mEntry), any(), eq(false) /* removedByUser */);
     }
 
     @Test
@@ -389,7 +373,7 @@ public class NotificationEntryManagerTest extends SysuiTestCase {
         mEntryManager.removeNotification(mSbn.getKey(), mRankingMap);
 
         verify(mEntryListener, never()).onEntryRemoved(
-                mEntry, null, false /* removedByUser */);
+                eq(mEntry), any(), eq(false /* removedByUser */));
     }
 
     @Test
@@ -453,10 +437,152 @@ public class NotificationEntryManagerTest extends SysuiTestCase {
         assertEquals("action", mEntry.systemGeneratedSmartActions.get(0).title);
     }
 
+    @Test
+    public void testLifetimeExtenders_ifNotificationIsRetainedItIsntRemoved() {
+        // GIVEN an entry manager with a notification
+        mEntryManager.setRowBinder(mMockedRowBinder);
+        mEntryManager.getNotificationData().add(mEntry);
+
+        // GIVEN a lifetime extender that always tries to extend lifetime
+        NotificationLifetimeExtender extender = mock(NotificationLifetimeExtender.class);
+        when(extender.shouldExtendLifetime(mEntry)).thenReturn(true);
+        mEntryManager.addNotificationLifetimeExtender(extender);
+
+        // WHEN the notification is removed
+        mEntryManager.removeNotification(mEntry.key, mRankingMap);
+
+        // THEN the extender is asked to manage the lifetime
+        verify(extender).setShouldManageLifetime(mEntry, true);
+        // THEN the notification is retained
+        assertNotNull(mEntryManager.getNotificationData().get(mSbn.getKey()));
+        verify(mEntryListener, never()).onEntryRemoved(eq(mEntry), any(), eq(false));
+    }
+
+    @Test
+    public void testLifetimeExtenders_whenRetentionEndsNotificationIsRemoved() {
+        // GIVEN an entry manager with a notification whose life has been extended
+        mEntryManager.setRowBinder(mMockedRowBinder);
+        mEntryManager.getNotificationData().add(mEntry);
+        final FakeNotificationLifetimeExtender extender = new FakeNotificationLifetimeExtender();
+        mEntryManager.addNotificationLifetimeExtender(extender);
+        mEntryManager.removeNotification(mEntry.key, mRankingMap);
+        assertTrue(extender.isManaging(mEntry.key));
+
+        // WHEN the extender finishes its extension
+        extender.setExtendLifetimes(false);
+        extender.getCallback().onSafeToRemove(mEntry.key);
+
+        // THEN the notification is removed
+        assertNull(mEntryManager.getNotificationData().get(mSbn.getKey()));
+        verify(mEntryListener).onEntryRemoved(eq(mEntry), any(), eq(false));
+    }
+
+    @Test
+    public void testLifetimeExtenders_whenNotificationUpdatedRetainersAreCanceled() {
+        // GIVEN an entry manager with a notification whose life has been extended
+        mEntryManager.setRowBinder(mMockedRowBinder);
+        mEntryManager.getNotificationData().add(mEntry);
+        NotificationLifetimeExtender extender = mock(NotificationLifetimeExtender.class);
+        when(extender.shouldExtendLifetime(mEntry)).thenReturn(true);
+        mEntryManager.addNotificationLifetimeExtender(extender);
+        mEntryManager.removeNotification(mEntry.key, mRankingMap);
+
+        // WHEN the notification is updated
+        mEntryManager.updateNotification(mEntry.notification, mRankingMap);
+
+        // THEN the lifetime extension is canceled
+        verify(extender).setShouldManageLifetime(mEntry, false);
+    }
+
+    @Test
+    public void testLifetimeExtenders_whenNewExtenderTakesPrecedenceOldExtenderIsCanceled() {
+        // GIVEN an entry manager with a notification
+        mEntryManager.setRowBinder(mMockedRowBinder);
+        mEntryManager.getNotificationData().add(mEntry);
+
+        // GIVEN two lifetime extenders, the first which never extends and the second which
+        // always extends
+        NotificationLifetimeExtender extender1 = mock(NotificationLifetimeExtender.class);
+        when(extender1.shouldExtendLifetime(mEntry)).thenReturn(false);
+        NotificationLifetimeExtender extender2 = mock(NotificationLifetimeExtender.class);
+        when(extender2.shouldExtendLifetime(mEntry)).thenReturn(true);
+        mEntryManager.addNotificationLifetimeExtender(extender1);
+        mEntryManager.addNotificationLifetimeExtender(extender2);
+
+        // GIVEN a notification was lifetime-extended and extender2 is managing it
+        mEntryManager.removeNotification(mEntry.key, mRankingMap);
+        verify(extender1, never()).setShouldManageLifetime(mEntry, true);
+        verify(extender2).setShouldManageLifetime(mEntry, true);
+
+        // WHEN the extender1 changes its mind and wants to extend the lifetime of the notif
+        when(extender1.shouldExtendLifetime(mEntry)).thenReturn(true);
+        mEntryManager.removeNotification(mEntry.key, mRankingMap);
+
+        // THEN extender2 stops managing the notif and extender1 starts managing it
+        verify(extender1).setShouldManageLifetime(mEntry, true);
+        verify(extender2).setShouldManageLifetime(mEntry, false);
+    }
+
+    /**
+     * Ensure that calling NotificationEntryManager.performRemoveNotification() doesn't crash when
+     * given a notification that has already been removed from NotificationData.
+     */
+    @Test
+    public void testPerformRemoveNotification_removedEntry() {
+        mEntryManager.getNotificationData().remove(mSbn.getKey(), null /* ranking */);
+        mEntryManager.performRemoveNotification(mSbn);
+    }
+
     private Notification.Action createAction() {
         return new Notification.Action.Builder(
                 Icon.createWithResource(getContext(), android.R.drawable.sym_def_app_icon),
                 "action",
                 PendingIntent.getBroadcast(getContext(), 0, new Intent("Action"), 0)).build();
+    }
+
+    private static class FakeNotificationLifetimeExtender implements NotificationLifetimeExtender {
+        private NotificationSafeToRemoveCallback mCallback;
+        private boolean mExtendLifetimes = true;
+        private Set<String> mManagedNotifs = new ArraySet<>();
+
+        @Override
+        public void setCallback(@NonNull NotificationSafeToRemoveCallback callback) {
+            mCallback = callback;
+        }
+
+        @Override
+        public boolean shouldExtendLifetime(@NonNull NotificationEntry entry) {
+            return mExtendLifetimes;
+        }
+
+        @Override
+        public void setShouldManageLifetime(
+                @NonNull NotificationEntry entry,
+                boolean shouldManage) {
+            final boolean hasEntry = mManagedNotifs.contains(entry.key);
+            if (shouldManage) {
+                if (hasEntry) {
+                    throw new RuntimeException("Already managing this entry: " + entry.key);
+                }
+                mManagedNotifs.add(entry.key);
+            } else {
+                if (!hasEntry) {
+                    throw new RuntimeException("Not managing this entry: " + entry.key);
+                }
+                mManagedNotifs.remove(entry.key);
+            }
+        }
+
+        public void setExtendLifetimes(boolean extendLifetimes) {
+            mExtendLifetimes = extendLifetimes;
+        }
+
+        public NotificationSafeToRemoveCallback getCallback() {
+            return mCallback;
+        }
+
+        public boolean isManaging(String notificationKey) {
+            return mManagedNotifs.contains(notificationKey);
+        }
     }
 }

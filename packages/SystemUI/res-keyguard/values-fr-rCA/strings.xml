@@ -34,6 +34,7 @@
     <string name="keyguard_password_wrong_pin_code" msgid="6535018036285012028">"NIP erroné."</string>
     <string name="keyguard_sim_error_message_short" msgid="592109500618448312">"Cette carte n\'est pas valide."</string>
     <string name="keyguard_charged" msgid="3316115607283493413">"Complètement chargé"</string>
+    <string name="keyguard_plugged_in_wireless" msgid="3004717438401575235">"<xliff:g id="PERCENTAGE">%s</xliff:g> • En recharge sans fil"</string>
     <string name="keyguard_plugged_in" msgid="3161102098900158923">"En recharge : <xliff:g id="PERCENTAGE">%s</xliff:g>"</string>
     <string name="keyguard_plugged_in_charging_fast" msgid="3684592786276709342">"En recharge rapide : <xliff:g id="PERCENTAGE">%s</xliff:g>"</string>
     <string name="keyguard_plugged_in_charging_slowly" msgid="509533586841478405">"En recharge lente : <xliff:g id="PERCENTAGE">%s</xliff:g>"</string>
@@ -150,7 +151,10 @@
       <item quantity="one">La carte SIM est maintenant désactivée. Entrez le code PUK pour continuer. Il vous reste <xliff:g id="_NUMBER_1">%d</xliff:g> tentative avant que votre carte SIM devienne définitivement inutilisable. Pour obtenir plus de détails, communiquez avec votre fournisseur de services.</item>
       <item quantity="other">La carte SIM est maintenant désactivée. Entrez le code PUK pour continuer. Il vous reste <xliff:g id="_NUMBER_1">%d</xliff:g> tentatives avant que votre carte SIM devienne définitivement inutilisable. Pour obtenir plus de détails, communiquez avec votre fournisseur de services.</item>
     </plurals>
-    <string name="type_clock_header" msgid="4786545441902447636">"Il est"</string>
+    <plurals name="type_clock_header" formatted="false" msgid="6782840450655632763">
+      <item quantity="one">"<annotation name="color">"Il est"</annotation>\n"^1\n^2</item>
+      <item quantity="other">"<annotation name="color">"Il est"</annotation>\n"^1\n^2</item>
+    </plurals>
   <string-array name="type_clock_hours">
     <item msgid="3543074812389379830">"douze h."</item>
     <item msgid="7389464214252023751">"Une h."</item>
@@ -167,15 +171,15 @@
   </string-array>
   <string-array name="type_clock_minutes">
     <item msgid="8322049385467207985">"heures"</item>
-    <item msgid="8837126587669001578">"une"</item>
-    <item msgid="4294343372940455660">"deux"</item>
-    <item msgid="7129166637707421536">"trois"</item>
-    <item msgid="7579404865008788673">"quatre"</item>
-    <item msgid="3873924689207380586">"cinq"</item>
-    <item msgid="4849565597850069377">"six"</item>
-    <item msgid="4404219424523572364">"sept"</item>
-    <item msgid="8740481214764087329">"huit"</item>
-    <item msgid="1713216865806811237">"neuf"</item>
+    <item msgid="2091812961809760681">"et un"</item>
+    <item msgid="1496435384877290709">"et deux"</item>
+    <item msgid="881846472976674129">"et trois"</item>
+    <item msgid="2784477043911540584">"et quatre"</item>
+    <item msgid="1610928853656700614">"et cinq"</item>
+    <item msgid="2317806244043886658">"et six"</item>
+    <item msgid="3318687539120971327">"et sept"</item>
+    <item msgid="5701600693712102348">"et huit"</item>
+    <item msgid="3247381605947372495">"et neuf"</item>
     <item msgid="3508406095411245038">"dix"</item>
     <item msgid="7161996337755311711">"onze"</item>
     <item msgid="4044549963329624197">"douze"</item>

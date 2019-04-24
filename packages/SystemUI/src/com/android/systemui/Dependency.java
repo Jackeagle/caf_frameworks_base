@@ -18,6 +18,7 @@ import android.annotation.Nullable;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.hardware.SensorPrivacyManager;
+import android.hardware.display.NightDisplayListener;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.ArrayMap;
@@ -25,7 +26,6 @@ import android.util.DisplayMetrics;
 import android.view.IWindowManager;
 
 import com.android.internal.annotations.VisibleForTesting;
-import com.android.internal.app.ColorDisplayController;
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.statusbar.IStatusBarService;
 import com.android.internal.util.Preconditions;
@@ -42,11 +42,15 @@ import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.DarkIconDispatcher;
 import com.android.systemui.plugins.PluginDependencyProvider;
 import com.android.systemui.plugins.VolumeDialogController;
+import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.power.EnhancedEstimates;
 import com.android.systemui.power.PowerUI;
 import com.android.systemui.privacy.PrivacyItemController;
 import com.android.systemui.recents.OverviewProxyService;
 import com.android.systemui.shared.plugins.PluginManager;
+import com.android.systemui.shared.system.ActivityManagerWrapper;
+import com.android.systemui.shared.system.DevicePolicyManagerWrapper;
+import com.android.systemui.shared.system.PackageManagerWrapper;
 import com.android.systemui.statusbar.AmbientPulseManager;
 import com.android.systemui.statusbar.NavigationBarController;
 import com.android.systemui.statusbar.NotificationListener;
@@ -55,13 +59,11 @@ import com.android.systemui.statusbar.NotificationMediaManager;
 import com.android.systemui.statusbar.NotificationRemoteInputManager;
 import com.android.systemui.statusbar.NotificationViewHierarchyManager;
 import com.android.systemui.statusbar.SmartReplyController;
-import com.android.systemui.statusbar.StatusBarStateController;
 import com.android.systemui.statusbar.VibratorHelper;
 import com.android.systemui.statusbar.notification.NotificationAlertingManager;
 import com.android.systemui.statusbar.notification.NotificationEntryManager;
 import com.android.systemui.statusbar.notification.NotificationFilter;
 import com.android.systemui.statusbar.notification.NotificationInterruptionStateProvider;
-import com.android.systemui.statusbar.notification.NotificationRowBinder;
 import com.android.systemui.statusbar.notification.VisualStabilityManager;
 import com.android.systemui.statusbar.notification.collection.NotificationData.KeyguardEnvironment;
 import com.android.systemui.statusbar.notification.logging.NotificationLogger;
@@ -95,6 +97,7 @@ import com.android.systemui.statusbar.policy.NextAlarmController;
 import com.android.systemui.statusbar.policy.RemoteInputQuickSettingsDisabler;
 import com.android.systemui.statusbar.policy.RotationLockController;
 import com.android.systemui.statusbar.policy.SecurityController;
+import com.android.systemui.statusbar.policy.SensorPrivacyController;
 import com.android.systemui.statusbar.policy.SmartReplyConstants;
 import com.android.systemui.statusbar.policy.UserInfoController;
 import com.android.systemui.statusbar.policy.UserSwitcherController;
@@ -189,7 +192,7 @@ public class Dependency extends SystemUI {
             new DependencyKey<>(LEAK_REPORT_EMAIL_NAME);
 
     private final ArrayMap<Object, Object> mDependencies = new ArrayMap<>();
-    private final ArrayMap<Object, DependencyProvider> mProviders = new ArrayMap<>();
+    private final ArrayMap<Object, LazyDependencyCreator> mProviders = new ArrayMap<>();
 
     @Inject Lazy<ActivityStarter> mActivityStarter;
     @Inject Lazy<ActivityStarterDelegate> mActivityStarterDelegate;
@@ -206,7 +209,7 @@ public class Dependency extends SystemUI {
     @Inject Lazy<UserInfoController> mUserInfoController;
     @Inject Lazy<KeyguardMonitor> mKeyguardMonitor;
     @Inject Lazy<BatteryController> mBatteryController;
-    @Inject Lazy<ColorDisplayController> mColorDisplayController;
+    @Inject Lazy<NightDisplayListener> mNightDisplayListener;
     @Inject Lazy<ManagedProfileController> mManagedProfileController;
     @Inject Lazy<NextAlarmController> mNextAlarmController;
     @Inject Lazy<DataSaverController> mDataSaverController;
@@ -266,7 +269,6 @@ public class Dependency extends SystemUI {
     @Inject Lazy<NotificationListener> mNotificationListener;
     @Inject Lazy<NotificationLogger> mNotificationLogger;
     @Inject Lazy<NotificationViewHierarchyManager> mNotificationViewHierarchyManager;
-    @Inject Lazy<NotificationRowBinder> mNotificationRowBinder;
     @Inject Lazy<NotificationFilter> mNotificationFilter;
     @Inject Lazy<NotificationInterruptionStateProvider> mNotificationInterruptionStateProvider;
     @Inject Lazy<KeyguardDismissUtil> mKeyguardDismissUtil;
@@ -287,6 +289,10 @@ public class Dependency extends SystemUI {
     @Nullable
     @Inject @Named(LEAK_REPORT_EMAIL_NAME) Lazy<String> mLeakReportEmail;
     @Inject Lazy<ClockManager> mClockManager;
+    @Inject Lazy<ActivityManagerWrapper> mActivityManagerWrapper;
+    @Inject Lazy<DevicePolicyManagerWrapper> mDevicePolicyManagerWrapper;
+    @Inject Lazy<PackageManagerWrapper> mPackageManagerWrapper;
+    @Inject Lazy<SensorPrivacyController> mSensorPrivacyController;
 
     @Inject
     public Dependency() {
@@ -330,7 +336,7 @@ public class Dependency extends SystemUI {
 
         mProviders.put(BatteryController.class, mBatteryController::get);
 
-        mProviders.put(ColorDisplayController.class, mColorDisplayController::get);
+        mProviders.put(NightDisplayListener.class, mNightDisplayListener::get);
 
         mProviders.put(ManagedProfileController.class, mManagedProfileController::get);
 
@@ -440,7 +446,6 @@ public class Dependency extends SystemUI {
         mProviders.put(NotificationLogger.class, mNotificationLogger::get);
         mProviders.put(NotificationViewHierarchyManager.class,
                 mNotificationViewHierarchyManager::get);
-        mProviders.put(NotificationRowBinder.class, mNotificationRowBinder::get);
         mProviders.put(NotificationFilter.class, mNotificationFilter::get);
         mProviders.put(NotificationInterruptionStateProvider.class,
                 mNotificationInterruptionStateProvider::get);
@@ -455,6 +460,10 @@ public class Dependency extends SystemUI {
                 mForegroundServiceNotificationListener::get);
         mProviders.put(ClockManager.class, mClockManager::get);
         mProviders.put(PrivacyItemController.class, mPrivacyItemController::get);
+        mProviders.put(ActivityManagerWrapper.class, mActivityManagerWrapper::get);
+        mProviders.put(DevicePolicyManagerWrapper.class, mDevicePolicyManagerWrapper::get);
+        mProviders.put(PackageManagerWrapper.class, mPackageManagerWrapper::get);
+        mProviders.put(SensorPrivacyController.class, mSensorPrivacyController::get);
 
 
         // TODO(b/118592525): to support multi-display , we start to add something which is
@@ -504,7 +513,7 @@ public class Dependency extends SystemUI {
         Preconditions.checkArgument(cls instanceof DependencyKey<?> || cls instanceof Class<?>);
 
         @SuppressWarnings("unchecked")
-        DependencyProvider<T> provider = mProviders.get(cls);
+        LazyDependencyCreator<T> provider = mProviders.get(cls);
         if (provider == null) {
             throw new IllegalArgumentException("Unsupported dependency " + cls
                     + ". " + mProviders.size() + " providers known.");
@@ -514,7 +523,11 @@ public class Dependency extends SystemUI {
 
     private static Dependency sDependency;
 
-    public interface DependencyProvider<T> {
+    /**
+     * Interface for a class that can create a dependency. Used to implement laziness
+     * @param <T> The type of the dependency being created
+     */
+    private interface LazyDependencyCreator<T> {
         T createDependency();
     }
 

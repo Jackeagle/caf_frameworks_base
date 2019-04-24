@@ -41,12 +41,12 @@ import android.media.AudioAttributes;
 import android.net.Uri;
 import android.os.Build;
 import android.os.UserHandle;
-import android.provider.Settings.Secure;
 import android.service.notification.StatusBarNotification;
-import android.support.test.InstrumentationRegistry;
-import android.support.test.runner.AndroidJUnit4;
 import android.test.suitebuilder.annotation.SmallTest;
 import android.testing.TestableContentResolver;
+
+import androidx.test.InstrumentationRegistry;
+import androidx.test.runner.AndroidJUnit4;
 
 import com.android.server.UiServiceTestCase;
 
@@ -125,11 +125,8 @@ public class RankingHelperTest extends UiServiceTestCase {
                 InstrumentationRegistry.getContext().getContentResolver());
         when(mContext.getPackageManager()).thenReturn(mPm);
         when(mContext.getApplicationInfo()).thenReturn(legacy);
-        // most tests assume badging is enabled
         TestableContentResolver contentResolver = getContext().getContentResolver();
         contentResolver.setFallbackToExisting(false);
-        Secure.putIntForUser(contentResolver,
-                Secure.NOTIFICATION_BADGING, 1, UserHandle.getUserId(UID));
 
         ContentProvider testContentProvider = mock(ContentProvider.class);
         when(testContentProvider.getIContentProvider()).thenReturn(mTestIContentProvider);

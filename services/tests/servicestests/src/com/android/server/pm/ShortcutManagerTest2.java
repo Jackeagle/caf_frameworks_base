@@ -32,8 +32,10 @@ import static org.mockito.Mockito.verify;
 
 import android.Manifest.permission;
 import android.app.ActivityManager;
+import android.app.Person;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.LocusId;
 import android.content.pm.ShortcutInfo;
 import android.content.res.Resources;
 import android.graphics.BitmapFactory;
@@ -249,7 +251,7 @@ public class ShortcutManagerTest2 extends BaseShortcutManagerTest {
                 .setCategories(set(ShortcutInfo.SHORTCUT_CATEGORY_CONVERSATION, "xyz"))
                 .setRank(123)
                 .setPerson(makePerson("person", "personKey", "personUri"))
-                .setLongLived()
+                .setLongLived(true)
                 .setExtras(pb)
                 .build();
         si.addFlags(ShortcutInfo.FLAG_PINNED);
@@ -351,7 +353,7 @@ public class ShortcutManagerTest2 extends BaseShortcutManagerTest {
                 .setIntent(makeIntent("action", ShortcutActivity.class, "key", "val"))
                 .setRank(123)
                 .setPerson(makePerson("person", "personKey", "personUri"))
-                .setLongLived()
+                .setLongLived(true)
                 .setExtras(pb)
                 .build();
         sorig.addFlags(ShortcutInfo.FLAG_PINNED);
@@ -890,9 +892,11 @@ public class ShortcutManagerTest2 extends BaseShortcutManagerTest {
                 .setText("text")
                 .setDisabledMessage("dismes")
                 .setCategories(set(ShortcutInfo.SHORTCUT_CATEGORY_CONVERSATION, "xyz"))
+                .setPerson(makePerson("person", "personKey", "personUri"))
                 .setIntent(makeIntent("action", ShortcutActivity.class, "key", "val"))
                 .setRank(123)
                 .setExtras(pb)
+                .setLocusId(new LocusId("1.2.3.4.5"))
                 .build();
         sorig.setTimestamp(mInjectedCurrentTimeMillis);
 
@@ -901,7 +905,10 @@ public class ShortcutManagerTest2 extends BaseShortcutManagerTest {
                 .setTitle("x")
                 .setActivity(new ComponentName(mClientContext, ShortcutActivity2.class))
                 .setIntent(makeIntent("action", ShortcutActivity.class, "key", "val"))
+                .setPersons(list(makePerson("person1", "personKey1", "personUri1"),
+                        makePerson("person2", "personKey2", "personUri2")).toArray(new Person[2]))
                 .setRank(456)
+                .setLocusId(new LocusId("6.7.8.9"))
                 .build();
         sorig2.setTimestamp(mInjectedCurrentTimeMillis);
 
@@ -936,8 +943,13 @@ public class ShortcutManagerTest2 extends BaseShortcutManagerTest {
         assertEquals(set(ShortcutInfo.SHORTCUT_CATEGORY_CONVERSATION, "xyz"), si.getCategories());
         assertEquals("action", si.getIntent().getAction());
         assertEquals("val", si.getIntent().getStringExtra("key"));
+        assertEquals(1, si.getPersons().length);
+        assertEquals("person", si.getPersons()[0].getName());
+        assertEquals("personKey", si.getPersons()[0].getKey());
+        assertEquals("personUri", si.getPersons()[0].getUri());
         assertEquals(0, si.getRank());
         assertEquals(1, si.getExtras().getInt("k"));
+        assertEquals("1.2.3.4.5", si.getLocusId().getId());
 
         assertEquals(ShortcutInfo.FLAG_DYNAMIC | ShortcutInfo.FLAG_HAS_ICON_FILE
                 | ShortcutInfo.FLAG_STRINGS_RESOLVED, si.getFlags());
@@ -949,6 +961,9 @@ public class ShortcutManagerTest2 extends BaseShortcutManagerTest {
         // to test it.
         si = mService.getPackageShortcutForTest(CALLING_PACKAGE_1, "id2", USER_10);
         assertEquals(1, si.getRank());
+        assertEquals(2, si.getPersons().length);
+        assertEquals("personUri2", si.getPersons()[1].getUri());
+        assertEquals("6.7.8.9", si.getLocusId().getId());
 
         dumpUserFile(USER_10);
     }
@@ -1114,6 +1129,7 @@ public class ShortcutManagerTest2 extends BaseShortcutManagerTest {
                 .setDisabledMessage("dismes")
                 .setCategories(set(ShortcutInfo.SHORTCUT_CATEGORY_CONVERSATION, "xyz"))
                 .setIntent(makeIntent("action", ShortcutActivity.class, "key", "val"))
+                .setPerson(makePerson("person", "personKey", "personUri"))
                 .setRank(123)
                 .setExtras(pb)
                 .build();
@@ -1150,6 +1166,7 @@ public class ShortcutManagerTest2 extends BaseShortcutManagerTest {
         assertEquals(set(ShortcutInfo.SHORTCUT_CATEGORY_CONVERSATION, "xyz"), si.getCategories());
         assertEquals("action", si.getIntent().getAction());
         assertEquals("val", si.getIntent().getStringExtra("key"));
+        assertEquals(0, si.getPersons().length); // Don't backup the persons field
         assertEquals(0, si.getRank());
         assertEquals(1, si.getExtras().getInt("k"));
 

@@ -16,6 +16,7 @@
 
 package com.android.server.am;
 
+import android.annotation.NonNull;
 import android.content.ContentResolver;
 import android.database.ContentObserver;
 import android.net.Uri;
@@ -38,8 +39,9 @@ import java.util.HashSet;
 /**
  * Maps system settings to system properties.
  * <p>The properties are dynamically updated when settings change.
+ * @hide
  */
-class SettingsToPropertiesMapper {
+public class SettingsToPropertiesMapper {
 
     private static final String TAG = "SettingsToPropertiesMapper";
 
@@ -77,10 +79,12 @@ class SettingsToPropertiesMapper {
     // permission in the corresponding .te file your feature belongs to.
     @VisibleForTesting
     static final String[] sDeviceConfigScopes = new String[] {
-        DeviceConfig.ActivityManagerNativeBoot.NAMESPACE,
+        DeviceConfig.NAMESPACE_ACTIVITY_MANAGER_NATIVE_BOOT,
         DeviceConfig.NAMESPACE_INPUT_NATIVE_BOOT,
+        DeviceConfig.NAMESPACE_MEDIA_NATIVE,
         DeviceConfig.NAMESPACE_NETD_NATIVE,
-        DeviceConfig.RuntimeNative.NAMESPACE,
+        DeviceConfig.NAMESPACE_RUNTIME_NATIVE,
+        DeviceConfig.NAMESPACE_RUNTIME_NATIVE_BOOT,
     };
 
     private final String[] mGlobalSettings;
@@ -154,8 +158,8 @@ class SettingsToPropertiesMapper {
      * during current device booting.
      * @return
      */
-    public boolean isNativeFlagsResetPerformed() {
-        String value = systemPropertiesGet(RESET_PERFORMED_PROPERTY);
+    public static boolean isNativeFlagsResetPerformed() {
+        String value = SystemProperties.get(RESET_PERFORMED_PROPERTY);
         return "true".equals(value);
     }
 
@@ -164,7 +168,7 @@ class SettingsToPropertiesMapper {
      * booting.
      * @return
      */
-    public String[] getResetNativeCategories() {
+    public static @NonNull String[] getResetNativeCategories() {
         if (!isNativeFlagsResetPerformed()) {
             return new String[0];
         }
@@ -212,7 +216,7 @@ class SettingsToPropertiesMapper {
         if (value == null) {
             // It's impossible to remove system property, therefore we check previous value to
             // avoid setting an empty string if the property wasn't set.
-            if (TextUtils.isEmpty(systemPropertiesGet(key))) {
+            if (TextUtils.isEmpty(SystemProperties.get(key))) {
                 return;
             }
             value = "";
@@ -222,7 +226,7 @@ class SettingsToPropertiesMapper {
         }
 
         try {
-            systemPropertiesSet(key, value);
+            SystemProperties.set(key, value);
         } catch (Exception e) {
             // Failure to set a property can be caused by SELinux denial. This usually indicates
             // that the property wasn't whitelisted in sepolicy.
@@ -248,17 +252,7 @@ class SettingsToPropertiesMapper {
     }
 
     @VisibleForTesting
-    protected String systemPropertiesGet(String key) {
-        return SystemProperties.get(key);
-    }
-
-    @VisibleForTesting
-    protected void systemPropertiesSet(String key, String value) {
-        SystemProperties.set(key, value);
-    }
-
-    @VisibleForTesting
-    protected String getResetFlagsFileContent() {
+    static String getResetFlagsFileContent() {
         String content = null;
         try {
             File reset_flag_file = new File(RESET_RECORD_FILE_PATH);

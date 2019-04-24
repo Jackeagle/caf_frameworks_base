@@ -27,8 +27,10 @@ import androidx.slice.SliceProvider;
 import androidx.slice.SliceSpecs;
 import androidx.slice.builders.ListBuilder;
 
+import com.android.systemui.SystemUIFactory;
 import com.android.systemui.SysuiTestCase;
 import com.android.systemui.keyguard.KeyguardSliceProvider;
+import com.android.systemui.util.InjectionInflationController;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -49,7 +51,11 @@ public class KeyguardSliceViewTest extends SysuiTestCase {
     @Before
     public void setUp() throws Exception {
         com.android.systemui.util.Assert.sMainLooper = TestableLooper.get(this).getLooper();
-        mKeyguardSliceView = (KeyguardSliceView) LayoutInflater.from(getContext())
+        InjectionInflationController inflationController = new InjectionInflationController(
+                SystemUIFactory.getInstance().getRootComponent());
+        LayoutInflater layoutInflater = inflationController
+                .injectable(LayoutInflater.from(getContext()));
+        mKeyguardSliceView = (KeyguardSliceView) layoutInflater
                 .inflate(R.layout.keyguard_status_area, null);
         mSliceUri = Uri.parse(KeyguardSliceProvider.KEYGUARD_SLICE_URI);
         SliceProvider.setSpecs(new HashSet<>(Collections.singletonList(SliceSpecs.LIST)));
@@ -72,6 +78,17 @@ public class KeyguardSliceViewTest extends SysuiTestCase {
         mKeyguardSliceView.onChanged(null);
         Assert.assertTrue("Listener should be notified about slice changes.",
                 notified.get());
+    }
+
+    @Test
+    public void hasHeader_readsSliceData() {
+        ListBuilder builder = new ListBuilder(getContext(), mSliceUri, ListBuilder.INFINITY);
+        mKeyguardSliceView.onChanged(builder.build());
+        Assert.assertFalse("View should not have a header", mKeyguardSliceView.hasHeader());
+
+        builder.setHeader(new ListBuilder.HeaderBuilder().setTitle("header title!"));
+        mKeyguardSliceView.onChanged(builder.build());
+        Assert.assertTrue("View should have a header", mKeyguardSliceView.hasHeader());
     }
 
     @Test

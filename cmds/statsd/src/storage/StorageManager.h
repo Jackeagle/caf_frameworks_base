@@ -37,6 +37,17 @@ public:
     static void writeFile(const char* file, const void* buffer, int numBytes);
 
     /**
+     * Writes train info.
+     */
+    static bool writeTrainInfo(int64_t trainVersionCode, const std::string& trainName,
+                               int32_t status, const std::vector<int64_t>& experimentIds);
+
+    /**
+     * Reads train info.
+     */
+    static bool readTrainInfo(InstallTrainInfo& trainInfo);
+
+    /**
      * Reads the file content to the buffer.
      */
     static bool readFileToString(const char* file, string* content);
@@ -109,6 +120,8 @@ private:
      * Prints disk usage statistics about a directory related to statsd.
      */
     static void printDirStats(int out, const char* path);
+
+    static std::mutex sTrainInfoMutex;
 };
 
 }  // namespace statsd

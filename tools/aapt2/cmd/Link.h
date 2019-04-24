@@ -17,12 +17,15 @@
 #ifndef AAPT2_LINK_H
 #define AAPT2_LINK_H
 
+#include <regex>
+
 #include "Command.h"
 #include "Diagnostics.h"
 #include "Resource.h"
 #include "split/TableSplitter.h"
 #include "format/binary/TableFlattener.h"
 #include "link/ManifestFixer.h"
+#include "trace/TraceBuffer.h"
 
 namespace aapt {
 
@@ -63,6 +66,7 @@ struct LinkOptions {
   bool no_xml_namespaces = false;
   bool do_not_compress_anything = false;
   std::unordered_set<std::string> extensions_to_not_compress;
+  Maybe<std::regex> regex_to_not_compress;
 
   // Static lib options.
   bool no_static_lib_packages = false;
@@ -250,6 +254,11 @@ class LinkCommand : public Command {
         &options_.do_not_compress_anything);
     AddOptionalSwitch("--keep-raw-values", "Preserve raw attribute values in xml files.",
         &options_.keep_raw_values);
+    AddOptionalFlag("--no-compress-regex",
+        "Do not compress extensions matching the regular expression. Remember to\n"
+            " use the '$' symbol for end of line. Uses a non case-sensitive\n"
+            " ECMAScript regular expression grammar.",
+        &no_compress_regex);
     AddOptionalSwitch("--warn-manifest-validation",
         "Treat manifest validation errors as warnings.",
         &options_.manifest_fixer_options.warn_validation);
@@ -269,6 +278,8 @@ class LinkCommand : public Command {
         "Do not allow overlays with different visibility levels.",
         &options_.strict_visibility);
     AddOptionalSwitch("-v", "Enables verbose logging.", &verbose_);
+    AddOptionalFlag("--trace-folder", "Generate systrace json trace fragment to specified folder.",
+                    &trace_folder_);
   }
 
   int Action(const std::vector<std::string>& args) override;
@@ -283,6 +294,7 @@ class LinkCommand : public Command {
   std::vector<std::string> configs_;
   Maybe<std::string> preferred_density_;
   Maybe<std::string> product_list_;
+  Maybe<std::string> no_compress_regex;
   bool legacy_x_flag_ = false;
   bool require_localization_ = false;
   bool verbose_ = false;
@@ -291,6 +303,7 @@ class LinkCommand : public Command {
   bool proto_format_ = false;
   Maybe<std::string> stable_id_file_path_;
   std::vector<std::string> split_args_;
+  Maybe<std::string> trace_folder_;
 };
 
 }// namespace aapt

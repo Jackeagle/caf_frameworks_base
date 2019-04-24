@@ -24,16 +24,17 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
 import android.app.StatusBarManager;
-import android.support.test.filters.SmallTest;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper.RunWithLooper;
 import android.view.View;
 import android.view.ViewPropertyAnimator;
 
+import androidx.test.filters.SmallTest;
+
 import com.android.systemui.R;
 import com.android.systemui.SysuiBaseFragmentTest;
+import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.statusbar.CommandQueue;
-import com.android.systemui.statusbar.StatusBarStateController;
 import com.android.systemui.tuner.TunerService;
 
 import org.junit.Before;

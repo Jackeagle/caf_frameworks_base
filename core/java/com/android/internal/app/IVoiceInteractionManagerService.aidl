@@ -51,6 +51,7 @@ interface IVoiceInteractionManagerService {
      * @param keyphraseId The unique identifier for the keyphrase.
      * @param bcp47Locale The BCP47 language tag  for the keyphrase's locale.
      */
+    @UnsupportedAppUsage
     SoundTrigger.KeyphraseSoundModel getKeyphraseSoundModel(int keyphraseId, in String bcp47Locale);
     /**
      * Add/Update the given keyphrase sound model.
@@ -153,17 +154,7 @@ interface IVoiceInteractionManagerService {
      in IVoiceActionCheckCallback callback);
 
     /**
-     * Sets the transcribed voice to the given string.
+     * Provide hints for showing UI.
      */
-    void setTranscription(IVoiceInteractionService service, String transcription);
-
-    /**
-     * Indicates that the transcription session is finished.
-     */
-    void clearTranscription(IVoiceInteractionService service, boolean immediate);
-
-    /**
-     * Sets the voice state indication based upon the given value.
-     */
-    void setVoiceState(IVoiceInteractionService service, int state);
+    void setUiHints(in IVoiceInteractionService service, in Bundle hints);
 }

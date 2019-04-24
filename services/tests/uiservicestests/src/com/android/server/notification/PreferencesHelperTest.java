@@ -59,11 +59,10 @@ import android.os.Build;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.provider.Settings.Secure;
-import android.support.test.InstrumentationRegistry;
-import android.support.test.runner.AndroidJUnit4;
 import android.test.suitebuilder.annotation.SmallTest;
 import android.testing.TestableContentResolver;
 import android.util.ArrayMap;
+import android.util.ArraySet;
 import android.util.Xml;
 
 import com.android.internal.util.FastXmlSerializer;
@@ -89,6 +88,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
+
+import androidx.test.InstrumentationRegistry;
+import androidx.test.runner.AndroidJUnit4;
 
 @SmallTest
 @RunWith(AndroidJUnit4.class)
@@ -149,6 +151,8 @@ public class PreferencesHelperTest extends UiServiceTestCase {
         contentResolver.setFallbackToExisting(false);
         Secure.putIntForUser(contentResolver,
                 Secure.NOTIFICATION_BADGING, 1, UserHandle.getUserId(UID_N_MR1));
+        Secure.putIntForUser(contentResolver,
+                Secure.NOTIFICATION_BUBBLES, 1, UserHandle.getUserId(UID_N_MR1));
 
         ContentProvider testContentProvider = mock(ContentProvider.class);
         when(testContentProvider.getIContentProvider()).thenReturn(mTestIContentProvider);
@@ -174,14 +178,14 @@ public class PreferencesHelperTest extends UiServiceTestCase {
                 .build();
     }
 
-    private ByteArrayOutputStream writeXmlAndPurge(String pkg, int uid, boolean forBackup,
-            String... channelIds)
+    private ByteArrayOutputStream writeXmlAndPurge(
+            String pkg, int uid, boolean forBackup, int userId, String... channelIds)
             throws Exception {
         XmlSerializer serializer = new FastXmlSerializer();
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         serializer.setOutput(new BufferedOutputStream(baos), "utf-8");
         serializer.startDocument(null, true);
-        mHelper.writeXml(serializer, forBackup);
+        mHelper.writeXml(serializer, forBackup, userId);
         serializer.endDocument();
         serializer.flush();
         for (String channelId : channelIds) {
@@ -190,15 +194,17 @@ public class PreferencesHelperTest extends UiServiceTestCase {
         return baos;
     }
 
-    private void loadStreamXml(ByteArrayOutputStream stream, boolean forRestore) throws Exception {
-        loadByteArrayXml(stream.toByteArray(), forRestore);
+    private void loadStreamXml(ByteArrayOutputStream stream, boolean forRestore, int userId)
+            throws Exception {
+        loadByteArrayXml(stream.toByteArray(), forRestore, userId);
     }
 
-    private void loadByteArrayXml(byte[] byteArray, boolean forRestore) throws Exception {
+    private void loadByteArrayXml(byte[] byteArray, boolean forRestore, int userId)
+            throws Exception {
         XmlPullParser parser = Xml.newPullParser();
         parser.setInput(new BufferedInputStream(new ByteArrayInputStream(byteArray)), null);
         parser.nextTag();
-        mHelper.readXml(parser, forRestore);
+        mHelper.readXml(parser, forRestore, userId);
     }
 
     private void compareChannels(NotificationChannel expected, NotificationChannel actual) {
@@ -242,6 +248,69 @@ public class PreferencesHelperTest extends UiServiceTestCase {
         when(mMockZenModeHelper.getNotificationPolicy()).thenReturn(mTestNotificationPolicy);
     }
 
+    private void setUpPackageWithUid(String packageName, int uid) throws Exception {
+        when(mPm.getApplicationInfoAsUser(eq(packageName), anyInt(), anyInt()))
+                .thenReturn(new ApplicationInfo());
+        when(mPm.getPackageUidAsUser(eq(packageName), anyInt())).thenReturn(uid);
+    }
+
+    @Test
+    public void testWriteXml_onlyBackupsTargetUser() throws Exception {
+        // Setup package notifications.
+        String package0 = "test.package.user0";
+        int uid0 = 1001;
+        setUpPackageWithUid(package0, uid0);
+        NotificationChannel channel0 = new NotificationChannel("id0", "name0", IMPORTANCE_HIGH);
+        mHelper.createNotificationChannel(package0, uid0, channel0, true, false);
+
+        String package10 = "test.package.user10";
+        int uid10 = 1001001;
+        setUpPackageWithUid(package10, uid10);
+        NotificationChannel channel10 = new NotificationChannel("id10", "name10", IMPORTANCE_HIGH);
+        mHelper.createNotificationChannel(package10, uid10, channel10, true, false);
+
+        ByteArrayOutputStream baos = writeXmlAndPurge(package10, uid10, true, 10);
+
+        // Reset state.
+        mHelper.onPackagesChanged(true, 0, new String[] {package0}, new int[] {uid0});
+        mHelper.onPackagesChanged(true, 10, new String[] {package10}, new int[] {uid10});
+
+        // Parse backup data.
+        loadStreamXml(baos, true, 0);
+        loadStreamXml(baos, true, 10);
+
+        assertEquals(
+                channel10,
+                mHelper.getNotificationChannel(package10, uid10, channel10.getId(), false));
+        assertNull(mHelper.getNotificationChannel(package0, uid0, channel0.getId(), false));
+    }
+
+    @Test
+    public void testReadXml_onlyRestoresTargetUser() throws Exception {
+        // Setup package in user 0.
+        String package0 = "test.package.user0";
+        int uid0 = 1001;
+        setUpPackageWithUid(package0, uid0);
+        NotificationChannel channel0 = new NotificationChannel("id0", "name0", IMPORTANCE_HIGH);
+        mHelper.createNotificationChannel(package0, uid0, channel0, true, false);
+
+        ByteArrayOutputStream baos = writeXmlAndPurge(package0, uid0, true, 0);
+
+        // Reset state.
+        mHelper.onPackagesChanged(true, 0, new String[] {package0}, new int[] {uid0});
+
+        // Restore should convert the uid according to the target user.
+        int expectedUid = 1001001;
+        setUpPackageWithUid(package0, expectedUid);
+        // Parse backup data.
+        loadStreamXml(baos, true, 10);
+
+        assertEquals(
+                channel0,
+                mHelper.getNotificationChannel(package0, expectedUid, channel0.getId(), false));
+        assertNull(mHelper.getNotificationChannel(package0, uid0, channel0.getId(), false));
+    }
+
     @Test
     public void testChannelXml() throws Exception {
         NotificationChannelGroup ncg = new NotificationChannelGroup("1", "bye");
@@ -270,12 +339,13 @@ public class PreferencesHelperTest extends UiServiceTestCase {
         mHelper.setShowBadge(PKG_N_MR1, UID_N_MR1, true);
         mHelper.setAppImportanceLocked(PKG_N_MR1, UID_N_MR1);
 
-        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_N_MR1, UID_N_MR1, false, channel1.getId(),
-                channel2.getId(), NotificationChannel.DEFAULT_CHANNEL_ID);
+        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_N_MR1, UID_N_MR1, false,
+                UserHandle.USER_ALL, channel1.getId(), channel2.getId(),
+                NotificationChannel.DEFAULT_CHANNEL_ID);
         mHelper.onPackagesChanged(true, UserHandle.myUserId(), new String[]{PKG_N_MR1}, new int[]{
                 UID_N_MR1});
 
-        loadStreamXml(baos, false);
+        loadStreamXml(baos, false, UserHandle.USER_ALL);
 
         assertTrue(mHelper.canShowBadge(PKG_N_MR1, UID_N_MR1));
         assertTrue(mHelper.getIsAppImportanceLocked(PKG_N_MR1, UID_N_MR1));
@@ -337,14 +407,15 @@ public class PreferencesHelperTest extends UiServiceTestCase {
 
         mHelper.setImportance(PKG_O, UID_O, IMPORTANCE_NONE);
 
-        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_N_MR1, UID_N_MR1, true, channel1.getId(),
-                channel2.getId(), channel3.getId(), NotificationChannel.DEFAULT_CHANNEL_ID);
+        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_N_MR1, UID_N_MR1, true,
+                UserHandle.USER_SYSTEM, channel1.getId(), channel2.getId(), channel3.getId(),
+                NotificationChannel.DEFAULT_CHANNEL_ID);
         mHelper.onPackagesChanged(true, UserHandle.myUserId(), new String[]{PKG_N_MR1, PKG_O},
                 new int[]{UID_N_MR1, UID_O});
 
         mHelper.setShowBadge(PKG_O, UID_O, true);
 
-        loadStreamXml(baos, true);
+        loadStreamXml(baos, true, UserHandle.USER_SYSTEM);
 
         assertEquals(IMPORTANCE_NONE, mHelper.getImportance(PKG_O, UID_O));
         assertTrue(mHelper.canShowBadge(PKG_N_MR1, UID_N_MR1));
@@ -385,10 +456,11 @@ public class PreferencesHelperTest extends UiServiceTestCase {
         channel.setSound(SOUND_URI, mAudioAttributes);
         mHelper.createNotificationChannel(PKG_N_MR1, UID_N_MR1, channel, true, false);
 
-        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_N_MR1, UID_N_MR1, true, channel.getId());
+        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_N_MR1, UID_N_MR1, true,
+                UserHandle.USER_SYSTEM, channel.getId());
 
         // Testing that in restore we are given the canonical version
-        loadStreamXml(baos, true);
+        loadStreamXml(baos, true, UserHandle.USER_SYSTEM);
         verify(mTestIContentProvider).uncanonicalize(any(), eq(CANONICAL_SOUND_URI));
     }
 
@@ -410,9 +482,10 @@ public class PreferencesHelperTest extends UiServiceTestCase {
                 new NotificationChannel("id", "name", IMPORTANCE_LOW);
         channel.setSound(SOUND_URI, mAudioAttributes);
         mHelper.createNotificationChannel(PKG_N_MR1, UID_N_MR1, channel, true, false);
-        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_N_MR1, UID_N_MR1, true, channel.getId());
+        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_N_MR1, UID_N_MR1, true,
+                UserHandle.USER_SYSTEM, channel.getId());
 
-        loadStreamXml(baos, true);
+        loadStreamXml(baos, true, UserHandle.USER_SYSTEM);
 
         NotificationChannel actualChannel = mHelper.getNotificationChannel(
                 PKG_N_MR1, UID_N_MR1, channel.getId(), false);
@@ -431,9 +504,10 @@ public class PreferencesHelperTest extends UiServiceTestCase {
                 new NotificationChannel("id", "name", IMPORTANCE_LOW);
         channel.setSound(SOUND_URI, mAudioAttributes);
         mHelper.createNotificationChannel(PKG_N_MR1, UID_N_MR1, channel, true, false);
-        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_N_MR1, UID_N_MR1, true, channel.getId());
+        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_N_MR1, UID_N_MR1, true,
+                UserHandle.USER_SYSTEM, channel.getId());
 
-        loadStreamXml(baos, true);
+        loadStreamXml(baos, true, UserHandle.USER_SYSTEM);
 
         NotificationChannel actualChannel = mHelper.getNotificationChannel(
                 PKG_N_MR1, UID_N_MR1, channel.getId(), false);
@@ -460,7 +534,8 @@ public class PreferencesHelperTest extends UiServiceTestCase {
                 + "</package>\n"
                 + "</ranking>\n";
 
-        loadByteArrayXml(backupWithUncanonicalizedSoundUri.getBytes(), true);
+        loadByteArrayXml(
+                backupWithUncanonicalizedSoundUri.getBytes(), true, UserHandle.USER_SYSTEM);
 
         NotificationChannel actualChannel = mHelper.getNotificationChannel(PKG_N_MR1, UID_N_MR1, id, false);
         assertEquals(Settings.System.DEFAULT_NOTIFICATION_URI, actualChannel.getSound());
@@ -472,9 +547,10 @@ public class PreferencesHelperTest extends UiServiceTestCase {
                 new NotificationChannel("id", "name", IMPORTANCE_LOW);
         channel.setSound(null, mAudioAttributes);
         mHelper.createNotificationChannel(PKG_N_MR1, UID_N_MR1, channel, true, false);
-        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_N_MR1, UID_N_MR1, true, channel.getId());
+        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_N_MR1, UID_N_MR1, true,
+                UserHandle.USER_SYSTEM, channel.getId());
 
-        loadStreamXml(baos, true);
+        loadStreamXml(baos, true, UserHandle.USER_SYSTEM);
 
         NotificationChannel actualChannel = mHelper.getNotificationChannel(
                 PKG_N_MR1, UID_N_MR1, channel.getId(), false);
@@ -504,8 +580,9 @@ public class PreferencesHelperTest extends UiServiceTestCase {
         assertEquals(channel2,
                 mHelper.getNotificationChannel(PKG_N_MR1, UID_N_MR1, channel2.getId(), false));
 
-        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_N_MR1, UID_N_MR1, true, channel1.getId(),
-                channel2.getId(), channel3.getId(), NotificationChannel.DEFAULT_CHANNEL_ID);
+        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_N_MR1, UID_N_MR1, true,
+                UserHandle.USER_SYSTEM, channel1.getId(), channel2.getId(), channel3.getId(),
+                NotificationChannel.DEFAULT_CHANNEL_ID);
         mHelper.onPackagesChanged(true, UserHandle.myUserId(), new String[]{PKG_N_MR1}, new int[]{
                 UID_N_MR1});
 
@@ -513,7 +590,7 @@ public class PreferencesHelperTest extends UiServiceTestCase {
         parser.setInput(new BufferedInputStream(new ByteArrayInputStream(baos.toByteArray())),
                 null);
         parser.nextTag();
-        mHelper.readXml(parser, true);
+        mHelper.readXml(parser, true, UserHandle.USER_SYSTEM);
 
         assertNull(mHelper.getNotificationChannel(PKG_N_MR1, UID_N_MR1, channel1.getId(), false));
         assertNull(mHelper.getNotificationChannel(PKG_N_MR1, UID_N_MR1, channel3.getId(), false));
@@ -525,9 +602,9 @@ public class PreferencesHelperTest extends UiServiceTestCase {
     @Test
     public void testChannelXml_defaultChannelLegacyApp_noUserSettings() throws Exception {
         ByteArrayOutputStream baos = writeXmlAndPurge(PKG_N_MR1, UID_N_MR1, false,
-                NotificationChannel.DEFAULT_CHANNEL_ID);
+                UserHandle.USER_ALL, NotificationChannel.DEFAULT_CHANNEL_ID);
 
-        loadStreamXml(baos, false);
+        loadStreamXml(baos, false, UserHandle.USER_ALL);
 
         final NotificationChannel updated = mHelper.getNotificationChannel(PKG_N_MR1, UID_N_MR1,
                 NotificationChannel.DEFAULT_CHANNEL_ID, false);
@@ -546,9 +623,9 @@ public class PreferencesHelperTest extends UiServiceTestCase {
         mHelper.updateNotificationChannel(PKG_N_MR1, UID_N_MR1, defaultChannel, true);
 
         ByteArrayOutputStream baos = writeXmlAndPurge(PKG_N_MR1, UID_N_MR1, false,
-                NotificationChannel.DEFAULT_CHANNEL_ID);
+                UserHandle.USER_ALL, NotificationChannel.DEFAULT_CHANNEL_ID);
 
-        loadStreamXml(baos, false);
+        loadStreamXml(baos, false, UserHandle.USER_ALL);
 
         assertEquals(NotificationManager.IMPORTANCE_LOW, mHelper.getNotificationChannel(
                 PKG_N_MR1, UID_N_MR1, NotificationChannel.DEFAULT_CHANNEL_ID, false).getImportance());
@@ -568,7 +645,7 @@ public class PreferencesHelperTest extends UiServiceTestCase {
         parser.setInput(new BufferedInputStream(new ByteArrayInputStream(preupgradeXml.getBytes())),
                 null);
         parser.nextTag();
-        mHelper.readXml(parser, false);
+        mHelper.readXml(parser, false, UserHandle.USER_ALL);
 
         final NotificationChannel updated1 =
             mHelper.getNotificationChannel(PKG_N_MR1, UID_N_MR1, NotificationChannel.DEFAULT_CHANNEL_ID, false);
@@ -590,13 +667,13 @@ public class PreferencesHelperTest extends UiServiceTestCase {
         final NotificationChannel defaultChannel = mHelper.getNotificationChannel(
                 PKG_N_MR1, UID_N_MR1, NotificationChannel.DEFAULT_CHANNEL_ID, false);
         assertTrue(defaultChannel != null);
-        ByteArrayOutputStream baos =
-                writeXmlAndPurge(PKG_N_MR1, UID_N_MR1, false, NotificationChannel.DEFAULT_CHANNEL_ID);
+        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_N_MR1, UID_N_MR1, false,
+                UserHandle.USER_ALL, NotificationChannel.DEFAULT_CHANNEL_ID);
         // Load package at higher sdk.
         final ApplicationInfo upgraded = new ApplicationInfo();
         upgraded.targetSdkVersion = Build.VERSION_CODES.N_MR1 + 1;
         when(mPm.getApplicationInfoAsUser(eq(PKG_N_MR1), anyInt(), anyInt())).thenReturn(upgraded);
-        loadStreamXml(baos, false);
+        loadStreamXml(baos, false, UserHandle.USER_ALL);
 
         // Default Channel should be gone.
         assertEquals(null, mHelper.getNotificationChannel(PKG_N_MR1, UID_N_MR1,
@@ -608,13 +685,13 @@ public class PreferencesHelperTest extends UiServiceTestCase {
         mHelper.createNotificationChannel(PKG_N_MR1, UID_N_MR1,
                 new NotificationChannel("bananas", "bananas", IMPORTANCE_LOW), true, false);
         ByteArrayOutputStream baos = writeXmlAndPurge(PKG_N_MR1, UID_N_MR1, false,
-                NotificationChannel.DEFAULT_CHANNEL_ID, "bananas");
+                UserHandle.USER_ALL, NotificationChannel.DEFAULT_CHANNEL_ID, "bananas");
 
         // Load package at higher sdk.
         final ApplicationInfo upgraded = new ApplicationInfo();
         upgraded.targetSdkVersion = Build.VERSION_CODES.N_MR1 + 1;
         when(mPm.getApplicationInfoAsUser(eq(PKG_N_MR1), anyInt(), anyInt())).thenReturn(upgraded);
-        loadStreamXml(baos, false);
+        loadStreamXml(baos, false, UserHandle.USER_ALL);
 
         // Default Channel should be gone.
         assertEquals(null, mHelper.getNotificationChannel(PKG_N_MR1, UID_N_MR1,
@@ -624,11 +701,11 @@ public class PreferencesHelperTest extends UiServiceTestCase {
     @Test
     public void testLoadingOldChannelsDoesNotDeleteNewlyCreatedChannels() throws Exception {
         ByteArrayOutputStream baos = writeXmlAndPurge(PKG_N_MR1, UID_N_MR1, false,
-                NotificationChannel.DEFAULT_CHANNEL_ID, "bananas");
+                UserHandle.USER_ALL, NotificationChannel.DEFAULT_CHANNEL_ID, "bananas");
         mHelper.createNotificationChannel(PKG_N_MR1, UID_N_MR1,
                 new NotificationChannel("bananas", "bananas", IMPORTANCE_LOW), true, false);
 
-        loadStreamXml(baos, false);
+        loadStreamXml(baos, false, UserHandle.USER_ALL);
 
         // Should still have the newly created channel that wasn't in the xml.
         assertTrue(mHelper.getNotificationChannel(PKG_N_MR1, UID_N_MR1, "bananas", false) != null);
@@ -863,12 +940,12 @@ public class PreferencesHelperTest extends UiServiceTestCase {
     @Test
     public void testClearLockedFields() {
         final NotificationChannel channel = getChannel();
-        mHelper.clearLockedFields(channel);
+        mHelper.clearLockedFieldsLocked(channel);
         assertEquals(0, channel.getUserLockedFields());
 
         channel.lockFields(NotificationChannel.USER_LOCKED_PRIORITY
                 | NotificationChannel.USER_LOCKED_IMPORTANCE);
-        mHelper.clearLockedFields(channel);
+        mHelper.clearLockedFieldsLocked(channel);
         assertEquals(0, channel.getUserLockedFields());
     }
 
@@ -1828,6 +1905,46 @@ public class PreferencesHelperTest extends UiServiceTestCase {
     }
 
     @Test
+    public void testBubblesOverrideTrue() {
+        Secure.putIntForUser(getContext().getContentResolver(),
+                Secure.NOTIFICATION_BUBBLES, 1,
+                USER.getIdentifier());
+        mHelper.updateBubblesEnabled(); // would be called by settings observer
+        assertTrue(mHelper.bubblesEnabled(USER));
+    }
+
+    @Test
+    public void testBubblesOverrideFalse() {
+        Secure.putIntForUser(getContext().getContentResolver(),
+                Secure.NOTIFICATION_BUBBLES, 0,
+                USER.getIdentifier());
+        mHelper.updateBubblesEnabled(); // would be called by settings observer
+        assertFalse(mHelper.bubblesEnabled(USER));
+    }
+
+    @Test
+    public void testBubblesForUserAll() {
+        try {
+            mHelper.bubblesEnabled(UserHandle.ALL);
+        } catch (Exception e) {
+            fail("just don't throw");
+        }
+    }
+
+    @Test
+    public void testBubblesOverrideUserIsolation() {
+        Secure.putIntForUser(getContext().getContentResolver(),
+                Secure.NOTIFICATION_BUBBLES, 0,
+                USER.getIdentifier());
+        Secure.putIntForUser(getContext().getContentResolver(),
+                Secure.NOTIFICATION_BUBBLES, 1,
+                USER2.getIdentifier());
+        mHelper.updateBubblesEnabled(); // would be called by settings observer
+        assertFalse(mHelper.bubblesEnabled(USER));
+        assertTrue(mHelper.bubblesEnabled(USER2));
+    }
+
+    @Test
     public void testOnLocaleChanged_updatesDefaultChannels() throws Exception {
         String newLabel = "bananas!";
         final NotificationChannel defaultChannel = mHelper.getNotificationChannel(PKG_N_MR1,
@@ -2007,9 +2124,16 @@ public class PreferencesHelperTest extends UiServiceTestCase {
 
     @Test
     public void testXml_statusBarIcons_default() throws Exception {
-        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_O, UID_O, false);
+        String preQXml = "<ranking version=\"1\">\n"
+                + "<package name=\"" + PKG_N_MR1 + "\" show_badge=\"true\">\n"
+                + "<channel id=\"something\" name=\"name\" importance=\"2\" "
+                + "show_badge=\"true\" />\n"
+                + "<channel id=\"miscellaneous\" name=\"Uncategorized\" usage=\"5\" "
+                + "content_type=\"4\" flags=\"0\" show_badge=\"true\" />\n"
+                + "</package>\n"
+                + "</ranking>\n";
         mHelper = new PreferencesHelper(getContext(), mPm, mHandler, mMockZenModeHelper);
-        loadStreamXml(baos, false);
+        loadByteArrayXml(preQXml.getBytes(), true, UserHandle.USER_SYSTEM);
 
         assertEquals(PreferencesHelper.DEFAULT_HIDE_SILENT_STATUS_BAR_ICONS,
                 mHelper.shouldHideSilentStatusIcons());
@@ -2019,9 +2143,9 @@ public class PreferencesHelperTest extends UiServiceTestCase {
     public void testXml_statusBarIcons() throws Exception {
         mHelper.setHideSilentStatusIcons(!PreferencesHelper.DEFAULT_HIDE_SILENT_STATUS_BAR_ICONS);
 
-        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_O, UID_O, false);
+        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_O, UID_O, false, UserHandle.USER_ALL);
         mHelper = new PreferencesHelper(getContext(), mPm, mHandler, mMockZenModeHelper);
-        loadStreamXml(baos, false);
+        loadStreamXml(baos, false, UserHandle.USER_ALL);
 
         assertEquals(!PreferencesHelper.DEFAULT_HIDE_SILENT_STATUS_BAR_ICONS,
                 mHelper.shouldHideSilentStatusIcons());
@@ -2115,9 +2239,9 @@ public class PreferencesHelperTest extends UiServiceTestCase {
     public void testDelegateXml_noDelegate() throws Exception {
         mHelper.setImportance(PKG_O, UID_O, IMPORTANCE_UNSPECIFIED);
 
-        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_O, UID_O, false);
+        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_O, UID_O, false, UserHandle.USER_ALL);
         mHelper = new PreferencesHelper(getContext(), mPm, mHandler, mMockZenModeHelper);
-        loadStreamXml(baos, false);
+        loadStreamXml(baos, false, UserHandle.USER_ALL);
 
         assertNull(mHelper.getNotificationDelegate(PKG_O, UID_O));
     }
@@ -2126,9 +2250,9 @@ public class PreferencesHelperTest extends UiServiceTestCase {
     public void testDelegateXml_delegate() throws Exception {
         mHelper.setNotificationDelegate(PKG_O, UID_O, "other", 53);
 
-        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_O, UID_O, false);
+        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_O, UID_O, false, UserHandle.USER_ALL);
         mHelper = new PreferencesHelper(getContext(), mPm, mHandler, mMockZenModeHelper);
-        loadStreamXml(baos, false);
+        loadStreamXml(baos, false, UserHandle.USER_ALL);
 
         assertEquals("other", mHelper.getNotificationDelegate(PKG_O, UID_O));
     }
@@ -2138,9 +2262,9 @@ public class PreferencesHelperTest extends UiServiceTestCase {
         mHelper.setNotificationDelegate(PKG_O, UID_O, "other", 53);
         mHelper.revokeNotificationDelegate(PKG_O, UID_O);
 
-        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_O, UID_O, false);
+        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_O, UID_O, false, UserHandle.USER_ALL);
         mHelper = new PreferencesHelper(getContext(), mPm, mHandler, mMockZenModeHelper);
-        loadStreamXml(baos, false);
+        loadStreamXml(baos, false, UserHandle.USER_ALL);
 
         assertNull(mHelper.getNotificationDelegate(PKG_O, UID_O));
     }
@@ -2150,9 +2274,9 @@ public class PreferencesHelperTest extends UiServiceTestCase {
         mHelper.setNotificationDelegate(PKG_O, UID_O, "other", 53);
         mHelper.toggleNotificationDelegate(PKG_O, UID_O, false);
 
-        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_O, UID_O, false);
+        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_O, UID_O, false, UserHandle.USER_ALL);
         mHelper = new PreferencesHelper(getContext(), mPm, mHandler, mMockZenModeHelper);
-        loadStreamXml(baos, false);
+        loadStreamXml(baos, false, UserHandle.USER_ALL);
 
         // appears disabled
         assertNull(mHelper.getNotificationDelegate(PKG_O, UID_O));
@@ -2168,9 +2292,9 @@ public class PreferencesHelperTest extends UiServiceTestCase {
         mHelper.toggleNotificationDelegate(PKG_O, UID_O, false);
         mHelper.revokeNotificationDelegate(PKG_O, UID_O);
 
-        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_O, UID_O, false);
+        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_O, UID_O, false, UserHandle.USER_ALL);
         mHelper = new PreferencesHelper(getContext(), mPm, mHandler, mMockZenModeHelper);
-        loadStreamXml(baos, false);
+        loadStreamXml(baos, false, UserHandle.USER_ALL);
 
         // appears disabled
         assertNull(mHelper.getNotificationDelegate(PKG_O, UID_O));
@@ -2186,9 +2310,9 @@ public class PreferencesHelperTest extends UiServiceTestCase {
     public void testAllowBubbles_defaults() throws Exception {
         assertTrue(mHelper.areBubblesAllowed(PKG_O, UID_O));
 
-        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_O, UID_O, false);
+        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_O, UID_O, false, UserHandle.USER_ALL);
         mHelper = new PreferencesHelper(getContext(), mPm, mHandler, mMockZenModeHelper);
-        loadStreamXml(baos, false);
+        loadStreamXml(baos, false, UserHandle.USER_ALL);
 
         assertTrue(mHelper.areBubblesAllowed(PKG_O, UID_O));
         assertEquals(0, mHelper.getAppLockedFields(PKG_O, UID_O));
@@ -2201,9 +2325,9 @@ public class PreferencesHelperTest extends UiServiceTestCase {
         assertEquals(PreferencesHelper.LockableAppFields.USER_LOCKED_BUBBLE,
                 mHelper.getAppLockedFields(PKG_O, UID_O));
 
-        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_O, UID_O, false);
+        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_O, UID_O, false, UserHandle.USER_ALL);
         mHelper = new PreferencesHelper(getContext(), mPm, mHandler, mMockZenModeHelper);
-        loadStreamXml(baos, false);
+        loadStreamXml(baos, false, UserHandle.USER_ALL);
 
         assertFalse(mHelper.areBubblesAllowed(PKG_O, UID_O));
         assertEquals(PreferencesHelper.LockableAppFields.USER_LOCKED_BUBBLE,
@@ -2322,6 +2446,155 @@ public class PreferencesHelperTest extends UiServiceTestCase {
                 mHelper.getNotificationChannel(PKG_O, UID_O, a.getId(), false).canBubble());
 
         mHelper.updateNotificationChannel(PKG_O, UID_O, update, true);
+
+        assertEquals(IMPORTANCE_HIGH,
+                mHelper.getNotificationChannel(PKG_O, UID_O, a.getId(), false).getImportance());
+    }
+
+    @Test
+    public void testUpdateDefaultApps_add_multiUser() {
+        NotificationChannel a = new NotificationChannel("a", "a", IMPORTANCE_HIGH);
+        NotificationChannel b = new NotificationChannel("b", "b", IMPORTANCE_LOW);
+        NotificationChannel c = new NotificationChannel("c", "c", IMPORTANCE_DEFAULT);
+        // different uids, same package
+        mHelper.createNotificationChannel(PKG_O, UID_O, a, true, false);
+        mHelper.createNotificationChannel(PKG_O, UID_O, b, false, false);
+        mHelper.createNotificationChannel(PKG_O, UserHandle.PER_USER_RANGE + 1, c, true, true);
+
+        ArraySet<String> toAdd = new ArraySet<>();
+        toAdd.add(PKG_O);
+        mHelper.updateDefaultApps(UserHandle.getUserId(UID_O), null, toAdd);
+
+        assertTrue(mHelper.getNotificationChannel(PKG_O, UID_O, a.getId(), false)
+                .isImportanceLockedByCriticalDeviceFunction());
+        assertTrue(mHelper.getNotificationChannel(PKG_O, UID_O, b.getId(), false)
+                .isImportanceLockedByCriticalDeviceFunction());
+        assertFalse(mHelper.getNotificationChannel(
+                PKG_O, UserHandle.PER_USER_RANGE + 1, c.getId(), false)
+                .isImportanceLockedByCriticalDeviceFunction());
+    }
+
+    @Test
+    public void testUpdateDefaultApps_add_onlyGivenPkg() {
+        NotificationChannel a = new NotificationChannel("a", "a", IMPORTANCE_HIGH);
+        NotificationChannel b = new NotificationChannel("b", "b", IMPORTANCE_LOW);
+        mHelper.createNotificationChannel(PKG_O, UID_O, a, true, false);
+        mHelper.createNotificationChannel(PKG_N_MR1, UID_N_MR1, b, false, false);
+
+        ArraySet<String> toAdd = new ArraySet<>();
+        toAdd.add(PKG_O);
+        mHelper.updateDefaultApps(UserHandle.getUserId(UID_O), null, toAdd);
+
+
+        assertTrue(mHelper.getNotificationChannel(PKG_O, UID_O, a.getId(), false)
+                .isImportanceLockedByCriticalDeviceFunction());
+        assertFalse(mHelper.getNotificationChannel(PKG_N_MR1, UID_N_MR1, b.getId(), false)
+                .isImportanceLockedByCriticalDeviceFunction());
+    }
+
+    @Test
+    public void testUpdateDefaultApps_remove() {
+        NotificationChannel a = new NotificationChannel("a", "a", IMPORTANCE_HIGH);
+        NotificationChannel b = new NotificationChannel("b", "b", IMPORTANCE_LOW);
+        // different uids, same package
+        mHelper.createNotificationChannel(PKG_O, UID_O, a, true, false);
+        mHelper.createNotificationChannel(PKG_O, UID_O, b, false, false);
+
+        ArraySet<String> toAdd = new ArraySet<>();
+        toAdd.add(PKG_O);
+        mHelper.updateDefaultApps(UserHandle.getUserId(UID_O), null, toAdd);
+
+        assertTrue(mHelper.getNotificationChannel(PKG_O, UID_O, a.getId(), false)
+                .isImportanceLockedByCriticalDeviceFunction());
+        assertTrue(mHelper.getNotificationChannel(PKG_O, UID_O, b.getId(), false)
+                .isImportanceLockedByCriticalDeviceFunction());
+
+        ArraySet<String> toRemove = new ArraySet<>();
+        toRemove.add(PKG_O);
+        mHelper.updateDefaultApps(UserHandle.getUserId(UID_O), toRemove, null);
+
+        assertFalse(mHelper.getNotificationChannel(PKG_O, UID_O, a.getId(), false)
+                .isImportanceLockedByCriticalDeviceFunction());
+        assertFalse(mHelper.getNotificationChannel(PKG_O, UID_O, b.getId(), false)
+                .isImportanceLockedByCriticalDeviceFunction());
+    }
+
+    @Test
+    public void testUpdateDefaultApps_addAndRemove() {
+        NotificationChannel a = new NotificationChannel("a", "a", IMPORTANCE_HIGH);
+        NotificationChannel b = new NotificationChannel("b", "b", IMPORTANCE_LOW);
+        mHelper.createNotificationChannel(PKG_O, UID_O, a, true, false);
+        mHelper.createNotificationChannel(PKG_N_MR1, UID_N_MR1, b, false, false);
+
+        ArraySet<String> toAdd = new ArraySet<>();
+        toAdd.add(PKG_O);
+        mHelper.updateDefaultApps(UserHandle.getUserId(UID_O), null, toAdd);
+
+
+        assertTrue(mHelper.getNotificationChannel(PKG_O, UID_O, a.getId(), false)
+                .isImportanceLockedByCriticalDeviceFunction());
+        assertFalse(mHelper.getNotificationChannel(PKG_N_MR1, UID_N_MR1, b.getId(), false)
+                .isImportanceLockedByCriticalDeviceFunction());
+
+        // now the default is PKG_N_MR1
+        ArraySet<String> toRemove = new ArraySet<>();
+        toRemove.add(PKG_O);
+        toAdd = new ArraySet<>();
+        toAdd.add(PKG_N_MR1);
+        mHelper.updateDefaultApps(USER.getIdentifier(), toRemove, toAdd);
+
+        assertFalse(mHelper.getNotificationChannel(PKG_O, UID_O, a.getId(), false)
+                .isImportanceLockedByCriticalDeviceFunction());
+        assertTrue(mHelper.getNotificationChannel(PKG_N_MR1, UID_N_MR1, b.getId(), false)
+                .isImportanceLockedByCriticalDeviceFunction());
+    }
+
+    @Test
+    public void testUpdateDefaultApps_appDoesNotExist_noCrash() {
+        ArraySet<String> toAdd = new ArraySet<>();
+        toAdd.add(PKG_O);
+        ArraySet<String> toRemove = new ArraySet<>();
+        toRemove.add(PKG_N_MR1);
+        mHelper.updateDefaultApps(UserHandle.getUserId(UID_O), toRemove, toAdd);
+    }
+
+    @Test
+    public void testUpdateDefaultApps_channelDoesNotExistYet() {
+        NotificationChannel a = new NotificationChannel("a", "a", IMPORTANCE_HIGH);
+        NotificationChannel b = new NotificationChannel("b", "b", IMPORTANCE_LOW);
+        mHelper.createNotificationChannel(PKG_O, UID_O, a, true, false);
+
+        ArraySet<String> toAdd = new ArraySet<>();
+        toAdd.add(PKG_O);
+        mHelper.updateDefaultApps(UserHandle.getUserId(UID_O), null, toAdd);
+
+        assertTrue(mHelper.getNotificationChannel(PKG_O, UID_O, a.getId(), false)
+                .isImportanceLockedByCriticalDeviceFunction());
+
+        mHelper.createNotificationChannel(PKG_O, UID_O, b, true, false);
+        assertTrue(mHelper.getNotificationChannel(PKG_O, UID_O, b.getId(), false)
+                .isImportanceLockedByCriticalDeviceFunction());
+    }
+
+    @Test
+    public void testUpdateNotificationChannel_defaultAppLockedImportance() {
+        NotificationChannel a = new NotificationChannel("a", "a", IMPORTANCE_HIGH);
+        mHelper.createNotificationChannel(PKG_O, UID_O, a, true, false);
+        ArraySet<String> toAdd = new ArraySet<>();
+        toAdd.add(PKG_O);
+        mHelper.updateDefaultApps(UserHandle.getUserId(UID_O), null, toAdd);
+
+        NotificationChannel update = new NotificationChannel("a", "a", IMPORTANCE_NONE);
+        update.setAllowBubbles(false);
+
+        mHelper.updateNotificationChannel(PKG_O, UID_O, update, true);
+
+        assertEquals(IMPORTANCE_HIGH,
+                mHelper.getNotificationChannel(PKG_O, UID_O, a.getId(), false).getImportance());
+        assertEquals(false,
+                mHelper.getNotificationChannel(PKG_O, UID_O, a.getId(), false).canBubble());
+
+        mHelper.updateNotificationChannel(PKG_O, UID_O, update, false);
 
         assertEquals(IMPORTANCE_HIGH,
                 mHelper.getNotificationChannel(PKG_O, UID_O, a.getId(), false).getImportance());

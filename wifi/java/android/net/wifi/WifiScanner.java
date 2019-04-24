@@ -259,8 +259,17 @@ public class WifiScanner {
          * {@hide}
          */
         @SystemApi
-        @RequiresPermission(android.Manifest.permission.LOCATION_HARDWARE)
         public boolean ignoreLocationSettings;
+        /**
+         * This scan request will be hidden from app-ops noting for location information. This
+         * should only be used by FLP/NLP module on the device which is using the scan results to
+         * compute results for behalf on their clients. FLP/NLP module using this flag should ensure
+         * that they note in app-ops the eventual delivery of location information computed using
+         * these results to their client .
+         * {@hide}
+         */
+        @SystemApi
+        public boolean hideFromAppOps;
 
         /** Implement the Parcelable interface {@hide} */
         public int describeContents() {
@@ -279,6 +288,7 @@ public class WifiScanner {
             dest.writeInt(isPnoScan ? 1 : 0);
             dest.writeInt(type);
             dest.writeInt(ignoreLocationSettings ? 1 : 0);
+            dest.writeInt(hideFromAppOps ? 1 : 0);
             if (channels != null) {
                 dest.writeInt(channels.length);
                 for (int i = 0; i < channels.length; i++) {
@@ -300,7 +310,7 @@ public class WifiScanner {
         }
 
         /** Implement the Parcelable interface {@hide} */
-        public static final Creator<ScanSettings> CREATOR =
+        public static final @android.annotation.NonNull Creator<ScanSettings> CREATOR =
                 new Creator<ScanSettings>() {
                     public ScanSettings createFromParcel(Parcel in) {
                         ScanSettings settings = new ScanSettings();
@@ -314,6 +324,7 @@ public class WifiScanner {
                         settings.isPnoScan = in.readInt() == 1;
                         settings.type = in.readInt();
                         settings.ignoreLocationSettings = in.readInt() == 1;
+                        settings.hideFromAppOps = in.readInt() == 1;
                         int num_channels = in.readInt();
                         settings.channels = new ChannelSpec[num_channels];
                         for (int i = 0; i < num_channels; i++) {
@@ -442,7 +453,7 @@ public class WifiScanner {
         }
 
         /** Implement the Parcelable interface {@hide} */
-        public static final Creator<ScanData> CREATOR =
+        public static final @android.annotation.NonNull Creator<ScanData> CREATOR =
                 new Creator<ScanData>() {
                     public ScanData createFromParcel(Parcel in) {
                         int id = in.readInt();
@@ -494,7 +505,7 @@ public class WifiScanner {
         }
 
         /** Implement the Parcelable interface {@hide} */
-        public static final Creator<ParcelableScanData> CREATOR =
+        public static final @android.annotation.NonNull Creator<ParcelableScanData> CREATOR =
                 new Creator<ParcelableScanData>() {
                     public ParcelableScanData createFromParcel(Parcel in) {
                         int n = in.readInt();
@@ -542,7 +553,7 @@ public class WifiScanner {
         }
 
         /** Implement the Parcelable interface {@hide} */
-        public static final Creator<ParcelableScanResults> CREATOR =
+        public static final @android.annotation.NonNull Creator<ParcelableScanResults> CREATOR =
                 new Creator<ParcelableScanResults>() {
                     public ParcelableScanResults createFromParcel(Parcel in) {
                         int n = in.readInt();
@@ -673,7 +684,7 @@ public class WifiScanner {
         }
 
         /** Implement the Parcelable interface {@hide} */
-        public static final Creator<PnoSettings> CREATOR =
+        public static final @android.annotation.NonNull Creator<PnoSettings> CREATOR =
                 new Creator<PnoSettings>() {
                     public PnoSettings createFromParcel(Parcel in) {
                         PnoSettings settings = new PnoSettings();
@@ -1018,7 +1029,7 @@ public class WifiScanner {
         }
 
         /** Implement the Parcelable interface {@hide} */
-        public static final Creator<WifiChangeSettings> CREATOR =
+        public static final @android.annotation.NonNull Creator<WifiChangeSettings> CREATOR =
                 new Creator<WifiChangeSettings>() {
                     public WifiChangeSettings createFromParcel(Parcel in) {
                         return new WifiChangeSettings();
@@ -1129,7 +1140,7 @@ public class WifiScanner {
         }
 
         /** Implement the Parcelable interface {@hide} */
-        public static final Creator<HotlistSettings> CREATOR =
+        public static final @android.annotation.NonNull Creator<HotlistSettings> CREATOR =
                 new Creator<HotlistSettings>() {
                     public HotlistSettings createFromParcel(Parcel in) {
                         HotlistSettings settings = new HotlistSettings();
@@ -1362,7 +1373,7 @@ public class WifiScanner {
         }
 
         /** Implement the Parcelable interface {@hide} */
-        public static final Creator<OperationResult> CREATOR =
+        public static final @android.annotation.NonNull Creator<OperationResult> CREATOR =
                 new Creator<OperationResult>() {
                     public OperationResult createFromParcel(Parcel in) {
                         int reason = in.readInt();

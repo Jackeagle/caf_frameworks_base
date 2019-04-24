@@ -22,6 +22,7 @@ import android.annotation.Nullable;
 import android.annotation.UserIdInt;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.IntentSender;
 import android.content.pm.PackageManager.ApplicationInfoFlags;
 import android.content.pm.PackageManager.ComponentInfoFlags;
 import android.content.pm.PackageManager.PackageInfoFlags;
@@ -78,9 +79,11 @@ public abstract class PackageManagerInternal {
     /** Observer called whenever the list of packages changes */
     public interface PackageListObserver {
         /** A package was added to the system. */
-        void onPackageAdded(@NonNull String packageName);
+        void onPackageAdded(@NonNull String packageName, int uid);
+        /** A package was changed - either installed for a specific user or updated. */
+        default void onPackageChanged(@NonNull String packageName, int uid) {}
         /** A package was removed from the system. */
-        void onPackageRemoved(@NonNull String packageName);
+        void onPackageRemoved(@NonNull String packageName, int uid);
     }
 
     /** Interface to override permission checks via composition */
@@ -134,6 +137,66 @@ public abstract class PackageManagerInternal {
          * @return The package names.
          */
         public String[] getPackages(String authority, int userId);
+    }
+
+    /**
+     * Provider for default browser
+     */
+    public interface DefaultBrowserProvider {
+
+        /**
+         * Get the package name of the default browser.
+         *
+         * @param userId the user id
+         *
+         * @return the package name of the default browser, or {@code null} if none
+         */
+        @Nullable
+        String getDefaultBrowser(@UserIdInt int userId);
+
+        /**
+         * Set the package name of the default browser.
+         *
+         * @param packageName package name of the default browser, or {@code null} to remove
+         * @param userId the user id
+         *
+         * @return whether the default browser was successfully set.
+         */
+        boolean setDefaultBrowser(@Nullable String packageName, @UserIdInt int userId);
+
+        /**
+         * Set the package name of the default browser asynchronously.
+         *
+         * @param packageName package name of the default browser, or {@code null} to remove
+         * @param userId the user id
+         */
+        void setDefaultBrowserAsync(@Nullable String packageName, @UserIdInt int userId);
+    }
+
+    /**
+     * Provider for default home
+     */
+    public interface DefaultHomeProvider {
+
+        /**
+         * Get the package name of the default home.
+         *
+         * @param userId the user id
+         *
+         * @return the package name of the default home, or {@code null} if none
+         */
+        @Nullable
+        String getDefaultHome(@UserIdInt int userId);
+
+        /**
+         * Set the package name of the default home.
+         *
+         * @param packageName package name of the default home, or {@code null} to remove
+         * @param userId the user id
+         * @param callback the callback made after the default home as been updated
+         */
+        void setDefaultHomeAsync(@Nullable String packageName, @UserIdInt int userId,
+                @NonNull Consumer<Boolean> callback);
     }
 
     /**
@@ -804,6 +867,13 @@ public abstract class PackageManagerInternal {
             "android.content.pm.extra.ENABLE_ROLLBACK_INSTALLED_USERS";
 
     /**
+     * Extra field name for the user id an install is associated with when
+     * enabling rollback.
+     */
+    public static final String EXTRA_ENABLE_ROLLBACK_USER =
+            "android.content.pm.extra.ENABLE_ROLLBACK_USER";
+
+    /**
      * Used as the {@code enableRollbackCode} argument for
      * {@link PackageManagerInternal#setEnableRollbackCode} to indicate that
      * enabling rollback succeeded.
@@ -843,4 +913,54 @@ public abstract class PackageManagerInternal {
      * {@code token} can be completed.
      */
     public abstract void finishPackageInstall(int token, boolean didLaunch);
+
+    /**
+     * Remove the default browser stored in the legacy package settings.
+     *
+     * @param userId the user id
+     *
+     * @return the package name of the default browser, or {@code null} if none
+     */
+    @Nullable
+    public abstract String removeLegacyDefaultBrowserPackageName(int userId);
+
+    /**
+     * Sets the default browser provider.
+     *
+     * @param provider the provider
+     */
+    public abstract void setDefaultBrowserProvider(@NonNull DefaultBrowserProvider provider);
+
+    /**
+     * Sets the default home provider.
+     *
+     * @param provider the provider
+     */
+    public abstract void setDefaultHomeProvider(@NonNull DefaultHomeProvider provider);
+
+    /**
+     * Returns {@code true} if given {@code packageName} is an apex package.
+     */
+    public abstract boolean isApexPackage(String packageName);
+
+    /**
+     * Uninstalls given {@code packageName}.
+     *
+     * @param packageName apex package to uninstall.
+     * @param versionCode version of a package to uninstall.
+     * @param userId user to uninstall apex package for. Must be
+     *               {@link android.os.UserHandle#USER_ALL}, otherwise failure will be reported.
+     * @param intentSender a {@link IntentSender} to send result of an uninstall to.
+     */
+    public abstract void uninstallApex(String packageName, long versionCode, int userId,
+            IntentSender intentSender);
+
+    /**
+     * Whether default permission grants have been performed for a user
+     * since the device booted.
+     *
+     * @param userId The user id.
+     * @return true if default permissions
+     */
+    public abstract boolean wereDefaultPermissionsGrantedSinceBoot(int userId);
 }

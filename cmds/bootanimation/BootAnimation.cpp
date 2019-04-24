@@ -101,7 +101,7 @@ static constexpr size_t TEXT_POS_LEN_MAX = 16;
 
 BootAnimation::BootAnimation(sp<Callbacks> callbacks)
         : Thread(false), mClockEnabled(true), mTimeIsAccurate(false),
-        mTimeFormat12Hour(false), mTimeCheckThread(NULL), mCallbacks(callbacks) {
+        mTimeFormat12Hour(false), mTimeCheckThread(nullptr), mCallbacks(callbacks) {
     mSession = new SurfaceComposerClient();
 
     std::string powerCtl = android::base::GetProperty("sys.powerctl", "");
@@ -110,13 +110,30 @@ BootAnimation::BootAnimation(sp<Callbacks> callbacks)
     } else {
         mShuttingDown = true;
     }
+    ALOGD("%sAnimationStartTiming start time: %" PRId64 "ms", mShuttingDown ? "Shutdown" : "Boot",
+            elapsedRealtime());
+}
+
+BootAnimation::~BootAnimation() {
+    if (mAnimation != nullptr) {
+        releaseAnimation(mAnimation);
+        mAnimation = nullptr;
+    }
+    ALOGD("%sAnimationStopTiming start time: %" PRId64 "ms", mShuttingDown ? "Shutdown" : "Boot",
+            elapsedRealtime());
 }
 
 void BootAnimation::onFirstRef() {
     status_t err = mSession->linkToComposerDeath(this);
     SLOGE_IF(err, "linkToComposerDeath failed (%s) ", strerror(-err));
     if (err == NO_ERROR) {
-        run("BootAnimation", PRIORITY_DISPLAY);
+        // Load the animation content -- this can be slow (eg 200ms)
+        // called before waitForSurfaceFlinger() in main() to avoid wait
+        ALOGD("%sAnimationPreloadTiming start time: %" PRId64 "ms",
+                mShuttingDown ? "Shutdown" : "Boot", elapsedRealtime());
+        preloadAnimation();
+        ALOGD("%sAnimationPreloadStopTiming start time: %" PRId64 "ms",
+                mShuttingDown ? "Shutdown" : "Boot", elapsedRealtime());
     }
 }
 
@@ -139,7 +156,7 @@ void BootAnimation::binderDied(const wp<IBinder>&)
 status_t BootAnimation::initTexture(Texture* texture, AssetManager& assets,
         const char* name) {
     Asset* asset = assets.open(name, Asset::ACCESS_BUFFER);
-    if (asset == NULL)
+    if (asset == nullptr)
         return NO_INIT;
     SkBitmap bitmap;
     sk_sp<SkData> data = SkData::MakeWithoutCopy(asset->getBuffer(false),
@@ -217,7 +234,7 @@ status_t BootAnimation::initTexture(FileMap* map, int* width, int* height)
         case kN32_SkColorType:
             if (!mUseNpotTextures && (tw != w || th != h)) {
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tw, th, 0, GL_RGBA,
-                        GL_UNSIGNED_BYTE, 0);
+                        GL_UNSIGNED_BYTE, nullptr);
                 glTexSubImage2D(GL_TEXTURE_2D, 0,
                         0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, p);
             } else {
@@ -229,7 +246,7 @@ status_t BootAnimation::initTexture(FileMap* map, int* width, int* height)
         case kRGB_565_SkColorType:
             if (!mUseNpotTextures && (tw != w || th != h)) {
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, tw, th, 0, GL_RGB,
-                        GL_UNSIGNED_SHORT_5_6_5, 0);
+                        GL_UNSIGNED_SHORT_5_6_5, nullptr);
                 glTexSubImage2D(GL_TEXTURE_2D, 0,
                         0, 0, w, h, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, p);
             } else {
@@ -252,10 +269,12 @@ status_t BootAnimation::initTexture(FileMap* map, int* width, int* height)
 status_t BootAnimation::readyToRun() {
     mAssets.addDefaultAssets();
 
-    sp<IBinder> dtoken(SurfaceComposerClient::getBuiltInDisplay(
-            ISurfaceComposer::eDisplayIdMain));
+    mDisplayToken = SurfaceComposerClient::getInternalDisplayToken();
+    if (mDisplayToken == nullptr)
+        return -1;
+
     DisplayInfo dinfo;
-    status_t status = SurfaceComposerClient::getDisplayInfo(dtoken, &dinfo);
+    status_t status = SurfaceComposerClient::getDisplayInfo(mDisplayToken, &dinfo);
     if (status)
         return -1;
 
@@ -285,10 +304,10 @@ status_t BootAnimation::readyToRun() {
 
     EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
 
-    eglInitialize(display, 0, 0);
+    eglInitialize(display, nullptr, nullptr);
     eglChooseConfig(display, attribs, &config, 1, &numConfigs);
-    surface = eglCreateWindowSurface(display, config, s.get(), NULL);
-    context = eglCreateContext(display, config, NULL, NULL);
+    surface = eglCreateWindowSurface(display, config, s.get(), nullptr);
+    context = eglCreateContext(display, config, nullptr, nullptr);
     eglQuerySurface(display, surface, EGL_WIDTH, &w);
     eglQuerySurface(display, surface, EGL_HEIGHT, &h);
 
@@ -304,6 +323,20 @@ status_t BootAnimation::readyToRun() {
     mFlingerSurface = s;
     mTargetInset = -1;
 
+    return NO_ERROR;
+}
+
+bool BootAnimation::preloadAnimation() {
+    findBootAnimationFile();
+    if (!mZipFileName.isEmpty()) {
+        mAnimation = loadAnimation(mZipFileName);
+        return (mAnimation != nullptr);
+    }
+
+    return false;
+}
+
+void BootAnimation::findBootAnimationFile() {
     // If the device has encryption turned on or is in process
     // of being encrypted we show the encrypted boot animation.
     char decrypt[PROPERTY_VALUE_MAX];
@@ -318,7 +351,7 @@ status_t BootAnimation::readyToRun() {
         for (const char* f : encryptedBootFiles) {
             if (access(f, R_OK) == 0) {
                 mZipFileName = f;
-                return NO_ERROR;
+                return;
             }
         }
     }
@@ -330,10 +363,9 @@ status_t BootAnimation::readyToRun() {
     for (const char* f : (!mShuttingDown ? bootFiles : shutdownFiles)) {
         if (access(f, R_OK) == 0) {
             mZipFileName = f;
-            return NO_ERROR;
+            return;
         }
     }
-    return NO_ERROR;
 }
 
 bool BootAnimation::threadLoop()
@@ -639,7 +671,7 @@ bool BootAnimation::parseAnimationDesc(Animation& animation)
     // Parse the description file
     for (;;) {
         const char* endl = strstr(s, "\n");
-        if (endl == NULL) break;
+        if (endl == nullptr) break;
         String8 line(s, endl - s);
         const char* l = line.string();
         int fps = 0;
@@ -667,8 +699,8 @@ bool BootAnimation::parseAnimationDesc(Animation& animation)
             part.count = count;
             part.pause = pause;
             part.path = path;
-            part.audioData = NULL;
-            part.animation = NULL;
+            part.audioData = nullptr;
+            part.animation = nullptr;
             if (!parseColor(color, part.backgroundColor)) {
                 SLOGE("> invalid color '#%s'", color);
                 part.backgroundColor[0] = 0.0f;
@@ -684,9 +716,9 @@ bool BootAnimation::parseAnimationDesc(Animation& animation)
             part.playUntilComplete = false;
             part.count = 1;
             part.pause = 0;
-            part.audioData = NULL;
+            part.audioData = nullptr;
             part.animation = loadAnimation(String8(SYSTEM_BOOTANIMATION_FILE));
-            if (part.animation != NULL)
+            if (part.animation != nullptr)
                 animation.parts.add(part);
         }
         s = ++endl;
@@ -699,7 +731,7 @@ bool BootAnimation::preloadZip(Animation& animation)
 {
     // read all the data structures
     const size_t pcount = animation.parts.size();
-    void *cookie = NULL;
+    void *cookie = nullptr;
     ZipFileRO* zip = animation.zip;
     if (!zip->startIteration(&cookie)) {
         return false;
@@ -707,7 +739,7 @@ bool BootAnimation::preloadZip(Animation& animation)
 
     ZipEntryRO entry;
     char name[ANIM_ENTRY_NAME_MAX];
-    while ((entry = zip->nextEntry(cookie)) != NULL) {
+    while ((entry = zip->nextEntry(cookie)) != nullptr) {
         const int foundEntryName = zip->getEntryFileName(entry, name, ANIM_ENTRY_NAME_MAX);
         if (foundEntryName > ANIM_ENTRY_NAME_MAX || foundEntryName == -1) {
             SLOGE("Error fetching entry file name");
@@ -730,7 +762,7 @@ bool BootAnimation::preloadZip(Animation& animation)
                 if (path == animation.parts[j].path) {
                     uint16_t method;
                     // supports only stored png files
-                    if (zip->getEntryInfo(entry, &method, NULL, NULL, NULL, NULL, NULL)) {
+                    if (zip->getEntryInfo(entry, &method, nullptr, nullptr, nullptr, nullptr, nullptr)) {
                         if (method == ZipFileRO::kCompressStored) {
                             FileMap* map = zip->createEntryFileMap(entry);
                             if (map) {
@@ -768,7 +800,7 @@ bool BootAnimation::preloadZip(Animation& animation)
         for (size_t frameIdx = 0; frameIdx < part.frames.size(); frameIdx++) {
             const char* endl = strstr(trimDataStr, "\n");
             // No more trimData for this part.
-            if (endl == NULL) {
+            if (endl == nullptr) {
                 break;
             }
             String8 line(trimDataStr, endl - trimDataStr);
@@ -788,8 +820,6 @@ bool BootAnimation::preloadZip(Animation& animation)
         }
     }
 
-    mCallbacks->init(animation.parts);
-
     zip->endIteration(cookie);
 
     return true;
@@ -797,13 +827,25 @@ bool BootAnimation::preloadZip(Animation& animation)
 
 bool BootAnimation::movie()
 {
-    Animation* animation = loadAnimation(mZipFileName);
-    if (animation == NULL)
+    if (mAnimation == nullptr) {
+        mAnimation = loadAnimation(mZipFileName);
+    }
+
+    if (mAnimation == nullptr)
         return false;
 
+    // mCallbacks->init() may get called recursively,
+    // this loop is needed to get the same results
+    for (const Animation::Part& part : mAnimation->parts) {
+        if (part.animation != nullptr) {
+            mCallbacks->init(part.animation->parts);
+        }
+    }
+    mCallbacks->init(mAnimation->parts);
+
     bool anyPartHasClock = false;
-    for (size_t i=0; i < animation->parts.size(); i++) {
-        if(validClock(animation->parts[i])) {
+    for (size_t i=0; i < mAnimation->parts.size(); i++) {
+        if(validClock(mAnimation->parts[i])) {
             anyPartHasClock = true;
             break;
         }
@@ -844,7 +886,7 @@ bool BootAnimation::movie()
     bool clockFontInitialized = false;
     if (mClockEnabled) {
         clockFontInitialized =
-            (initFont(&animation->clockFont, CLOCK_FONT_ASSET) == NO_ERROR);
+            (initFont(&mAnimation->clockFont, CLOCK_FONT_ASSET) == NO_ERROR);
         mClockEnabled = clockFontInitialized;
     }
 
@@ -853,7 +895,7 @@ bool BootAnimation::movie()
         mTimeCheckThread->run("BootAnimation::TimeCheckThread", PRIORITY_NORMAL);
     }
 
-    playAnimation(*animation);
+    playAnimation(*mAnimation);
 
     if (mTimeCheckThread != nullptr) {
         mTimeCheckThread->requestExit();
@@ -861,10 +903,11 @@ bool BootAnimation::movie()
     }
 
     if (clockFontInitialized) {
-        glDeleteTextures(1, &animation->clockFont.texture.name);
+        glDeleteTextures(1, &mAnimation->clockFont.texture.name);
     }
 
-    releaseAnimation(animation);
+    releaseAnimation(mAnimation);
+    mAnimation = nullptr;
 
     return false;
 }
@@ -884,7 +927,7 @@ bool BootAnimation::playAnimation(const Animation& animation)
         glBindTexture(GL_TEXTURE_2D, 0);
 
         // Handle animation package
-        if (part.animation != NULL) {
+        if (part.animation != nullptr) {
             playAnimation(*part.animation);
             if (exitPending())
                 break;
@@ -958,7 +1001,7 @@ bool BootAnimation::playAnimation(const Animation& animation)
                     spec.tv_nsec = (now + delay) % 1000000000;
                     int err;
                     do {
-                        err = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &spec, NULL);
+                        err = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &spec, nullptr);
                     } while (err<0 && errno == EINTR);
                 }
 
@@ -1014,16 +1057,13 @@ void BootAnimation::handleViewport(nsecs_t timestep) {
         // At the end of the animation, we switch to the viewport that DisplayManager will apply
         // later. This changes the coordinate system, and means we must move the surface up by
         // the inset amount.
-        sp<IBinder> dtoken(SurfaceComposerClient::getBuiltInDisplay(
-                ISurfaceComposer::eDisplayIdMain));
-
         Rect layerStackRect(0, 0, mWidth, mHeight - mTargetInset);
         Rect displayRect(0, mTargetInset, mWidth, mHeight);
 
         SurfaceComposerClient::Transaction t;
         t.setPosition(mFlingerSurfaceControl, 0, -mTargetInset)
                 .setCrop(mFlingerSurfaceControl, Rect(0, mTargetInset, mWidth, mHeight));
-        t.setDisplayProjection(dtoken, 0 /* orientation */, layerStackRect, displayRect);
+        t.setDisplayProjection(mDisplayToken, 0 /* orientation */, layerStackRect, displayRect);
         t.apply();
 
         mTargetInset = mCurrentInset = 0;
@@ -1050,13 +1090,13 @@ BootAnimation::Animation* BootAnimation::loadAnimation(const String8& fn)
     if (mLoadedFiles.indexOf(fn) >= 0) {
         SLOGE("File \"%s\" is already loaded. Cyclic ref is not allowed",
             fn.string());
-        return NULL;
+        return nullptr;
     }
     ZipFileRO *zip = ZipFileRO::open(fn);
-    if (zip == NULL) {
+    if (zip == nullptr) {
         SLOGE("Failed to open animation zip \"%s\": %s",
             fn.string(), strerror(errno));
-        return NULL;
+        return nullptr;
     }
 
     Animation *animation =  new Animation;
@@ -1067,7 +1107,7 @@ BootAnimation::Animation* BootAnimation::loadAnimation(const String8& fn)
 
     parseAnimationDesc(*animation);
     if (!preloadZip(*animation)) {
-        return NULL;
+        return nullptr;
     }
 
 
@@ -1095,7 +1135,7 @@ bool BootAnimation::updateIsTimeAccurate() {
     }
 
     FILE* file = fopen(LAST_TIME_CHANGED_FILE_PATH, "r");
-    if (file != NULL) {
+    if (file != nullptr) {
       long long lastChangedTime = 0;
       fscanf(file, "%lld", &lastChangedTime);
       fclose(file);

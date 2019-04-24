@@ -257,7 +257,7 @@ public final class PreciseCallState implements Parcelable {
         out.writeInt(mPreciseDisconnectCause);
     }
 
-    public static final Parcelable.Creator<PreciseCallState> CREATOR
+    public static final @android.annotation.NonNull Parcelable.Creator<PreciseCallState> CREATOR
             = new Parcelable.Creator<PreciseCallState>() {
 
         public PreciseCallState createFromParcel(Parcel in) {
@@ -287,11 +287,11 @@ public final class PreciseCallState implements Parcelable {
             return false;
         }
         PreciseCallState other = (PreciseCallState) obj;
-        return (mRingingCallState != other.mRingingCallState &&
-            mForegroundCallState != other.mForegroundCallState &&
-            mBackgroundCallState != other.mBackgroundCallState &&
-            mDisconnectCause != other.mDisconnectCause &&
-            mPreciseDisconnectCause != other.mPreciseDisconnectCause);
+        return (mRingingCallState == other.mRingingCallState
+                && mForegroundCallState == other.mForegroundCallState
+                && mBackgroundCallState == other.mBackgroundCallState
+                && mDisconnectCause == other.mDisconnectCause
+                && mPreciseDisconnectCause == other.mPreciseDisconnectCause);
     }
 
     @Override

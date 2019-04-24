@@ -413,7 +413,18 @@ public final class MediaFormat {
     */
     public static final String KEY_INTRA_REFRESH_PERIOD = "intra-refresh-period";
 
-   /**
+    /**
+     * An optional key describing whether encoders prepend headers to sync frames (e.g.
+     * SPS and PPS to IDR frames for H.264). This is an optional parameter that applies only
+     * to video encoders. A video encoder may not support this feature; the component will fail
+     * to configure in that case. For other components, this key is ignored.
+     *
+     * The value is an integer, with 1 indicating to prepend headers to every sync frames,
+     * or 0 otherwise. The default value is 0.
+     */
+    public static final String KEY_PREPEND_HEADER_TO_SYNC_FRAMES = "prepend-sps-pps-to-idr-frames";
+
+    /**
      * A key describing the temporal layering schema.  This is an optional parameter
      * that applies only to video encoders.  Use {@link MediaCodec#getOutputFormat}
      * after {@link MediaCodec#configure configure} to query if the encoder supports
@@ -461,6 +472,61 @@ public final class MediaFormat {
      */
     public static final String KEY_REPEAT_PREVIOUS_FRAME_AFTER
         = "repeat-previous-frame-after";
+
+    /**
+     * Instruct the video encoder in "surface-input" mode to drop excessive
+     * frames from the source, so that the input frame rate to the encoder
+     * does not exceed the specified fps.
+     *
+     * The associated value is a float, representing the max frame rate to
+     * feed the encoder at.
+     *
+     */
+    public static final String KEY_MAX_FPS_TO_ENCODER
+        = "max-fps-to-encoder";
+
+    /**
+     * Instruct the video encoder in "surface-input" mode to limit the gap of
+     * timestamp between any two adjacent frames fed to the encoder to the
+     * specified amount (in micro-second).
+     *
+     * The associated value is a long int. When positive, it represents the max
+     * timestamp gap between two adjacent frames fed to the encoder. When negative,
+     * the absolute value represents a fixed timestamp gap between any two adjacent
+     * frames fed to the encoder. Note that this will also apply even when the
+     * original timestamp goes backward in time. Under normal conditions, such frames
+     * would be dropped and not sent to the encoder.
+     *
+     * The output timestamp will be restored to the original timestamp and will
+     * not be affected.
+     *
+     * This is used in some special scenarios where input frames arrive sparingly
+     * but it's undesirable to allocate more bits to any single frame, or when it's
+     * important to ensure all frames are captured (rather than captured in the
+     * correct order).
+     *
+     */
+    public static final String KEY_MAX_PTS_GAP_TO_ENCODER
+        = "max-pts-gap-to-encoder";
+
+    /**
+     * If specified when configuring a video encoder that's in "surface-input"
+     * mode, it will instruct the encoder to put the surface source in suspended
+     * state when it's connected. No video frames will be accepted until a resume
+     * operation (see {@link MediaCodec#PARAMETER_KEY_SUSPEND}), optionally with
+     * timestamp specified via {@link MediaCodec#PARAMETER_KEY_SUSPEND_TIME}, is
+     * received.
+     *
+     * The value is an integer, with 1 indicating to create with the surface
+     * source suspended, or 0 otherwise. The default value is 0.
+     *
+     * If this key is not set or set to 0, the surface source will accept buffers
+     * as soon as it's connected to the encoder (although they may not be encoded
+     * immediately). This key can be used when the client wants to prepare the
+     * encoder session in advance, but do not want to accept buffers immediately.
+     */
+    public static final String KEY_CREATE_INPUT_SURFACE_SUSPENDED
+        = "create-input-buffers-suspended";
 
     /**
      * If specified when configuring a video decoder rendering to a surface,
@@ -808,6 +874,12 @@ public final class MediaFormat {
      */
     public static final String KEY_IS_FORCED_SUBTITLE = "is-forced-subtitle";
 
+    /**
+     * A key describing the number of haptic channels in an audio format.
+     * The associated value is an integer.
+     */
+    public static final String KEY_HAPTIC_CHANNEL_COUNT = "haptic-channel-count";
+
     /** @hide */
     public static final String KEY_IS_TIMED_TEXT = "is-timed-text";
 
@@ -980,6 +1052,15 @@ public final class MediaFormat {
      * @hide
      */
     public static final String KEY_CA_PRIVATE_DATA = "ca-private-data";
+
+    /**
+     * A key describing the maximum number of B frames between I or P frames,
+     * to be used by a video encoder.
+     * The associated value is an integer. The default value is 0, which means
+     * that no B frames are allowed. Note that non-zero value does not guarantee
+     * B frames; it's up to the encoder to decide.
+     */
+    public static final String KEY_MAX_B_FRAMES = "max-bframes";
 
     /* package private */ MediaFormat(@NonNull Map<String, Object> map) {
         mMap = map;
@@ -1465,6 +1546,7 @@ public final class MediaFormat {
      * Create a copy of a media format object.
      */
     public MediaFormat(@NonNull MediaFormat other) {
+        this();
         mMap.putAll(other.mMap);
     }
 

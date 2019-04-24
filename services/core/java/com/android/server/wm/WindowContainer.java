@@ -45,6 +45,7 @@ import android.view.SurfaceControl;
 import android.view.SurfaceControl.Builder;
 import android.view.SurfaceSession;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.ToBooleanFunction;
 import com.android.server.wm.SurfaceAnimator.Animatable;
 
@@ -319,7 +320,7 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
         }
 
         if (mSurfaceControl != null) {
-            mPendingTransaction.reparent(mSurfaceControl, null);
+            mPendingTransaction.remove(mSurfaceControl);
 
             // Merge to parent transaction to ensure the transactions on this WindowContainer are
             // applied in native even if WindowContainer is removed.
@@ -714,6 +715,21 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
     }
 
     /**
+     * Check if this container or its parent will handle orientation changes from descendants. It's
+     * different from the return value of {@link #onDescendantOrientationChanged(IBinder,
+     * ConfigurationContainer)} in the sense that the return value of this method tells if this
+     * container or its parent will handle the request eventually, while the return value of the
+     * other method is if it handled the request synchronously.
+     *
+     * @return {@code true} if it handles or will handle orientation change in the future; {@code
+     *         false} if it won't handle the change at anytime.
+     */
+    boolean handlesOrientationChangeFromDescendant() {
+        final WindowContainer parent = getParent();
+        return parent != null && parent.handlesOrientationChangeFromDescendant();
+    }
+
+    /**
      * Calls {@link #setOrientation(int, IBinder, ActivityRecord)} with {@code null} to the last 2
      * parameters.
      *
@@ -987,7 +1003,10 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
         return p.makeChildSurface(child)
                 .setParent(mSurfaceControl);
     }
-
+    /*
+     * @return The SurfaceControl parent for this containers SurfaceControl.
+     *         The SurfaceControl must be valid if non-null.
+     */
     @Override
     public SurfaceControl getParentSurfaceControl() {
         final WindowContainer parent = getParent();
@@ -1096,17 +1115,25 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
      *
      * @param proto     Stream to write the WindowContainer object to.
      * @param fieldId   Field Id of the WindowContainer as defined in the parent message.
-     * @param trim      If true, reduce the amount of data written.
+     * @param logLevel  Determines the amount of data to be written to the Protobuf.
      * @hide
      */
     @CallSuper
     @Override
-    public void writeToProto(ProtoOutputStream proto, long fieldId, boolean trim) {
+    public void writeToProto(ProtoOutputStream proto, long fieldId,
+            @WindowTraceLogLevel int logLevel) {
+        boolean isVisible = isVisible();
+        if (logLevel == WindowTraceLogLevel.CRITICAL && !isVisible) {
+            return;
+        }
+
         final long token = proto.start(fieldId);
-        super.writeToProto(proto, CONFIGURATION_CONTAINER, trim);
+        super.writeToProto(proto, CONFIGURATION_CONTAINER, logLevel);
         proto.write(ORIENTATION, mOrientation);
-        proto.write(VISIBLE, isVisible());
-        mSurfaceAnimator.writeToProto(proto, SURFACE_ANIMATOR);
+        proto.write(VISIBLE, isVisible);
+        if (mSurfaceAnimator.isAnimating()) {
+            mSurfaceAnimator.writeToProto(proto, SURFACE_ANIMATOR);
+        }
         proto.end(token);
     }
 
@@ -1186,6 +1213,10 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
         }
     }
 
+    /**
+     * @return The SurfaceControl for this container.
+     *         The SurfaceControl must be valid if non-null.
+     */
     @Override
     public SurfaceControl getSurfaceControl() {
         return mSurfaceControl;
@@ -1268,6 +1299,7 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
      * Called when an animation has finished running.
      */
     protected void onAnimationFinished() {
+        mWmService.onAnimationFinished();
     }
 
     /**
@@ -1321,6 +1353,11 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
 
         getPendingTransaction().setPosition(mSurfaceControl, mTmpPos.x, mTmpPos.y);
         mLastSurfacePosition.set(mTmpPos.x, mTmpPos.y);
+    }
+
+    @VisibleForTesting
+    Point getLastSurfacePosition() {
+        return mLastSurfacePosition;
     }
 
     /**

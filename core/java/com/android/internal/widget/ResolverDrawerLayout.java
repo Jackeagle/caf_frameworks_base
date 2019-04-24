@@ -17,15 +17,12 @@
 
 package com.android.internal.widget;
 
-import com.android.internal.R;
-
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Rect;
-import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.metrics.LogMaker;
 import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -45,8 +42,13 @@ import android.view.animation.AnimationUtils;
 import android.widget.AbsListView;
 import android.widget.OverScroller;
 
+import com.android.internal.R;
+import com.android.internal.logging.MetricsLogger;
+import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
+
 public class ResolverDrawerLayout extends ViewGroup {
     private static final String TAG = "ResolverDrawerLayout";
+    private MetricsLogger mMetricsLogger;
 
     /**
      * Max width of the whole drawer layout
@@ -71,8 +73,14 @@ public class ResolverDrawerLayout extends ViewGroup {
      */
     private float mCollapseOffset;
 
+    /**
+      * Track fractions of pixels from drag calculations. Without this, the view offsets get
+      * out of sync due to frequently dropping fractions of a pixel from '(int) dy' casts.
+      */
+    private float mDragRemainder = 0.0f;
     private int mCollapsibleHeight;
     private int mUncollapsibleHeight;
+    private int mAlwaysShowHeight;
 
     /**
      * The height in pixels of reserved space added to the top of the collapsed UI;
@@ -482,6 +490,16 @@ public class ResolverDrawerLayout extends ViewGroup {
                 mCollapsibleHeight + mUncollapsibleHeight));
         if (newPos != mCollapseOffset) {
             dy = newPos - mCollapseOffset;
+
+            mDragRemainder += dy - (int) dy;
+            if (mDragRemainder >= 1.0f) {
+                mDragRemainder -= 1.0f;
+                dy += 1.0f;
+            } else if (mDragRemainder <= -1.0f) {
+                mDragRemainder += 1.0f;
+                dy -= 1.0f;
+            }
+
             final int childCount = getChildCount();
             for (int i = 0; i < childCount; i++) {
                 final View child = getChildAt(i);
@@ -496,7 +514,11 @@ public class ResolverDrawerLayout extends ViewGroup {
             final boolean isCollapsedNew = newPos != 0;
             if (isCollapsedOld != isCollapsedNew) {
                 onCollapsedChanged(isCollapsedNew);
+                getMetricsLogger().write(
+                        new LogMaker(MetricsEvent.ACTION_SHARESHEET_COLLAPSED_CHANGED)
+                        .setSubtype(isCollapsedNew ? 1 : 0));
             }
+            onScrollChanged(0, (int) newPos, 0, (int) (newPos - dy));
             postInvalidateOnAnimation();
             return dy;
         }
@@ -826,7 +848,7 @@ public class ResolverDrawerLayout extends ViewGroup {
             }
         }
 
-        final int alwaysShowHeight = heightUsed;
+        mAlwaysShowHeight = heightUsed;
 
         // And now the rest.
         for (int i = 0; i < childCount; i++) {
@@ -848,7 +870,7 @@ public class ResolverDrawerLayout extends ViewGroup {
 
         final int oldCollapsibleHeight = mCollapsibleHeight;
         mCollapsibleHeight = Math.max(0,
-                heightUsed - alwaysShowHeight - getMaxCollapsedHeight());
+                heightUsed - mAlwaysShowHeight - getMaxCollapsedHeight());
         mUncollapsibleHeight = heightUsed - mCollapsibleHeight;
 
         updateCollapseOffset(oldCollapsibleHeight, !isDragging());
@@ -860,6 +882,13 @@ public class ResolverDrawerLayout extends ViewGroup {
         }
 
         setMeasuredDimension(sourceWidth, heightSize);
+    }
+
+    /**
+      * @return The space reserved by views with 'alwaysShow=true'
+      */
+    public int getAlwaysShowHeight() {
+        return mAlwaysShowHeight;
     }
 
     @Override
@@ -1036,5 +1065,12 @@ public class ResolverDrawerLayout extends ViewGroup {
         public void run() {
             dispatchOnDismissed();
         }
+    }
+
+    private MetricsLogger getMetricsLogger() {
+        if (mMetricsLogger == null) {
+            mMetricsLogger = new MetricsLogger();
+        }
+        return mMetricsLogger;
     }
 }

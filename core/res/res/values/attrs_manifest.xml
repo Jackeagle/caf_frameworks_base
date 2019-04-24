@@ -119,7 +119,10 @@
 
     <!-- Option to let applications specify that user data can/cannot be
          cleared. This flag is turned on by default.
-         <em>This attribute is usable only by applications
+         <p>Starting from API level 29 this flag only controls if the user can
+         clear app data from Settings. To control clearing the data after a
+         failed restore use allowClearUserDataOnFailedRestore flag.
+         <p><em>This attribute is usable only by applications
          included in the system image. Third-party apps cannot use it.</em> -->
     <attr name="allowClearUserData" format="boolean" />
 
@@ -163,6 +166,15 @@
          Context.revokeUriPermission} when URIs are deleted from your
          provider.-->
     <attr name="grantUriPermissions" format="boolean" />
+
+    <!-- If true, the system will always create URI permission grants
+         in the cases where {@link android.content.Intent#FLAG_GRANT_READ_URI_PERMISSION}
+         or {@link android.content.Intent#FLAG_GRANT_WRITE_URI_PERMISSION} would apply.
+         This is useful for a content provider that dynamically enforces permissions
+         on calls in to the provider, instead of through the manifest: the system
+         needs to know that it should always apply permission grants, even if it
+         looks like the target of the grant would already have access to the URI. -->
+    <attr name="forceUriPermissions" format="boolean" />
 
     <!-- Characterizes the potential risk implied in a permission and
          indicates the procedure the system should follow when determining
@@ -298,13 +310,24 @@
         <!-- Set to indicate that this permission allows an operation that
              may cost the user money.  Such permissions may be highlighted
              when shown to the user with this additional information.  -->
-        <flag name="costsMoney" value="0x0001" />
+        <flag name="costsMoney" value="0x1" />
         <!-- Additional flag from base permission type: this permission has been
              removed and it is no longer enforced. It shouldn't be shown in the
              UI. Removed permissions are kept as normal permissions for backwards
              compatibility as apps may be checking them before calling an API.
         -->
         <flag name="removed" value="0x2" />
+        <!-- This permission is restricted by the platform and it would be
+             grantable only to apps that meet special criteria per platform
+             policy.
+        -->
+        <flag name="hardRestricted" value="0x4" />
+        <!-- This permission is restricted by the platform and it would be
+             grantable in its full form to apps that meet special criteria
+             per platform policy. Otherwise, a weaker form of the permission
+             would be granted. The weak grant depends on the permission.
+        -->
+        <flag name="softRestricted" value="0x8" />
     </attr>
 
     <!-- Specified the name of a group that this permission is associated
@@ -956,7 +979,7 @@
          <p>The default value of this attribute is <code>false</code>. -->
     <attr name="allowEmbedded" format="boolean" />
 
-    <!-- @hide @SystemApi Specifies whether this {@link android.app.Activity} should be shown on
+    <!-- Specifies whether this {@link android.app.Activity} should be shown on
          top of the lock screen whenever the lockscreen is up and this activity has another
          activity behind it with the {@link android.R.attr#showWhenLocked} attribute set. That
          is, this activity is only visible on the lock screen if there is another activity with
@@ -1464,6 +1487,9 @@
         <flag name="location" value="0x08" />
         <!-- Auto, bluetooth, TV or other devices connection, monitoring and interaction. -->
         <flag name="connectedDevice" value="0x10" />
+        <!-- Managing a media projection session, e.g, for screen recording or taking
+             screenshots.-->
+        <flag name="mediaProjection" value="0x20" />
     </attr>
 
 
@@ -1652,7 +1678,37 @@
         <!-- If {@code true} the user is prompted to keep the app's data on uninstall -->
         <attr name="hasFragileUserData" />
 
-	<attr name="zygotePreloadName" />
+        <attr name="zygotePreloadName" />
+
+        <!-- If {@code true} the system will clear app's data if a restore operation fails.
+             This flag is turned on by default. <em>This attribute is usable only by system apps.
+             </em> -->
+        <attr name="allowClearUserDataOnFailedRestore"/>
+        <!-- If {@code true} the app's non sensitive audio can be capture by other apps with
+             {@code AudioPlaybackCaptureConfiguration} and a {@code MediaProjection}.
+
+             <p>
+             Non sensitive audio is defined as audio whose {@code AttributeUsage} is
+             {@code USAGE_UNKNOWN}), {@code USAGE_MEDIA}) or {@code USAGE_GAME}).
+             All other usages (eg. {@code USAGE_VOICE_COMMUNICATION}) will not be captured.
+
+             <p>
+             The default value is:
+                 - {@code true} for apps with targetSdkVersion >= 29 (Q).
+                 - {@code false} for apps with targetSdkVersion < 29.
+             -->
+        <attr name="allowAudioPlaybackCapture" format="boolean" />
+        <!-- If {@code true} this app allows shared/external storage media to be
+             a sandboxed view that only contains files owned by the app.
+             <p>
+             Sandboxed apps can continue to discover and read media belonging to other
+             apps via {@code MediaStore}.
+             <p>
+             The default value is:
+                 - {@code true} for apps with targetSdkVersion >= 29 (Q).
+                 - {@code false} for apps with targetSdkVersion < 29.
+             -->
+        <attr name="allowExternalStorageSandbox" format="boolean" />
     </declare-styleable>
     <!-- The <code>permission</code> tag declares a security permission that can be
          used to control access from other packages to specific components or
@@ -1680,10 +1736,6 @@
         <attr name="request" />
         <attr name="protectionLevel" />
         <attr name="permissionFlags" />
-        <!-- If {@code true} applications that target Q <em>must</em> specify the permission usage
-             attributes in their {@code uses-permission} elements or the permission will not be
-             granted. -->
-        <attr name="usageInfoRequired" format="boolean" />
     </declare-styleable>
 
     <!-- The <code>permission-group</code> tag declares a logical grouping of
@@ -1783,81 +1835,6 @@
         requested.  If it does support the feature, it will be as if the manifest didn't
         request it at all. -->
         <attr name="requiredNotFeature" format="string" />
-
-        <!-- Specify if the app uploads data, or derived data, guarded by this permission.
-
-             If the permission is defined with {@link android.R.attr#usageInfoRequired}
-             {@code true} this <em>must</em> be specified by apps that target Android Q or the
-             permission will not be granted, it will be as if the manifest didn't request it at all.
-        -->
-        <attr name="dataSentOffDevice">
-          <!-- The application may send data, or derived data, guarded by this permission off of the
-               device. -->
-          <enum name="yes" value="1" />
-          <!-- The application may send data, or derived data, guarded by this permission off of the
-               device, however it will only do so when explicitly triggered by a user action. -->
-          <enum name="userTriggered" value="2" />
-          <!-- The application does not send data, or derived data, guarded by this permission off
-               of the device. -->
-          <enum name="no" value="3" />
-        </attr>
-
-        <!-- Specify if the application or its related off-device services provide data,
-             or derived data, guarded by this permission to third parties outside of the developer's
-             organization that do not qualify as data processors.
-
-             If the permission is defined with {@link android.R.attr#usageInfoRequired}
-             {@code true} this <em>must</em> be specified by apps that target Android Q or the
-             permission will not be granted, it will be as if the manifest didn't request it at all.
-             -->
-        <attr name="dataSharedWithThirdParty">
-          <!-- The application or its services may provide data, or derived data, guarded by this
-               permission to third party organizations. -->
-          <enum name="yes" value="1" />
-          <!-- The application or its services may provide data, or derived data, guarded by this
-               permission to third party organizations, however it will only do so when explicitly
-               triggered by a user action. -->
-          <enum name="userTriggered" value="2" />
-          <!-- The application or its services does not provide data, or derived data, guarded by
-               this permission to third party organizations. -->
-          <enum name="no" value="3" />
-        </attr>
-
-        <!-- Specify if the application or its related off-device services use data,
-             or derived data, guarded by this permission for monetization purposes.
-
-             For example, if the data is sold to another party or used for targeting advertisements
-             this must be set to {@code yes}.
-
-             If the permission is defined with {@link android.R.attr#usageInfoRequired}
-             {@code true} this <em>must</em> be specified by apps that target Android Q or the
-             permission will not be granted, it will be as if the manifest didn't request it at all.
-             -->
-        <attr name="dataUsedForMonetization">
-          <!-- The application or its services may use data, or derived data, guarded by this
-               permission for monetization purposes. -->
-          <enum name="yes" value="1" />
-          <!-- The application or its services may use data, or derived data, guarded by this
-               permission for monetization purposes, however it will only do so when explicity
-               triggered by a user action. -->
-          <enum name="userTriggered" value="2" />
-          <!--  The application or its services does not use data, or derived data, guarded by
-                this permission for monetization purposes. -->
-          <enum name="no" value="3" />
-        </attr>
-
-        <!-- Specify how long the application or its related off-device services store
-             data, or derived data, guarded by this permission.
-
-             This can be one of "notRetained", "userSelected", "unlimited", or a number
-             representing the number of weeks the data is retained.
-
-             If the permission is defined with {@link android.R.attr#usageInfoRequired}
-             {@code true} this <em>must</em> be specified by apps that target Android Q or the
-             permission will not be granted, it will be as if the manifest didn't request it at all.
-             -->
-        <attr name="dataRetentionTime" format="string" />
-
     </declare-styleable>
 
     <!-- The <code>uses-configuration</code> tag specifies
@@ -2055,7 +2032,9 @@
          {@link #AndroidManifestApplication application} tag. -->
     <declare-styleable name="AndroidManifestUsesPackage" parent="AndroidManifestApplication">
         <!-- Required type of association with the package, for example "android.package.ad_service"
-             if it provides an advertising service. -->
+             if it provides an advertising service.  This should use the standard scoped naming
+             convention as used for other things such as package names, based on the Java naming
+             convention. -->
         <attr name="packageType" format="string" />
         <!-- Required name of the package you use. -->
         <attr name="name" />
@@ -2199,6 +2178,7 @@
         <attr name="readPermission" />
         <attr name="writePermission" />
         <attr name="grantUriPermissions" />
+        <attr name="forceUriPermissions" />
         <attr name="permission" />
         <attr name="multiprocess" />
         <attr name="initOrder" />

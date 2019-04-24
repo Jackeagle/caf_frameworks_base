@@ -13,6 +13,7 @@
  */
 package com.android.systemui.plugins;
 
+import android.graphics.Bitmap;
 import android.graphics.Paint.Style;
 import android.view.View;
 
@@ -21,13 +22,41 @@ import com.android.systemui.plugins.annotations.ProvidesInterface;
 import java.util.TimeZone;
 
 /**
- * This plugin is used to replace main clock in keyguard.
+ * Plugin used to replace main clock in keyguard.
  */
 @ProvidesInterface(action = ClockPlugin.ACTION, version = ClockPlugin.VERSION)
 public interface ClockPlugin extends Plugin {
 
     String ACTION = "com.android.systemui.action.PLUGIN_CLOCK";
-    int VERSION = 1;
+    int VERSION = 4;
+
+    /**
+     * Get the name of the clock face.
+     *
+     * This name should not be translated.
+     */
+    String getName();
+
+    /**
+     * Get the title of the clock face to be shown in the picker app.
+     */
+    String getTitle();
+
+    /**
+     * Get thumbnail of clock face to be shown in the picker app.
+     */
+    Bitmap getThumbnail();
+
+    /**
+     * Get preview images of clock face to be shown in the picker app.
+     *
+     * Preview image should be realistic and show what the clock face will look like on AOD and lock
+     * screen.
+     *
+     * @param width width of the preview image, should be the same as device width in pixels.
+     * @param height height of the preview image, should be the same as device height in pixels.
+     */
+    Bitmap getPreview(int width, int height);
 
     /**
      * Get clock view.
@@ -43,6 +72,14 @@ public interface ClockPlugin extends Plugin {
     }
 
     /**
+     * Allows the plugin to clean up resources when no longer needed.
+     *
+     * Called when the view previously created by {@link ClockPlugin#getView()} has been detached
+     * from the view hierarchy.
+     */
+    void onDestroyView();
+
+    /**
      * Set clock paint style.
      * @param style The new style to set in the paint.
      */
@@ -55,9 +92,11 @@ public interface ClockPlugin extends Plugin {
     void setTextColor(int color);
 
     /**
-     * Notifies that time tick alarm from doze service fired.
+     * Sets the color palette for the clock face.
+     * @param supportsDarkText Whether dark text can be displayed.
+     * @param colors Colors that should be used on the clock face, ordered from darker to lighter.
      */
-    default void dozeTimeTick() { }
+    default void setColorPalette(boolean supportsDarkText, int[] colors) {}
 
     /**
      * Set the amount (ratio) that the device has transitioned to doze.
@@ -66,7 +105,16 @@ public interface ClockPlugin extends Plugin {
     default void setDarkAmount(float darkAmount) {}
 
     /**
+     * Notifies that time tick alarm from doze service fired.
+     *
+     * Implement this method instead of registering a broadcast listener for TIME_TICK.
+     */
+    default void onTimeTick() {}
+
+    /**
      * Notifies that the time zone has changed.
+     *
+     * Implement this method instead of registering a broadcast listener for TIME_ZONE_CHANGED.
      */
     default void onTimeZoneChanged(TimeZone timeZone) {}
 

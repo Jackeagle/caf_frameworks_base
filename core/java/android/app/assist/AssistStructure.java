@@ -3,6 +3,7 @@ package android.app.assist;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SystemApi;
+import android.annotation.TestApi;
 import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Context;
@@ -715,9 +716,10 @@ public class AssistStructure implements Parcelable {
         ViewNode[] mChildren;
 
         // TODO(b/111276913): temporarily made public / @hide until we decide what will be used by
-        // ScreenObservation.
+        // COntent Capture.
         /** @hide */
         @SystemApi
+        @TestApi
         public ViewNode() {
         }
 
@@ -2072,7 +2074,7 @@ public class AssistStructure implements Parcelable {
         }
 
         @SuppressWarnings("hiding")
-        public static final Creator<HtmlInfoNode> CREATOR = new Creator<HtmlInfoNode>() {
+        public static final @android.annotation.NonNull Creator<HtmlInfoNode> CREATOR = new Creator<HtmlInfoNode>() {
             @Override
             public HtmlInfoNode createFromParcel(Parcel parcel) {
                 // Always go through the builder to ensure the data ingested by
@@ -2428,7 +2430,7 @@ public class AssistStructure implements Parcelable {
         }
     }
 
-    public static final Parcelable.Creator<AssistStructure> CREATOR
+    public static final @android.annotation.NonNull Parcelable.Creator<AssistStructure> CREATOR
             = new Parcelable.Creator<AssistStructure>() {
         @Override
         public AssistStructure createFromParcel(Parcel in) {

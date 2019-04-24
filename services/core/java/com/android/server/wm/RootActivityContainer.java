@@ -114,6 +114,7 @@ import com.android.server.LocalServices;
 import com.android.server.am.ActivityManagerService;
 import com.android.server.am.AppTimeTracker;
 import com.android.server.am.UserState;
+import com.android.server.policy.WindowManagerPolicy;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -174,12 +175,6 @@ class RootActivityContainer extends ConfigurationContainer
     /** Reference to default display so we can quickly look it up. */
     private ActivityDisplay mDefaultDisplay;
     private final SparseArray<IntArray> mDisplayAccessUIDs = new SparseArray<>();
-
-    /**
-     * Cached value of the topmost resumed activity in the system. Updated when new activity is
-     * resumed.
-     */
-    private ActivityRecord mTopResumedActivity;
 
     /** The current user */
     int mCurrentUser;
@@ -300,7 +295,7 @@ class RootActivityContainer extends ConfigurationContainer
      * corresponding record in display manager.
      */
     // TODO: Look into consolidating with getActivityDisplay()
-    ActivityDisplay getActivityDisplayOrCreate(int displayId) {
+    @Nullable ActivityDisplay getActivityDisplayOrCreate(int displayId) {
         ActivityDisplay activityDisplay = getActivityDisplay(displayId);
         if (activityDisplay != null) {
             return activityDisplay;
@@ -351,6 +346,11 @@ class RootActivityContainer extends ConfigurationContainer
         }
     }
 
+    boolean startHomeOnDisplay(int userId, String reason, int displayId) {
+        return startHomeOnDisplay(userId, reason, displayId, false /* allowInstrumenting */,
+                false /* fromHomeKey */);
+    }
+
     /**
      * This starts home activity on displays that can have system decorations based on displayId -
      * Default display always use primary home component.
@@ -362,12 +362,20 @@ class RootActivityContainer extends ConfigurationContainer
      *    If there are multiple activities matched, use first one.
      *  - Use the secondary home defined in the config.
      */
-    boolean startHomeOnDisplay(int userId, String reason, int displayId) {
+    boolean startHomeOnDisplay(int userId, String reason, int displayId, boolean allowInstrumenting,
+            boolean fromHomeKey) {
+        // Fallback to top focused display if the displayId is invalid.
+        if (displayId == INVALID_DISPLAY) {
+            displayId = getTopDisplayFocusedStack().mDisplayId;
+        }
+
         Intent homeIntent;
         ActivityInfo aInfo;
         if (displayId == DEFAULT_DISPLAY) {
             homeIntent = mService.getHomeIntent();
             aInfo = resolveHomeActivity(userId, homeIntent);
+        } else if (!mService.mSupportsMultiDisplay) {
+            return false;
         } else {
             Pair<ActivityInfo, Intent> info = resolveSecondaryHomeActivity(userId, displayId);
             aInfo = info.first;
@@ -377,13 +385,17 @@ class RootActivityContainer extends ConfigurationContainer
             return false;
         }
 
-        if (!canStartHomeOnDisplay(aInfo, displayId, false /* allowInstrumenting */)) {
+        if (!canStartHomeOnDisplay(aInfo, displayId, allowInstrumenting)) {
             return false;
         }
 
         // Updates the home component of the intent.
         homeIntent.setComponent(new ComponentName(aInfo.applicationInfo.packageName, aInfo.name));
         homeIntent.setFlags(homeIntent.getFlags() | FLAG_ACTIVITY_NEW_TASK);
+        // Updates the extra information of the intent.
+        if (fromHomeKey) {
+            homeIntent.putExtra(WindowManagerPolicy.EXTRA_FROM_HOME_KEY, true);
+        }
         // Update the reason for ANR debugging to verify if the user activity is the one that
         // actually launched.
         final String myReason = reason + ":" + userId + ":" + UserHandle.getUserId(
@@ -548,6 +560,11 @@ class RootActivityContainer extends ConfigurationContainer
                 && displayId == mService.mVr2dDisplayId)) {
             // No restrictions to default display or vr 2d display.
             return true;
+        }
+
+        if (displayId != DEFAULT_DISPLAY && !mService.mSupportsMultiDisplay) {
+            // Can't launch home on secondary display if device not support multi-display.
+            return false;
         }
 
         final boolean deviceProvisioned = Settings.Global.getInt(
@@ -1126,6 +1143,13 @@ class RootActivityContainer extends ConfigurationContainer
                 if (!stack.isFocusableAndVisible() || topRunningActivity == null) {
                     continue;
                 }
+                if (stack == targetStack) {
+                    // Simply update the result for targetStack because the targetStack had
+                    // already resumed in above. We don't want to resume it again, especially in
+                    // some cases, it would cause a second launch failure if app process was dead.
+                    resumedOnDisplay |= result;
+                    continue;
+                }
                 if (topRunningActivity.isState(RESUMED)) {
                     // Kick off any lingering app transitions form the MoveTaskToFront operation.
                     stack.executeAppTransition(targetOptions);
@@ -1146,23 +1170,6 @@ class RootActivityContainer extends ConfigurationContainer
         }
 
         return result;
-    }
-
-    void updateTopResumedActivityIfNeeded() {
-        final ActivityRecord prevTopActivity = mTopResumedActivity;
-        final ActivityStack topStack = getTopDisplayFocusedStack();
-        if (topStack == null || topStack.mResumedActivity == prevTopActivity) {
-            return;
-        }
-        // Clear previous top state
-        if (prevTopActivity != null) {
-            prevTopActivity.scheduleTopResumedActivityChanged(false /* onTop */);
-        }
-        // Update the current top activity
-        mTopResumedActivity = topStack.mResumedActivity;
-        if (mTopResumedActivity != null) {
-            mTopResumedActivity.scheduleTopResumedActivityChanged(true /* onTop */);
-        }
     }
 
     void applySleepTokens(boolean applyToStacks) {
@@ -1317,6 +1324,9 @@ class RootActivityContainer extends ConfigurationContainer
         if (DEBUG_STACK) Slog.v(TAG, "Display added displayId=" + displayId);
         synchronized (mService.mGlobalLock) {
             final ActivityDisplay display = getActivityDisplayOrCreate(displayId);
+            if (display == null) {
+                return;
+            }
             // Do not start home before booting, or it may accidentally finish booting before it
             // starts. Instead, we expect home activities to be launched when the system is ready
             // (ActivityManagerService#systemReady).
@@ -1424,7 +1434,7 @@ class RootActivityContainer extends ConfigurationContainer
             mActivityDisplays.remove(display);
             mActivityDisplays.add(position, display);
         }
-        updateTopResumedActivityIfNeeded();
+        mStackSupervisor.updateTopResumedActivityIfNeeded();
     }
 
     @VisibleForTesting
@@ -2029,8 +2039,7 @@ class RootActivityContainer extends ConfigurationContainer
                 final ActivityStack stack = display.getChildAt(stackNdx);
                 final ActivityRecord r = stack.getResumedActivity();
                 if (r != null) {
-                    if (!r.nowVisible
-                            || mStackSupervisor.mActivitiesWaitingForVisibleActivity.contains(r)) {
+                    if (!r.nowVisible) {
                         return false;
                     }
                     foundResumed = true;
@@ -2358,10 +2367,6 @@ class RootActivityContainer extends ConfigurationContainer
         printed |= dumpHistoryList(fd, pw, mStackSupervisor.mStoppingActivities, "  ",
                 "Stop", false, !dumpAll,
                 false, dumpPackage, true, "  Activities waiting to stop:", null);
-        printed |= dumpHistoryList(fd, pw,
-                mStackSupervisor.mActivitiesWaitingForVisibleActivity, "  ", "Wait",
-                false, !dumpAll, false, dumpPackage, true,
-                "  Activities waiting for another to become visible:", null);
         printed |= dumpHistoryList(fd, pw, mStackSupervisor.mGoingToSleepActivities,
                 "  ", "Sleep", false, !dumpAll,
                 false, dumpPackage, true, "  Activities waiting to sleep:", null);
@@ -2369,12 +2374,13 @@ class RootActivityContainer extends ConfigurationContainer
         return printed;
     }
 
-    void writeToProto(ProtoOutputStream proto, long fieldId) {
+    protected void writeToProto(ProtoOutputStream proto, long fieldId,
+            @WindowTraceLogLevel int logLevel) {
         final long token = proto.start(fieldId);
-        super.writeToProto(proto, CONFIGURATION_CONTAINER, false /* trim */);
+        super.writeToProto(proto, CONFIGURATION_CONTAINER, logLevel);
         for (int displayNdx = 0; displayNdx < mActivityDisplays.size(); ++displayNdx) {
             final ActivityDisplay activityDisplay = mActivityDisplays.get(displayNdx);
-            activityDisplay.writeToProto(proto, DISPLAYS);
+            activityDisplay.writeToProto(proto, DISPLAYS, logLevel);
         }
         mStackSupervisor.getKeyguardController().writeToProto(proto, KEYGUARD_CONTROLLER);
         // TODO(b/111541062): Update tests to look for resumed activities on all displays

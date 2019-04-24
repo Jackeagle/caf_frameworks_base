@@ -191,9 +191,9 @@ public class Resources {
 
     /**
      * Return a global shared Resources object that provides access to only
-     * system resources (no application resources), and is not configured for
-     * the current screen (can not use dimension units, does not change based
-     * on orientation, etc).
+     * system resources (no application resources), is not configured for the
+     * current screen (can not use dimension units, does not change based on
+     * orientation, etc), and is not affected by Runtime Resource Overlay.
      */
     public static Resources getSystem() {
         synchronized (sSync) {
@@ -1396,9 +1396,11 @@ public class Resources {
 
 
     /**
+     * Returns the resource ID of the resource that was used to create this AttributeSet.
+     *
      * @param set AttributeSet for which we want to find the source.
-     * @return The resource id for the source that is backing the given AttributeSet
-     * @hide
+     * @return The resource ID for the source that is backing the given AttributeSet or
+     * {@link Resources#ID_NULL} if the AttributeSet is {@code null}.
      */
     @AnyRes
     public static int getAttributeSetSourceResId(@Nullable AttributeSet set) {
@@ -1719,11 +1721,77 @@ public class Resources {
          * Rebases the theme against the parent Resource object's current
          * configuration by re-applying the styles passed to
          * {@link #applyStyle(int, boolean)}.
-         *
-         * @hide
          */
         public void rebase() {
             mThemeImpl.rebase();
+        }
+
+        /**
+         * Returns the resource ID for the style specified using {@code style="..."} in the
+         * {@link AttributeSet}'s backing XML element or {@link Resources#ID_NULL} otherwise if not
+         * specified or otherwise not applicable.
+         * <p>
+         * Each {@link android.view.View} can have an explicit style specified in the layout file.
+         * This style is used first during the {@link android.view.View} attribute resolution, then
+         * if an attribute is not defined there the resource system looks at default style and theme
+         * as fallbacks.
+         *
+         * @param set The base set of attribute values.
+         *
+         * @return The resource ID for the style specified using {@code style="..."} in the
+         *      {@link AttributeSet}'s backing XML element or {@link Resources#ID_NULL} otherwise
+         *      if not specified or otherwise not applicable.
+         */
+        @StyleRes
+        public int getExplicitStyle(@Nullable AttributeSet set) {
+            if (set == null) {
+                return ID_NULL;
+            }
+            int styleAttr = set.getStyleAttribute();
+            if (styleAttr == ID_NULL) {
+                return ID_NULL;
+            }
+            String styleAttrType = getResources().getResourceTypeName(styleAttr);
+            if ("attr".equals(styleAttrType)) {
+                TypedValue explicitStyle = new TypedValue();
+                boolean resolved = resolveAttribute(styleAttr, explicitStyle, true);
+                if (resolved) {
+                    return explicitStyle.resourceId;
+                }
+            } else if ("style".equals(styleAttrType)) {
+                return styleAttr;
+            }
+            return ID_NULL;
+        }
+
+        /**
+         * Returns the ordered list of resource ID that are considered when resolving attribute
+         * values when making an equivalent call to
+         * {@link #obtainStyledAttributes(AttributeSet, int[], int, int)} . The list will include
+         * a set of explicit styles ({@code explicitStyleRes} and it will include the default styles
+         * ({@code defStyleAttr} and {@code defStyleRes}).
+         *
+         * @param defStyleAttr An attribute in the current theme that contains a
+         *                     reference to a style resource that supplies
+         *                     defaults values for the TypedArray.  Can be
+         *                     0 to not look for defaults.
+         * @param defStyleRes A resource identifier of a style resource that
+         *                    supplies default values for the TypedArray,
+         *                    used only if defStyleAttr is 0 or can not be found
+         *                    in the theme.  Can be 0 to not look for defaults.
+         * @param explicitStyleRes A resource identifier of an explicit style resource.
+         * @return ordered list of resource ID that are considered when resolving attribute values.
+         */
+        @NonNull
+        public int[] getAttributeResolutionStack(@AttrRes int defStyleAttr,
+                @StyleRes int defStyleRes, @StyleRes int explicitStyleRes) {
+            int[] stack = mThemeImpl.getAttributeResolutionStack(
+                    defStyleAttr, defStyleRes, explicitStyleRes);
+            if (stack == null) {
+                return new int[0];
+            } else {
+                return stack;
+            }
         }
     }
 

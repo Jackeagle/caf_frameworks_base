@@ -40,6 +40,7 @@ import static com.android.server.am.ActivityDisplayProto.RESUMED_ACTIVITY;
 import static com.android.server.am.ActivityDisplayProto.SINGLE_TASK_INSTANCE;
 import static com.android.server.am.ActivityDisplayProto.STACKS;
 import static com.android.server.wm.ActivityStack.ActivityState.RESUMED;
+import static com.android.server.wm.ActivityStack.STACK_VISIBILITY_VISIBLE;
 import static com.android.server.wm.ActivityStackSupervisor.TAG_TASKS;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_STACK;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_STATES;
@@ -123,6 +124,13 @@ class ActivityDisplay extends ConfigurationContainer<ActivityStack>
 
     /** The display can only contain one task. */
     private boolean mSingleTaskInstance;
+
+    /**
+     * Non-null if the last size compatibility mode activity is using non-native screen
+     * configuration. The activity is not able to put in multi-window mode, so it exists only one
+     * per display.
+     */
+    private ActivityRecord mLastCompatModeActivity;
 
     /**
      * A focusable stack that is purposely to be positioned at the top. Although the stack may not
@@ -575,7 +583,8 @@ class ActivityDisplay extends ConfigurationContainer<ActivityStack>
             final ActivityStack stack = mStacks.get(stackNdx);
             final ActivityRecord resumedActivity = stack.getResumedActivity();
             if (resumedActivity != null
-                    && (!stack.shouldBeVisible(resuming) || !stack.isFocusable())) {
+                    && (stack.getVisibility(resuming) != STACK_VISIBILITY_VISIBLE
+                        || !stack.isFocusable())) {
                 if (DEBUG_STATES) Slog.d(TAG_STATES, "pauseBackStacks: stack=" + stack +
                         " mResumedActivity=" + resumedActivity);
                 someActivityPaused |= stack.startPausingLocked(userLeaving, false, resuming,
@@ -1030,6 +1039,28 @@ class ActivityDisplay extends ConfigurationContainer<ActivityStack>
         mSplitScreenPrimaryStack = null;
     }
 
+    /** Checks whether the given activity is in size compatibility mode and notifies the change. */
+    void handleActivitySizeCompatModeIfNeeded(ActivityRecord r) {
+        if (!r.isState(RESUMED) || r.getWindowingMode() != WINDOWING_MODE_FULLSCREEN) {
+            // The callback is only interested in the foreground changes of fullscreen activity.
+            return;
+        }
+        if (!r.inSizeCompatMode()) {
+            if (mLastCompatModeActivity != null) {
+                mService.getTaskChangeNotificationController()
+                        .notifySizeCompatModeActivityChanged(mDisplayId, null /* activityToken */);
+            }
+            mLastCompatModeActivity = null;
+            return;
+        }
+        if (mLastCompatModeActivity == r) {
+            return;
+        }
+        mLastCompatModeActivity = r;
+        mService.getTaskChangeNotificationController()
+                .notifySizeCompatModeActivityChanged(mDisplayId, r.appToken);
+    }
+
     ActivityStack getSplitScreenPrimaryStack() {
         return mSplitScreenPrimaryStack;
     }
@@ -1142,7 +1173,17 @@ class ActivityDisplay extends ConfigurationContainer<ActivityStack>
     }
 
     private void releaseSelfIfNeeded() {
-        if (mStacks.isEmpty() && mRemoved) {
+        if (!mRemoved || mDisplayContent == null) {
+            return;
+        }
+
+        final ActivityStack stack = mStacks.size() == 1 ? mStacks.get(0) : null;
+        if (stack != null && stack.isActivityTypeHome() && stack.getAllTasks().isEmpty()) {
+            // Release this display if an empty home stack is the only thing left.
+            // Since it is the last stack, this display will be released along with the stack
+            // removal.
+            stack.remove();
+        } else if (mStacks.isEmpty()) {
             mDisplayContent.removeIfPossible();
             mDisplayContent = null;
             mRootActivityContainer.removeChild(this);
@@ -1436,9 +1477,10 @@ class ActivityDisplay extends ConfigurationContainer<ActivityStack>
         }
     }
 
-    public void writeToProto(ProtoOutputStream proto, long fieldId) {
+    public void writeToProto(ProtoOutputStream proto, long fieldId,
+            @WindowTraceLogLevel int logLevel) {
         final long token = proto.start(fieldId);
-        super.writeToProto(proto, CONFIGURATION_CONTAINER, false /* trim */);
+        super.writeToProto(proto, CONFIGURATION_CONTAINER, logLevel);
         proto.write(ID, mDisplayId);
         proto.write(SINGLE_TASK_INSTANCE, mSingleTaskInstance);
         final ActivityStack focusedStack = getFocusedStack();
@@ -1453,7 +1495,7 @@ class ActivityDisplay extends ConfigurationContainer<ActivityStack>
         }
         for (int stackNdx = mStacks.size() - 1; stackNdx >= 0; --stackNdx) {
             final ActivityStack stack = mStacks.get(stackNdx);
-            stack.writeToProto(proto, STACKS);
+            stack.writeToProto(proto, STACKS, logLevel);
         }
         proto.end(token);
     }

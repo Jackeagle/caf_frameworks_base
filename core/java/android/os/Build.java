@@ -22,6 +22,7 @@ import android.annotation.RequiresPermission;
 import android.annotation.SuppressAutoDoc;
 import android.annotation.SystemApi;
 import android.annotation.TestApi;
+import android.annotation.UnsupportedAppUsage;
 import android.app.ActivityThread;
 import android.app.Application;
 import android.content.Context;
@@ -107,6 +108,7 @@ public class Build {
      * Whether this build was for an emulator device.
      * @hide
      */
+    @TestApi
     public static final boolean IS_EMULATOR = getString("ro.kernel.qemu").equals("1");
 
     /**
@@ -305,7 +307,7 @@ public class Build {
          * @hide
          */
         @SystemApi
-        public static final String PREVIEW_SDK_FINGERPRINT = SystemProperties.get(
+        @NonNull public static final String PREVIEW_SDK_FINGERPRINT = SystemProperties.get(
                 "ro.build.version.preview_sdk_fingerprint", "REL");
 
         /**
@@ -320,6 +322,7 @@ public class Build {
         /**
          * @hide
          */
+        @UnsupportedAppUsage
         public static final String[] ACTIVE_CODENAMES = "REL".equals(ALL_CODENAMES[0])
                 ? new String[0] : ALL_CODENAMES;
 
@@ -1120,11 +1123,9 @@ public class Build {
         /** The name identifying the system partition. */
         public static final String PARTITION_NAME_SYSTEM = "system";
 
-        private String mName;
-        private String mFingerprint;
-        private long mTimeMs;
-
-        public Partition() {}
+        private final String mName;
+        private final String mFingerprint;
+        private final long mTimeMs;
 
         private Partition(String name, String fingerprint, long timeMs) {
             mName = name;
@@ -1203,6 +1204,7 @@ public class Build {
      * Returns true if we are running a debug build such as "user-debug" or "eng".
      * @hide
      */
+    @UnsupportedAppUsage
     public static final boolean IS_DEBUGGABLE =
             SystemProperties.getInt("ro.debuggable", 0) == 1;
 
@@ -1250,6 +1252,7 @@ public class Build {
         return TextUtils.isEmpty(propVal) ? null : propVal;
     }
 
+    @UnsupportedAppUsage
     private static String getString(String property) {
         return SystemProperties.get(property, UNKNOWN);
     }
@@ -1263,6 +1266,7 @@ public class Build {
         }
     }
 
+    @UnsupportedAppUsage
     private static long getLong(String property) {
         try {
             return Long.parseLong(SystemProperties.get(property));

@@ -33,8 +33,10 @@
         android:protectionLevel="signature" />
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Used to read wallpaper -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
     <!-- Used to read storage for all users -->
     <uses-permission android:name="android.permission.WRITE_MEDIA_STORAGE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -42,6 +44,7 @@
     <uses-permission android:name="android.permission.INJECT_EVENTS" />
     <uses-permission android:name="android.permission.DUMP" />
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+    <uses-permission android:name="android.permission.READ_DEVICE_CONFIG" />
 
     <uses-permission android:name="android.permission.STATUS_BAR_SERVICE" />
     <uses-permission android:name="android.permission.STATUS_BAR" />
@@ -109,6 +112,7 @@
     <uses-permission android:name="android.permission.REGISTER_WINDOW_MANAGER_LISTENERS" />
     <uses-permission android:name="android.permission.SET_ORIENTATION" />
     <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
+    <uses-permission android:name="android.permission.MONITOR_INPUT" />
 
     <!-- DreamManager -->
     <uses-permission android:name="android.permission.READ_DREAM_STATE" />
@@ -131,8 +135,10 @@
     <uses-permission android:name="android.permission.USE_BIOMETRIC_INTERNAL" />
     <uses-permission android:name="android.permission.USE_FINGERPRINT" />
     <uses-permission android:name="android.permission.RESET_FINGERPRINT_LOCKOUT" />
+    <uses-permission android:name="android.permission.MANAGE_BIOMETRIC" />
     <uses-permission android:name="android.permission.MANAGE_SLICE_PERMISSIONS" />
     <uses-permission android:name="android.permission.CONTROL_KEYGUARD_SECURE_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.GET_RUNTIME_PERMISSIONS" />
 
     <!-- Needed for WallpaperManager.clear in ImageWallpaper.updateWallpaperLocked -->
     <uses-permission android:name="android.permission.SET_WALLPAPER"/>
@@ -435,7 +441,7 @@
         <activity
             android:name=".media.MediaProjectionPermissionActivity"
             android:exported="true"
-            android:theme="@style/Theme.AlertDialogHost"
+            android:theme="@style/Theme.MediaProjectionAlertDialog"
             android:finishOnCloseSystemDialogs="true"
             android:launchMode="singleTop"
             android:excludeFromRecents="true"
@@ -629,6 +635,14 @@
                   android:authorities="com.android.systemui.keyguard"
                   android:grantUriPermissions="true"
                   android:exported="true">
+        </provider>
+
+        <!-- Provides list and realistic previews of clock faces for the picker app. -->
+        <provider
+            android:name="com.android.keyguard.clock.ClockOptionsProvider"
+            android:authorities="com.android.keyguard.clock"
+            android:exported="true"
+            android:grantUriPermissions="true">
         </provider>
 
         <receiver

@@ -21,8 +21,10 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.TestApi;
 import android.annotation.UnsupportedAppUsage;
+import android.content.AutofillOptions;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
+import android.content.ContentCaptureOptions;
 import android.content.ContentProvider;
 import android.content.ContentResolver;
 import android.content.Context;
@@ -100,6 +102,7 @@ import java.util.Objects;
 import java.util.concurrent.Executor;
 
 class ReceiverRestrictedContext extends ContextWrapper {
+    @UnsupportedAppUsage
     ReceiverRestrictedContext(Context base) {
         super(base);
     }
@@ -142,10 +145,17 @@ class ReceiverRestrictedContext extends ContextWrapper {
     }
 
     @Override
-    public boolean bindIsolatedService(Intent service, ServiceConnection conn, int flags,
-            String instanceName) {
+    public boolean bindService(
+          Intent service, int flags, Executor executor, ServiceConnection conn) {
         throw new ReceiverCallNotAllowedException(
-                "BroadcastReceiver components are not allowed to bind to services");
+            "BroadcastReceiver components are not allowed to bind to services");
+    }
+
+    @Override
+    public boolean bindIsolatedService(Intent service, int flags, String instanceName,
+            Executor executor, ServiceConnection conn) {
+        throw new ReceiverCallNotAllowedException(
+            "BroadcastReceiver components are not allowed to bind to services");
     }
 }
 
@@ -214,10 +224,10 @@ class ContextImpl extends Context {
     // The name of the split this Context is representing. May be null.
     private @Nullable String mSplitName = null;
 
-    private AutofillClient mAutofillClient = null;
-    private boolean mIsAutofillCompatEnabled;
+    private @Nullable AutofillClient mAutofillClient = null;
+    private @Nullable AutofillOptions mAutofillOptions;
 
-    private boolean mIsContentCaptureSupported = false;
+    private ContentCaptureOptions mContentCaptureOptions = null;
 
     private final Object mSync = new Object();
 
@@ -1080,7 +1090,6 @@ class ContextImpl extends Context {
     @Override
     public void sendBroadcastAsUserMultiplePermissions(Intent intent, UserHandle user,
             String[] receiverPermissions) {
-        warnIfCallingFromSystemProcess();
         String resolvedType = intent.resolveTypeIfNeeded(getContentResolver());
         try {
             intent.prepareToLeaveProcess(this);
@@ -1636,28 +1645,34 @@ class ContextImpl extends Context {
     }
 
     @Override
-    public boolean bindService(Intent service, ServiceConnection conn,
-            int flags) {
+    public boolean bindService(Intent service, ServiceConnection conn, int flags) {
         warnIfCallingFromSystemProcess();
-        return bindServiceCommon(service, conn, flags, null, mMainThread.getHandler(), getUser());
+        return bindServiceCommon(service, conn, flags, null, mMainThread.getHandler(), null,
+                getUser());
     }
 
     @Override
-    public boolean bindIsolatedService(Intent service, ServiceConnection conn,
-            int flags, String instanceName) {
+    public boolean bindService(
+            Intent service, int flags, Executor executor, ServiceConnection conn) {
+        warnIfCallingFromSystemProcess();
+        return bindServiceCommon(service, conn, flags, null, null, executor, getUser());
+    }
+
+    @Override
+    public boolean bindIsolatedService(Intent service, int flags, String instanceName,
+            Executor executor, ServiceConnection conn) {
         warnIfCallingFromSystemProcess();
         if (instanceName == null) {
             throw new NullPointerException("null instanceName");
         }
-        return bindServiceCommon(service, conn, flags, instanceName, mMainThread.getHandler(),
-                getUser());
+        return bindServiceCommon(service, conn, flags, instanceName, null, executor, getUser());
     }
 
     /** @hide */
     @Override
     public boolean bindServiceAsUser(Intent service, ServiceConnection conn, int flags,
             UserHandle user) {
-        return bindServiceCommon(service, conn, flags, null, mMainThread.getHandler(), user);
+        return bindServiceCommon(service, conn, flags, null, mMainThread.getHandler(), null, user);
     }
 
     /** @hide */
@@ -1667,7 +1682,7 @@ class ContextImpl extends Context {
         if (handler == null) {
             throw new IllegalArgumentException("handler must not be null.");
         }
-        return bindServiceCommon(service, conn, flags, null, handler, user);
+        return bindServiceCommon(service, conn, flags, null, handler, null, user);
     }
 
     /** @hide */
@@ -1690,15 +1705,21 @@ class ContextImpl extends Context {
     }
 
     private boolean bindServiceCommon(Intent service, ServiceConnection conn, int flags,
-            String instanceName, Handler
-            handler, UserHandle user) {
+            String instanceName, Handler handler, Executor executor, UserHandle user) {
         // Keep this in sync with DevicePolicyManager.bindDeviceAdminServiceAsUser.
         IServiceConnection sd;
         if (conn == null) {
             throw new IllegalArgumentException("connection is null");
         }
+        if (handler != null && executor != null) {
+            throw new IllegalArgumentException("Handler and Executor both supplied");
+        }
         if (mPackageInfo != null) {
-            sd = mPackageInfo.getServiceDispatcher(conn, getOuterContext(), handler, flags);
+            if (executor != null) {
+                sd = mPackageInfo.getServiceDispatcher(conn, getOuterContext(), executor, flags);
+            } else {
+                sd = mPackageInfo.getServiceDispatcher(conn, getOuterContext(), handler, flags);
+            }
         } else {
             throw new RuntimeException("Not supported in system context");
         }
@@ -2277,8 +2298,8 @@ class ContextImpl extends Context {
         return (mFlags & Context.CONTEXT_IGNORE_SECURITY) != 0;
     }
 
+    @TestApi
     @Override
-    @UnsupportedAppUsage
     public Display getDisplay() {
         if (mDisplay == null) {
             return mResourcesManager.getAdjustedDisplay(Display.DEFAULT_DISPLAY,
@@ -2370,27 +2391,26 @@ class ContextImpl extends Context {
 
     /** @hide */
     @Override
-    public boolean isAutofillCompatibilityEnabled() {
-        return mIsAutofillCompatEnabled;
-    }
-
-    /** @hide */
-    @TestApi
-    @Override
-    public void setAutofillCompatibilityEnabled(boolean autofillCompatEnabled) {
-        mIsAutofillCompatEnabled = autofillCompatEnabled;
+    public AutofillOptions getAutofillOptions() {
+        return mAutofillOptions;
     }
 
     /** @hide */
     @Override
-    public boolean isContentCaptureSupported() {
-        return mIsContentCaptureSupported;
+    public void setAutofillOptions(AutofillOptions options) {
+        mAutofillOptions = options;
     }
 
     /** @hide */
     @Override
-    public void setContentCaptureSupported(boolean supported) {
-        mIsContentCaptureSupported = supported;
+    public ContentCaptureOptions getContentCaptureOptions() {
+        return mContentCaptureOptions;
+    }
+
+    /** @hide */
+    @Override
+    public void setContentCaptureOptions(ContentCaptureOptions options) {
+        mContentCaptureOptions = options;
     }
 
     @UnsupportedAppUsage

@@ -29,6 +29,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -41,6 +42,7 @@ import android.app.Notification;
 import android.app.StatusBarManager;
 import android.app.trust.TrustManager;
 import android.content.Context;
+import android.hardware.display.AmbientDisplayConfiguration;
 import android.hardware.fingerprint.FingerprintManager;
 import android.metrics.LogMaker;
 import android.os.Binder;
@@ -52,13 +54,14 @@ import android.os.RemoteException;
 import android.os.UserHandle;
 import android.service.dreams.IDreamManager;
 import android.service.notification.StatusBarNotification;
-import android.support.test.filters.SmallTest;
 import android.support.test.metricshelper.MetricsAsserts;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
 import android.testing.TestableLooper.RunWithLooper;
 import android.util.SparseArray;
 import android.view.ViewGroup.LayoutParams;
+
+import androidx.test.filters.SmallTest;
 
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
@@ -73,7 +76,6 @@ import com.android.systemui.SystemUIFactory;
 import com.android.systemui.SysuiTestCase;
 import com.android.systemui.UiOffloadThread;
 import com.android.systemui.appops.AppOpsController;
-import com.android.systemui.appops.AppOpsControllerImpl;
 import com.android.systemui.assist.AssistManager;
 import com.android.systemui.bubbles.BubbleController;
 import com.android.systemui.classifier.FalsingManager;
@@ -82,6 +84,7 @@ import com.android.systemui.doze.DozeLog;
 import com.android.systemui.keyguard.KeyguardViewMediator;
 import com.android.systemui.keyguard.WakefulnessLifecycle;
 import com.android.systemui.plugins.ActivityStarter.OnDismissAction;
+import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.KeyguardIndicationController;
 import com.android.systemui.statusbar.NavigationBarController;
@@ -94,7 +97,7 @@ import com.android.systemui.statusbar.NotificationShelf;
 import com.android.systemui.statusbar.NotificationViewHierarchyManager;
 import com.android.systemui.statusbar.RemoteInputController;
 import com.android.systemui.statusbar.StatusBarState;
-import com.android.systemui.statusbar.StatusBarStateController;
+import com.android.systemui.statusbar.StatusBarStateControllerImpl;
 import com.android.systemui.statusbar.notification.NotificationAlertingManager;
 import com.android.systemui.statusbar.notification.NotificationEntryListener;
 import com.android.systemui.statusbar.notification.NotificationEntryManager;
@@ -109,7 +112,6 @@ import com.android.systemui.statusbar.notification.stack.NotificationListContain
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.statusbar.policy.KeyguardMonitor;
-import com.android.systemui.statusbar.policy.KeyguardMonitorImpl;
 import com.android.systemui.statusbar.policy.UserSwitcherController;
 
 import org.junit.Before;
@@ -153,12 +155,11 @@ public class StatusBarTest extends SysuiTestCase {
     @Mock private NotificationLockscreenUserManager mLockscreenUserManager;
     @Mock private NotificationRemoteInputManager mRemoteInputManager;
     @Mock private RemoteInputController mRemoteInputController;
-    @Mock private StatusBarStateController mStatusBarStateController;
+    @Mock private StatusBarStateControllerImpl mStatusBarStateController;
     @Mock private DeviceProvisionedController mDeviceProvisionedController;
     @Mock private NotificationPresenter mNotificationPresenter;
     @Mock
     private NotificationEntryListener mEntryListener;
-    @Mock private BubbleController mBubbleController;
     @Mock
     private NotificationFilter mNotificationFilter;
     @Mock
@@ -167,6 +168,8 @@ public class StatusBarTest extends SysuiTestCase {
     private NotificationLogger.ExpansionStateLogger mExpansionStateLogger;
     @Mock
     private KeyguardUpdateMonitor mKeyguardUpdateMonitor;
+    @Mock
+    private AmbientDisplayConfiguration mAmbientDisplayConfiguration;
 
     private TestableStatusBar mStatusBar;
     private FakeMetricsLogger mMetricsLogger;
@@ -187,8 +190,8 @@ public class StatusBarTest extends SysuiTestCase {
                 mViewHierarchyManager);
         mDependency.injectTestDependency(VisualStabilityManager.class, mVisualStabilityManager);
         mDependency.injectTestDependency(NotificationListener.class, mNotificationListener);
-        mDependency.injectTestDependency(KeyguardMonitor.class, mock(KeyguardMonitorImpl.class));
-        mDependency.injectTestDependency(AppOpsController.class, mock(AppOpsControllerImpl.class));
+        mDependency.injectTestDependency(KeyguardMonitor.class, mock(KeyguardMonitor.class));
+        mDependency.injectTestDependency(AppOpsController.class, mock(AppOpsController.class));
         mDependency.injectTestDependency(StatusBarStateController.class, mStatusBarStateController);
         mDependency.injectTestDependency(DeviceProvisionedController.class,
                 mDeviceProvisionedController);
@@ -203,7 +206,7 @@ public class StatusBarTest extends SysuiTestCase {
 
         mNotificationInterruptionStateProvider =
                 new TestableNotificationInterruptionStateProvider(mContext, mPowerManager,
-                        mDreamManager);
+                        mDreamManager, mAmbientDisplayConfiguration);
         mDependency.injectTestDependency(NotificationInterruptionStateProvider.class,
                 mNotificationInterruptionStateProvider);
         mDependency.injectMockDependency(NavigationBarController.class);
@@ -639,10 +642,10 @@ public class StatusBarTest extends SysuiTestCase {
     @Test
     public void testPulseWhileDozing_notifyAuthInterrupt() {
         HashSet<Integer> reasonsWantingAuth = new HashSet<>(
-                Collections.singletonList(DozeLog.PULSE_REASON_SENSOR_WAKE_LOCK_SCREEN));
+                Collections.singletonList(DozeLog.PULSE_REASON_NOTIFICATION));
         HashSet<Integer> reasonsSkippingAuth = new HashSet<>(
                 Arrays.asList(DozeLog.PULSE_REASON_INTENT,
-                        DozeLog.PULSE_REASON_NOTIFICATION,
+                        DozeLog.PULSE_REASON_SENSOR_WAKE_LOCK_SCREEN,
                         DozeLog.PULSE_REASON_SENSOR_SIGMOTION,
                         DozeLog.REASON_SENSOR_PICKUP,
                         DozeLog.REASON_SENSOR_DOUBLE_TAP,
@@ -655,13 +658,19 @@ public class StatusBarTest extends SysuiTestCase {
                         DozeLog.REASON_SENSOR_DOUBLE_TAP,
                         DozeLog.REASON_SENSOR_TAP));
 
+        doAnswer(invocation -> {
+            DozeHost.PulseCallback callback = invocation.getArgument(0);
+            callback.onPulseStarted();
+            return null;
+        }).when(mDozeScrimController).pulse(any(), anyInt());
+
         for (int i = 0; i < DozeLog.REASONS; i++) {
             reset(mKeyguardUpdateMonitor);
             mStatusBar.mDozeServiceHost.pulseWhileDozing(mock(DozeHost.PulseCallback.class), i);
             if (reasonsWantingAuth.contains(i)) {
-                verify(mKeyguardUpdateMonitor).onAuthInterruptDetected();
+                verify(mKeyguardUpdateMonitor).onAuthInterruptDetected(eq(true));
             } else if (reasonsSkippingAuth.contains(i) || reasonsThatDontPulse.contains(i)) {
-                verify(mKeyguardUpdateMonitor, never()).onAuthInterruptDetected();
+                verify(mKeyguardUpdateMonitor, never()).onAuthInterruptDetected(eq(true));
             } else {
                 throw new AssertionError("Reason " + i + " isn't specified as wanting or skipping"
                         + " passive auth. Please consider how this pulse reason should behave.");
@@ -711,12 +720,25 @@ public class StatusBarTest extends SysuiTestCase {
     public void testOnStartedWakingUp_isNotDozing() {
         mStatusBar.setBarStateForTest(StatusBarState.KEYGUARD);
         when(mStatusBarStateController.isKeyguardRequested()).thenReturn(true);
-
         mStatusBar.mDozeServiceHost.startDozing();
         verify(mStatusBarStateController).setIsDozing(eq(true));
+        clearInvocations(mNotificationPanelView);
 
         mStatusBar.mWakefulnessObserver.onStartedWakingUp();
         verify(mStatusBarStateController).setIsDozing(eq(false));
+        verify(mNotificationPanelView).expand(eq(false));
+    }
+
+    @Test
+    public void testOnStartedWakingUp_doesNotDismissBouncer_whenPulsing() {
+        mStatusBar.setBarStateForTest(StatusBarState.KEYGUARD);
+        when(mStatusBarStateController.isKeyguardRequested()).thenReturn(true);
+        mStatusBar.mDozeServiceHost.startDozing();
+        clearInvocations(mNotificationPanelView);
+
+        mStatusBar.setBouncerShowing(true);
+        mStatusBar.mWakefulnessObserver.onStartedWakingUp();
+        verify(mNotificationPanelView, never()).expand(anyBoolean());
     }
 
     static class TestableStatusBar extends StatusBar {
@@ -824,8 +846,9 @@ public class StatusBarTest extends SysuiTestCase {
         public TestableNotificationInterruptionStateProvider(
                 Context context,
                 PowerManager powerManager,
-                IDreamManager dreamManager) {
-            super(context, powerManager, dreamManager);
+                IDreamManager dreamManager,
+                AmbientDisplayConfiguration ambientDisplayConfiguration) {
+            super(context, powerManager, dreamManager, ambientDisplayConfiguration);
             mUseHeadsUp = true;
         }
     }

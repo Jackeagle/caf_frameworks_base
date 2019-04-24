@@ -16,10 +16,6 @@
 
 package android.telecom;
 
-import com.android.internal.os.SomeArgs;
-import com.android.internal.telecom.IVideoCallback;
-import com.android.internal.telecom.IVideoProvider;
-
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SystemApi;
@@ -42,6 +38,10 @@ import android.telephony.ServiceState;
 import android.telephony.TelephonyManager;
 import android.util.ArraySet;
 import android.view.Surface;
+
+import com.android.internal.os.SomeArgs;
+import com.android.internal.telecom.IVideoCallback;
+import com.android.internal.telecom.IVideoProvider;
 
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -555,6 +555,15 @@ public abstract class Connection extends Conferenceable {
     public static final String EVENT_CALL_MERGE_FAILED = "android.telecom.event.CALL_MERGE_FAILED";
 
     /**
+     * Connection event used to inform Telecom when a hold operation on a call has failed.
+     * Not intended for use by the UI at this time.
+     * Sent via {@link #sendConnectionEvent(String, Bundle)}.  The {@link Bundle} parameter is
+     * expected to be null when this connection event is used.
+     * @hide
+     */
+    public static final String EVENT_CALL_HOLD_FAILED = "android.telecom.event.CALL_HOLD_FAILED";
+
+    /**
      * Connection event used to inform {@link InCallService}s when the process of merging a
      * Connection into a conference has begun.
      * <p>
@@ -623,7 +632,7 @@ public abstract class Connection extends Conferenceable {
             "android.telecom.event.HANDOVER_FAILED";
 
     /**
-     * Connection extra key used to store SIP invite fields for an incoming call for IMS calls
+     * String Connection extra key used to store SIP invite fields for an incoming call for IMS call
      */
     public static final String EXTRA_SIP_INVITE = "android.telecom.extra.SIP_INVITE";
 

@@ -17,6 +17,8 @@
 package android.provider;
 
 import android.annotation.BytesLong;
+import android.annotation.CurrentTimeMillisLong;
+import android.annotation.CurrentTimeSecondsLong;
 import android.annotation.DurationMillisLong;
 import android.annotation.IntRange;
 import android.annotation.NonNull;
@@ -29,6 +31,7 @@ import android.annotation.UnsupportedAppUsage;
 import android.app.Activity;
 import android.app.AppGlobals;
 import android.content.ClipData;
+import android.content.ContentInterface;
 import android.content.ContentProviderClient;
 import android.content.ContentResolver;
 import android.content.ContentUris;
@@ -40,7 +43,9 @@ import android.database.Cursor;
 import android.database.DatabaseUtils;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.ImageDecoder;
 import android.graphics.Point;
+import android.graphics.PostProcessor;
 import android.media.ExifInterface;
 import android.net.Uri;
 import android.os.Bundle;
@@ -78,8 +83,15 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * The Media provider contains meta data for all available media on both internal
- * and external storage devices.
+ * The contract between the media provider and applications. Contains
+ * definitions for the supported URIs and columns.
+ * <p>
+ * The media provider provides an indexed collection of common media types, such
+ * as {@link Audio}, {@link Video}, and {@link Images}, from any attached
+ * storage devices. Each collection is organized based on the primary MIME type
+ * of the underlying content; for example, {@code image/*} content is indexed
+ * under {@link Images}. The {@link Files} collection provides a broad view
+ * across all collections, and does not filter by MIME type.
  */
 public final class MediaStore {
     private final static String TAG = "MediaStore";
@@ -87,27 +99,56 @@ public final class MediaStore {
     /** The authority for the media provider */
     public static final String AUTHORITY = "media";
     /** A content:// style uri to the authority for the media provider */
-    public static final Uri AUTHORITY_URI = Uri.parse("content://" + AUTHORITY);
+    public static final @NonNull Uri AUTHORITY_URI = Uri.parse("content://" + AUTHORITY);
 
     /**
-     * Volume name used for content on "internal" storage of device. This
-     * volume contains media distributed with the device, such as built-in
-     * ringtones and wallpapers.
+     * Synthetic volume name that provides a view of all content across the
+     * "internal" storage of the device.
+     * <p>
+     * This synthetic volume provides a merged view of all media distributed
+     * with the device, such as built-in ringtones and wallpapers.
+     * <p>
+     * Because this is a synthetic volume, you can't insert new content into
+     * this volume.
      */
     public static final String VOLUME_INTERNAL = "internal";
 
     /**
-     * Volume name used for content on "external" storage of device. This only
-     * includes media on the primary shared storage device; the contents of any
-     * secondary storage devices can be obtained using
-     * {@link #getAllVolumeNames(Context)}.
+     * Synthetic volume name that provides a view of all content across the
+     * "external" storage of the device.
+     * <p>
+     * This synthetic volume provides a merged view of all media across all
+     * currently attached external storage devices.
+     * <p>
+     * Because this is a synthetic volume, you can't insert new content into
+     * this volume. Instead, you can insert content into a specific storage
+     * volume obtained from {@link #getExternalVolumeNames(Context)}.
      */
     public static final String VOLUME_EXTERNAL = "external";
 
-    /** {@hide} */ @TestApi
+    /**
+     * Specific volume name that represents the primary external storage device
+     * at {@link Environment#getExternalStorageDirectory()}.
+     * <p>
+     * This volume may not always be available, such as when the user has
+     * ejected the device. You can find a list of all specific volume names
+     * using {@link #getExternalVolumeNames(Context)}.
+     */
+    public static final String VOLUME_EXTERNAL_PRIMARY = "external_primary";
+
+    /** {@hide} */
     public static final String SCAN_FILE_CALL = "scan_file";
-    /** {@hide} */ @TestApi
+    /** {@hide} */
     public static final String SCAN_VOLUME_CALL = "scan_volume";
+
+    /**
+     * Extra used with {@link #SCAN_FILE_CALL} or {@link #SCAN_VOLUME_CALL} to indicate that
+     * the file path originated from shell.
+     *
+     * {@hide}
+     */
+    public static final String EXTRA_ORIGINATED_FROM_SHELL =
+            "android.intent.extra.originated_from_shell";
 
     /**
      * The method name used by the media scanner and mtp to tell the media provider to
@@ -115,6 +156,7 @@ public final class MediaStore {
      * removing nomedia files
      * @hide
      */
+    @Deprecated
     public static final String UNHIDE_CALL = "unhide";
 
     /**
@@ -124,6 +166,8 @@ public final class MediaStore {
      */
     public static final String RETRANSLATE_CALL = "update_titles";
 
+    /** {@hide} */
+    public static final String GET_VERSION_CALL = "get_version";
     /** {@hide} */
     public static final String GET_DOCUMENT_URI_CALL = "get_document_uri";
     /** {@hide} */
@@ -146,10 +190,6 @@ public final class MediaStore {
      */
     public static final String PARAM_DELETE_DATA = "deletedata";
 
-    /** {@hide} */
-    public static final String PARAM_PRIMARY = "primary";
-    /** {@hide} */
-    public static final String PARAM_SECONDARY = "secondary";
     /** {@hide} */
     public static final String PARAM_INCLUDE_PENDING = "includePending";
     /** {@hide} */
@@ -512,7 +552,6 @@ public final class MediaStore {
      *
      * @see MediaColumns#IS_PENDING
      * @see MediaStore#setIncludePending(Uri)
-     * @see MediaStore#createPending(Context, PendingParams)
      */
     public static @NonNull Uri setIncludePending(@NonNull Uri uri) {
         return setIncludePending(uri.buildUpon()).build();
@@ -533,7 +572,9 @@ public final class MediaStore {
      * @see MediaStore#setIncludeTrashed(Uri)
      * @see MediaStore#trash(Context, Uri)
      * @see MediaStore#untrash(Context, Uri)
+     * @removed
      */
+    @Deprecated
     public static @NonNull Uri setIncludeTrashed(@NonNull Uri uri) {
         return uri.buildUpon().appendQueryParameter(PARAM_INCLUDE_TRASHED, "1").build();
     }
@@ -567,17 +608,12 @@ public final class MediaStore {
      * @see MediaColumns#IS_PENDING
      * @see MediaStore#setIncludePending(Uri)
      * @see MediaStore#createPending(Context, PendingParams)
+     * @removed
      */
+    @Deprecated
     public static @NonNull Uri createPending(@NonNull Context context,
             @NonNull PendingParams params) {
-        final Uri.Builder builder = params.insertUri.buildUpon();
-        if (!TextUtils.isEmpty(params.primaryDirectory)) {
-            builder.appendQueryParameter(PARAM_PRIMARY, params.primaryDirectory);
-        }
-        if (!TextUtils.isEmpty(params.secondaryDirectory)) {
-            builder.appendQueryParameter(PARAM_SECONDARY, params.secondaryDirectory);
-        }
-        return context.getContentResolver().insert(builder.build(), params.insertValues);
+        return context.getContentResolver().insert(params.insertUri, params.insertValues);
     }
 
     /**
@@ -587,23 +623,24 @@ public final class MediaStore {
      *
      * @param uri token which was previously returned from
      *            {@link #createPending(Context, PendingParams)}.
+     * @removed
      */
+    @Deprecated
     public static @NonNull PendingSession openPending(@NonNull Context context, @NonNull Uri uri) {
         return new PendingSession(context, uri);
     }
 
     /**
      * Parameters that describe a pending media item.
+     *
+     * @removed
      */
+    @Deprecated
     public static class PendingParams {
         /** {@hide} */
         public final Uri insertUri;
         /** {@hide} */
         public final ContentValues insertValues;
-        /** {@hide} */
-        public String primaryDirectory;
-        /** {@hide} */
-        public String secondaryDirectory;
 
         /**
          * Create parameters that describe a pending media item.
@@ -645,7 +682,11 @@ public final class MediaStore {
          * @see MediaColumns#PRIMARY_DIRECTORY
          */
         public void setPrimaryDirectory(@Nullable String primaryDirectory) {
-            this.primaryDirectory = primaryDirectory;
+            if (primaryDirectory == null) {
+                this.insertValues.remove(MediaColumns.PRIMARY_DIRECTORY);
+            } else {
+                this.insertValues.put(MediaColumns.PRIMARY_DIRECTORY, primaryDirectory);
+            }
         }
 
         /**
@@ -658,7 +699,11 @@ public final class MediaStore {
          * @see MediaColumns#SECONDARY_DIRECTORY
          */
         public void setSecondaryDirectory(@Nullable String secondaryDirectory) {
-            this.secondaryDirectory = secondaryDirectory;
+            if (secondaryDirectory == null) {
+                this.insertValues.remove(MediaColumns.SECONDARY_DIRECTORY);
+            } else {
+                this.insertValues.put(MediaColumns.SECONDARY_DIRECTORY, secondaryDirectory);
+            }
         }
 
         /**
@@ -695,7 +740,10 @@ public final class MediaStore {
      * expected to have a short lifetime, and owners should either
      * {@link PendingSession#publish()} or {@link PendingSession#abandon()} a
      * pending item within a few hours after first creating it.
+     *
+     * @removed
      */
+    @Deprecated
     public static class PendingSession implements AutoCloseable {
         /** {@hide} */
         private final Context mContext;
@@ -787,7 +835,9 @@ public final class MediaStore {
      * @see MediaStore#setIncludeTrashed(Uri)
      * @see MediaStore#trash(Context, Uri)
      * @see MediaStore#untrash(Context, Uri)
+     * @removed
      */
+    @Deprecated
     public static void trash(@NonNull Context context, @NonNull Uri uri) {
         trash(context, uri, 48 * DateUtils.HOUR_IN_MILLIS);
     }
@@ -805,7 +855,9 @@ public final class MediaStore {
      * @see MediaStore#setIncludeTrashed(Uri)
      * @see MediaStore#trash(Context, Uri)
      * @see MediaStore#untrash(Context, Uri)
+     * @removed
      */
+    @Deprecated
     public static void trash(@NonNull Context context, @NonNull Uri uri,
             @DurationMillisLong long timeoutMillis) {
         if (timeoutMillis < 0) {
@@ -827,7 +879,9 @@ public final class MediaStore {
      * @see MediaStore#setIncludeTrashed(Uri)
      * @see MediaStore#trash(Context, Uri)
      * @see MediaStore#untrash(Context, Uri)
+     * @removed
      */
+    @Deprecated
     public static void untrash(@NonNull Context context, @NonNull Uri uri) {
         final ContentValues values = new ContentValues();
         values.put(MediaColumns.IS_TRASHED, 0);
@@ -836,32 +890,29 @@ public final class MediaStore {
     }
 
     /**
-     * Common fields for most MediaProvider tables
+     * Common media metadata columns.
      */
     public interface MediaColumns extends BaseColumns {
         /**
-         * Path to the file on disk.
+         * Absolute filesystem path to the media item on disk.
          * <p>
          * Note that apps may not have filesystem permissions to directly access
          * this path. Instead of trying to open this path directly, apps should
          * use {@link ContentResolver#openFileDescriptor(Uri, String)} to gain
          * access.
-         * <p>
-         * Type: TEXT
          *
          * @deprecated Apps may not have filesystem permissions to directly
          *             access this path. Instead of trying to open this path
          *             directly, apps should use
          *             {@link ContentResolver#openFileDescriptor(Uri, String)}
-         *             to gain access. This value will always be {@code NULL}
-         *             for apps targeting
-         *             {@link android.os.Build.VERSION_CODES#Q} or higher.
+         *             to gain access.
          */
         @Deprecated
+        @Column(Cursor.FIELD_TYPE_STRING)
         public static final String DATA = "_data";
 
         /**
-         * Hash of the file on disk.
+         * Hash of the media item on disk.
          * <p>
          * Contains a 20-byte binary blob which is the SHA-1 hash of the file as
          * persisted on disk. For performance reasons, the hash may not be
@@ -872,48 +923,67 @@ public final class MediaStore {
          * If you require the hash of a specific item, you can call
          * {@link ContentResolver#canonicalize(Uri)}, which will block until the
          * hash is calculated.
-         * <p>
-         * Type: BLOB
+         *
+         * @removed
          */
+        @Deprecated
+        @Column(value = Cursor.FIELD_TYPE_BLOB, readOnly = true)
         public static final String HASH = "_hash";
 
         /**
-         * The size of the file in bytes
-         * <P>Type: INTEGER (long)</P>
+         * The size of the media item.
          */
+        @BytesLong
+        @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
         public static final String SIZE = "_size";
 
         /**
-         * The display name of the file
-         * <P>Type: TEXT</P>
+         * The display name of the media item.
+         * <p>
+         * For example, an item stored at
+         * {@code /storage/0000-0000/DCIM/Vacation/IMG1024.JPG} would have a
+         * display name of {@code IMG1024.JPG}.
          */
+        @Column(Cursor.FIELD_TYPE_STRING)
         public static final String DISPLAY_NAME = "_display_name";
 
         /**
-         * The title of the content
-         * <P>Type: TEXT</P>
+         * The title of the media item.
          */
+        @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
         public static final String TITLE = "title";
 
         /**
-         * The time the file was added to the media provider
-         * Units are seconds since 1970.
-         * <P>Type: INTEGER (long)</P>
+         * The time the media item was first added.
          */
+        @CurrentTimeSecondsLong
+        @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
         public static final String DATE_ADDED = "date_added";
 
         /**
-         * The time the file was last modified
-         * Units are seconds since 1970.
-         * NOTE: This is for internal use by the media scanner.  Do not modify this field.
-         * <P>Type: INTEGER (long)</P>
+         * The time the media item was last modified.
          */
+        @CurrentTimeSecondsLong
+        @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
         public static final String DATE_MODIFIED = "date_modified";
 
         /**
-         * The MIME type of the file
-         * <P>Type: TEXT</P>
+         * The MIME type of the media item.
+         * <p>
+         * This is typically defined based on the file extension of the media
+         * item. However, it may be the value of the {@code format} attribute
+         * defined by the <em>Dublin Core Media Initiative</em> standard,
+         * extracted from any XMP metadata contained within this media item.
+         * <p class="note">
+         * Note: the {@code format} attribute may be ignored if the top-level
+         * MIME type disagrees with the file extension. For example, it's
+         * reasonable for an {@code image/jpeg} file to declare a {@code format}
+         * of {@code image/vnd.google.panorama360+jpg}, but declaring a
+         * {@code format} of {@code audio/ogg} would be ignored.
+         * <p>
+         * This is a read-only column that is automatically computed.
          */
+        @Column(Cursor.FIELD_TYPE_STRING)
         public static final String MIME_TYPE = "mime_type";
 
         /**
@@ -921,89 +991,167 @@ public final class MediaStore {
          * Used to pass the new file's object handle through the media scanner
          * from MTP to the media provider
          * For internal use only by MTP, media scanner and media provider.
-         * <P>Type: INTEGER</P>
          * @hide
          */
+        @Deprecated
+        // @Column(Cursor.FIELD_TYPE_INTEGER)
         public static final String MEDIA_SCANNER_NEW_OBJECT_ID = "media_scanner_new_object_id";
 
         /**
          * Non-zero if the media file is drm-protected
-         * <P>Type: INTEGER (boolean)</P>
          * @hide
          */
         @UnsupportedAppUsage
+        @Deprecated
+        @Column(Cursor.FIELD_TYPE_INTEGER)
         public static final String IS_DRM = "is_drm";
 
         /**
          * Flag indicating if a media item is pending, and still being inserted
-         * by its owner.
-         * <p>
-         * Type: BOOLEAN
+         * by its owner. While this flag is set, only the owner of the item can
+         * open the underlying file; requests from other apps will be rejected.
          *
-         * @see MediaColumns#IS_PENDING
          * @see MediaStore#setIncludePending(Uri)
-         * @see MediaStore#createPending(Context, PendingParams)
          */
+        @Column(Cursor.FIELD_TYPE_INTEGER)
         public static final String IS_PENDING = "is_pending";
 
         /**
          * Flag indicating if a media item is trashed.
-         * <p>
-         * Type: BOOLEAN
          *
          * @see MediaColumns#IS_TRASHED
          * @see MediaStore#setIncludeTrashed(Uri)
          * @see MediaStore#trash(Context, Uri)
          * @see MediaStore#untrash(Context, Uri)
+         * @removed
          */
+        @Deprecated
+        @Column(Cursor.FIELD_TYPE_INTEGER)
         public static final String IS_TRASHED = "is_trashed";
 
         /**
-         * The time the file should be considered expired. Units are seconds
-         * since 1970. Typically only meaningful in the context of
-         * {@link #IS_PENDING} or {@link #IS_TRASHED}.
-         * <p>
-         * Type: INTEGER
+         * The time the media item should be considered expired. Typically only
+         * meaningful in the context of {@link #IS_PENDING}.
          */
+        @CurrentTimeSecondsLong
+        @Column(Cursor.FIELD_TYPE_INTEGER)
         public static final String DATE_EXPIRES = "date_expires";
 
         /**
-         * The width of the image/video in pixels.
+         * The width of the media item, in pixels.
          */
+        @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
         public static final String WIDTH = "width";
 
         /**
-         * The height of the image/video in pixels.
+         * The height of the media item, in pixels.
          */
+        @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
         public static final String HEIGHT = "height";
 
         /**
          * Package name that contributed this media. The value may be
          * {@code NULL} if ownership cannot be reliably determined.
-         * <p>
-         * Type: TEXT
          */
+        @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
         public static final String OWNER_PACKAGE_NAME = "owner_package_name";
+
+        /**
+         * Volume name of the specific storage device where this media item is
+         * persisted. The value is typically one of the volume names returned
+         * from {@link MediaStore#getExternalVolumeNames(Context)}.
+         * <p>
+         * This is a read-only column that is automatically computed.
+         */
+        @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
+        public static final String VOLUME_NAME = "volume_name";
+
+        /**
+         * Relative path of this media item within the storage device where it
+         * is persisted. For example, an item stored at
+         * {@code /storage/0000-0000/DCIM/Vacation/IMG1024.JPG} would have a
+         * path of {@code DCIM/Vacation}.
+         * <p>
+         * This value should only be used for organizational purposes, and you
+         * should not attempt to construct or access a raw filesystem path using
+         * this value. If you need to open a media item, use an API like
+         * {@link ContentResolver#openFileDescriptor(Uri, String)}.
+         * <p>
+         * When this value is set to {@code NULL} during an
+         * {@link ContentResolver#insert} operation, the newly created item will
+         * be placed in a relevant default location based on the type of media
+         * being inserted. For example, a {@code image/jpeg} item will be placed
+         * under {@link Environment#DIRECTORY_PICTURES}.
+         * <p>
+         * You can modify this column during an {@link ContentResolver#update}
+         * call, which will move the underlying file on disk.
+         * <p>
+         * In both cases above, content must be placed under a top-level
+         * directory that is relevant to the media type. For example, attempting
+         * to place a {@code audio/mpeg} file under
+         * {@link Environment#DIRECTORY_PICTURES} will be rejected.
+         */
+        @Column(Cursor.FIELD_TYPE_STRING)
+        public static final String RELATIVE_PATH = "relative_path";
 
         /**
          * The primary directory name this media exists under. The value may be
          * {@code NULL} if the media doesn't have a primary directory name.
-         * <p>
-         * Type: TEXT
          *
-         * @see PendingParams#setPrimaryDirectory(String)
+         * @removed
+         * @deprecated Replaced by {@link #RELATIVE_PATH}.
          */
+        @Column(Cursor.FIELD_TYPE_STRING)
+        @Deprecated
         public static final String PRIMARY_DIRECTORY = "primary_directory";
 
         /**
          * The secondary directory name this media exists under. The value may
          * be {@code NULL} if the media doesn't have a secondary directory name.
-         * <p>
-         * Type: TEXT
          *
-         * @see PendingParams#setSecondaryDirectory(String)
+         * @removed
+         * @deprecated Replaced by {@link #RELATIVE_PATH}.
          */
+        @Column(Cursor.FIELD_TYPE_STRING)
+        @Deprecated
         public static final String SECONDARY_DIRECTORY = "secondary_directory";
+
+        /**
+         * The "document ID" GUID as defined by the <em>XMP Media
+         * Management</em> standard, extracted from any XMP metadata contained
+         * within this media item. The value is {@code null} when no metadata
+         * was found.
+         * <p>
+         * Each "document ID" is created once for each new resource. Different
+         * renditions of that resource are expected to have different IDs.
+         */
+        @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
+        public static final String DOCUMENT_ID = "document_id";
+
+        /**
+         * The "instance ID" GUID as defined by the <em>XMP Media
+         * Management</em> standard, extracted from any XMP metadata contained
+         * within this media item. The value is {@code null} when no metadata
+         * was found.
+         * <p>
+         * This "instance ID" changes with each save operation of a specific
+         * "document ID".
+         */
+        @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
+        public static final String INSTANCE_ID = "instance_id";
+
+        /**
+         * The "original document ID" GUID as defined by the <em>XMP Media
+         * Management</em> standard, extracted from any XMP metadata contained
+         * within this media item.
+         * <p>
+         * This "original document ID" links a resource to its original source.
+         * For example, when you save a PSD document as a JPEG, then convert the
+         * JPEG to GIF format, the "original document ID" of both the JPEG and
+         * GIF files is the "document ID" of the original PSD file.
+         */
+        @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
+        public static final String ORIGINAL_DOCUMENT_ID = "original_document_id";
     }
 
     /**
@@ -1087,49 +1235,62 @@ public final class MediaStore {
         }
 
         /**
-         * Fields for master table for all media files.
-         * Table also contains MediaColumns._ID, DATA, SIZE and DATE_MODIFIED.
+         * File metadata columns.
          */
         public interface FileColumns extends MediaColumns {
             /**
              * The MTP storage ID of the file
-             * <P>Type: INTEGER</P>
              * @hide
              */
             @UnsupportedAppUsage
+            @Deprecated
+            // @Column(Cursor.FIELD_TYPE_INTEGER)
             public static final String STORAGE_ID = "storage_id";
 
             /**
              * The MTP format code of the file
-             * <P>Type: INTEGER</P>
              * @hide
              */
             @UnsupportedAppUsage
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String FORMAT = "format";
 
             /**
              * The index of the parent directory of the file
-             * <P>Type: INTEGER</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String PARENT = "parent";
 
             /**
-             * The MIME type of the file
-             * <P>Type: TEXT</P>
+             * The MIME type of the media item.
+             * <p>
+             * This is typically defined based on the file extension of the media
+             * item. However, it may be the value of the {@code format} attribute
+             * defined by the <em>Dublin Core Media Initiative</em> standard,
+             * extracted from any XMP metadata contained within this media item.
+             * <p class="note">
+             * Note: the {@code format} attribute may be ignored if the top-level
+             * MIME type disagrees with the file extension. For example, it's
+             * reasonable for an {@code image/jpeg} file to declare a {@code format}
+             * of {@code image/vnd.google.panorama360+jpg}, but declaring a
+             * {@code format} of {@code audio/ogg} would be ignored.
+             * <p>
+             * This is a read-only column that is automatically computed.
              */
+            @Column(Cursor.FIELD_TYPE_STRING)
             public static final String MIME_TYPE = "mime_type";
 
             /**
-             * The title of the content
-             * <P>Type: TEXT</P>
+             * The title of the media item.
              */
+            @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
             public static final String TITLE = "title";
 
             /**
              * The media type (audio, video, image or playlist)
              * of the file, or 0 for not a media file
-             * <P>Type: TEXT</P>
              */
+            @Column(Cursor.FIELD_TYPE_INTEGER)
             public static final String MEDIA_TYPE = "media_type";
 
             /**
@@ -1162,6 +1323,7 @@ public final class MediaStore {
              * Column indicating if the file is part of Downloads collection.
              * @hide
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String IS_DOWNLOAD = "is_download";
         }
     }
@@ -1177,37 +1339,31 @@ public final class MediaStore {
         public static final Point MICRO_SIZE = new Point(96, 96);
     }
 
-    /** Column fields for downloaded files used in {@link Downloads} table */
+    /**
+     * Download metadata columns.
+     */
     public interface DownloadColumns extends MediaColumns {
         /**
-         * Uri indicating where the file has been downloaded from.
-         * <p>
-         * Type: TEXT
+         * Uri indicating where the item has been downloaded from.
          */
+        @Column(Cursor.FIELD_TYPE_STRING)
         String DOWNLOAD_URI = "download_uri";
 
         /**
          * Uri indicating HTTP referer of {@link #DOWNLOAD_URI}.
-         * <p>
-         * Type: TEXT
          */
+        @Column(Cursor.FIELD_TYPE_STRING)
         String REFERER_URI = "referer_uri";
 
         /**
          * The description of the download.
-         * <p>
-         * Type: Text
          */
+        @Column(Cursor.FIELD_TYPE_STRING)
         String DESCRIPTION = "description";
     }
 
     /**
-     * Container for downloaded files.
-     *
-     * <p>
-     * Querying for downloads from this table will return files contributed via
-     * {@link PendingSession} and also ones which were downloaded using
-     * {@link android.app.DownloadManager} APIs.
+     * Collection of downloaded items.
      */
     public static final class Downloads implements DownloadColumns {
         private Downloads() {}
@@ -1215,6 +1371,7 @@ public final class MediaStore {
         /**
          * The content:// style URI for the internal storage.
          */
+        @NonNull
         public static final Uri INTERNAL_CONTENT_URI =
                 getContentUri("internal");
 
@@ -1222,6 +1379,7 @@ public final class MediaStore {
          * The content:// style URI for the "primary" external storage
          * volume.
          */
+        @NonNull
         public static final Uri EXTERNAL_CONTENT_URI =
                 getContentUri("external");
 
@@ -1246,13 +1404,18 @@ public final class MediaStore {
          * @param volumeName the name of the volume to get the URI for
          * @return the URI to the image media table on the given volume
          */
-        public static Uri getContentUri(String volumeName) {
+        public static @NonNull Uri getContentUri(@NonNull String volumeName) {
             return AUTHORITY_URI.buildUpon().appendPath(volumeName)
                     .appendPath("downloads").build();
         }
 
         /** @hide */
-        public static Uri getContentUriForPath(@NonNull String path) {
+        public static @NonNull Uri getContentUri(@NonNull String volumeName, long id) {
+            return ContentUris.withAppendedId(getContentUri(volumeName), id);
+        }
+
+        /** @hide */
+        public static @NonNull Uri getContentUriForPath(@NonNull String path) {
             return getContentUri(getVolumeName(new File(path)));
         }
 
@@ -1275,7 +1438,7 @@ public final class MediaStore {
             final StorageVolume sv = sm.getStorageVolume(path);
             if (sv != null) {
                 if (sv.isPrimary()) {
-                    return VOLUME_EXTERNAL;
+                    return VOLUME_EXTERNAL_PRIMARY;
                 } else {
                     return checkArgumentVolumeName(sv.getNormalizedUuid());
                 }
@@ -1357,35 +1520,37 @@ public final class MediaStore {
     }
 
     /**
-     * Contains meta data for all available images.
+     * Collection of all media with MIME type of {@code image/*}.
      */
     public static final class Images {
+        /**
+         * Image metadata columns.
+         */
         public interface ImageColumns extends MediaColumns {
             /**
              * The description of the image
-             * <P>Type: TEXT</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
             public static final String DESCRIPTION = "description";
 
             /**
              * The picasa id of the image
-             * <P>Type: TEXT</P>
              *
              * @deprecated this value was only relevant for images hosted on
              *             Picasa, which are no longer supported.
              */
             @Deprecated
+            @Column(Cursor.FIELD_TYPE_STRING)
             public static final String PICASA_ID = "picasa_id";
 
             /**
              * Whether the video should be published as public or private
-             * <P>Type: INTEGER</P>
              */
+            @Column(Cursor.FIELD_TYPE_INTEGER)
             public static final String IS_PRIVATE = "isprivate";
 
             /**
              * The latitude where the image was captured.
-             * <P>Type: DOUBLE</P>
              *
              * @deprecated location details are no longer indexed for privacy
              *             reasons, and this value is now always {@code null}.
@@ -1393,11 +1558,11 @@ public final class MediaStore {
              *             {@link ExifInterface#getLatLong(float[])}.
              */
             @Deprecated
+            @Column(value = Cursor.FIELD_TYPE_FLOAT, readOnly = true)
             public static final String LATITUDE = "latitude";
 
             /**
              * The longitude where the image was captured.
-             * <P>Type: DOUBLE</P>
              *
              * @deprecated location details are no longer indexed for privacy
              *             reasons, and this value is now always {@code null}.
@@ -1405,40 +1570,40 @@ public final class MediaStore {
              *             {@link ExifInterface#getLatLong(float[])}.
              */
             @Deprecated
+            @Column(value = Cursor.FIELD_TYPE_FLOAT, readOnly = true)
             public static final String LONGITUDE = "longitude";
 
             /**
-             * The date & time that the image was taken in units
-             * of milliseconds since jan 1, 1970.
-             * <P>Type: INTEGER</P>
+             * The time the media item was taken.
              */
+            @CurrentTimeMillisLong
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String DATE_TAKEN = "datetaken";
 
             /**
              * The orientation for the image expressed as degrees.
              * Only degrees 0, 90, 180, 270 will work.
-             * <P>Type: INTEGER</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String ORIENTATION = "orientation";
 
             /**
              * The mini thumb id.
-             * <P>Type: INTEGER</P>
              *
              * @deprecated all thumbnails should be obtained via
              *             {@link MediaStore.Images.Thumbnails#getThumbnail}, as this
              *             value is no longer supported.
              */
             @Deprecated
+            @Column(Cursor.FIELD_TYPE_INTEGER)
             public static final String MINI_THUMB_MAGIC = "mini_thumb_magic";
 
             /**
              * The primary bucket ID of this media item. This can be useful to
              * present the user a first-level clustering of related media items.
              * This is a read-only column that is automatically computed.
-             * <p>
-             * Type: INTEGER
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String BUCKET_ID = "bucket_id";
 
             /**
@@ -1446,9 +1611,8 @@ public final class MediaStore {
              * useful to present the user a first-level clustering of related
              * media items. This is a read-only column that is automatically
              * computed.
-             * <p>
-             * Type: TEXT
              */
+            @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
             public static final String BUCKET_DISPLAY_NAME = "bucket_display_name";
 
             /**
@@ -1462,23 +1626,40 @@ public final class MediaStore {
              * {@code IMG1024.BURST001.JPG} and {@code IMG1024.BURST002.JPG}
              * will have the same {@link #GROUP_ID} because the first portion of
              * their filenames is identical.
-             * <p>
-             * Type: INTEGER
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String GROUP_ID = "group_id";
         }
 
         public static final class Media implements ImageColumns {
+            /**
+             * @deprecated all queries should be performed through
+             *             {@link ContentResolver} directly, which offers modern
+             *             features like {@link CancellationSignal}.
+             */
+            @Deprecated
             public static final Cursor query(ContentResolver cr, Uri uri, String[] projection) {
                 return cr.query(uri, projection, null, null, DEFAULT_SORT_ORDER);
             }
 
+            /**
+             * @deprecated all queries should be performed through
+             *             {@link ContentResolver} directly, which offers modern
+             *             features like {@link CancellationSignal}.
+             */
+            @Deprecated
             public static final Cursor query(ContentResolver cr, Uri uri, String[] projection,
                     String where, String orderBy) {
                 return cr.query(uri, projection, where,
                                              null, orderBy == null ? DEFAULT_SORT_ORDER : orderBy);
             }
 
+            /**
+             * @deprecated all queries should be performed through
+             *             {@link ContentResolver} directly, which offers modern
+             *             features like {@link CancellationSignal}.
+             */
+            @Deprecated
             public static final Cursor query(ContentResolver cr, Uri uri, String[] projection,
                     String selection, String [] selectionArgs, String orderBy) {
                 return cr.query(uri, projection, selection,
@@ -1490,9 +1671,12 @@ public final class MediaStore {
              *
              * @param cr The content resolver to use
              * @param url The url of the image
-             * @throws FileNotFoundException
-             * @throws IOException
+             * @deprecated loading of images should be performed through
+             *             {@link ImageDecoder#createSource(ContentResolver, Uri)},
+             *             which offers modern features like
+             *             {@link PostProcessor}.
              */
+            @Deprecated
             public static final Bitmap getBitmap(ContentResolver cr, Uri url)
                     throws FileNotFoundException, IOException {
                 InputStream input = cr.openInputStream(url);
@@ -1509,8 +1693,11 @@ public final class MediaStore {
              * @param name The name of the image
              * @param description The description of the image
              * @return The URL to the newly created image
-             * @throws FileNotFoundException
+             * @deprecated inserting of images should be performed using
+             *             {@link MediaColumns#IS_PENDING}, which offers richer
+             *             control over lifecycle.
              */
+            @Deprecated
             public static final String insertImage(ContentResolver cr, String imagePath,
                     String name, String description) throws FileNotFoundException {
                 // Check if file exists with a FileInputStream
@@ -1537,7 +1724,11 @@ public final class MediaStore {
              * @param description The description of the image
              * @return The URL to the newly created image, or <code>null</code> if the image failed to be stored
              *              for any reason.
+             * @deprecated inserting of images should be performed using
+             *             {@link MediaColumns#IS_PENDING}, which offers richer
+             *             control over lifecycle.
              */
+            @Deprecated
             public static final String insertImage(ContentResolver cr, Bitmap source,
                                                    String title, String description) {
                 ContentValues values = new ContentValues();
@@ -1549,14 +1740,12 @@ public final class MediaStore {
                 String stringUrl = null;    /* value to be returned */
 
                 try {
-                    url = cr.insert(EXTERNAL_CONTENT_URI, values);
+                    url = cr.insert(getContentUri(VOLUME_EXTERNAL_PRIMARY), values);
 
                     if (source != null) {
-                        OutputStream imageOut = cr.openOutputStream(url);
-                        try {
-                            source.compress(Bitmap.CompressFormat.JPEG, 50, imageOut);
-                        } finally {
-                            imageOut.close();
+                        try (OutputStream out = new ParcelFileDescriptor.AutoCloseOutputStream(
+                                cr.openFile(url, "w", null))) {
+                            source.compress(Bitmap.CompressFormat.JPEG, 50, out);
                         }
 
                         long id = ContentUris.parseId(url);
@@ -1593,6 +1782,11 @@ public final class MediaStore {
             public static Uri getContentUri(String volumeName) {
                 return AUTHORITY_URI.buildUpon().appendPath(volumeName).appendPath("images")
                         .appendPath("media").build();
+            }
+
+            /** @hide */
+            public static @NonNull Uri getContentUri(@NonNull String volumeName, long id) {
+                return ContentUris.withAppendedId(getContentUri(volumeName), id);
             }
 
             /**
@@ -1632,15 +1826,33 @@ public final class MediaStore {
          */
         @Deprecated
         public static class Thumbnails implements BaseColumns {
+            /**
+             * @deprecated all queries should be performed through
+             *             {@link ContentResolver} directly, which offers modern
+             *             features like {@link CancellationSignal}.
+             */
+            @Deprecated
             public static final Cursor query(ContentResolver cr, Uri uri, String[] projection) {
                 return cr.query(uri, projection, null, null, DEFAULT_SORT_ORDER);
             }
 
+            /**
+             * @deprecated all queries should be performed through
+             *             {@link ContentResolver} directly, which offers modern
+             *             features like {@link CancellationSignal}.
+             */
+            @Deprecated
             public static final Cursor queryMiniThumbnails(ContentResolver cr, Uri uri, int kind,
                     String[] projection) {
                 return cr.query(uri, projection, "kind = " + kind, null, DEFAULT_SORT_ORDER);
             }
 
+            /**
+             * @deprecated all queries should be performed through
+             *             {@link ContentResolver} directly, which offers modern
+             *             features like {@link CancellationSignal}.
+             */
+            @Deprecated
             public static final Cursor queryMiniThumbnail(ContentResolver cr, long origId, int kind,
                     String[] projection) {
                 return cr.query(EXTERNAL_CONTENT_URI, projection,
@@ -1769,140 +1981,145 @@ public final class MediaStore {
              * apps should use
              * {@link ContentResolver#openFileDescriptor(Uri, String)} to gain
              * access.
-             * <p>
-             * Type: TEXT
              *
              * @deprecated Apps may not have filesystem permissions to directly
              *             access this path. Instead of trying to open this path
              *             directly, apps should use
              *             {@link ContentResolver#loadThumbnail}
-             *             to gain access. This value will always be
-             *             {@code NULL} for apps targeting
-             *             {@link android.os.Build.VERSION_CODES#Q} or higher.
+             *             to gain access.
              */
             @Deprecated
+            @Column(Cursor.FIELD_TYPE_STRING)
             public static final String DATA = "_data";
 
             /**
              * The original image for the thumbnal
-             * <P>Type: INTEGER (ID from Images table)</P>
              */
+            @Column(Cursor.FIELD_TYPE_INTEGER)
             public static final String IMAGE_ID = "image_id";
 
             /**
              * The kind of the thumbnail
-             * <P>Type: INTEGER (One of the values below)</P>
              */
+            @Column(Cursor.FIELD_TYPE_INTEGER)
             public static final String KIND = "kind";
 
             public static final int MINI_KIND = ThumbnailConstants.MINI_KIND;
             public static final int FULL_SCREEN_KIND = ThumbnailConstants.FULL_SCREEN_KIND;
             public static final int MICRO_KIND = ThumbnailConstants.MICRO_KIND;
+
             /**
              * The blob raw data of thumbnail
-             * <P>Type: DATA STREAM</P>
+             *
+             * @deprecated this column never existed internally, and could never
+             *             have returned valid data.
              */
+            @Deprecated
+            @Column(Cursor.FIELD_TYPE_BLOB)
             public static final String THUMB_DATA = "thumb_data";
 
             /**
              * The width of the thumbnal
-             * <P>Type: INTEGER (long)</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String WIDTH = "width";
 
             /**
              * The height of the thumbnail
-             * <P>Type: INTEGER (long)</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String HEIGHT = "height";
         }
     }
 
     /**
-     * Container for all audio content.
+     * Collection of all media with MIME type of {@code audio/*}.
      */
     public static final class Audio {
         /**
-         * Columns for audio file that show up in multiple tables.
+         * Audio metadata columns.
          */
         public interface AudioColumns extends MediaColumns {
 
             /**
              * A non human readable key calculated from the TITLE, used for
              * searching, sorting and grouping
-             * <P>Type: TEXT</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
             public static final String TITLE_KEY = "title_key";
 
             /**
-             * The duration of the audio file, in ms
-             * <P>Type: INTEGER (long)</P>
+             * The duration of the audio item.
              */
+            @DurationMillisLong
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String DURATION = "duration";
 
             /**
-             * The position, in ms, playback was at when playback for this file
-             * was last stopped.
-             * <P>Type: INTEGER (long)</P>
+             * The position within the audio item at which playback should be
+             * resumed.
              */
+            @DurationMillisLong
+            @Column(Cursor.FIELD_TYPE_INTEGER)
             public static final String BOOKMARK = "bookmark";
 
             /**
              * The id of the artist who created the audio file, if any
-             * <P>Type: INTEGER (long)</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String ARTIST_ID = "artist_id";
 
             /**
              * The artist who created the audio file, if any
-             * <P>Type: TEXT</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
             public static final String ARTIST = "artist";
 
             /**
              * The artist credited for the album that contains the audio file
-             * <P>Type: TEXT</P>
              * @hide
              */
+            @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
             public static final String ALBUM_ARTIST = "album_artist";
 
             /**
              * Whether the song is part of a compilation
-             * <P>Type: TEXT</P>
              * @hide
              */
+            @Deprecated
+            // @Column(Cursor.FIELD_TYPE_STRING)
             public static final String COMPILATION = "compilation";
 
             /**
              * A non human readable key calculated from the ARTIST, used for
              * searching, sorting and grouping
-             * <P>Type: TEXT</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
             public static final String ARTIST_KEY = "artist_key";
 
             /**
              * The composer of the audio file, if any
-             * <P>Type: TEXT</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
             public static final String COMPOSER = "composer";
 
             /**
              * The id of the album the audio file is from, if any
-             * <P>Type: INTEGER (long)</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String ALBUM_ID = "album_id";
 
             /**
              * The album the audio file is from, if any
-             * <P>Type: TEXT</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
             public static final String ALBUM = "album";
 
             /**
              * A non human readable key calculated from the ALBUM, used for
              * searching, sorting and grouping
-             * <P>Type: TEXT</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
             public static final String ALBUM_KEY = "album_key";
 
             /**
@@ -1911,63 +2128,63 @@ public final class MediaStore {
              * disc number. For multi-disc sets, this number will
              * be 1xxx for tracks on the first disc, 2xxx for tracks
              * on the second disc, etc.
-             * <P>Type: INTEGER</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String TRACK = "track";
 
             /**
              * The year the audio file was recorded, if any
-             * <P>Type: INTEGER</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String YEAR = "year";
 
             /**
              * Non-zero if the audio file is music
-             * <P>Type: INTEGER (boolean)</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String IS_MUSIC = "is_music";
 
             /**
              * Non-zero if the audio file is a podcast
-             * <P>Type: INTEGER (boolean)</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String IS_PODCAST = "is_podcast";
 
             /**
              * Non-zero if the audio file may be a ringtone
-             * <P>Type: INTEGER (boolean)</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String IS_RINGTONE = "is_ringtone";
 
             /**
              * Non-zero if the audio file may be an alarm
-             * <P>Type: INTEGER (boolean)</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String IS_ALARM = "is_alarm";
 
             /**
              * Non-zero if the audio file may be a notification sound
-             * <P>Type: INTEGER (boolean)</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String IS_NOTIFICATION = "is_notification";
 
             /**
              * Non-zero if the audio file is an audiobook
-             * <P>Type: INTEGER (boolean)</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String IS_AUDIOBOOK = "is_audiobook";
 
             /**
              * The genre of the audio file, if any
-             * <P>Type: TEXT</P>
              * Does not exist in the database - only used by the media scanner for inserts.
              * @hide
              */
+            @Deprecated
+            // @Column(Cursor.FIELD_TYPE_STRING)
             public static final String GENRE = "genre";
 
             /**
              * The resource URI of a localized title, if any
-             * <P>Type: TEXT</P>
              * Conforms to this pattern:
              *   Scheme: {@link ContentResolver.SCHEME_ANDROID_RESOURCE}
              *   Authority: Package Name of ringtone title provider
@@ -1975,6 +2192,7 @@ public final class MediaStore {
              *   Second Path Segment: Resource ID of title
              * @hide
              */
+            @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
             public static final String TITLE_RESOURCE_URI = "title_resource_uri";
         }
 
@@ -2057,12 +2275,18 @@ public final class MediaStore {
                         .appendPath("media").build();
             }
 
+            /** @hide */
+            public static @NonNull Uri getContentUri(@NonNull String volumeName, long id) {
+                return ContentUris.withAppendedId(getContentUri(volumeName), id);
+            }
+
             /**
              * Get the content:// style URI for the given audio media file.
              *
              * @deprecated Apps may not have filesystem permissions to directly
              *             access this path.
              */
+            @Deprecated
             public static @Nullable Uri getContentUriForPath(@NonNull String path) {
                 return getContentUri(getVolumeName(new File(path)));
             }
@@ -2118,13 +2342,13 @@ public final class MediaStore {
         }
 
         /**
-         * Columns representing an audio genre
+         * Audio genre metadata columns.
          */
         public interface GenresColumns {
             /**
              * The name of the genre
-             * <P>Type: TEXT</P>
              */
+            @Column(Cursor.FIELD_TYPE_STRING)
             public static final String NAME = "name";
         }
 
@@ -2208,26 +2432,26 @@ public final class MediaStore {
 
                 /**
                  * The ID of the audio file
-                 * <P>Type: INTEGER (long)</P>
                  */
+                @Column(Cursor.FIELD_TYPE_INTEGER)
                 public static final String AUDIO_ID = "audio_id";
 
                 /**
                  * The ID of the genre
-                 * <P>Type: INTEGER (long)</P>
                  */
+                @Column(Cursor.FIELD_TYPE_INTEGER)
                 public static final String GENRE_ID = "genre_id";
             }
         }
 
         /**
-         * Columns representing a playlist
+         * Audio playlist metadata columns.
          */
         public interface PlaylistsColumns {
             /**
              * The name of the playlist
-             * <P>Type: TEXT</P>
              */
+            @Column(Cursor.FIELD_TYPE_STRING)
             public static final String NAME = "name";
 
             /**
@@ -2238,33 +2462,29 @@ public final class MediaStore {
              * apps should use
              * {@link ContentResolver#openFileDescriptor(Uri, String)} to gain
              * access.
-             * <p>
-             * Type: TEXT
              *
              * @deprecated Apps may not have filesystem permissions to directly
              *             access this path. Instead of trying to open this path
              *             directly, apps should use
              *             {@link ContentResolver#openFileDescriptor(Uri, String)}
-             *             to gain access. This value will always be
-             *             {@code NULL} for apps targeting
-             *             {@link android.os.Build.VERSION_CODES#Q} or higher.
+             *             to gain access.
              */
             @Deprecated
+            @Column(Cursor.FIELD_TYPE_STRING)
             public static final String DATA = "_data";
 
             /**
-             * The time the file was added to the media provider
-             * Units are seconds since 1970.
-             * <P>Type: INTEGER (long)</P>
+             * The time the media item was first added.
              */
+            @CurrentTimeSecondsLong
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String DATE_ADDED = "date_added";
 
             /**
-             * The time the file was last modified
-             * Units are seconds since 1970.
-             * NOTE: This is for internal use by the media scanner.  Do not modify this field.
-             * <P>Type: INTEGER (long)</P>
+             * The time the media item was last modified.
              */
+            @CurrentTimeSecondsLong
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String DATE_MODIFIED = "date_modified";
         }
 
@@ -2347,6 +2567,7 @@ public final class MediaStore {
                 /**
                  * The ID within the playlist.
                  */
+                @Column(Cursor.FIELD_TYPE_INTEGER)
                 public static final String _ID = "_id";
 
                 /**
@@ -2357,20 +2578,20 @@ public final class MediaStore {
 
                 /**
                  * The ID of the audio file
-                 * <P>Type: INTEGER (long)</P>
                  */
+                @Column(Cursor.FIELD_TYPE_INTEGER)
                 public static final String AUDIO_ID = "audio_id";
 
                 /**
                  * The ID of the playlist
-                 * <P>Type: INTEGER (long)</P>
                  */
+                @Column(Cursor.FIELD_TYPE_INTEGER)
                 public static final String PLAYLIST_ID = "playlist_id";
 
                 /**
                  * The order of the songs in the playlist
-                 * <P>Type: INTEGER (long)></P>
                  */
+                @Column(Cursor.FIELD_TYPE_INTEGER)
                 public static final String PLAY_ORDER = "play_order";
 
                 /**
@@ -2381,30 +2602,32 @@ public final class MediaStore {
         }
 
         /**
-         * Columns representing an artist
+         * Audio artist metadata columns.
          */
         public interface ArtistColumns {
             /**
              * The artist who created the audio file, if any
-             * <P>Type: TEXT</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
             public static final String ARTIST = "artist";
 
             /**
              * A non human readable key calculated from the ARTIST, used for
              * searching, sorting and grouping
-             * <P>Type: TEXT</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
             public static final String ARTIST_KEY = "artist_key";
 
             /**
              * The number of albums in the database for this artist
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String NUMBER_OF_ALBUMS = "number_of_albums";
 
             /**
              * The number of albums in the database for this artist
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String NUMBER_OF_TRACKS = "number_of_tracks";
         }
 
@@ -2466,40 +2689,46 @@ public final class MediaStore {
         }
 
         /**
-         * Columns representing an album
+         * Audio album metadata columns.
          */
         public interface AlbumColumns {
 
             /**
              * The id for the album
-             * <P>Type: INTEGER</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String ALBUM_ID = "album_id";
 
             /**
              * The album on which the audio file appears, if any
-             * <P>Type: TEXT</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
             public static final String ALBUM = "album";
 
             /**
-             * The artist whose songs appear on this album
-             * <P>Type: TEXT</P>
+             * The ID of the artist whose songs appear on this album.
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
+            public static final String ARTIST_ID = "artist_id";
+
+            /**
+             * The name of the artist whose songs appear on this album.
+             */
+            @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
             public static final String ARTIST = "artist";
 
             /**
              * The number of songs on this album
-             * <P>Type: INTEGER</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String NUMBER_OF_SONGS = "numsongs";
 
             /**
              * This column is available when getting album info via artist,
              * and indicates the number of songs on the album by the given
              * artist.
-             * <P>Type: INTEGER</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String NUMBER_OF_SONGS_FOR_ARTIST = "numsongs_by_artist";
 
             /**
@@ -2507,8 +2736,8 @@ public final class MediaStore {
              * on this album were released. This will often
              * be the same as {@link #LAST_YEAR}, but for compilation albums
              * they might differ.
-             * <P>Type: INTEGER</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String FIRST_YEAR = "minyear";
 
             /**
@@ -2516,30 +2745,28 @@ public final class MediaStore {
              * on this album were released. This will often
              * be the same as {@link #FIRST_YEAR}, but for compilation albums
              * they might differ.
-             * <P>Type: INTEGER</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String LAST_YEAR = "maxyear";
 
             /**
              * A non human readable key calculated from the ALBUM, used for
              * searching, sorting and grouping
-             * <P>Type: TEXT</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
             public static final String ALBUM_KEY = "album_key";
 
             /**
              * Cached album art.
-             * <P>Type: TEXT</P>
              *
              * @deprecated Apps may not have filesystem permissions to directly
              *             access this path. Instead of trying to open this path
              *             directly, apps should use
              *             {@link ContentResolver#loadThumbnail}
-             *             to gain access. This value will always be
-             *             {@code NULL} for apps targeting
-             *             {@link android.os.Build.VERSION_CODES#Q} or higher.
+             *             to gain access.
              */
             @Deprecated
+            @Column(Cursor.FIELD_TYPE_STRING)
             public static final String ALBUM_ART = "album_art";
         }
 
@@ -2597,8 +2824,46 @@ public final class MediaStore {
             // Not instantiable.
             private Radio() { }
         }
+
+        /**
+         * This class provides utility methods to obtain thumbnails for various
+         * {@link Audio} items.
+         *
+         * @deprecated Callers should migrate to using
+         *             {@link ContentResolver#loadThumbnail}, since it offers
+         *             richer control over requested thumbnail sizes and
+         *             cancellation behavior.
+         * @hide
+         */
+        @Deprecated
+        public static class Thumbnails implements BaseColumns {
+            /**
+             * Path to the thumbnail file on disk.
+             * <p>
+             * Note that apps may not have filesystem permissions to directly
+             * access this path. Instead of trying to open this path directly,
+             * apps should use
+             * {@link ContentResolver#openFileDescriptor(Uri, String)} to gain
+             * access.
+             *
+             * @deprecated Apps may not have filesystem permissions to directly
+             *             access this path. Instead of trying to open this path
+             *             directly, apps should use
+             *             {@link ContentResolver#loadThumbnail}
+             *             to gain access.
+             */
+            @Deprecated
+            @Column(Cursor.FIELD_TYPE_STRING)
+            public static final String DATA = "_data";
+
+            @Column(Cursor.FIELD_TYPE_INTEGER)
+            public static final String ALBUM_ID = "album_id";
+        }
     }
 
+    /**
+     * Collection of all media with MIME type of {@code video/*}.
+     */
     public static final class Video {
 
         /**
@@ -2606,69 +2871,78 @@ public final class MediaStore {
          */
         public static final String DEFAULT_SORT_ORDER = MediaColumns.DISPLAY_NAME;
 
+        /**
+         * @deprecated all queries should be performed through
+         *             {@link ContentResolver} directly, which offers modern
+         *             features like {@link CancellationSignal}.
+         */
+        @Deprecated
         public static final Cursor query(ContentResolver cr, Uri uri, String[] projection) {
             return cr.query(uri, projection, null, null, DEFAULT_SORT_ORDER);
         }
 
+        /**
+         * Video metadata columns.
+         */
         public interface VideoColumns extends MediaColumns {
 
             /**
-             * The duration of the video file, in ms
-             * <P>Type: INTEGER (long)</P>
+             * The duration of the video item.
              */
+            @DurationMillisLong
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String DURATION = "duration";
 
             /**
              * The artist who created the video file, if any
-             * <P>Type: TEXT</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
             public static final String ARTIST = "artist";
 
             /**
              * The album the video file is from, if any
-             * <P>Type: TEXT</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
             public static final String ALBUM = "album";
 
             /**
              * The resolution of the video file, formatted as "XxY"
-             * <P>Type: TEXT</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
             public static final String RESOLUTION = "resolution";
 
             /**
              * The description of the video recording
-             * <P>Type: TEXT</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
             public static final String DESCRIPTION = "description";
 
             /**
              * Whether the video should be published as public or private
-             * <P>Type: INTEGER</P>
              */
+            @Column(Cursor.FIELD_TYPE_INTEGER)
             public static final String IS_PRIVATE = "isprivate";
 
             /**
              * The user-added tags associated with a video
-             * <P>Type: TEXT</P>
              */
+            @Column(Cursor.FIELD_TYPE_STRING)
             public static final String TAGS = "tags";
 
             /**
              * The YouTube category of the video
-             * <P>Type: TEXT</P>
              */
+            @Column(Cursor.FIELD_TYPE_STRING)
             public static final String CATEGORY = "category";
 
             /**
              * The language of the video
-             * <P>Type: TEXT</P>
              */
+            @Column(Cursor.FIELD_TYPE_STRING)
             public static final String LANGUAGE = "language";
 
             /**
              * The latitude where the video was captured.
-             * <P>Type: DOUBLE</P>
              *
              * @deprecated location details are no longer indexed for privacy
              *             reasons, and this value is now always {@code null}.
@@ -2676,11 +2950,11 @@ public final class MediaStore {
              *             {@link ExifInterface#getLatLong(float[])}.
              */
             @Deprecated
+            @Column(value = Cursor.FIELD_TYPE_FLOAT, readOnly = true)
             public static final String LATITUDE = "latitude";
 
             /**
              * The longitude where the video was captured.
-             * <P>Type: DOUBLE</P>
              *
              * @deprecated location details are no longer indexed for privacy
              *             reasons, and this value is now always {@code null}.
@@ -2688,33 +2962,33 @@ public final class MediaStore {
              *             {@link ExifInterface#getLatLong(float[])}.
              */
             @Deprecated
+            @Column(value = Cursor.FIELD_TYPE_FLOAT, readOnly = true)
             public static final String LONGITUDE = "longitude";
 
             /**
-             * The date & time that the video was taken in units
-             * of milliseconds since jan 1, 1970.
-             * <P>Type: INTEGER</P>
+             * The time the media item was taken.
              */
+            @CurrentTimeMillisLong
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String DATE_TAKEN = "datetaken";
 
             /**
              * The mini thumb id.
-             * <P>Type: INTEGER</P>
              *
              * @deprecated all thumbnails should be obtained via
              *             {@link MediaStore.Images.Thumbnails#getThumbnail}, as this
              *             value is no longer supported.
              */
             @Deprecated
+            @Column(Cursor.FIELD_TYPE_INTEGER)
             public static final String MINI_THUMB_MAGIC = "mini_thumb_magic";
 
             /**
              * The primary bucket ID of this media item. This can be useful to
              * present the user a first-level clustering of related media items.
              * This is a read-only column that is automatically computed.
-             * <p>
-             * Type: INTEGER
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String BUCKET_ID = "bucket_id";
 
             /**
@@ -2722,9 +2996,8 @@ public final class MediaStore {
              * useful to present the user a first-level clustering of related
              * media items. This is a read-only column that is automatically
              * computed.
-             * <p>
-             * Type: TEXT
              */
+            @Column(value = Cursor.FIELD_TYPE_STRING, readOnly = true)
             public static final String BUCKET_DISPLAY_NAME = "bucket_display_name";
 
             /**
@@ -2738,39 +3011,37 @@ public final class MediaStore {
              * {@code IMG1024.BURST001.JPG} and {@code IMG1024.BURST002.JPG}
              * will have the same {@link #GROUP_ID} because the first portion of
              * their filenames is identical.
-             * <p>
-             * Type: INTEGER
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String GROUP_ID = "group_id";
 
             /**
-             * The bookmark for the video. Time in ms. Represents the location in the video that the
-             * video should start playing at the next time it is opened. If the value is null or
-             * out of the range 0..DURATION-1 then the video should start playing from the
-             * beginning.
-             * <P>Type: INTEGER</P>
+             * The position within the video item at which playback should be
+             * resumed.
              */
+            @DurationMillisLong
+            @Column(Cursor.FIELD_TYPE_INTEGER)
             public static final String BOOKMARK = "bookmark";
 
             /**
              * The standard of color aspects
-             * <P>Type: INTEGER</P>
              * @hide
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String COLOR_STANDARD = "color_standard";
 
             /**
              * The transfer of color aspects
-             * <P>Type: INTEGER</P>
              * @hide
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String COLOR_TRANSFER = "color_transfer";
 
             /**
              * The range of color aspects
-             * <P>Type: INTEGER</P>
              * @hide
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String COLOR_RANGE = "color_range";
         }
 
@@ -2785,6 +3056,11 @@ public final class MediaStore {
             public static Uri getContentUri(String volumeName) {
                 return AUTHORITY_URI.buildUpon().appendPath(volumeName).appendPath("video")
                         .appendPath("media").build();
+            }
+
+            /** @hide */
+            public static @NonNull Uri getContentUri(@NonNull String volumeName, long id) {
+                return ContentUris.withAppendedId(getContentUri(volumeName), id);
             }
 
             /**
@@ -2937,30 +3213,27 @@ public final class MediaStore {
 
             /**
              * Path to the thumbnail file on disk.
-             * <p>
-             * Type: TEXT
              *
              * @deprecated Apps may not have filesystem permissions to directly
              *             access this path. Instead of trying to open this path
              *             directly, apps should use
              *             {@link ContentResolver#openFileDescriptor(Uri, String)}
-             *             to gain access. This value will always be
-             *             {@code NULL} for apps targeting
-             *             {@link android.os.Build.VERSION_CODES#Q} or higher.
+             *             to gain access.
              */
             @Deprecated
+            @Column(Cursor.FIELD_TYPE_STRING)
             public static final String DATA = "_data";
 
             /**
              * The original image for the thumbnal
-             * <P>Type: INTEGER (ID from Video table)</P>
              */
+            @Column(Cursor.FIELD_TYPE_INTEGER)
             public static final String VIDEO_ID = "video_id";
 
             /**
              * The kind of the thumbnail
-             * <P>Type: INTEGER (One of the values below)</P>
              */
+            @Column(Cursor.FIELD_TYPE_INTEGER)
             public static final String KIND = "kind";
 
             public static final int MINI_KIND = ThumbnailConstants.MINI_KIND;
@@ -2969,34 +3242,41 @@ public final class MediaStore {
 
             /**
              * The width of the thumbnal
-             * <P>Type: INTEGER (long)</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String WIDTH = "width";
 
             /**
              * The height of the thumbnail
-             * <P>Type: INTEGER (long)</P>
              */
+            @Column(value = Cursor.FIELD_TYPE_INTEGER, readOnly = true)
             public static final String HEIGHT = "height";
         }
     }
 
+    /** @removed */
+    @Deprecated
+    public static @NonNull Set<String> getAllVolumeNames(@NonNull Context context) {
+        return getExternalVolumeNames(context);
+    }
+
     /**
-     * Return list of all volume names currently available. This includes a
-     * unique name for each shared storage device that is currently mounted.
+     * Return list of all specific volume names that make up
+     * {@link #VOLUME_EXTERNAL}. This includes a unique volume name for each
+     * shared storage device that is currently attached, which typically
+     * includes {@link MediaStore#VOLUME_EXTERNAL_PRIMARY}.
      * <p>
-     * Each name can be passed to APIs like
-     * {@link MediaStore.Images.Media#getContentUri(String)} to query media at
-     * that location.
+     * Each specific volume name can be passed to APIs like
+     * {@link MediaStore.Images.Media#getContentUri(String)} to interact with
+     * media on that storage device.
      */
-    public static @NonNull Set<String> getAllVolumeNames(Context context) {
+    public static @NonNull Set<String> getExternalVolumeNames(@NonNull Context context) {
         final StorageManager sm = context.getSystemService(StorageManager.class);
         final Set<String> volumeNames = new ArraySet<>();
-        volumeNames.add(VOLUME_INTERNAL);
         for (VolumeInfo vi : sm.getVolumes()) {
             if (vi.isVisibleForUser(UserHandle.myUserId()) && vi.isMountedReadable()) {
                 if (vi.isPrimary()) {
-                    volumeNames.add(VOLUME_EXTERNAL);
+                    volumeNames.add(VOLUME_EXTERNAL_PRIMARY);
                 } else {
                     volumeNames.add(vi.getNormalizedFsUuid());
                 }
@@ -3027,6 +3307,8 @@ public final class MediaStore {
             return volumeName;
         } else if (VOLUME_EXTERNAL.equals(volumeName)) {
             return volumeName;
+        } else if (VOLUME_EXTERNAL_PRIMARY.equals(volumeName)) {
+            return volumeName;
         }
 
         // When not one of the well-known values above, it must be a hex UUID
@@ -3042,8 +3324,9 @@ public final class MediaStore {
     }
 
     /**
-     * Return path where the given volume is mounted. Not valid for
-     * {@link #VOLUME_INTERNAL}.
+     * Return path where the given specific volume is mounted. Not valid for
+     * {@link #VOLUME_INTERNAL} or {@link #VOLUME_EXTERNAL}, since those are
+     * broad collections that cover many paths.
      *
      * @hide
      */
@@ -3054,8 +3337,12 @@ public final class MediaStore {
             throw new IllegalArgumentException();
         }
 
-        if (VOLUME_EXTERNAL.equals(volumeName)) {
-            return Environment.getExternalStorageDirectory();
+        switch (volumeName) {
+            case VOLUME_INTERNAL:
+            case VOLUME_EXTERNAL:
+                throw new FileNotFoundException(volumeName + " has no associated path");
+            case VOLUME_EXTERNAL_PRIMARY:
+                return Environment.getExternalStorageDirectory();
         }
 
         final StorageManager sm = AppGlobals.getInitialApplication()
@@ -3085,20 +3372,37 @@ public final class MediaStore {
             throw new IllegalArgumentException();
         }
 
+        final Context context = AppGlobals.getInitialApplication();
+        final UserManager um = context.getSystemService(UserManager.class);
+
         final ArrayList<File> res = new ArrayList<>();
         if (VOLUME_INTERNAL.equals(volumeName)) {
-            res.add(new File(Environment.getRootDirectory(), "media"));
-            res.add(new File(Environment.getOemDirectory(), "media"));
-            res.add(new File(Environment.getProductDirectory(), "media"));
+            addCanonicalFile(res, new File(Environment.getRootDirectory(), "media"));
+            addCanonicalFile(res, new File(Environment.getOemDirectory(), "media"));
+            addCanonicalFile(res, new File(Environment.getProductDirectory(), "media"));
+        } else if (VOLUME_EXTERNAL.equals(volumeName)) {
+            for (String exactVolume : getExternalVolumeNames(context)) {
+                addCanonicalFile(res, getVolumePath(exactVolume));
+            }
+            if (um.isDemoUser()) {
+                addCanonicalFile(res, Environment.getDataPreloadsMediaDirectory());
+            }
         } else {
-            res.add(getVolumePath(volumeName));
-            final UserManager um = AppGlobals.getInitialApplication()
-                    .getSystemService(UserManager.class);
-            if (VOLUME_EXTERNAL.equals(volumeName) && um.isDemoUser()) {
-                res.add(Environment.getDataPreloadsMediaDirectory());
+            addCanonicalFile(res, getVolumePath(volumeName));
+            if (VOLUME_EXTERNAL_PRIMARY.equals(volumeName) && um.isDemoUser()) {
+                addCanonicalFile(res, Environment.getDataPreloadsMediaDirectory());
             }
         }
         return res;
+    }
+
+    private static void addCanonicalFile(List<File> list, File file) {
+        try {
+            list.add(file.getCanonicalFile());
+        } catch (IOException e) {
+            Log.w(TAG, "Failed to resolve " + file + ": " + e);
+            list.add(file);
+        }
     }
 
     /**
@@ -3122,21 +3426,45 @@ public final class MediaStore {
     public static final String MEDIA_IGNORE_FILENAME = ".nomedia";
 
     /**
-     * Get the media provider's version.
-     * Applications that import data from the media provider into their own caches
-     * can use this to detect that the media provider changed, and reimport data
-     * as needed. No other assumptions should be made about the meaning of the version.
-     * @param context Context to use for performing the query.
-     * @return A version string, or null if the version could not be determined.
+     * Return an opaque version string describing the {@link MediaStore} state.
+     * <p>
+     * Applications that import data from {@link MediaStore} into their own
+     * caches can use this to detect that {@link MediaStore} has undergone
+     * substantial changes, and that data should be rescanned.
+     * <p>
+     * No other assumptions should be made about the meaning of the version.
+     * <p>
+     * This method returns the version for
+     * {@link MediaStore#VOLUME_EXTERNAL_PRIMARY}; to obtain a version for a
+     * different volume, use {@link #getVersion(Context, String)}.
      */
-    public static String getVersion(Context context) {
-        final Uri uri = AUTHORITY_URI.buildUpon().appendPath("none").appendPath("version").build();
-        try (Cursor c = context.getContentResolver().query(uri, null, null, null, null)) {
-            if (c.moveToFirst()) {
-                return c.getString(0);
-            }
+    public static @NonNull String getVersion(@NonNull Context context) {
+        return getVersion(context, VOLUME_EXTERNAL_PRIMARY);
+    }
+
+    /**
+     * Return an opaque version string describing the {@link MediaStore} state.
+     * <p>
+     * Applications that import data from {@link MediaStore} into their own
+     * caches can use this to detect that {@link MediaStore} has undergone
+     * substantial changes, and that data should be rescanned.
+     * <p>
+     * No other assumptions should be made about the meaning of the version.
+     *
+     * @param volumeName specific volume to obtain an opaque version string for.
+     *            Must be one of the values returned from
+     *            {@link #getExternalVolumeNames(Context)}.
+     */
+    public static @NonNull String getVersion(@NonNull Context context, @NonNull String volumeName) {
+        final ContentResolver resolver = context.getContentResolver();
+        try (ContentProviderClient client = resolver.acquireContentProviderClient(AUTHORITY)) {
+            final Bundle in = new Bundle();
+            in.putString(Intent.EXTRA_TEXT, volumeName);
+            final Bundle out = client.call(GET_VERSION_CALL, null, in);
+            return out.getString(Intent.EXTRA_TEXT);
+        } catch (RemoteException e) {
+            throw e.rethrowAsRuntimeException();
         }
-        return null;
     }
 
     /**
@@ -3154,7 +3482,7 @@ public final class MediaStore {
      *         if no equivalent was found.
      * @see #getMediaUri(Context, Uri)
      */
-    public static Uri getDocumentUri(Context context, Uri mediaUri) {
+    public static @Nullable Uri getDocumentUri(@NonNull Context context, @NonNull Uri mediaUri) {
         final ContentResolver resolver = context.getContentResolver();
         final List<UriPermission> uriPermissions = resolver.getPersistedUriPermissions();
 
@@ -3184,7 +3512,7 @@ public final class MediaStore {
      *         equivalent was found.
      * @see #getDocumentUri(Context, Uri)
      */
-    public static Uri getMediaUri(Context context, Uri documentUri) {
+    public static @Nullable Uri getMediaUri(@NonNull Context context, @NonNull Uri documentUri) {
         final ContentResolver resolver = context.getContentResolver();
         final List<UriPermission> uriPermissions = resolver.getPersistedUriPermissions();
 
@@ -3251,6 +3579,39 @@ public final class MediaStore {
             }
         } else {
             throw new IOException("User " + user + " must be unlocked and running");
+        }
+    }
+
+    /** @hide */
+    @TestApi
+    public static Uri scanFile(Context context, File file) {
+        return scan(context, SCAN_FILE_CALL, file, false);
+    }
+
+    /** @hide */
+    @TestApi
+    public static Uri scanFileFromShell(Context context, File file) {
+        return scan(context, SCAN_FILE_CALL, file, true);
+    }
+
+    /** @hide */
+    @TestApi
+    public static void scanVolume(Context context, File file) {
+        scan(context, SCAN_VOLUME_CALL, file, false);
+    }
+
+    /** @hide */
+    private static Uri scan(Context context, String method, File file,
+            boolean originatedFromShell) {
+        final ContentResolver resolver = context.getContentResolver();
+        try (ContentProviderClient client = resolver.acquireContentProviderClient(AUTHORITY)) {
+            final Bundle in = new Bundle();
+            in.putParcelable(Intent.EXTRA_STREAM, Uri.fromFile(file));
+            in.putBoolean(EXTRA_ORIGINATED_FROM_SHELL, originatedFromShell);
+            final Bundle out = client.call(method, null, in);
+            return out.getParcelable(Intent.EXTRA_STREAM);
+        } catch (RemoteException e) {
+            throw e.rethrowAsRuntimeException();
         }
     }
 }

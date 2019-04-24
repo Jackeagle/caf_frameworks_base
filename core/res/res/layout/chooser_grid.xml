@@ -20,8 +20,7 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:maxWidth="@dimen/resolver_max_width"
-    android:maxCollapsedHeight="288dp"
+    android:maxCollapsedHeight="0dp"
     android:maxCollapsedHeightSmall="56dp"
     android:id="@id/contentPanel">
 
@@ -29,7 +28,19 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alwaysShow="true"
-        android:background="?attr/colorBackgroundFloating">
+        android:background="@drawable/bottomsheet_background">
+
+        <ImageView
+            android:id="@+id/drag"
+            android:layout_width="32dp"
+            android:layout_height="4dp"
+            android:src="@drawable/ic_drag_handle"
+            android:clickable="true"
+            android:layout_marginTop="@dimen/chooser_view_spacing"
+            android:tint="@color/lighter_gray"
+            android:layout_centerHorizontal="true"
+            android:layout_alignParentTop="true" />
+
         <TextView android:id="@+id/profile_button"
                   android:layout_width="wrap_content"
                   android:layout_height="48dp"
@@ -41,7 +52,7 @@
                   android:textAppearance="?attr/textAppearanceButton"
                   android:textColor="?attr/colorAccent"
                   android:gravity="center_vertical"
-                  android:layout_alignParentTop="true"
+                  android:layout_below="@id/drag"
                   android:layout_alignParentRight="true"
                   android:singleLine="true"/>
 
@@ -51,85 +62,13 @@
                   android:textAppearance="?attr/textAppearanceMedium"
                   android:textSize="20sp"
                   android:gravity="center"
-                  android:paddingTop="18dp"
-                  android:paddingBottom="18dp"
+                  android:paddingTop="@dimen/chooser_view_spacing"
+                  android:paddingBottom="@dimen/chooser_view_spacing"
                   android:paddingLeft="24dp"
                   android:paddingRight="24dp"
                   android:layout_below="@id/profile_button"
                   android:layout_centerHorizontal="true"/>
     </RelativeLayout>
-
-    <LinearLayout
-        android:id="@+id/content_preview"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingBottom="@dimen/chooser_view_spacing"
-        android:background="?attr/colorBackgroundFloating">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:paddingLeft="@dimen/chooser_edge_margin_normal"
-            android:paddingRight="@dimen/chooser_edge_margin_normal"
-            android:layout_marginBottom="@dimen/chooser_view_spacing"
-            android:id="@+id/content_preview_text_layout">
-            <TextView
-                android:id="@+id/content_preview_text"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center_vertical"
-                android:ellipsize="end"
-                android:gravity="start|top"
-                android:paddingRight="24dp"
-                android:maxLines="2"/>
-            <Button
-                android:id="@+id/copy_button"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:gravity="center"
-                android:layout_gravity="center_vertical"
-                android:background="@drawable/ic_content_copy_gm2"/>
-        </LinearLayout>
-
-        <!-- Required sub-layout so we can get the nice rounded corners-->
-        <!-- around this section -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginLeft="@dimen/chooser_edge_margin_thin"
-            android:layout_marginRight="@dimen/chooser_edge_margin_thin"
-            android:minHeight="80dp"
-            android:background="@drawable/chooser_content_preview_rounded"
-            android:id="@+id/content_preview_title_layout">
-
-            <view class="com.android.internal.app.ChooserActivity$RoundedRectImageView"
-                  android:id="@+id/content_preview_thumbnail"
-                  android:layout_width="80dp"
-                  android:layout_height="80dp"
-                  android:layout_marginRight="12dp"
-                  android:adjustViewBounds="true"
-                  android:layout_gravity="center_vertical"
-                  android:gravity="center"
-                  android:maxWidth="70dp"
-                  android:maxHeight="70dp"
-                  android:padding="5dp"
-                  android:scaleType="centerCrop"/>
-
-            <TextView
-                android:id="@+id/content_preview_title"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center_vertical"
-                android:ellipsize="end"
-                android:maxLines="2"
-                android:textAppearance="?attr/textAppearanceMedium"/>
-        </LinearLayout>
-    </LinearLayout>
 
     <ListView
         android:layout_width="match_parent"
@@ -138,7 +77,6 @@
         android:clipToPadding="false"
         android:scrollbarStyle="outsideOverlay"
         android:background="?attr/colorBackgroundFloating"
-        android:elevation="8dp"
         android:listSelector="@color/transparent"
         android:divider="@null"
         android:scrollIndicators="top"
@@ -150,7 +88,7 @@
               android:layout_alwaysShow="true"
               android:background="?attr/colorBackgroundFloating"
               android:text="@string/noApplications"
-              android:padding="32dp"
+              android:padding="@dimen/chooser_edge_margin_normal"
               android:gravity="center"
               android:visibility="gone"/>
 

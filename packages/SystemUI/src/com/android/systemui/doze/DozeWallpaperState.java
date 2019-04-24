@@ -37,8 +37,8 @@ public class DozeWallpaperState implements DozeMachine.Part {
     private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
 
     private final IWallpaperManager mWallpaperManagerService;
-    private boolean mIsAmbientMode;
     private final DozeParameters mDozeParameters;
+    private boolean mIsAmbientMode;
 
     public DozeWallpaperState(Context context) {
         this(IWallpaperManager.Stub.asInterface(
@@ -47,7 +47,8 @@ public class DozeWallpaperState implements DozeMachine.Part {
     }
 
     @VisibleForTesting
-    DozeWallpaperState(IWallpaperManager wallpaperManagerService, DozeParameters parameters) {
+    DozeWallpaperState(IWallpaperManager wallpaperManagerService,
+            DozeParameters parameters) {
         mWallpaperManagerService = wallpaperManagerService;
         mDozeParameters = parameters;
     }
@@ -61,14 +62,14 @@ public class DozeWallpaperState implements DozeMachine.Part {
             case DOZE_AOD_PAUSING:
             case DOZE_AOD_PAUSED:
             case DOZE_REQUEST_PULSE:
-            case DOZE_PULSING:
             case DOZE_PULSE_DONE:
+            case DOZE_PULSING:
                 isAmbientMode = true;
                 break;
+            case DOZE_PULSING_BRIGHT:
             default:
                 isAmbientMode = false;
         }
-
         final boolean animated;
         if (isAmbientMode) {
             animated = mDozeParameters.shouldControlScreenOff();

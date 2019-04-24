@@ -27,8 +27,10 @@
 #include "pipeline/skia/SkiaOpenGLPipeline.h"
 #include "pipeline/skia/SkiaPipeline.h"
 #include "pipeline/skia/SkiaVulkanPipeline.h"
+#include "thread/CommonPool.h"
 #include "utils/GLUtils.h"
 #include "utils/TimeUtils.h"
+#include "utils/TraceUtils.h"
 #include "../Properties.h"
 
 #include <cutils/properties.h>
@@ -103,12 +105,13 @@ CanvasContext::CanvasContext(RenderThread& thread, bool translucent, RenderNode*
         , mOpaque(!translucent)
         , mAnimationContext(contextFactory->createAnimationContext(mRenderThread.timeLord()))
         , mJankTracker(&thread.globalProfileData(), thread.mainDisplayInfo())
-        , mProfiler(mJankTracker.frames())
+        , mProfiler(mJankTracker.frames(), thread.timeLord().frameIntervalNanos())
         , mContentDrawBounds(0, 0, 0, 0)
         , mRenderPipeline(std::move(renderPipeline)) {
     rootRenderNode->makeRoot();
     mRenderNodes.emplace_back(rootRenderNode);
     mProfiler.setDensity(mRenderThread.mainDisplayInfo().density);
+    setRenderAheadDepth(Properties::defaultRenderAhead);
 }
 
 CanvasContext::~CanvasContext() {
@@ -157,6 +160,7 @@ void CanvasContext::setSurface(sp<Surface>&& surface) {
     if (hasSurface) {
         mHaveNewSurface = true;
         mSwapHistory.clear();
+        applyRenderAheadSettings();
     } else {
         mRenderThread.removeFrameCallback(this);
         mGenerationID++;
@@ -401,11 +405,11 @@ void CanvasContext::draw() {
     SkRect dirty;
     mDamageAccumulator.finish(&dirty);
 
-    // TODO: Re-enable after figuring out cause of b/22592975
-    //    if (dirty.isEmpty() && Properties::skipEmptyFrames) {
-    //        mCurrentFrameInfo->addFlag(FrameInfoFlags::SkippedFrame);
-    //        return;
-    //    }
+    if (dirty.isEmpty() && Properties::skipEmptyFrames
+            && !surfaceRequiresRedraw()) {
+        mCurrentFrameInfo->addFlag(FrameInfoFlags::SkippedFrame);
+        return;
+    }
 
     mCurrentFrameInfo->markIssueDrawCommandsStart();
 
@@ -420,6 +424,12 @@ void CanvasContext::draw() {
     int64_t frameCompleteNr = mFrameCompleteCallbacks.size() ? getFrameNumber() : -1;
 
     waitOnFences();
+
+    if (mRenderAheadDepth) {
+        auto presentTime = mCurrentFrameInfo->get(FrameInfoIndex::Vsync) +
+                (mRenderThread.timeLord().frameIntervalNanos() * (mRenderAheadDepth + 1));
+        native_window_set_buffers_timestamp(mNativeSurface.get(), presentTime);
+    }
 
     bool requireSwap = false;
     bool didSwap =
@@ -603,31 +613,14 @@ void CanvasContext::waitOnFences() {
     if (mFrameFences.size()) {
         ATRACE_CALL();
         for (auto& fence : mFrameFences) {
-            fence->getResult();
+            fence.get();
         }
         mFrameFences.clear();
     }
 }
 
-class CanvasContext::FuncTaskProcessor : public TaskProcessor<bool> {
-public:
-    explicit FuncTaskProcessor(TaskManager* taskManager) : TaskProcessor<bool>(taskManager) {}
-
-    virtual void onProcess(const sp<Task<bool> >& task) override {
-        FuncTask* t = static_cast<FuncTask*>(task.get());
-        t->func();
-        task->setResult(true);
-    }
-};
-
 void CanvasContext::enqueueFrameWork(std::function<void()>&& func) {
-    if (!mFrameWorkProcessor.get()) {
-        mFrameWorkProcessor = new FuncTaskProcessor(mRenderPipeline->getTaskManager());
-    }
-    sp<FuncTask> task(new FuncTask());
-    task->func = func;
-    mFrameFences.push_back(task);
-    mFrameWorkProcessor->add(task);
+    mFrameFences.push_back(CommonPool::async(std::move(func)));
 }
 
 int64_t CanvasContext::getFrameNumber() {
@@ -636,6 +629,41 @@ int64_t CanvasContext::getFrameNumber() {
         mFrameNumber = static_cast<int64_t>(mNativeSurface->getNextFrameNumber());
     }
     return mFrameNumber;
+}
+
+bool CanvasContext::surfaceRequiresRedraw() {
+    if (!mNativeSurface) return false;
+    if (mHaveNewSurface) return true;
+
+    int width = -1;
+    int height = -1;
+    ReliableSurface* surface = mNativeSurface.get();
+    surface->query(NATIVE_WINDOW_WIDTH, &width);
+    surface->query(NATIVE_WINDOW_HEIGHT, &height);
+
+    return width == mLastFrameWidth && height == mLastFrameHeight;
+}
+
+void CanvasContext::applyRenderAheadSettings() {
+    if (Properties::getRenderPipelineType() == RenderPipelineType::SkiaVulkan) {
+        // TODO: Fix SkiaVulkan's assumptions on buffer counts. And SIGBUS crashes.
+        mRenderAheadDepth = 0;
+        return;
+    }
+    if (mNativeSurface) {
+        native_window_set_buffer_count(mNativeSurface.get(), 3 + mRenderAheadDepth);
+        if (!mRenderAheadDepth) {
+            native_window_set_buffers_timestamp(mNativeSurface.get(), NATIVE_WINDOW_TIMESTAMP_AUTO);
+        }
+    }
+}
+
+void CanvasContext::setRenderAheadDepth(int renderAhead) {
+    if (renderAhead < 0 || renderAhead > 2 || renderAhead == mRenderAheadDepth) {
+        return;
+    }
+    mRenderAheadDepth = renderAhead;
+    applyRenderAheadSettings();
 }
 
 SkRect CanvasContext::computeDirtyRect(const Frame& frame, SkRect* dirty) {

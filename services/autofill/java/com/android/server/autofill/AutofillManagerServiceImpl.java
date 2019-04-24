@@ -18,6 +18,9 @@ package com.android.server.autofill;
 
 import static android.service.autofill.FillRequest.FLAG_MANUAL_REQUEST;
 import static android.view.autofill.AutofillManager.ACTION_START_SESSION;
+import static android.view.autofill.AutofillManager.FLAG_ADD_CLIENT_ENABLED;
+import static android.view.autofill.AutofillManager.FLAG_ADD_CLIENT_ENABLED_FOR_AUGMENTED_AUTOFILL_ONLY;
+import static android.view.autofill.AutofillManager.FLAG_SESSION_FOR_AUGMENTED_AUTOFILL_ONLY;
 import static android.view.autofill.AutofillManager.NO_SESSION;
 
 import static com.android.server.autofill.Helper.sDebug;
@@ -40,6 +43,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.Process;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import android.os.SystemClock;
@@ -58,6 +62,7 @@ import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.DebugUtils;
 import android.util.LocalLog;
+import android.util.Pair;
 import android.util.Slog;
 import android.util.SparseArray;
 import android.util.TimeUtils;
@@ -76,7 +81,6 @@ import com.android.server.autofill.AutofillManagerService.AutofillCompatState;
 import com.android.server.autofill.RemoteAugmentedAutofillService.RemoteAugmentedAutofillServiceCallbacks;
 import com.android.server.autofill.ui.AutoFillUI;
 import com.android.server.infra.AbstractPerUserSystemService;
-import com.android.server.infra.FrameworkResourcesServiceNameResolver;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -95,7 +99,7 @@ final class AutofillManagerServiceImpl
     private static final int MAX_SESSION_ID_CREATE_TRIES = 2048;
 
     /** Minimum interval to prune abandoned sessions */
-    private static final int MAX_ABANDONED_SESSION_MILLIS = 30000;
+    private static final int MAX_ABANDONED_SESSION_MILLIS = 30_000;
 
     private final AutoFillUI mUi;
     private final MetricsLogger mMetricsLogger = new MetricsLogger();
@@ -153,17 +157,15 @@ final class AutofillManagerServiceImpl
     private long mLastPrune = 0;
 
     /**
-     * Object used to set the name of the augmented autofill service.
-     */
-    @NonNull
-    final FrameworkResourcesServiceNameResolver mAugmentedAutofillResolver;
-
-    /**
      * Reference to the {@link RemoteAugmentedAutofillService}, is set on demand.
      */
     @GuardedBy("mLock")
     @Nullable
     private RemoteAugmentedAutofillService mRemoteAugmentedAutofillService;
+
+    @GuardedBy("mLock")
+    @Nullable
+    private ServiceInfo mRemoteAugmentedAutofillServiceInfo;
 
     AutofillManagerServiceImpl(AutofillManagerService master, Object lock,
             LocalLog uiLatencyHistory, LocalLog wtfHistory, int userId, AutoFillUI ui,
@@ -176,11 +178,6 @@ final class AutofillManagerServiceImpl
         mUi = ui;
         mFieldClassificationStrategy = new FieldClassificationStrategy(getContext(), userId);
         mAutofillCompatState = autofillCompatState;
-
-        mAugmentedAutofillResolver = new FrameworkResourcesServiceNameResolver(master.getContext(),
-                com.android.internal.R.string.config_defaultAugmentedAutofillService);
-        mAugmentedAutofillResolver.setOnTemporaryServiceNameChangedCallback(
-                (u, s) -> updateRemoteAugmentedAutofillService());
 
         updateLocked(disabled);
     }
@@ -207,8 +204,9 @@ final class AutofillManagerServiceImpl
                     session.removeSelfLocked();
                 }
             }
-            sendStateToClients(false);
+            sendStateToClients(/* resetClient= */ false);
         }
+        updateRemoteAugmentedAutofillService();
         return enabledChanged;
     }
 
@@ -224,13 +222,29 @@ final class AutofillManagerServiceImpl
         return mAutofillCompatState.getUrlBarResourceIds(packageName, mUserId);
     }
 
+    /**
+     * Adds the client and return the proper flags
+     *
+     * @return {@code 0} if disabled, {@code FLAG_ADD_CLIENT_ENABLED} if enabled (it might be
+     * OR'ed with {@code FLAG_AUGMENTED_AUTOFILL_REQUEST}).
+     */
     @GuardedBy("mLock")
-    boolean addClientLocked(IAutoFillManagerClient client) {
+    int addClientLocked(IAutoFillManagerClient client, ComponentName componentName) {
         if (mClients == null) {
             mClients = new RemoteCallbackList<>();
         }
         mClients.register(client);
-        return isEnabledLocked();
+
+        if (isEnabledLocked()) return FLAG_ADD_CLIENT_ENABLED;
+
+        // Check if it's enabled for augmented autofill
+        if (isAugmentedAutofillServiceAvailableLocked()
+                && isWhitelistedForAugmentedAutofillLocked(componentName)) {
+            return FLAG_ADD_CLIENT_ENABLED_FOR_AUGMENTED_AUTOFILL_ONLY;
+        }
+
+        // No flags / disabled
+        return 0;
     }
 
     @GuardedBy("mLock")
@@ -263,57 +277,91 @@ final class AutofillManagerServiceImpl
         }
     }
 
+    /**
+     * Starts a new session.
+     *
+     * @return {@code long} whose right-most 32 bits represent the session id (which is always
+     * non-negative), and the left-most contains extra flags (currently either {@code 0} or
+     * {@link AutofillManager#FLAG_SESSION_FOR_AUGMENTED_AUTOFILL_ONLY}).
+     */
     @GuardedBy("mLock")
-    int startSessionLocked(@NonNull IBinder activityToken, int taskId, int uid,
+    long startSessionLocked(@NonNull IBinder activityToken, int taskId, int uid,
             @NonNull IBinder appCallbackToken, @NonNull AutofillId autofillId,
             @NonNull Rect virtualBounds, @Nullable AutofillValue value, boolean hasCallback,
             @NonNull ComponentName componentName, boolean compatMode,
             boolean bindInstantServiceAllowed, int flags) {
-        if (!isEnabledLocked()) {
+        // FLAG_AUGMENTED_AUTOFILL_REQUEST is set in the flags when standard autofill is disabled
+        // but the package is whitelisted for augmented autofill
+        boolean forAugmentedAutofillOnly = (flags
+                & FLAG_ADD_CLIENT_ENABLED_FOR_AUGMENTED_AUTOFILL_ONLY) != 0;
+        if (!isEnabledLocked() && !forAugmentedAutofillOnly) {
             return 0;
         }
 
-        final String shortComponentName = componentName.toShortString();
+        if (!forAugmentedAutofillOnly && isAutofillDisabledLocked(componentName)) {
+            // Standard autofill is enabled, but service disabled autofill for this activity; that
+            // means no session, unless the activity is whitelisted for augmented autofill
+            if (isWhitelistedForAugmentedAutofillLocked(componentName)) {
+                if (sDebug) {
+                    Slog.d(TAG, "startSession(" + componentName + "): disabled by service but "
+                            + "whitelisted for augmented autofill");
+                }
+                forAugmentedAutofillOnly = true;
 
-        if (isAutofillDisabledLocked(componentName)) {
-            if (sDebug) {
-                Slog.d(TAG, "startSession(" + shortComponentName
-                        + "): ignored because disabled by service");
+            } else {
+                if (sDebug) {
+                    Slog.d(TAG, "startSession(" + componentName + "): ignored because "
+                            + "disabled by service and not whitelisted for augmented autofill");
+                }
+                final IAutoFillManagerClient client = IAutoFillManagerClient.Stub
+                        .asInterface(appCallbackToken);
+                try {
+                    client.setSessionFinished(AutofillManager.STATE_DISABLED_BY_SERVICE,
+                            /* autofillableIds= */ null);
+                } catch (RemoteException e) {
+                    Slog.w(TAG,
+                            "Could not notify " + componentName + " that it's disabled: " + e);
+                }
+
+                return NO_SESSION;
             }
-
-            final IAutoFillManagerClient client = IAutoFillManagerClient.Stub
-                    .asInterface(appCallbackToken);
-            try {
-                client.setSessionFinished(AutofillManager.STATE_DISABLED_BY_SERVICE);
-            } catch (RemoteException e) {
-                Slog.w(TAG, "Could not notify " + shortComponentName + " that it's disabled: " + e);
-            }
-
-            return NO_SESSION;
         }
 
-        if (sVerbose) Slog.v(TAG, "startSession(): token=" + activityToken + ", flags=" + flags);
+        if (sVerbose) {
+            Slog.v(TAG, "startSession(): token=" + activityToken + ", flags=" + flags
+                    + ", forAugmentedAutofillOnly=" + forAugmentedAutofillOnly);
+        }
 
         // Occasionally clean up abandoned sessions
         pruneAbandonedSessionsLocked();
 
         final Session newSession = createSessionByTokenLocked(activityToken, taskId, uid,
                 appCallbackToken, hasCallback, componentName, compatMode,
-                bindInstantServiceAllowed, flags);
+                bindInstantServiceAllowed, forAugmentedAutofillOnly, flags);
         if (newSession == null) {
             return NO_SESSION;
         }
 
+        // Service can be null when it's only for augmented autofill
+        String servicePackageName = mInfo == null ? null : mInfo.getServiceInfo().packageName;
         final String historyItem =
-                "id=" + newSession.id + " uid=" + uid + " a=" + shortComponentName
-                + " s=" + mInfo.getServiceInfo().packageName
+                "id=" + newSession.id + " uid=" + uid + " a=" + componentName.toShortString()
+                + " s=" + servicePackageName
                 + " u=" + mUserId + " i=" + autofillId + " b=" + virtualBounds
-                + " hc=" + hasCallback + " f=" + flags;
+                + " hc=" + hasCallback + " f=" + flags + " aa=" + forAugmentedAutofillOnly;
         mMaster.logRequestLocked(historyItem);
 
         newSession.updateLocked(autofillId, virtualBounds, value, ACTION_START_SESSION, flags);
 
-        return newSession.id;
+        if (forAugmentedAutofillOnly) {
+            // Must embed the flag in the response, at the high-end side of the long.
+            // (session is always positive, so we don't have to worry about the signal bit)
+            final long extraFlags = ((long) FLAG_SESSION_FOR_AUGMENTED_AUTOFILL_ONLY) << 32;
+            final long result = extraFlags | newSession.id;
+            return result;
+        } else {
+            return newSession.id;
+        }
     }
 
     /**
@@ -419,7 +467,7 @@ final class AutofillManagerServiceImpl
     private Session createSessionByTokenLocked(@NonNull IBinder activityToken, int taskId, int uid,
             @NonNull IBinder appCallbackToken, boolean hasCallback,
             @NonNull ComponentName componentName, boolean compatMode,
-            boolean bindInstantServiceAllowed, int flags) {
+            boolean bindInstantServiceAllowed, boolean forAugmentedAutofillOnly, int flags) {
         // use random ids so that one app cannot know that another app creates sessions
         int sessionId;
         int tries = 0;
@@ -430,15 +478,20 @@ final class AutofillManagerServiceImpl
                 return null;
             }
 
-            sessionId = sRandom.nextInt();
-        } while (sessionId == NO_SESSION || mSessions.indexOfKey(sessionId) >= 0);
+            sessionId = Math.abs(sRandom.nextInt());
+        } while (sessionId == 0 || sessionId == NO_SESSION
+                || mSessions.indexOfKey(sessionId) >= 0);
 
         assertCallerLocked(componentName, compatMode);
 
+        // It's null when the session is just for augmented autofill
+        final ComponentName serviceComponentName = mInfo == null ? null
+                : mInfo.getServiceInfo().getComponentName();
         final Session newSession = new Session(this, mUi, getContext(), mHandler, mUserId, mLock,
                 sessionId, taskId, uid, activityToken, appCallbackToken, hasCallback,
-                mUiLatencyHistory, mWtfHistory, mInfo.getServiceInfo().getComponentName(),
-                componentName, compatMode, bindInstantServiceAllowed, flags);
+                mUiLatencyHistory, mWtfHistory, serviceComponentName,
+                componentName, compatMode, bindInstantServiceAllowed, forAugmentedAutofillOnly,
+                flags);
         mSessions.put(newSession.id, newSession);
 
         return newSession;
@@ -618,7 +671,7 @@ final class AutofillManagerServiceImpl
             remoteFillServices.valueAt(i).destroy();
         }
 
-        sendStateToClients(true);
+        sendStateToClients(/* resetclient=*/ true);
         if (mClients != null) {
             mClients.kill();
             mClients = null;
@@ -844,10 +897,11 @@ final class AutofillManagerServiceImpl
     }
 
     @GuardedBy("mLock")
-    private boolean isCalledByServiceLocked(String methodName, int callingUid) {
-        if (getServiceUidLocked() != callingUid) {
+    private boolean isCalledByServiceLocked(@NonNull String methodName, int callingUid) {
+        final int serviceUid = getServiceUidLocked();
+        if (serviceUid != callingUid) {
             Slog.w(TAG, methodName + "() called by UID " + callingUid
-                    + ", but service UID is " + getServiceUidLocked());
+                    + ", but service UID is " + serviceUid);
             return false;
         }
         return true;
@@ -872,20 +926,22 @@ final class AutofillManagerServiceImpl
         } else {
             pw.println();
             mInfo.dump(prefix2, pw);
-            pw.print(prefix); pw.print("Service Label: "); pw.println(getServiceLabelLocked());
-            pw.print(prefix); pw.print("Target SDK: "); pw.println(getTargedSdkLocked());
         }
         pw.print(prefix); pw.print("Default component: "); pw.println(getContext()
                 .getString(R.string.config_defaultAutofillService));
 
         pw.print(prefix); pw.println("mAugmentedAutofillNamer: ");
-        pw.print(prefix2); mAugmentedAutofillResolver.dumpShort(pw); pw.println();
-        pw.print(prefix2); mAugmentedAutofillResolver.dumpShort(pw, mUserId); pw.println();
+        pw.print(prefix2); mMaster.mAugmentedAutofillResolver.dumpShort(pw, mUserId); pw.println();
 
         if (mRemoteAugmentedAutofillService != null) {
             pw.print(prefix); pw.println("RemoteAugmentedAutofillService: ");
             mRemoteAugmentedAutofillService.dump(prefix2, pw);
         }
+        if (mRemoteAugmentedAutofillServiceInfo != null) {
+            pw.print(prefix); pw.print("RemoteAugmentedAutofillServiceInfo: ");
+            pw.println(mRemoteAugmentedAutofillServiceInfo);
+        }
+
         pw.print(prefix); pw.print("Field classification enabled: ");
             pw.println(isFieldClassificationEnabledLocked());
         pw.print(prefix); pw.print("Compat pkgs: ");
@@ -1030,16 +1086,20 @@ final class AutofillManagerServiceImpl
     @GuardedBy("mLock")
     @Nullable RemoteAugmentedAutofillService getRemoteAugmentedAutofillServiceLocked() {
         if (mRemoteAugmentedAutofillService == null) {
-            final String serviceName = mAugmentedAutofillResolver.getServiceName(mUserId);
+            final String serviceName = mMaster.mAugmentedAutofillResolver.getServiceName(mUserId);
             if (serviceName == null) {
                 if (mMaster.verbose) {
                     Slog.v(TAG, "getRemoteAugmentedAutofillServiceLocked(): not set");
                 }
                 return null;
             }
-            final ComponentName componentName = RemoteAugmentedAutofillService.getComponentName(
-                    serviceName, mUserId, mAugmentedAutofillResolver.isTemporary(mUserId));
-            if (componentName == null) return null;
+            final Pair<ServiceInfo, ComponentName> pair = RemoteAugmentedAutofillService
+                    .getComponentName(serviceName, mUserId,
+                            mMaster.mAugmentedAutofillResolver.isTemporary(mUserId));
+            if (pair == null) return null;
+
+            mRemoteAugmentedAutofillServiceInfo = pair.first;
+            final ComponentName componentName = pair.second;
             if (sVerbose) {
                 Slog.v(TAG, "getRemoteAugmentedAutofillServiceLocked(): " + componentName);
             }
@@ -1048,27 +1108,148 @@ final class AutofillManagerServiceImpl
                     componentName, mUserId, new RemoteAugmentedAutofillServiceCallbacks() {
                         @Override
                         public void onServiceDied(@NonNull RemoteAugmentedAutofillService service) {
-                            // TODO(b/123100811): properly implement
                             Slog.w(TAG, "remote augmented autofill service died");
+                            final RemoteAugmentedAutofillService remoteService =
+                                    mRemoteAugmentedAutofillService;
+                            if (remoteService != null) {
+                                remoteService.destroy();
+                            }
+                            mRemoteAugmentedAutofillService = null;
                         }
-                    }, mMaster.isInstantServiceAllowed(), mMaster.verbose);
+                    }, mMaster.isInstantServiceAllowed(), mMaster.verbose,
+                    mMaster.mAugmentedServiceIdleUnbindTimeoutMs,
+                    mMaster.mAugmentedServiceRequestTimeoutMs);
         }
 
         return mRemoteAugmentedAutofillService;
     }
 
     /**
-     * Called when the {@link #mAugmentedAutofillResolver} changed (among other places).
+     * Called when the {@link AutofillManagerService#mAugmentedAutofillResolver}
+     * changed (among other places).
      */
-    private void updateRemoteAugmentedAutofillService() {
-        final String serviceName = mAugmentedAutofillResolver.getServiceName(mUserId);
-        if (serviceName == null) {
-            if (sVerbose) Slog.v(TAG, "updateRemoteAugmentedAutofillService(): time's up!");
+    void updateRemoteAugmentedAutofillService() {
+        synchronized (mLock) {
             if (mRemoteAugmentedAutofillService != null) {
+                if (sVerbose) {
+                    Slog.v(TAG, "updateRemoteAugmentedAutofillService(): "
+                            + "destroying old remote service");
+                }
                 mRemoteAugmentedAutofillService.destroy();
                 mRemoteAugmentedAutofillService = null;
+                mRemoteAugmentedAutofillServiceInfo = null;
+                resetAugmentedAutofillWhitelistLocked();
+            }
+
+            final boolean available = isAugmentedAutofillServiceAvailableLocked();
+            if (sVerbose) Slog.v(TAG, "updateRemoteAugmentedAutofillService(): " + available);
+
+            if (available) {
+                mRemoteAugmentedAutofillService = getRemoteAugmentedAutofillServiceLocked();
             }
         }
+    }
+
+    private boolean isAugmentedAutofillServiceAvailableLocked() {
+        if (mMaster.verbose) {
+            Slog.v(TAG, "isAugmentedAutofillService(): "
+                    + "setupCompleted=" + isSetupCompletedLocked()
+                    + ", disabled=" + isDisabledByUserRestrictionsLocked()
+                    + ", augmentedService="
+                    + mMaster.mAugmentedAutofillResolver.getServiceName(mUserId));
+        }
+        if (!isSetupCompletedLocked() || isDisabledByUserRestrictionsLocked()
+                || mMaster.mAugmentedAutofillResolver.getServiceName(mUserId) == null) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Sets which packages and activities can trigger augmented autofill.
+     *
+     * @return whether caller UID is the augmented autofill service for the user
+     */
+    @GuardedBy("mLock")
+    boolean setAugmentedAutofillWhitelistLocked(List<String> packages,
+            List<ComponentName> activities, int callingUid) {
+
+        if (!isCalledByAugmentedAutofillServiceLocked("setAugmentedAutofillWhitelistLocked",
+                callingUid)) {
+            return false;
+        }
+        if (mMaster.verbose) {
+            Slog.v(TAG, "setAugmentedAutofillWhitelistLocked(packages=" + packages + ", activities="
+                    + activities + ")");
+        }
+        whitelistForAugmentedAutofillPackages(packages, activities);
+
+        // TODO(b/122858578): log metrics
+        return true;
+    }
+
+    @GuardedBy("mLock")
+    private boolean isCalledByAugmentedAutofillServiceLocked(@NonNull String methodName,
+            int callingUid) {
+        // Lazy load service first
+        final RemoteAugmentedAutofillService service = getRemoteAugmentedAutofillServiceLocked();
+        if (service == null) {
+            Slog.w(TAG, methodName + "() called by UID " + callingUid
+                    + ", but there is no augmented autofill service defined for user "
+                    + getUserId());
+            return false;
+        }
+
+        if (getAugmentedAutofillServiceUidLocked() != callingUid) {
+            Slog.w(TAG, methodName + "() called by UID " + callingUid
+                    + ", but service UID is " + getAugmentedAutofillServiceUidLocked()
+                    + " for user " + getUserId());
+            return false;
+        }
+        return true;
+    }
+
+    @GuardedBy("mLock")
+    private int getAugmentedAutofillServiceUidLocked() {
+        if (mRemoteAugmentedAutofillServiceInfo == null) {
+            if (mMaster.verbose) {
+                Slog.v(TAG, "getAugmentedAutofillServiceUid(): "
+                        + "no mRemoteAugmentedAutofillServiceInfo");
+            }
+            return Process.INVALID_UID;
+        }
+        return mRemoteAugmentedAutofillServiceInfo.applicationInfo.uid;
+    }
+
+    @GuardedBy("mLock")
+    boolean isWhitelistedForAugmentedAutofillLocked(@NonNull ComponentName componentName) {
+        return mMaster.mAugmentedAutofillState.isWhitelisted(mUserId, componentName);
+    }
+
+    /**
+     *
+     * @throws IllegalArgumentException if packages or components are empty.
+     */
+    private void whitelistForAugmentedAutofillPackages(@Nullable List<String> packages,
+            @Nullable List<ComponentName> components) {
+        // TODO(b/123100824): add CTS test for when it's null
+        synchronized (mLock) {
+            if (mMaster.verbose) {
+                Slog.v(TAG, "whitelisting packages: " + packages + "and activities: " + components);
+            }
+            mMaster.mAugmentedAutofillState.setWhitelist(mUserId, packages, components);
+        }
+    }
+
+    /**
+     * Resets the augmented autofill whitelist.
+     */
+    @GuardedBy("mLock")
+    void resetAugmentedAutofillWhitelistLocked() {
+        if (mMaster.verbose) {
+            Slog.v(TAG, "resetting augmented autofill whitelist");
+        }
+        mMaster.mAugmentedAutofillState.resetWhitelist(mUserId);
     }
 
     private void sendStateToClients(boolean resetClient) {

@@ -67,6 +67,7 @@
 #include "process/IResourceTableConsumer.h"
 #include "process/SymbolTable.h"
 #include "split/TableSplitter.h"
+#include "trace/TraceBuffer.h"
 #include "util/Files.h"
 #include "xml/XmlDom.h"
 
@@ -213,6 +214,7 @@ class FeatureSplitSymbolTableDelegate : public DefaultSymbolTableDelegate {
 static bool FlattenXml(IAaptContext* context, const xml::XmlResource& xml_res,
                        const StringPiece& path, bool keep_raw_values, bool utf16,
                        OutputFormat format, IArchiveWriter* writer) {
+  TRACE_CALL();
   if (context->IsVerbose()) {
     context->GetDiagnostics()->Note(DiagMessage(path) << "writing to archive (keep_raw_values="
                                                       << (keep_raw_values ? "true" : "false")
@@ -250,6 +252,7 @@ static bool FlattenXml(IAaptContext* context, const xml::XmlResource& xml_res,
 
 // Inflates an XML file from the source path.
 static std::unique_ptr<xml::XmlResource> LoadXml(const std::string& path, IDiagnostics* diag) {
+  TRACE_CALL();
   FileInputStream fin(path);
   if (fin.HadError()) {
     diag->Error(DiagMessage(path) << "failed to load XML file: " << fin.GetError());
@@ -268,6 +271,7 @@ struct ResourceFileFlattenerOptions {
   bool update_proguard_spec = false;
   OutputFormat output_format = OutputFormat::kApk;
   std::unordered_set<std::string> extensions_to_not_compress;
+  Maybe<std::regex> regex_to_not_compress;
 };
 
 // A sampling of public framework resource IDs.
@@ -377,8 +381,15 @@ ResourceFileFlattener::ResourceFileFlattener(const ResourceFileFlattenerOptions&
   }
 }
 
+// TODO(rtmitchell): turn this function into a variable that points to a method that retrieves the
+// compression flag
 uint32_t ResourceFileFlattener::GetCompressionFlags(const StringPiece& str) {
   if (options_.do_not_compress_anything) {
+    return 0;
+  }
+
+  if (options_.regex_to_not_compress
+      && std::regex_search(str.to_string(), options_.regex_to_not_compress.value())) {
     return 0;
   }
 
@@ -400,7 +411,8 @@ static bool IsTransitionElement(const std::string& name) {
 
 static bool IsVectorElement(const std::string& name) {
   return name == "vector" || name == "animated-vector" || name == "pathInterpolator" ||
-         name == "objectAnimator" || name == "gradient" || name == "animated-selector";
+         name == "objectAnimator" || name == "gradient" || name == "animated-selector" ||
+         name == "set";
 }
 
 template <typename T>
@@ -412,6 +424,7 @@ std::vector<T> make_singleton_vec(T&& val) {
 
 std::vector<std::unique_ptr<xml::XmlResource>> ResourceFileFlattener::LinkAndVersionXmlFile(
     ResourceTable* table, FileOperation* file_op) {
+  TRACE_CALL();
   xml::XmlResource* doc = file_op->xml_to_flatten.get();
   const Source& src = doc->file.source;
 
@@ -480,6 +493,7 @@ static auto kDrawableVersions = std::map<std::string, ApiVersion>{
 };
 
 bool ResourceFileFlattener::Flatten(ResourceTable* table, IArchiveWriter* archive_writer) {
+  TRACE_CALL();
   bool error = false;
   std::map<std::pair<ConfigDescription, StringPiece>, FileOperation> config_sorted_files;
 
@@ -708,28 +722,20 @@ static bool LoadStableIdMap(IDiagnostics* diag, const std::string& path,
   return true;
 }
 
-static int32_t FindFrameworkAssetManagerCookie(const android::AssetManager& assets) {
+static android::ApkAssetsCookie FindFrameworkAssetManagerCookie(
+    const android::AssetManager2& assets) {
   using namespace android;
 
   // Find the system package (0x01). AAPT always generates attributes with the type 0x01, so
   // we're looking for the first attribute resource in the system package.
-  const ResTable& table = assets.getResources(true);
-  Res_value val;
-  ssize_t idx = table.getResource(0x01010000, &val, true);
-  if (idx != NO_ERROR) {
-    // Try as a bag.
-    const ResTable::bag_entry* entry;
-    ssize_t cnt = table.lockBag(0x01010000, &entry);
-    if (cnt >= 0) {
-      idx = entry->stringBlock;
-    }
-    table.unlockBag(entry);
-  }
+  Res_value val{};
+  ResTable_config config{};
+  uint32_t type_spec_flags;
+  ApkAssetsCookie idx = assets.GetResource(0x01010000, true /** may_be_bag */,
+                                           0 /** density_override */, &val, &config,
+                                           &type_spec_flags);
 
-  if (idx < 0) {
-    return 0;
-  }
-  return table.getTableCookie(idx);
+  return idx;
 }
 
 class Linker {
@@ -741,17 +747,17 @@ class Linker {
         file_collection_(util::make_unique<io::FileCollection>()) {
   }
 
-  void ExtractCompileSdkVersions(android::AssetManager* assets) {
+  void ExtractCompileSdkVersions(android::AssetManager2* assets) {
     using namespace android;
 
-    int32_t cookie = FindFrameworkAssetManagerCookie(*assets);
-    if (cookie == 0) {
+    android::ApkAssetsCookie cookie = FindFrameworkAssetManagerCookie(*assets);
+    if (cookie == android::kInvalidCookie) {
       // No Framework assets loaded. Not a failure.
       return;
     }
 
     std::unique_ptr<Asset> manifest(
-        assets->openNonAsset(cookie, kAndroidManifestPath, Asset::AccessMode::ACCESS_BUFFER));
+        assets->OpenNonAsset(kAndroidManifestPath, cookie, Asset::AccessMode::ACCESS_BUFFER));
     if (manifest == nullptr) {
       // No errors.
       return;
@@ -805,6 +811,7 @@ class Linker {
   // Creates a SymbolTable that loads symbols from the various APKs.
   // Pre-condition: context_->GetCompilationPackage() needs to be set.
   bool LoadSymbolsFromIncludePaths() {
+    TRACE_NAME("LoadSymbolsFromIncludePaths: #" + std::to_string(options_.include_paths.size()));
     auto asset_source = util::make_unique<AssetManagerSymbolSource>();
     for (const std::string& path : options_.include_paths) {
       if (context_->IsVerbose()) {
@@ -890,6 +897,7 @@ class Linker {
   }
 
   Maybe<AppInfo> ExtractAppInfoFromManifest(xml::XmlResource* xml_res, IDiagnostics* diag) {
+    TRACE_CALL();
     // Make sure the first element is <manifest> with package attribute.
     xml::Element* manifest_el = xml::FindRootElement(xml_res->root.get());
     if (manifest_el == nullptr) {
@@ -1040,6 +1048,7 @@ class Linker {
   }
 
   bool FlattenTable(ResourceTable* table, OutputFormat format, IArchiveWriter* writer) {
+    TRACE_CALL();
     switch (format) {
       case OutputFormat::kApk: {
         BigBuffer buffer(1024);
@@ -1113,6 +1122,7 @@ class Linker {
   }
 
   bool GenerateJavaClasses() {
+    TRACE_CALL();
     // The set of packages whose R class to call in the main classes onResourcesLoaded callback.
     std::vector<std::string> packages_to_callback;
 
@@ -1196,6 +1206,7 @@ class Linker {
   }
 
   bool WriteManifestJavaFile(xml::XmlResource* manifest_xml) {
+    TRACE_CALL();
     if (!options_.generate_java_class_path) {
       return true;
     }
@@ -1253,6 +1264,7 @@ class Linker {
   }
 
   bool WriteProguardFile(const Maybe<std::string>& out, const proguard::KeepSet& keep_set) {
+    TRACE_CALL();
     if (!out) {
       return true;
     }
@@ -1277,6 +1289,7 @@ class Linker {
   }
 
   bool MergeStaticLibrary(const std::string& input, bool override) {
+    TRACE_CALL();
     if (context_->IsVerbose()) {
       context_->GetDiagnostics()->Note(DiagMessage() << "merging static library " << input);
     }
@@ -1327,6 +1340,7 @@ class Linker {
 
   bool MergeExportedSymbols(const Source& source,
                             const std::vector<SourcedResourceName>& exported_symbols) {
+    TRACE_CALL();
     // Add the exports of this file to the table.
     for (const SourcedResourceName& exported_symbol : exported_symbols) {
       ResourceName res_name = exported_symbol.name;
@@ -1352,6 +1366,7 @@ class Linker {
   }
 
   bool MergeCompiledFile(const ResourceFile& compiled_file, io::IFile* file, bool override) {
+    TRACE_CALL();
     if (context_->IsVerbose()) {
       context_->GetDiagnostics()->Note(DiagMessage()
                                        << "merging '" << compiled_file.name
@@ -1370,6 +1385,7 @@ class Linker {
   // An io::IFileCollection is created from the ZIP file and added to the set of
   // io::IFileCollections that are open.
   bool MergeArchive(const std::string& input, bool override) {
+    TRACE_CALL();
     if (context_->IsVerbose()) {
       context_->GetDiagnostics()->Note(DiagMessage() << "merging archive " << input);
     }
@@ -1417,6 +1433,7 @@ class Linker {
   // All other file types are ignored. This is because these files could be coming from a zip,
   // where we could have other files like classes.dex.
   bool MergeFile(io::IFile* file, bool override) {
+    TRACE_CALL();
     const Source& src = file->GetSource();
 
     if (util::EndsWith(src.path, ".xml") || util::EndsWith(src.path, ".png")) {
@@ -1457,6 +1474,7 @@ class Linker {
 
     while ((entry = reader.Next()) != nullptr) {
       if (entry->Type() == ContainerEntryType::kResTable) {
+        TRACE_NAME(std::string("Process ResTable:") + file->GetSource().path);
         pb::ResourceTable pb_table;
         if (!entry->GetResTable(&pb_table)) {
           context_->GetDiagnostics()->Error(DiagMessage(src) << "failed to read resource table: "
@@ -1477,6 +1495,7 @@ class Linker {
           return false;
         }
       } else if (entry->Type() == ContainerEntryType::kResFile) {
+        TRACE_NAME(std::string("Process ResFile") + file->GetSource().path);
         pb::internal::CompiledFile pb_compiled_file;
         off64_t offset;
         size_t len;
@@ -1530,7 +1549,11 @@ class Linker {
     for (auto& entry : merged_assets) {
       uint32_t compression_flags = ArchiveEntry::kCompress;
       std::string extension = file::GetExtension(entry.first).to_string();
-      if (options_.extensions_to_not_compress.count(extension) > 0) {
+
+      if (options_.do_not_compress_anything
+          || options_.extensions_to_not_compress.count(extension) > 0
+          || (options_.regex_to_not_compress
+              && std::regex_search(extension, options_.regex_to_not_compress.value()))) {
         compression_flags = 0u;
       }
 
@@ -1546,6 +1569,7 @@ class Linker {
   // to the IArchiveWriter.
   bool WriteApk(IArchiveWriter* writer, proguard::KeepSet* keep_set, xml::XmlResource* manifest,
                 ResourceTable* table) {
+    TRACE_CALL();
     const bool keep_raw_values = (context_->GetPackageType() == PackageType::kStaticLib)
                                  || options_.keep_raw_values;
     bool result = FlattenXml(context_, *manifest, kAndroidManifestPath, keep_raw_values,
@@ -1558,6 +1582,7 @@ class Linker {
     file_flattener_options.keep_raw_values = keep_raw_values;
     file_flattener_options.do_not_compress_anything = options_.do_not_compress_anything;
     file_flattener_options.extensions_to_not_compress = options_.extensions_to_not_compress;
+    file_flattener_options.regex_to_not_compress = options_.regex_to_not_compress;
     file_flattener_options.no_auto_version = options_.no_auto_version;
     file_flattener_options.no_version_vectors = options_.no_version_vectors;
     file_flattener_options.no_version_transitions = options_.no_version_transitions;
@@ -1626,6 +1651,7 @@ class Linker {
   }
 
   int Run(const std::vector<std::string>& input_files) {
+    TRACE_CALL();
     // Load the AndroidManifest.xml
     std::unique_ptr<xml::XmlResource> manifest_xml =
         LoadXml(options_.manifest_path, context_->GetDiagnostics());
@@ -1833,6 +1859,7 @@ class Linker {
       std::vector<ConfigDescription> excluded_configs;
 
       for (auto& config_string : options_.exclude_configs_) {
+        TRACE_NAME("ConfigDescription::Parse");
         ConfigDescription config_description;
 
         if (!ConfigDescription::Parse(config_string, &config_description)) {
@@ -2032,6 +2059,7 @@ class Linker {
 };
 
 int LinkCommand::Action(const std::vector<std::string>& args) {
+  TRACE_FLUSH(trace_folder_ ? trace_folder_.value() : "", "LinkCommand::Action");
   LinkContext context(diag_);
 
   // Expand all argument-files passed into the command line. These start with '@'.
@@ -2162,6 +2190,20 @@ int LinkCommand::Action(const std::vector<std::string>& args) {
     if (!LoadStableIdMap(context.GetDiagnostics(), stable_id_file_path_.value(),
         &options_.stable_id_map)) {
       return 1;
+    }
+  }
+
+  if (no_compress_regex) {
+    std::string regex = no_compress_regex.value();
+    if (util::StartsWith(regex, "@")) {
+      const std::string path = regex.substr(1, regex.size() -1);
+      std::string error;
+      if (!file::AppendSetArgsFromFile(path, &options_.extensions_to_not_compress, &error)) {
+        context.GetDiagnostics()->Error(DiagMessage(path) << error);
+        return 1;
+      }
+    } else {
+      options_.regex_to_not_compress = GetRegularExpression(no_compress_regex.value());
     }
   }
 

@@ -51,7 +51,7 @@ interface IFaceService {
 
     // Start face enrollment
     void enroll(IBinder token, in byte [] cryptoToken, IFaceServiceReceiver receiver,
-                String opPackageName, in int [] disabledFeatures);
+            String opPackageName, in int [] disabledFeatures);
 
     // Cancel enrollment in progress
     void cancelEnrollment(IBinder token);
@@ -86,8 +86,8 @@ interface IFaceService {
     // Gets the authenticator ID for face
     long getAuthenticatorId(String opPackageName);
 
-    // Reset the timeout when user authenticates with strong auth (e.g. PIN, pattern or password)
-    void resetTimeout(in byte [] cryptoToken);
+    // Reset the lockout when user authenticates with strong auth (e.g. PIN, pattern or password)
+    void resetLockout(in byte [] token);
 
     // Add a callback which gets notified when the face lockout period expired.
     void addLockoutResetCallback(IBiometricServiceLockoutResetCallback callback);
@@ -98,9 +98,10 @@ interface IFaceService {
     // Enumerate all faces
     void enumerate(IBinder token, int userId, IFaceServiceReceiver receiver);
 
-    int setFeature(int feature, boolean enabled, in byte [] token);
+    void setFeature(int feature, boolean enabled, in byte [] token,
+            IFaceServiceReceiver receiver);
 
-    boolean getFeature(int feature);
+    void getFeature(int feature, IFaceServiceReceiver receiver);
 
     void userActivity();
 }

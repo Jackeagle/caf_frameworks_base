@@ -119,6 +119,7 @@ import android.util.DisplayMetrics;
 import android.util.EventLog;
 import android.util.Slog;
 import android.util.proto.ProtoOutputStream;
+import android.view.Display;
 import android.view.DisplayInfo;
 
 import com.android.internal.annotations.VisibleForTesting;
@@ -200,13 +201,6 @@ class TaskRecord extends ConfigurationContainer {
     static final int REPARENT_KEEP_STACK_AT_FRONT = 1;
     // Do not move the stack as a part of reparenting
     static final int REPARENT_LEAVE_STACK_IN_PLACE = 2;
-
-    // The height/width divide used when fitting a task within a bounds with method
-    // {@link #fitWithinBounds}.
-    // We always want the task to to be visible in the bounds without affecting its size when
-    // fitting. To make sure this is the case, we don't adjust the task left or top side pass
-    // the input bounds right or bottom side minus the width or height divided by this value.
-    private static final int FIT_WITHIN_BOUNDS_DIVIDER = 3;
 
     /**
      * The factory used to create {@link TaskRecord}. This allows OEM subclass {@link TaskRecord}.
@@ -339,6 +333,9 @@ class TaskRecord extends ConfigurationContainer {
 
     // TODO: remove after unification
     Task mTask;
+
+    /** Used by fillTaskInfo */
+    final TaskActivitiesReport mReuseActivitiesReport = new TaskActivitiesReport();
 
     /**
      * Don't use constructor directly. Use {@link #create(ActivityTaskManagerService, int,
@@ -1288,22 +1285,7 @@ class TaskRecord extends ConfigurationContainer {
                 || top == null) {
             return getRequestedOverrideConfiguration().orientation;
         }
-        int screenOrientation = top.getOrientation();
-        if (screenOrientation == ActivityInfo.SCREEN_ORIENTATION_NOSENSOR) {
-            // NOSENSOR means the display's "natural" orientation, so return that.
-            ActivityDisplay display = mStack != null ? mStack.getDisplay() : null;
-            if (display != null && display.mDisplayContent != null) {
-                return mStack.getDisplay().mDisplayContent.getNaturalOrientation();
-            }
-        } else if (screenOrientation == ActivityInfo.SCREEN_ORIENTATION_LOCKED) {
-            // LOCKED means the activity's orientation remains unchanged, so return existing value.
-            return top.getConfiguration().orientation;
-        } else if (ActivityInfo.isFixedOrientationLandscape(screenOrientation)) {
-            return ORIENTATION_LANDSCAPE;
-        } else if (ActivityInfo.isFixedOrientationPortrait(screenOrientation)) {
-            return ORIENTATION_PORTRAIT;
-        }
-        return ORIENTATION_UNDEFINED;
+        return top.getRequestedConfigurationOrientation();
     }
 
     /**
@@ -1706,6 +1688,8 @@ class TaskRecord extends ConfigurationContainer {
             int colorBackground = 0;
             int statusBarColor = 0;
             int navigationBarColor = 0;
+            boolean statusBarContrastWhenTransparent = false;
+            boolean navigationBarContrastWhenTransparent = false;
             boolean topActivity = true;
             for (--activityNdx; activityNdx >= 0; --activityNdx) {
                 final ActivityRecord r = mActivities.get(activityNdx);
@@ -1729,12 +1713,17 @@ class TaskRecord extends ConfigurationContainer {
                         colorBackground = r.taskDescription.getBackgroundColor();
                         statusBarColor = r.taskDescription.getStatusBarColor();
                         navigationBarColor = r.taskDescription.getNavigationBarColor();
+                        statusBarContrastWhenTransparent =
+                                r.taskDescription.getEnsureStatusBarContrastWhenTransparent();
+                        navigationBarContrastWhenTransparent =
+                                r.taskDescription.getEnsureNavigationBarContrastWhenTransparent();
                     }
                 }
                 topActivity = false;
             }
             lastTaskDescription = new TaskDescription(label, null, iconResource, iconFilename,
-                    colorPrimary, colorBackground, statusBarColor, navigationBarColor);
+                    colorPrimary, colorBackground, statusBarColor, navigationBarColor,
+                    statusBarContrastWhenTransparent, navigationBarContrastWhenTransparent);
             if (mTask != null) {
                 mTask.setTaskDescription(lastTaskDescription);
             }
@@ -1943,35 +1932,33 @@ class TaskRecord extends ConfigurationContainer {
      *
      * @param bounds Bounds to be adjusted.
      * @param stackBounds Bounds within which the other bounds should remain.
+     * @param overlapPxX The amount of px required to be visible in the X dimension.
+     * @param overlapPxY The amount of px required to be visible in the Y dimension.
      */
-    private static void fitWithinBounds(Rect bounds, Rect stackBounds) {
+    private static void fitWithinBounds(Rect bounds, Rect stackBounds, int overlapPxX,
+            int overlapPxY) {
         if (stackBounds == null || stackBounds.isEmpty() || stackBounds.contains(bounds)) {
             return;
         }
 
-        if (bounds.left < stackBounds.left || bounds.right > stackBounds.right) {
-            final int maxRight = stackBounds.right
-                    - (stackBounds.width() / FIT_WITHIN_BOUNDS_DIVIDER);
-            int horizontalDiff = stackBounds.left - bounds.left;
-            if ((horizontalDiff < 0 && bounds.left >= maxRight)
-                    || (bounds.left + horizontalDiff >= maxRight)) {
-                horizontalDiff = maxRight - bounds.left;
-            }
-            bounds.left += horizontalDiff;
-            bounds.right += horizontalDiff;
+        // For each side of the parent (eg. left), check if the opposing side of the window (eg.
+        // right) is at least overlap pixels away. If less, offset the window by that difference.
+        int horizontalDiff = 0;
+        // If window is smaller than overlap, use it's smallest dimension instead
+        int overlapLR = Math.min(overlapPxX, bounds.width());
+        if (bounds.right < (stackBounds.left + overlapLR)) {
+            horizontalDiff = overlapLR - (bounds.right - stackBounds.left);
+        } else if (bounds.left > (stackBounds.right - overlapLR)) {
+            horizontalDiff = -(overlapLR - (stackBounds.right - bounds.left));
         }
-
-        if (bounds.top < stackBounds.top || bounds.bottom > stackBounds.bottom) {
-            final int maxBottom = stackBounds.bottom
-                    - (stackBounds.height() / FIT_WITHIN_BOUNDS_DIVIDER);
-            int verticalDiff = stackBounds.top - bounds.top;
-            if ((verticalDiff < 0 && bounds.top >= maxBottom)
-                    || (bounds.top + verticalDiff >= maxBottom)) {
-                verticalDiff = maxBottom - bounds.top;
-            }
-            bounds.top += verticalDiff;
-            bounds.bottom += verticalDiff;
+        int verticalDiff = 0;
+        int overlapTB = Math.min(overlapPxY, bounds.width());
+        if (bounds.bottom < (stackBounds.top + overlapTB)) {
+            verticalDiff = overlapTB - (bounds.bottom - stackBounds.top);
+        } else if (bounds.top > (stackBounds.bottom - overlapTB)) {
+            verticalDiff = -(overlapTB - (stackBounds.bottom - bounds.top));
         }
+        bounds.offset(horizontalDiff, verticalDiff);
     }
 
     /**
@@ -2084,6 +2071,11 @@ class TaskRecord extends ConfigurationContainer {
         return Configuration.SMALLEST_SCREEN_WIDTH_DP_UNDEFINED;
     }
 
+    void computeConfigResourceOverrides(@NonNull Configuration inOutConfig,
+            @NonNull Configuration parentConfig) {
+        computeConfigResourceOverrides(inOutConfig, parentConfig, true /* insideParentBounds */);
+    }
+
     /**
      * Calculates configuration values used by the client to get resources. This should be run
      * using app-facing bounds (bounds unmodified by animations or transient interactions).
@@ -2093,7 +2085,7 @@ class TaskRecord extends ConfigurationContainer {
      * just be inherited from the parent configuration.
      **/
     void computeConfigResourceOverrides(@NonNull Configuration inOutConfig,
-            @NonNull Configuration parentConfig) {
+            @NonNull Configuration parentConfig, boolean insideParentBounds) {
         int windowingMode = inOutConfig.windowConfiguration.getWindowingMode();
         if (windowingMode == WINDOWING_MODE_UNDEFINED) {
             windowingMode = parentConfig.windowConfiguration.getWindowingMode();
@@ -2111,7 +2103,7 @@ class TaskRecord extends ConfigurationContainer {
             inOutConfig.windowConfiguration.setAppBounds(bounds);
             outAppBounds = inOutConfig.windowConfiguration.getAppBounds();
         }
-        if (windowingMode != WINDOWING_MODE_FREEFORM) {
+        if (insideParentBounds && windowingMode != WINDOWING_MODE_FREEFORM) {
             final Rect parentAppBounds = parentConfig.windowConfiguration.getAppBounds();
             if (parentAppBounds != null && !parentAppBounds.isEmpty()) {
                 outAppBounds.intersect(parentAppBounds);
@@ -2120,7 +2112,7 @@ class TaskRecord extends ConfigurationContainer {
 
         if (inOutConfig.screenWidthDp == Configuration.SCREEN_WIDTH_DP_UNDEFINED
                 || inOutConfig.screenHeightDp == Configuration.SCREEN_HEIGHT_DP_UNDEFINED) {
-            if (mStack != null) {
+            if (insideParentBounds && mStack != null) {
                 final DisplayInfo di = new DisplayInfo();
                 mStack.getDisplay().mDisplay.getDisplayInfo(di);
 
@@ -2130,17 +2122,22 @@ class TaskRecord extends ConfigurationContainer {
                 // {@link WindowManagerPolicy#getNonDecorInsetsLw}.
                 calculateInsetFrames(mTmpNonDecorBounds, mTmpStableBounds, bounds, di);
             } else {
-                mTmpNonDecorBounds.set(bounds);
-                mTmpStableBounds.set(bounds);
+                // Set to app bounds because it excludes decor insets.
+                mTmpNonDecorBounds.set(outAppBounds);
+                mTmpStableBounds.set(outAppBounds);
             }
 
             if (inOutConfig.screenWidthDp == Configuration.SCREEN_WIDTH_DP_UNDEFINED) {
-                inOutConfig.screenWidthDp = Math.min((int) (mTmpStableBounds.width() / density),
-                        parentConfig.screenWidthDp);
+                final int overrideScreenWidthDp = (int) (mTmpStableBounds.width() / density);
+                inOutConfig.screenWidthDp = insideParentBounds
+                        ? Math.min(overrideScreenWidthDp, parentConfig.screenWidthDp)
+                        : overrideScreenWidthDp;
             }
             if (inOutConfig.screenHeightDp == Configuration.SCREEN_HEIGHT_DP_UNDEFINED) {
-                inOutConfig.screenHeightDp = Math.min((int) (mTmpStableBounds.height() / density),
-                        parentConfig.screenHeightDp);
+                final int overrideScreenHeightDp = (int) (mTmpStableBounds.height() / density);
+                inOutConfig.screenHeightDp = insideParentBounds
+                        ? Math.min(overrideScreenHeightDp, parentConfig.screenHeightDp)
+                        : overrideScreenHeightDp;
             }
 
             if (inOutConfig.smallestScreenWidthDp
@@ -2162,7 +2159,7 @@ class TaskRecord extends ConfigurationContainer {
 
         if (inOutConfig.orientation == ORIENTATION_UNDEFINED) {
             inOutConfig.orientation = (inOutConfig.screenWidthDp <= inOutConfig.screenHeightDp)
-                    ? Configuration.ORIENTATION_PORTRAIT : Configuration.ORIENTATION_LANDSCAPE;
+                    ? ORIENTATION_PORTRAIT : ORIENTATION_LANDSCAPE;
         }
         if (inOutConfig.screenLayout == Configuration.SCREENLAYOUT_UNDEFINED) {
             // For calculating screen layout, we need to use the non-decor inset screen area for the
@@ -2197,11 +2194,15 @@ class TaskRecord extends ConfigurationContainer {
             // In FULLSCREEN mode, always start with empty bounds to indicate "fill parent"
             outOverrideBounds.setEmpty();
 
+            final boolean parentHandlesOrientationChange = mTask != null
+                    && mTask.getParent() != null
+                    && mTask.getParent().handlesOrientationChangeFromDescendant();
             // If the task or its top activity requires a different orientation, make it fit the
             // available bounds by scaling down its bounds.
             int forcedOrientation = getTopActivityRequestedOrientation();
             if (forcedOrientation != ORIENTATION_UNDEFINED
-                    && forcedOrientation != newParentConfig.orientation) {
+                    && forcedOrientation != newParentConfig.orientation
+                    && !parentHandlesOrientationChange) {
                 final Rect parentBounds = newParentConfig.windowConfiguration.getBounds();
                 final int parentWidth = parentBounds.width();
                 final int parentHeight = parentBounds.height();
@@ -2228,7 +2229,11 @@ class TaskRecord extends ConfigurationContainer {
         adjustForMinimalTaskDimensions(outOverrideBounds, mTmpBounds);
         if (windowingMode == WINDOWING_MODE_FREEFORM) {
             // by policy, make sure the window remains within parent somewhere
-            fitWithinBounds(outOverrideBounds, newParentConfig.windowConfiguration.getBounds());
+            final float density =
+                    ((float) newParentConfig.densityDpi) / DisplayMetrics.DENSITY_DEFAULT;
+            fitWithinBounds(outOverrideBounds, newParentConfig.windowConfiguration.getBounds(),
+                    (int) (density * WindowState.MINIMUM_VISIBLE_WIDTH_IN_DP),
+                    (int) (density * WindowState.MINIMUM_VISIBLE_HEIGHT_IN_DP));
         }
         computeConfigResourceOverrides(getResolvedOverrideConfiguration(), newParentConfig);
     }
@@ -2320,30 +2325,38 @@ class TaskRecord extends ConfigurationContainer {
     /**
      * Fills in a {@link TaskInfo} with information from this task.
      * @param info the {@link TaskInfo} to fill in
-     * @param reuseActivitiesReport a temporary activities report that we can reuse to fetch the
-     *                              running activities
      */
-    void fillTaskInfo(TaskInfo info, TaskActivitiesReport reuseActivitiesReport) {
-        getNumRunningActivities(reuseActivitiesReport);
+    void fillTaskInfo(TaskInfo info) {
+        getNumRunningActivities(mReuseActivitiesReport);
         info.userId = userId;
         info.stackId = getStackId();
         info.taskId = taskId;
+        info.displayId = mStack == null ? Display.INVALID_DISPLAY : mStack.mDisplayId;
         info.isRunning = getTopActivity() != null;
         info.baseIntent = new Intent(getBaseIntent());
-        info.baseActivity = reuseActivitiesReport.base != null
-                ? reuseActivitiesReport.base.intent.getComponent()
+        info.baseActivity = mReuseActivitiesReport.base != null
+                ? mReuseActivitiesReport.base.intent.getComponent()
                 : null;
-        info.topActivity = reuseActivitiesReport.top != null
-                ? reuseActivitiesReport.top.mActivityComponent
+        info.topActivity = mReuseActivitiesReport.top != null
+                ? mReuseActivitiesReport.top.mActivityComponent
                 : null;
         info.origActivity = origActivity;
         info.realActivity = realActivity;
-        info.numActivities = reuseActivitiesReport.numActivities;
+        info.numActivities = mReuseActivitiesReport.numActivities;
         info.lastActiveTime = lastActiveTime;
         info.taskDescription = new ActivityManager.TaskDescription(lastTaskDescription);
         info.supportsSplitScreenMultiWindow = supportsSplitScreenWindowingMode();
         info.resizeMode = mResizeMode;
         info.configuration.setTo(getConfiguration());
+    }
+
+    /**
+     * Returns a  {@link TaskInfo} with information from this task.
+     */
+    ActivityManager.RunningTaskInfo getTaskInfo() {
+        ActivityManager.RunningTaskInfo info = new ActivityManager.RunningTaskInfo();
+        fillTaskInfo(info);
+        return info;
     }
 
     void dump(PrintWriter pw, String prefix) {
@@ -2476,9 +2489,14 @@ class TaskRecord extends ConfigurationContainer {
         return toString();
     }
 
-    public void writeToProto(ProtoOutputStream proto, long fieldId) {
+    public void writeToProto(ProtoOutputStream proto, long fieldId,
+            @WindowTraceLogLevel int logLevel) {
+        if (logLevel == WindowTraceLogLevel.CRITICAL && !isVisible()) {
+            return;
+        }
+
         final long token = proto.start(fieldId);
-        super.writeToProto(proto, CONFIGURATION_CONTAINER, false /* trim */);
+        super.writeToProto(proto, CONFIGURATION_CONTAINER, logLevel);
         proto.write(ID, taskId);
         for (int i = mActivities.size() - 1; i >= 0; i--) {
             ActivityRecord activity = mActivities.get(i);

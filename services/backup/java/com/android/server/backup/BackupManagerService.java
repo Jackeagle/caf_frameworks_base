@@ -31,16 +31,20 @@ import android.app.backup.ISelectBackupTransportCallback;
 import android.app.job.JobParameters;
 import android.app.job.JobScheduler;
 import android.app.job.JobService;
+import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Binder;
+import android.os.FileUtils;
 import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.ParcelFileDescriptor;
 import android.os.Trace;
 import android.os.UserHandle;
+import android.os.UserManager;
 import android.util.Slog;
 import android.util.SparseArray;
 
@@ -48,6 +52,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.SystemConfig;
 import com.android.server.SystemService;
 
+import java.io.File;
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.Collections;
@@ -85,6 +90,18 @@ public class BackupManagerService {
 
     private Set<ComponentName> mTransportWhitelist;
 
+    private final BroadcastReceiver mUserRemovedReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (Intent.ACTION_USER_REMOVED.equals(intent.getAction())) {
+                int userId = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, UserHandle.USER_NULL);
+                if (userId > 0) { // for only non system users
+                    onRemovedNonSystemUser(userId);
+                }
+            }
+        }
+    };
+
     /** Instantiate a new instance of {@link BackupManagerService}. */
     public BackupManagerService(
             Context context, Trampoline trampoline, HandlerThread backupThread) {
@@ -97,6 +114,23 @@ public class BackupManagerService {
         mTransportWhitelist = systemConfig.getBackupTransportWhitelist();
         if (mTransportWhitelist == null) {
             mTransportWhitelist = Collections.emptySet();
+        }
+
+        mContext.registerReceiver(mUserRemovedReceiver,
+                new IntentFilter(Intent.ACTION_USER_REMOVED));
+    }
+
+    /**
+     * Remove backup state for non system {@code userId} when the user is removed from the device.
+     * For non system users, backup state is stored in both the user's own dir and the system dir.
+     * When the user is removed, the user's own dir gets removed by the OS. This method ensures that
+     * the part of the user backup state which is in the system dir also gets removed.
+     */
+    private void onRemovedNonSystemUser(int userId) {
+        Slog.i(TAG, "Removing state for non system user " + userId);
+        File dir = UserBackupManagerFiles.getStateDirInSystemDir(userId);
+        if (!FileUtils.deleteContentsAndDir(dir)) {
+            Slog.w(TAG, "Failed to delete state dir for removed user: " + userId);
         }
     }
 
@@ -361,8 +395,8 @@ public class BackupManagerService {
      * @param dataManagementIntent An {@link Intent} that can be passed to {@link
      *     Context#startActivity} in order to launch the transport's data-management UI. It may be
      *     {@code null} if the transport does not offer any user-facing data management UI.
-     * @param dataManagementLabel A {@link String} to be used as the label for the transport's data
-     *     management affordance. This MUST be {@code null} when dataManagementIntent is {@code
+     * @param dataManagementLabel A {@link CharSequence} to be used as the label for the transport's
+     *     data management affordance. This MUST be {@code null} when dataManagementIntent is {@code
      *     null} and MUST NOT be {@code null} when dataManagementIntent is not {@code null}.
      * @throws SecurityException If the UID of the calling process differs from the package UID of
      *     {@code transportComponent} or if the caller does NOT have BACKUP permission.
@@ -374,7 +408,7 @@ public class BackupManagerService {
             @Nullable Intent configurationIntent,
             String currentDestinationString,
             @Nullable Intent dataManagementIntent,
-            String dataManagementLabel) {
+            CharSequence dataManagementLabel) {
         UserBackupManagerService userBackupManagerService =
                 getServiceForUserIfCallerHasPermission(userId, "updateTransportAttributes()");
 
@@ -433,8 +467,56 @@ public class BackupManagerService {
                 getServiceForUserIfCallerHasPermission(userId, "getConfigurationIntent()");
 
         return userBackupManagerService == null
-                ? null
-                : userBackupManagerService.getConfigurationIntent(transportName);
+            ? null
+            : userBackupManagerService.getConfigurationIntent(transportName);
+    }
+
+    /**
+     * Sets the ancestral work profile for the calling user.
+     *
+     * <p> The ancestral work profile corresponds to the profile that was used to restore to the
+     * callers profile.
+     */
+    public void setAncestralSerialNumber(long ancestralSerialNumber) {
+        UserBackupManagerService userBackupManagerService =
+                getServiceForUserIfCallerHasPermission(
+                        Binder.getCallingUserHandle().getIdentifier(),
+                        "setAncestralSerialNumber()");
+
+        if (userBackupManagerService != null) {
+            userBackupManagerService.setAncestralSerialNumber(ancestralSerialNumber);
+        }
+    }
+
+    /**
+     * Returns a {@link UserHandle} for the user that has {@code ancestralSerialNumber} as the
+     * serial number of the its ancestral work profile.
+     *
+     * <p> The ancestral work profile is set by {@link #setAncestralSerialNumber(long)}
+     * and it corresponds to the profile that was used to restore to the callers profile.
+     */
+    @Nullable
+    public UserHandle getUserForAncestralSerialNumber(long ancestralSerialNumber) {
+        int callingUserId = Binder.getCallingUserHandle().getIdentifier();
+        long oldId = Binder.clearCallingIdentity();
+        int[] userIds;
+        try {
+            userIds = mContext.getSystemService(UserManager.class).getProfileIds(callingUserId,
+                    false);
+        } finally {
+            Binder.restoreCallingIdentity(oldId);
+        }
+
+        for (int userId : userIds) {
+            UserBackupManagerService userBackupManagerService = getServiceUsers().get(userId);
+            if (userBackupManagerService != null) {
+                if (userBackupManagerService.getAncestralSerialNumber() == ancestralSerialNumber) {
+                    return UserHandle.of(userId);
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -472,7 +554,7 @@ public class BackupManagerService {
      * transport.
      */
     @Nullable
-    public String getDataManagementLabel(@UserIdInt int userId, String transportName) {
+    public CharSequence getDataManagementLabel(@UserIdInt int userId, String transportName) {
         UserBackupManagerService userBackupManagerService =
                 getServiceForUserIfCallerHasPermission(userId, "getDataManagementLabel()");
 

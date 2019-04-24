@@ -34,6 +34,7 @@
     <string name="keyguard_password_wrong_pin_code" msgid="6535018036285012028">"El codi PIN no és correcte."</string>
     <string name="keyguard_sim_error_message_short" msgid="592109500618448312">"La targeta no és vàlida."</string>
     <string name="keyguard_charged" msgid="3316115607283493413">"Completament carregada"</string>
+    <string name="keyguard_plugged_in_wireless" msgid="3004717438401575235">"<xliff:g id="PERCENTAGE">%s</xliff:g> • S\'està carregant sense fils"</string>
     <string name="keyguard_plugged_in" msgid="3161102098900158923">"<xliff:g id="PERCENTAGE">%s</xliff:g> • S\'està carregant"</string>
     <string name="keyguard_plugged_in_charging_fast" msgid="3684592786276709342">"<xliff:g id="PERCENTAGE">%s</xliff:g> • S\'està carregant ràpidament"</string>
     <string name="keyguard_plugged_in_charging_slowly" msgid="509533586841478405">"<xliff:g id="PERCENTAGE">%s</xliff:g> • S\'està carregant lentament"</string>
@@ -111,7 +112,7 @@
       <item quantity="other">El codi PUK de la SIM no és correcte. Et queden <xliff:g id="NUMBER_1">%d</xliff:g> intents; si els esgotes tots, la SIM no es podrà tornar a fer servir.</item>
       <item quantity="one">El codi PUK de la SIM no és correcte. Et queda <xliff:g id="NUMBER_0">%d</xliff:g> intent; si no l\'encertes, la SIM no es podrà tornar a fer servir.</item>
     </plurals>
-    <string name="kg_password_pin_failed" msgid="8769990811451236223">"No s\'ha pogut desbloquejar la SIM amb el codi PIN."</string>
+    <string name="kg_password_pin_failed" msgid="8769990811451236223">"Ha fallat l\'operació del PIN de la SIM"</string>
     <string name="kg_password_puk_failed" msgid="1331621440873439974">"No s\'ha pogut desbloquejar la SIM amb el codi PUK."</string>
     <string name="kg_pin_accepted" msgid="7637293533973802143">"S\'ha acceptat el codi."</string>
     <string name="keyguard_carrier_default" msgid="4274828292998453695">"Sense servei"</string>
@@ -150,7 +151,10 @@
       <item quantity="other">La targeta SIM s\'ha desactivat. Introdueix el codi PUK per continuar. Et queden <xliff:g id="_NUMBER_1">%d</xliff:g> intents; si no l\'encertes, la SIM no es podrà tornar a fer servir. Contacta amb l\'operador de telefonia mòbil per obtenir-ne més informació.</item>
       <item quantity="one">La targeta SIM s\'ha desactivat. Introdueix el codi PUK per continuar. Et queda <xliff:g id="_NUMBER_0">%d</xliff:g> intent; si no l\'encertes, la SIM no es podrà tornar a fer servir. Contacta amb l\'operador de telefonia mòbil per obtenir-ne més informació.</item>
     </plurals>
-    <string name="type_clock_header" msgid="4786545441902447636">"Són les"</string>
+    <plurals name="type_clock_header" formatted="false" msgid="6782840450655632763">
+      <item quantity="other">"<annotation name="color">"Són les"</annotation>\n"^1 i\n^2</item>
+      <item quantity="one">"<annotation name="color">"És la"</annotation>\n"^1 i\n^2</item>
+    </plurals>
   <string-array name="type_clock_hours">
     <item msgid="3543074812389379830">"i dotze"</item>
     <item msgid="7389464214252023751">"Una"</item>
@@ -167,15 +171,15 @@
   </string-array>
   <string-array name="type_clock_minutes">
     <item msgid="8322049385467207985">"en punt"</item>
-    <item msgid="8837126587669001578">"i un"</item>
-    <item msgid="4294343372940455660">"i dos"</item>
-    <item msgid="7129166637707421536">"i tres"</item>
-    <item msgid="7579404865008788673">"i quatre"</item>
-    <item msgid="3873924689207380586">"i cinc"</item>
-    <item msgid="4849565597850069377">"i sis"</item>
-    <item msgid="4404219424523572364">"i set"</item>
-    <item msgid="8740481214764087329">"i vuit"</item>
-    <item msgid="1713216865806811237">"i nou"</item>
+    <item msgid="2091812961809760681">"I un"</item>
+    <item msgid="1496435384877290709">"I dos"</item>
+    <item msgid="881846472976674129">"I tres"</item>
+    <item msgid="2784477043911540584">"I quatre"</item>
+    <item msgid="1610928853656700614">"I cinc"</item>
+    <item msgid="2317806244043886658">"I sis"</item>
+    <item msgid="3318687539120971327">"I set"</item>
+    <item msgid="5701600693712102348">"I vuit"</item>
+    <item msgid="3247381605947372495">"I nou"</item>
     <item msgid="3508406095411245038">"i deu"</item>
     <item msgid="7161996337755311711">"i onze"</item>
     <item msgid="4044549963329624197">"i dotze"</item>

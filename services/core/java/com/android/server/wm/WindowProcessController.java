@@ -57,6 +57,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.app.HeavyWeightSwitcherActivity;
 import com.android.internal.util.function.pooled.PooledLambda;
 import com.android.server.Watchdog;
+import com.android.server.wm.ActivityTaskManagerService.HotPath;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -148,6 +149,8 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
     // Set to true if this process is currently temporarily whitelisted to start activities even if
     // it's not in the foreground
     private volatile boolean mAllowBackgroundActivityStarts;
+    // Set of UIDs of clients currently bound to this process
+    private volatile ArraySet<Integer> mBoundClientUids = new ArraySet<Integer>();
 
     // Thread currently set for VR scheduling
     int mVrThreadTid;
@@ -296,6 +299,11 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         return mPendingUiClean;
     }
 
+    /** @return {@code true} if the process registered to a display as a config listener. */
+    boolean registeredForDisplayConfigChanges() {
+        return mDisplayId != INVALID_DISPLAY;
+    }
+
     void postPendingUiCleanMsg(boolean pendingUiClean) {
         if (mListener == null) return;
         // Posting on handler so WM lock isn't held when we call into AM.
@@ -367,6 +375,14 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         return mAllowBackgroundActivityStarts;
     }
 
+    public void setBoundClientUids(ArraySet<Integer> boundClientUids) {
+        mBoundClientUids = boundClientUids;
+    }
+
+    public ArraySet<Integer> getBoundClientUids() {
+        return mBoundClientUids;
+    }
+
     public void setInstrumenting(boolean instrumenting,
             boolean hasBackgroundActivityStartPrivileges) {
         mInstrumenting = instrumenting;
@@ -408,12 +424,14 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         return null;
     }
 
+    @HotPath(caller = HotPath.PROCESS_CHANGE)
     public void addPackage(String packageName) {
         synchronized (mAtm.mGlobalLockWithoutBoost) {
             mPkgList.add(packageName);
         }
     }
 
+    @HotPath(caller = HotPath.PROCESS_CHANGE)
     public void clearPackageList() {
         synchronized (mAtm.mGlobalLockWithoutBoost) {
             mPkgList.clear();
@@ -441,12 +459,14 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         mActivities.clear();
     }
 
+    @HotPath(caller = HotPath.OOM_ADJUSTMENT)
     public boolean hasActivities() {
         synchronized (mAtm.mGlobalLockWithoutBoost) {
             return !mActivities.isEmpty();
         }
     }
 
+    @HotPath(caller = HotPath.OOM_ADJUSTMENT)
     public boolean hasVisibleActivities() {
         synchronized (mAtm.mGlobalLockWithoutBoost) {
             for (int i = mActivities.size() - 1; i >= 0; --i) {
@@ -459,10 +479,25 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         return false;
     }
 
+    @HotPath(caller = HotPath.LRU_UPDATE)
     public boolean hasActivitiesOrRecentTasks() {
         synchronized (mAtm.mGlobalLockWithoutBoost) {
             return !mActivities.isEmpty() || !mRecentTasks.isEmpty();
         }
+    }
+
+    boolean hasActivityInVisibleTask() {
+        for (int i = mActivities.size() - 1; i >= 0; --i) {
+            TaskRecord task = mActivities.get(i).getTaskRecord();
+            if (task == null) {
+                continue;
+            }
+            ActivityRecord topActivity = task.getTopActivity();
+            if (topActivity != null && topActivity.visible) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -670,6 +705,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         void onOtherActivity();
     }
 
+    @HotPath(caller = HotPath.OOM_ADJUSTMENT)
     public int computeOomAdjFromActivities(int minTaskLayer, ComputeOomAdjCallback callback) {
         synchronized (mAtm.mGlobalLockWithoutBoost) {
             final int activitiesSize = mActivities.size();
@@ -903,6 +939,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         mRecentTasks.remove(task);
     }
 
+    @HotPath(caller = HotPath.OOM_ADJUSTMENT)
     public boolean hasRecentTasks() {
         synchronized (mAtm.mGlobalLockWithoutBoost) {
             return !mRecentTasks.isEmpty();
@@ -966,18 +1003,21 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         return false;
     }
 
+    @HotPath(caller = HotPath.OOM_ADJUSTMENT)
     public void onTopProcChanged() {
         synchronized (mAtm.mGlobalLockWithoutBoost) {
             mAtm.mVrController.onTopProcChangedLocked(this);
         }
     }
 
+    @HotPath(caller = HotPath.OOM_ADJUSTMENT)
     public boolean isHomeProcess() {
         synchronized (mAtm.mGlobalLockWithoutBoost) {
             return this == mAtm.mHomeProcess;
         }
     }
 
+    @HotPath(caller = HotPath.OOM_ADJUSTMENT)
     public boolean isPreviousProcess() {
         synchronized (mAtm.mGlobalLockWithoutBoost) {
             return this == mAtm.mPreviousProcess;
@@ -986,7 +1026,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
 
     @Override
     public String toString() {
-        return mOwner.toString();
+        return mOwner != null ? mOwner.toString() : null;
     }
 
     public void dump(PrintWriter pw, String prefix) {

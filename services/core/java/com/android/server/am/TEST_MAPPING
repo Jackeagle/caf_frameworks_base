@@ -1,17 +1,6 @@
 {
   "presubmit": [
     {
-      "name": "CtsActivityManagerDeviceSdk25TestCases",
-      "options": [
-        {
-          "include-annotation": "android.platform.test.annotations.Presubmit"
-        },
-        {
-          "exclude-annotation": "androidx.test.filters.FlakyTest"
-        }
-      ]
-    },
-    {
       "name": "CtsAppTestCases",
       "options": [
         {
@@ -40,7 +29,8 @@
       ]
     },
     {
-      "name": "WmTests",
+      "name": "FrameworksMockingServicesTests",
+      "file_patterns": ["AppCompactor\\.java"],
       "options": [
         {
           "include-filter": "com.android.server.am."

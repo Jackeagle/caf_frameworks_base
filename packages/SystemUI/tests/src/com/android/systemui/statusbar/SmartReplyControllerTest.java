@@ -29,9 +29,10 @@ import android.os.Looper;
 import android.os.RemoteException;
 import android.os.UserHandle;
 import android.service.notification.StatusBarNotification;
-import android.support.test.filters.SmallTest;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
+
+import androidx.test.filters.SmallTest;
 
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
 import com.android.internal.statusbar.IStatusBarService;
@@ -98,8 +99,8 @@ public class SmartReplyControllerTest extends SysuiTestCase {
 
     @Test
     public void testSendSmartReply_updatesRemoteInput() {
-        mSmartReplyController.smartReplySent(mEntry, TEST_CHOICE_INDEX, TEST_CHOICE_TEXT, false,
-                MetricsEvent.LOCATION_UNKNOWN);
+        mSmartReplyController.smartReplySent(mEntry, TEST_CHOICE_INDEX, TEST_CHOICE_TEXT,
+                MetricsEvent.LOCATION_UNKNOWN, false /* modifiedBeforeSending */);
 
         // Sending smart reply should make calls to NotificationEntryManager
         // to update the notification with reply and spinner.
@@ -109,48 +110,49 @@ public class SmartReplyControllerTest extends SysuiTestCase {
 
     @Test
     public void testSendSmartReply_logsToStatusBar() throws RemoteException {
-        mSmartReplyController.smartReplySent(mEntry, TEST_CHOICE_INDEX, TEST_CHOICE_TEXT, false,
-                MetricsEvent.LOCATION_UNKNOWN);
+        mSmartReplyController.smartReplySent(mEntry, TEST_CHOICE_INDEX, TEST_CHOICE_TEXT,
+                MetricsEvent.LOCATION_UNKNOWN, false /* modifiedBeforeSending */);
 
         // Check we log the result to the status bar service.
         verify(mIStatusBarService).onNotificationSmartReplySent(mSbn.getKey(),
-                TEST_CHOICE_INDEX, TEST_CHOICE_TEXT, false, MetricsEvent.LOCATION_UNKNOWN);
+                TEST_CHOICE_INDEX, TEST_CHOICE_TEXT, MetricsEvent.LOCATION_UNKNOWN, false);
     }
 
 
     @Test
-    public void testSendSmartReply_logsToStatusBar_generatedByAssistant() throws RemoteException {
-        mSmartReplyController.smartReplySent(mEntry, TEST_CHOICE_INDEX, TEST_CHOICE_TEXT, true,
-                MetricsEvent.LOCATION_UNKNOWN);
+    public void testSendSmartReply_logsToStatusBar_modifiedBeforeSending() throws RemoteException {
+        mSmartReplyController.smartReplySent(mEntry, TEST_CHOICE_INDEX, TEST_CHOICE_TEXT,
+                MetricsEvent.LOCATION_UNKNOWN, true /* modifiedBeforeSending */);
 
         // Check we log the result to the status bar service.
         verify(mIStatusBarService).onNotificationSmartReplySent(mSbn.getKey(),
-                TEST_CHOICE_INDEX, TEST_CHOICE_TEXT, true, MetricsEvent.LOCATION_UNKNOWN);
+                TEST_CHOICE_INDEX, TEST_CHOICE_TEXT, MetricsEvent.LOCATION_UNKNOWN, true);
     }
 
     @Test
     public void testShowSmartSuggestions_logsToStatusBar() throws RemoteException {
         final boolean generatedByAsssistant = true;
+        final boolean editBeforeSending = true;
         mSmartReplyController.smartSuggestionsAdded(mEntry, TEST_CHOICE_COUNT, TEST_ACTION_COUNT,
-                generatedByAsssistant);
+                generatedByAsssistant, editBeforeSending);
 
         // Check we log the result to the status bar service.
         verify(mIStatusBarService).onNotificationSmartSuggestionsAdded(mSbn.getKey(),
-                TEST_CHOICE_COUNT, TEST_ACTION_COUNT, generatedByAsssistant);
+                TEST_CHOICE_COUNT, TEST_ACTION_COUNT, generatedByAsssistant, editBeforeSending);
     }
 
     @Test
     public void testSendSmartReply_reportsSending() {
-        mSmartReplyController.smartReplySent(mEntry, TEST_CHOICE_INDEX, TEST_CHOICE_TEXT, false,
-                MetricsEvent.LOCATION_UNKNOWN);
+        mSmartReplyController.smartReplySent(mEntry, TEST_CHOICE_INDEX, TEST_CHOICE_TEXT,
+                MetricsEvent.LOCATION_UNKNOWN, false /* modifiedBeforeSending */);
 
         assertTrue(mSmartReplyController.isSendingSmartReply(mSbn.getKey()));
     }
 
     @Test
     public void testSendingSmartReply_afterRemove_shouldReturnFalse() {
-        mSmartReplyController.smartReplySent(mEntry, TEST_CHOICE_INDEX, TEST_CHOICE_TEXT, false,
-                MetricsEvent.LOCATION_UNKNOWN);
+        mSmartReplyController.smartReplySent(mEntry, TEST_CHOICE_INDEX, TEST_CHOICE_TEXT,
+                MetricsEvent.LOCATION_UNKNOWN, false /* modifiedBeforeSending */);
         mSmartReplyController.stopSending(mEntry);
 
         assertFalse(mSmartReplyController.isSendingSmartReply(mSbn.getKey()));

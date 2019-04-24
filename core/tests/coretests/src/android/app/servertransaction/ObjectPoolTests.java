@@ -42,6 +42,15 @@ import androidx.test.runner.AndroidJUnit4;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+/**
+ * Tests for {@link ObjectPool}.
+ *
+ * <p>Build/Install/Run:
+ *  atest FrameworksCoreTests:ObjectPoolTests
+ *
+ * <p>This test class is a part of Window Manager Service tests and specified in
+ * {@link com.android.server.wm.test.filters.FrameworksTestsFilter}.
+ */
 @RunWith(AndroidJUnit4.class)
 @SmallTest
 @Presubmit
@@ -203,15 +212,15 @@ public class ObjectPoolTests {
 
     @Test
     public void testRecycleNewIntentItem() {
-        NewIntentItem emptyItem = NewIntentItem.obtain(null, false);
-        NewIntentItem item = NewIntentItem.obtain(referrerIntentList(), true);
+        NewIntentItem emptyItem = NewIntentItem.obtain(null);
+        NewIntentItem item = NewIntentItem.obtain(referrerIntentList());
         assertNotSame(item, emptyItem);
         assertFalse(item.equals(emptyItem));
 
         item.recycle();
         assertEquals(item, emptyItem);
 
-        NewIntentItem item2 = NewIntentItem.obtain(referrerIntentList(), true);
+        NewIntentItem item2 = NewIntentItem.obtain(referrerIntentList());
         assertSame(item, item2);
         assertFalse(item2.equals(emptyItem));
     }

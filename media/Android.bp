@@ -3,7 +3,6 @@ java_library {
 
     srcs: [
         ":updatable-media-srcs",
-        ":framework-media-annotation-srcs",
     ],
 
     aidl: {
@@ -25,10 +24,19 @@ java_library {
         "mediaplayer2-protos",
     ],
 
+    permitted_packages: [
+        "android.media",
+    ],
+
     installable: true,
 
     // Make sure that the implementaion only relies on SDK or system APIs.
-    sdk_version: "system_current",
+    no_framework_libs: true,
+    libs: [
+        // The order matters. android_system_* library should come later.
+        "framework_media_annotation",
+        "android_system_stubs_current",
+    ],
 }
 
 filegroup {
@@ -86,7 +94,6 @@ filegroup {
         "apex/java/android/media/DataSourceDesc.java",
         "apex/java/android/media/UriDataSourceDesc.java",
         "apex/java/android/media/FileDataSourceDesc.java",
-        "apex/java/android/media/CallbackDataSourceDesc.java",
         "apex/java/android/media/Media2Utils.java",
         "apex/java/android/media/MediaPlayer2Utils.java",
         "apex/java/android/media/MediaPlayer2.java",
@@ -94,6 +101,7 @@ filegroup {
         "apex/java/android/media/Media2HTTPConnection.java",
         "apex/java/android/media/RoutingDelegate.java",
         "apex/java/android/media/BufferingParams.java",
+        "apex/java/android/media/ProxyDataSourceCallback.java",
     ],
 }
 
@@ -102,7 +110,8 @@ metalava_updatable_media_args = " --error UnhiddenSystemApi " +
     "--hide MissingPermission --hide BroadcastBehavior " +
     "--hide HiddenSuperclass --hide DeprecationMismatch --hide UnavailableSymbol " +
     "--hide SdkConstant --hide HiddenTypeParameter --hide Todo --hide Typo " +
-    "--hide HiddenTypedefConstant "
+    "--hide HiddenTypedefConstant --show-annotation android.annotation.SystemApi " +
+    " --show-annotation android.annotation.TestApi "
 
 droidstubs {
     name: "updatable-media-stubs",
@@ -110,8 +119,7 @@ droidstubs {
         ":updatable-media-srcs-without-aidls",
         ":framework-media-annotation-srcs",
     ],
-    args: metalava_updatable_media_args + " --show-annotation android.annotation.SystemApi " +
-        " --show-annotation android.annotation.TestApi ",
+    args: metalava_updatable_media_args,
     // Ideally, sdk_version here should be "current_system", but "current - 1" is used
     // to avoid dependency cycle with framework.
     sdk_version: "28",
@@ -125,3 +133,8 @@ java_library {
     sdk_version: "28",
 }
 
+java_library {
+    name: "framework_media_annotation",
+    srcs: [":framework-media-annotation-srcs"],
+    installable: false,
+}

@@ -18,9 +18,11 @@ package com.android.server.pm;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.UserIdInt;
+import android.app.Person;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.LocusId;
 import android.content.pm.PackageInfo;
 import android.content.pm.ShortcutInfo;
 import android.content.pm.ShortcutManager;
@@ -33,6 +35,7 @@ import android.util.Log;
 import android.util.Slog;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.Preconditions;
 import com.android.internal.util.XmlUtils;
 import com.android.server.pm.ShortcutService.DumpFilter;
@@ -71,6 +74,7 @@ class ShortcutPackage extends ShortcutPackageItem {
     private static final String TAG_EXTRAS = "extras";
     private static final String TAG_SHORTCUT = "shortcut";
     private static final String TAG_CATEGORIES = "categories";
+    private static final String TAG_PERSON = "person";
 
     private static final String ATTR_NAME = "name";
     private static final String ATTR_CALL_COUNT = "call-count";
@@ -95,6 +99,13 @@ class ShortcutPackage extends ShortcutPackageItem {
     private static final String ATTR_ICON_RES_ID = "icon-res";
     private static final String ATTR_ICON_RES_NAME = "icon-resname";
     private static final String ATTR_BITMAP_PATH = "bitmap-path";
+    private static final String ATTR_LOCUS_ID = "locus-id";
+
+    private static final String ATTR_PERSON_NAME = "name";
+    private static final String ATTR_PERSON_URI = "uri";
+    private static final String ATTR_PERSON_KEY = "key";
+    private static final String ATTR_PERSON_IS_BOT = "is-bot";
+    private static final String ATTR_PERSON_IS_IMPORTANT = "is-important";
 
     private static final String NAME_CATEGORIES = "categories";
 
@@ -1463,6 +1474,10 @@ class ShortcutPackage extends ShortcutPackageItem {
         ShortcutService.writeAttr(out, ATTR_DISABLED_REASON, si.getDisabledReason());
         ShortcutService.writeAttr(out, ATTR_TIMESTAMP,
                 si.getLastChangedTimestamp());
+        final LocusId locusId = si.getLocusId();
+        if (locusId != null) {
+            ShortcutService.writeAttr(out, ATTR_LOCUS_ID, si.getLocusId().getId());
+        }
         if (forBackup) {
             // Don't write icon information.  Also drop the dynamic flag.
 
@@ -1497,6 +1512,22 @@ class ShortcutPackage extends ShortcutPackageItem {
                     XmlUtils.writeStringArrayXml(cat.toArray(new String[cat.size()]),
                             NAME_CATEGORIES, out);
                     out.endTag(null, TAG_CATEGORIES);
+                }
+            }
+            if (!forBackup) {  // Don't backup the persons field.
+                final Person[] persons = si.getPersons();
+                if (!ArrayUtils.isEmpty(persons)) {
+                    for (int i = 0; i < persons.length; i++) {
+                        final Person p = persons[i];
+
+                        out.startTag(null, TAG_PERSON);
+                        ShortcutService.writeAttr(out, ATTR_PERSON_NAME, p.getName());
+                        ShortcutService.writeAttr(out, ATTR_PERSON_URI, p.getUri());
+                        ShortcutService.writeAttr(out, ATTR_PERSON_KEY, p.getKey());
+                        ShortcutService.writeAttr(out, ATTR_PERSON_IS_BOT, p.isBot());
+                        ShortcutService.writeAttr(out, ATTR_PERSON_IS_IMPORTANT, p.isImportant());
+                        out.endTag(null, TAG_PERSON);
+                    }
                 }
             }
             final Intent[] intentsNoExtras = si.getIntentsNoExtras();
@@ -1586,8 +1617,10 @@ class ShortcutPackage extends ShortcutPackageItem {
         int iconResId;
         String iconResName;
         String bitmapPath;
+        final String locusIdString;
         int backupVersionCode;
         ArraySet<String> categories = null;
+        ArrayList<Person> persons = new ArrayList<>();
 
         id = ShortcutService.parseStringAttribute(parser, ATTR_ID);
         activityComponent = ShortcutService.parseComponentNameAttribute(parser,
@@ -1611,6 +1644,7 @@ class ShortcutPackage extends ShortcutPackageItem {
         iconResId = (int) ShortcutService.parseLongAttribute(parser, ATTR_ICON_RES_ID);
         iconResName = ShortcutService.parseStringAttribute(parser, ATTR_ICON_RES_NAME);
         bitmapPath = ShortcutService.parseStringAttribute(parser, ATTR_BITMAP_PATH);
+        locusIdString = ShortcutService.parseStringAttribute(parser, ATTR_LOCUS_ID);
 
         final int outerDepth = parser.getDepth();
         int type;
@@ -1637,6 +1671,9 @@ class ShortcutPackage extends ShortcutPackageItem {
                     continue;
                 case TAG_CATEGORIES:
                     // This just contains string-array.
+                    continue;
+                case TAG_PERSON:
+                    persons.add(parsePerson(parser));
                     continue;
                 case TAG_STRING_ARRAY_XMLUTILS:
                     if (NAME_CATEGORIES.equals(ShortcutService.parseStringAttribute(parser,
@@ -1673,14 +1710,17 @@ class ShortcutPackage extends ShortcutPackageItem {
             flags |= ShortcutInfo.FLAG_SHADOW;
         }
 
+        final LocusId locusId = locusIdString == null ? null : new LocusId(locusIdString);
+
         return new ShortcutInfo(
-                userId, id, packageName, activityComponent, /* icon =*/ null,
+                userId, id, packageName, activityComponent, /* icon= */ null,
                 title, titleResId, titleResName, text, textResId, textResName,
                 disabledMessage, disabledMessageResId, disabledMessageResName,
                 categories,
                 intents.toArray(new Intent[intents.size()]),
                 rank, extras, lastChangedTimestamp, flags,
-                iconResId, iconResName, bitmapPath, disabledReason);
+                iconResId, iconResName, bitmapPath, disabledReason,
+                persons.toArray(new Person[persons.size()]), locusId);
     }
 
     private static Intent parseIntent(XmlPullParser parser)
@@ -1711,6 +1751,20 @@ class ShortcutPackage extends ShortcutPackageItem {
             throw ShortcutService.throwForInvalidTag(depth, tag);
         }
         return intent;
+    }
+
+    private static Person parsePerson(XmlPullParser parser)
+            throws IOException, XmlPullParserException {
+        CharSequence name = ShortcutService.parseStringAttribute(parser, ATTR_PERSON_NAME);
+        String uri = ShortcutService.parseStringAttribute(parser, ATTR_PERSON_URI);
+        String key = ShortcutService.parseStringAttribute(parser, ATTR_PERSON_KEY);
+        boolean isBot = ShortcutService.parseBooleanAttribute(parser, ATTR_PERSON_IS_BOT);
+        boolean isImportant = ShortcutService.parseBooleanAttribute(parser,
+                ATTR_PERSON_IS_IMPORTANT);
+
+        Person.Builder builder = new Person.Builder();
+        builder.setName(name).setUri(uri).setKey(key).setBot(isBot).setImportant(isImportant);
+        return builder.build();
     }
 
     @VisibleForTesting

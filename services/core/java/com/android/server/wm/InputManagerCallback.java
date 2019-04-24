@@ -6,6 +6,7 @@ import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
 
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_INPUT;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
+import static com.android.server.wm.WindowManagerService.H.ON_POINTER_DOWN_OUTSIDE_FOCUS;
 
 import android.os.Debug;
 import android.os.IBinder;
@@ -163,15 +164,12 @@ final class InputManagerCallback implements InputManagerService.WindowManagerCal
         return mService.mPolicy.interceptKeyBeforeQueueing(event, policyFlags);
     }
 
-    /**
-     * Provides an opportunity for the window manager policy to intercept early motion event
-     * processing when the device is in a non-interactive state since these events are normally
-     * dropped.
-     */
+    /** {@inheritDoc} */
     @Override
-    public int interceptMotionBeforeQueueingNonInteractive(long whenNanos, int policyFlags) {
+    public int interceptMotionBeforeQueueingNonInteractive(int displayId, long whenNanos,
+            int policyFlags) {
         return mService.mPolicy.interceptMotionBeforeQueueingNonInteractive(
-                whenNanos, policyFlags);
+                displayId, whenNanos, policyFlags);
     }
 
     /**
@@ -233,6 +231,11 @@ final class InputManagerCallback implements InputManagerService.WindowManagerCal
             // Look for the topmost non-default display
             return firstExternalDisplayId;
         }
+    }
+
+    @Override
+    public void onPointerDownOutsideFocus(IBinder touchedToken) {
+        mService.mH.obtainMessage(ON_POINTER_DOWN_OUTSIDE_FOCUS, touchedToken).sendToTarget();
     }
 
     /** Waits until the built-in input devices have been configured. */

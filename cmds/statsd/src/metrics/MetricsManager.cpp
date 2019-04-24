@@ -74,7 +74,8 @@ MetricsManager::MetricsManager(const ConfigKey& key, const StatsdConfig& config,
             timeBaseNs, currentTimeNs, mTagIds, mAllAtomMatchers, mAllConditionTrackers,
             mAllMetricProducers, mAllAnomalyTrackers, mAllPeriodicAlarmTrackers,
             mConditionToMetricMap, mTrackerToMetricMap, mTrackerToConditionMap,
-            mActivationAtomTrackerToMetricMap, mMetricIndexesWithActivation, mNoReportMetricIds);
+            mActivationAtomTrackerToMetricMap, mDeactivationAtomTrackerToMetricMap,
+            mMetricIndexesWithActivation, mNoReportMetricIds);
 
     mHashStringsInReport = config.hash_strings_in_metric_report();
     mVersionStringsInReport = config.version_strings_in_metric_report();
@@ -118,10 +119,27 @@ MetricsManager::MetricsManager(const ConfigKey& key, const StatsdConfig& config,
         ALOGE("This config has too many alerts! Reject!");
         mConfigValid = false;
     }
+
+    mIsAlwaysActive = (mMetricIndexesWithActivation.size() != mAllMetricProducers.size()) ||
+            (mAllMetricProducers.size() == 0);
+    bool isActive = mIsAlwaysActive;
+    for (int metric : mMetricIndexesWithActivation) {
+        isActive |= mAllMetricProducers[metric]->isActive();
+    }
+    mIsActive = isActive;
+    VLOG("mIsActive is initialized to %d", mIsActive)
+
     // no matter whether this config is valid, log it in the stats.
     StatsdStats::getInstance().noteConfigReceived(
             key, mAllMetricProducers.size(), mAllConditionTrackers.size(), mAllAtomMatchers.size(),
             mAllAnomalyTrackers.size(), mAnnotations, mConfigValid);
+    // Check active
+    for (const auto& metric : mAllMetricProducers) {
+        if (metric->isActive()) {
+            mIsActive = true;
+            break;
+        }
+    }
 }
 
 MetricsManager::~MetricsManager() {
@@ -200,6 +218,7 @@ void MetricsManager::dropData(const int64_t dropTimeNs) {
 void MetricsManager::onDumpReport(const int64_t dumpTimeStampNs,
                                   const bool include_current_partial_bucket,
                                   const bool erase_data,
+                                  const DumpLatency dumpLatency,
                                   std::set<string> *str_set,
                                   ProtoOutputStream* protoOutput) {
     VLOG("=========================Metric Reports Start==========================");
@@ -210,10 +229,10 @@ void MetricsManager::onDumpReport(const int64_t dumpTimeStampNs,
                     FIELD_TYPE_MESSAGE | FIELD_COUNT_REPEATED | FIELD_ID_METRICS);
             if (mHashStringsInReport) {
                 producer->onDumpReport(dumpTimeStampNs, include_current_partial_bucket, erase_data,
-                                       str_set, protoOutput);
+                                       dumpLatency, str_set, protoOutput);
             } else {
                 producer->onDumpReport(dumpTimeStampNs, include_current_partial_bucket, erase_data,
-                                       nullptr, protoOutput);
+                                       dumpLatency, nullptr, protoOutput);
             }
             protoOutput->end(token);
         } else {
@@ -234,12 +253,22 @@ void MetricsManager::onDumpReport(const int64_t dumpTimeStampNs,
     VLOG("=========================Metric Reports End==========================");
 }
 
-// Consume the stats log if it's interesting to this metric.
-void MetricsManager::onLogEvent(const LogEvent& event) {
-    if (!mConfigValid) {
-        return;
-    }
 
+bool MetricsManager::checkLogCredentials(const LogEvent& event) {
+    if (android::util::AtomsInfo::kWhitelistedAtoms.find(event.GetTagId()) !=
+      android::util::AtomsInfo::kWhitelistedAtoms.end())
+    {
+        return true;
+    }
+    std::lock_guard<std::mutex> lock(mAllowedLogSourcesMutex);
+    if (mAllowedLogSources.find(event.GetUid()) == mAllowedLogSources.end()) {
+        VLOG("log source %d not on the whitelist", event.GetUid());
+        return false;
+    }
+    return true;
+}
+
+bool MetricsManager::eventSanityCheck(const LogEvent& event) {
     if (event.GetTagId() == android::util::APP_BREADCRUMB_REPORTED) {
         // Check that app breadcrumb reported fields are valid.
         status_t err = NO_ERROR;
@@ -249,23 +278,23 @@ void MetricsManager::onLogEvent(const LogEvent& event) {
         long appHookUid = event.GetLong(event.size()-2, &err);
         if (err != NO_ERROR ) {
             VLOG("APP_BREADCRUMB_REPORTED had error when parsing the uid");
-            return;
+            return false;
         }
         int32_t loggerUid = event.GetUid();
         if (loggerUid != appHookUid && loggerUid != AID_STATSD) {
             VLOG("APP_BREADCRUMB_REPORTED has invalid uid: claimed %ld but caller is %d",
                  appHookUid, loggerUid);
-            return;
+            return false;
         }
 
         // The state must be from 0,3. This part of code must be manually updated.
         long appHookState = event.GetLong(event.size(), &err);
         if (err != NO_ERROR ) {
             VLOG("APP_BREADCRUMB_REPORTED had error when parsing the state field");
-            return;
+            return false;
         } else if (appHookState < 0 || appHookState > 3) {
             VLOG("APP_BREADCRUMB_REPORTED does not have valid state %ld", appHookState);
-            return;
+            return false;
         }
     } else if (event.GetTagId() == android::util::DAVEY_OCCURRED) {
         // Daveys can be logged from any app since they are logged in libs/hwui/JankTracker.cpp.
@@ -276,56 +305,111 @@ void MetricsManager::onLogEvent(const LogEvent& event) {
         long jankUid = event.GetLong(1, &err);
         if (err != NO_ERROR ) {
             VLOG("Davey occurred had error when parsing the uid");
-            return;
+            return false;
         }
         int32_t loggerUid = event.GetUid();
         if (loggerUid != jankUid && loggerUid != AID_STATSD) {
             VLOG("DAVEY_OCCURRED has invalid uid: claimed %ld but caller is %d", jankUid,
                  loggerUid);
-            return;
+            return false;
         }
 
         long duration = event.GetLong(event.size(), &err);
         if (err != NO_ERROR ) {
             VLOG("Davey occurred had error when parsing the duration");
-            return;
+            return false;
         } else if (duration > 100000) {
             VLOG("Davey duration is unreasonably long: %ld", duration);
-            return;
+            return false;
         }
-    } else {
-        std::lock_guard<std::mutex> lock(mAllowedLogSourcesMutex);
-        if (mAllowedLogSources.find(event.GetUid()) == mAllowedLogSources.end()) {
-            VLOG("log source %d not on the whitelist", event.GetUid());
-            return;
-        }
+    }
+
+    return true;
+}
+
+// Consume the stats log if it's interesting to this metric.
+void MetricsManager::onLogEvent(const LogEvent& event) {
+    if (!mConfigValid) {
+        return;
+    }
+
+    if (!checkLogCredentials(event)) {
+        return;
+    }
+
+    if (!eventSanityCheck(event)) {
+        return;
     }
 
     int tagId = event.GetTagId();
     int64_t eventTimeNs = event.GetElapsedTimestampNs();
 
-    for (int metric : mMetricIndexesWithActivation) {
-        mAllMetricProducers[metric]->flushIfExpire(eventTimeNs);
+    bool isActive = mIsAlwaysActive;
+
+    // Set of metrics that are still active after flushing.
+    unordered_set<int> activeMetricsIndices;
+
+    // Update state of all metrics w/ activation conditions as of eventTimeNs.
+    for (int metricIndex : mMetricIndexesWithActivation) {
+        const sp<MetricProducer>& metric = mAllMetricProducers[metricIndex];
+        metric->flushIfExpire(eventTimeNs);
+        if (metric->isActive()) {
+            // If this metric w/ activation condition is still active after
+            // flushing, remember it.
+            activeMetricsIndices.insert(metricIndex);
+        }
     }
 
+    mIsActive = isActive || !activeMetricsIndices.empty();
+
     if (mTagIds.find(tagId) == mTagIds.end()) {
-        // not interesting...
+        // Not interesting...
         return;
     }
 
     vector<MatchingState> matcherCache(mAllAtomMatchers.size(), MatchingState::kNotComputed);
 
+    // Evaluate all atom matchers.
     for (auto& matcher : mAllAtomMatchers) {
         matcher->onLogEvent(event, mAllAtomMatchers, matcherCache);
     }
 
+    // Set of metrics that received an activation cancellation.
+    unordered_set<int> metricIndicesWithCanceledActivations;
+
+    // Determine which metric activations received a cancellation and cancel them.
+    for (const auto& it : mDeactivationAtomTrackerToMetricMap) {
+        if (matcherCache[it.first] == MatchingState::kMatched) {
+            for (int metricIndex : it.second) {
+                mAllMetricProducers[metricIndex]->cancelEventActivation(it.first);
+                metricIndicesWithCanceledActivations.insert(metricIndex);
+            }
+        }
+    }
+
+    // Determine whether any metrics are no longer active after cancelling metric activations.
+    for (const int metricIndex : metricIndicesWithCanceledActivations) {
+        const sp<MetricProducer>& metric = mAllMetricProducers[metricIndex];
+        metric->flushIfExpire(eventTimeNs);
+        if (!metric->isActive()) {
+            activeMetricsIndices.erase(metricIndex);
+        }
+    }
+
+    isActive |= !activeMetricsIndices.empty();
+
+
+    // Determine which metric activations should be turned on and turn them on
     for (const auto& it : mActivationAtomTrackerToMetricMap) {
         if (matcherCache[it.first] == MatchingState::kMatched) {
             for (int metricIndex : it.second) {
                 mAllMetricProducers[metricIndex]->activate(it.first, eventTimeNs);
+                isActive |= mAllMetricProducers[metricIndex]->isActive();
             }
         }
     }
+
+    mIsActive = isActive;
 
     // A bitmap to see which ConditionTracker needs to be re-evaluated.
     vector<bool> conditionToBeEvaluated(mAllConditionTrackers.size(), false);
@@ -360,12 +444,12 @@ void MetricsManager::onLogEvent(const LogEvent& event) {
         if (pair != mConditionToMetricMap.end()) {
             auto& metricList = pair->second;
             for (auto metricIndex : metricList) {
-                // metric cares about non sliced condition, and it's changed.
+                // Metric cares about non sliced condition, and it's changed.
                 // Push the new condition to it directly.
                 if (!mAllMetricProducers[metricIndex]->isConditionSliced()) {
                     mAllMetricProducers[metricIndex]->onConditionChanged(conditionCache[i],
                                                                          eventTimeNs);
-                    // metric cares about sliced conditions, and it may have changed. Send
+                    // Metric cares about sliced conditions, and it may have changed. Send
                     // notification, and the metric can query the sliced conditions that are
                     // interesting to it.
                 } else {
@@ -416,6 +500,25 @@ size_t MetricsManager::byteSize() {
         totalSize += metricProducer->byteSize();
     }
     return totalSize;
+}
+
+void MetricsManager::setActiveMetrics(ActiveConfig config, int64_t currentTimeNs) {
+    if (config.active_metric_size() == 0) {
+        ALOGW("No active metric for config %s", mConfigKey.ToString().c_str());
+        return;
+    }
+
+    for (int i = 0; i < config.active_metric_size(); i++) {
+        for (int metric : mMetricIndexesWithActivation) {
+            if (mAllMetricProducers[metric]->getMetricId() == config.active_metric(i).metric_id()) {
+                VLOG("Setting active metric: %lld",
+                     (long long)mAllMetricProducers[metric]->getMetricId());
+                mAllMetricProducers[metric]->setActive(
+                        currentTimeNs, config.active_metric(i).time_to_live_nanos());
+                mIsActive = true;
+            }
+        }
+    }
 }
 
 }  // namespace statsd

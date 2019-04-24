@@ -1193,7 +1193,7 @@ public class VoiceInteractionManagerService extends SystemService {
         }
 
         @Override
-        public void setTranscription(IVoiceInteractionService service, String transcription) {
+        public void setUiHints(IVoiceInteractionService service, Bundle hints) {
             synchronized (this) {
                 enforceIsCurrentVoiceInteractionService(service);
 
@@ -1202,47 +1202,9 @@ public class VoiceInteractionManagerService extends SystemService {
                     final IVoiceInteractionSessionListener listener =
                             mVoiceInteractionSessionListeners.getBroadcastItem(i);
                     try {
-                        listener.onTranscriptionUpdate(transcription);
+                        listener.onSetUiHints(hints);
                     } catch (RemoteException e) {
-                        Slog.e(TAG, "Error delivering voice transcription.", e);
-                    }
-                }
-                mVoiceInteractionSessionListeners.finishBroadcast();
-            }
-        }
-
-        @Override
-        public void clearTranscription(IVoiceInteractionService service, boolean immediate) {
-            synchronized (this) {
-                enforceIsCurrentVoiceInteractionService(service);
-
-                final int size = mVoiceInteractionSessionListeners.beginBroadcast();
-                for (int i = 0; i < size; ++i) {
-                    final IVoiceInteractionSessionListener listener =
-                            mVoiceInteractionSessionListeners.getBroadcastItem(i);
-                    try {
-                        listener.onTranscriptionComplete(immediate);
-                    } catch (RemoteException e) {
-                        Slog.e(TAG, "Error delivering transcription complete event.", e);
-                    }
-                }
-                mVoiceInteractionSessionListeners.finishBroadcast();
-            }
-        }
-
-        @Override
-        public void setVoiceState(IVoiceInteractionService service, int state) {
-            synchronized (this) {
-                enforceIsCurrentVoiceInteractionService(service);
-
-                final int size = mVoiceInteractionSessionListeners.beginBroadcast();
-                for (int i = 0; i < size; ++i) {
-                    final IVoiceInteractionSessionListener listener =
-                            mVoiceInteractionSessionListeners.getBroadcastItem(i);
-                    try {
-                        listener.onVoiceStateChange(state);
-                    } catch (RemoteException e) {
-                        Slog.e(TAG, "Error delivering voice state change.", e);
+                        Slog.e(TAG, "Error delivering UI hints.", e);
                     }
                 }
                 mVoiceInteractionSessionListeners.finishBroadcast();
@@ -1276,6 +1238,9 @@ public class VoiceInteractionManagerService extends SystemService {
 
             RoleObserver(@NonNull @CallbackExecutor Executor executor) {
                 mRm.addOnRoleHoldersChangedListenerAsUser(executor, this, UserHandle.ALL);
+                UserHandle currentUser = UserHandle.of(LocalServices.getService(
+                        ActivityManagerInternal.class).getCurrentUserId());
+                onRoleHoldersChanged(RoleManager.ROLE_ASSISTANT, currentUser);
             }
 
             private @NonNull String getDefaultRecognizer(@NonNull UserHandle user) {
@@ -1307,13 +1272,15 @@ public class VoiceInteractionManagerService extends SystemService {
 
                 List<String> roleHolders = mRm.getRoleHoldersAsUser(roleName, user);
 
+                int userId = user.getIdentifier();
                 if (roleHolders.isEmpty()) {
-                    Settings.Secure.putString(getContext().getContentResolver(),
-                            Settings.Secure.ASSISTANT, "");
-                    Settings.Secure.putString(getContext().getContentResolver(),
-                            Settings.Secure.VOICE_INTERACTION_SERVICE, "");
-                    Settings.Secure.putString(getContext().getContentResolver(),
-                            Settings.Secure.VOICE_RECOGNITION_SERVICE, getDefaultRecognizer(user));
+                    Settings.Secure.putStringForUser(getContext().getContentResolver(),
+                            Settings.Secure.ASSISTANT, "", userId);
+                    Settings.Secure.putStringForUser(getContext().getContentResolver(),
+                            Settings.Secure.VOICE_INTERACTION_SERVICE, "", userId);
+                    Settings.Secure.putStringForUser(getContext().getContentResolver(),
+                            Settings.Secure.VOICE_RECOGNITION_SERVICE, getDefaultRecognizer(user),
+                            userId);
                 } else {
                     // Assistant is singleton role
                     String pkg = roleHolders.get(0);
@@ -1321,7 +1288,9 @@ public class VoiceInteractionManagerService extends SystemService {
                     // Try to set role holder as VoiceInteractionService
                     List<ResolveInfo> services = mPm.queryIntentServicesAsUser(
                             new Intent(VoiceInteractionService.SERVICE_INTERFACE).setPackage(pkg),
-                            PackageManager.GET_META_DATA, user.getIdentifier());
+                            PackageManager.GET_META_DATA
+                                    | PackageManager.MATCH_DIRECT_BOOT_AWARE
+                                    | PackageManager.MATCH_DIRECT_BOOT_UNAWARE, userId);
 
                     for (ResolveInfo resolveInfo : services) {
                         ServiceInfo serviceInfo = resolveInfo.serviceInfo;
@@ -1339,12 +1308,14 @@ public class VoiceInteractionManagerService extends SystemService {
                                 voiceInteractionServiceInfo.getRecognitionService())
                                 .flattenToShortString();
 
-                        Settings.Secure.putString(getContext().getContentResolver(),
-                                Settings.Secure.ASSISTANT, serviceComponentName);
-                        Settings.Secure.putString(getContext().getContentResolver(),
-                                Settings.Secure.VOICE_INTERACTION_SERVICE, serviceComponentName);
-                        Settings.Secure.putString(getContext().getContentResolver(),
-                                Settings.Secure.VOICE_RECOGNITION_SERVICE, serviceRecognizerName);
+                        Settings.Secure.putStringForUser(getContext().getContentResolver(),
+                                Settings.Secure.ASSISTANT, serviceComponentName, userId);
+                        Settings.Secure.putStringForUser(getContext().getContentResolver(),
+                                Settings.Secure.VOICE_INTERACTION_SERVICE, serviceComponentName,
+                                userId);
+                        Settings.Secure.putStringForUser(getContext().getContentResolver(),
+                                Settings.Secure.VOICE_RECOGNITION_SERVICE, serviceRecognizerName,
+                                userId);
 
                         return;
                     }
@@ -1352,19 +1323,22 @@ public class VoiceInteractionManagerService extends SystemService {
                     // If no service could be found try to set assist activity
                     final List<ResolveInfo> activities = mPm.queryIntentActivitiesAsUser(
                             new Intent(Intent.ACTION_ASSIST).setPackage(pkg),
-                            PackageManager.MATCH_DEFAULT_ONLY, user.getIdentifier());
+                            PackageManager.MATCH_DEFAULT_ONLY
+                                    | PackageManager.MATCH_DIRECT_BOOT_AWARE
+                                    | PackageManager.MATCH_DIRECT_BOOT_UNAWARE, userId);
 
                     for (ResolveInfo resolveInfo : activities) {
                         ActivityInfo activityInfo = resolveInfo.activityInfo;
 
-                        Settings.Secure.putString(getContext().getContentResolver(),
+                        Settings.Secure.putStringForUser(getContext().getContentResolver(),
                                 Settings.Secure.ASSISTANT,
-                                activityInfo.getComponentName().flattenToShortString());
-                        Settings.Secure.putString(getContext().getContentResolver(),
-                                Settings.Secure.VOICE_INTERACTION_SERVICE, "");
-                        Settings.Secure.putString(getContext().getContentResolver(),
+                                activityInfo.getComponentName().flattenToShortString(), userId);
+                        Settings.Secure.putStringForUser(getContext().getContentResolver(),
+                                Settings.Secure.VOICE_INTERACTION_SERVICE, "", userId);
+                        Settings.Secure.putStringForUser(getContext().getContentResolver(),
                                 Settings.Secure.VOICE_RECOGNITION_SERVICE,
-                                getDefaultRecognizer(user));
+                                getDefaultRecognizer(user), userId);
+                        return;
                     }
                 }
             }
@@ -1423,6 +1397,16 @@ public class VoiceInteractionManagerService extends SystemService {
                         resetCurAssistant(userHandle);
                         initForUser(userHandle);
                         switchImplementationIfNeededLocked(true);
+
+                        Context context = getContext();
+                        context.getSystemService(RoleManager.class).clearRoleHoldersAsUser(
+                                RoleManager.ROLE_ASSISTANT, 0, UserHandle.of(userHandle),
+                                context.getMainExecutor(), successful -> {
+                                    if (!successful) {
+                                        Slog.e(TAG,
+                                                "Failed to clear default assistant for force stop");
+                                    }
+                                });
                     }
                 } else if (hitRec && doit) {
                     // We are just force-stopping the current recognizer, which is not

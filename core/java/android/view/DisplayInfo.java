@@ -27,6 +27,7 @@ import android.annotation.UnsupportedAppUsage;
 import android.content.res.CompatibilityInfo;
 import android.content.res.Configuration;
 import android.graphics.Rect;
+import android.os.Build;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.util.ArraySet;
@@ -57,10 +58,15 @@ public final class DisplayInfo implements Parcelable {
     public int type;
 
     /**
+     * Logical display identifier.
+     */
+    public int displayId;
+
+    /**
      * Display address, or null if none.
      * Interpretation varies by display type.
      */
-    public String address;
+    public DisplayAddress address;
 
     /**
      * The human-readable name of the display.
@@ -157,8 +163,9 @@ public final class DisplayInfo implements Parcelable {
      *
      * @hide
      */
+    // Remark on @UnsupportedAppUsage: Display.getCutout should be used instead
     @Nullable
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     public DisplayCutout displayCutout;
 
     /**
@@ -269,7 +276,7 @@ public final class DisplayInfo implements Parcelable {
     // TODO (b/114338689): Remove the flag and use IWindowManager#getRemoveContentMode
     public int removeMode = Display.REMOVE_MODE_MOVE_CONTENT_TO_PRIMARY;
 
-    public static final Creator<DisplayInfo> CREATOR = new Creator<DisplayInfo>() {
+    public static final @android.annotation.NonNull Creator<DisplayInfo> CREATOR = new Creator<DisplayInfo>() {
         @Override
         public DisplayInfo createFromParcel(Parcel source) {
             return new DisplayInfo(source);
@@ -281,7 +288,7 @@ public final class DisplayInfo implements Parcelable {
         }
     };
 
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 123769467)
     public DisplayInfo() {
     }
 
@@ -303,6 +310,7 @@ public final class DisplayInfo implements Parcelable {
                 && layerStack == other.layerStack
                 && flags == other.flags
                 && type == other.type
+                && displayId == other.displayId
                 && Objects.equals(address, other.address)
                 && Objects.equals(uniqueId, other.uniqueId)
                 && appWidth == other.appWidth
@@ -344,6 +352,7 @@ public final class DisplayInfo implements Parcelable {
         layerStack = other.layerStack;
         flags = other.flags;
         type = other.type;
+        displayId = other.displayId;
         address = other.address;
         name = other.name;
         uniqueId = other.uniqueId;
@@ -383,7 +392,8 @@ public final class DisplayInfo implements Parcelable {
         layerStack = source.readInt();
         flags = source.readInt();
         type = source.readInt();
-        address = source.readString();
+        displayId = source.readInt();
+        address = source.readParcelable(null);
         name = source.readString();
         appWidth = source.readInt();
         appHeight = source.readInt();
@@ -430,7 +440,8 @@ public final class DisplayInfo implements Parcelable {
         dest.writeInt(layerStack);
         dest.writeInt(this.flags);
         dest.writeInt(type);
-        dest.writeString(address);
+        dest.writeInt(displayId);
+        dest.writeParcelable(address, flags);
         dest.writeString(name);
         dest.writeInt(appWidth);
         dest.writeInt(appHeight);
@@ -577,7 +588,7 @@ public final class DisplayInfo implements Parcelable {
      * Returns true if the specified UID has access to this display.
      */
     public boolean hasAccess(int uid) {
-        return Display.hasAccess(uid, flags, ownerUid);
+        return Display.hasAccess(uid, flags, ownerUid, displayId);
     }
 
     private void getMetricsWithSize(DisplayMetrics outMetrics, CompatibilityInfo compatInfo,
@@ -608,6 +619,8 @@ public final class DisplayInfo implements Parcelable {
         StringBuilder sb = new StringBuilder();
         sb.append("DisplayInfo{\"");
         sb.append(name);
+        sb.append(", displayId ");
+        sb.append(displayId);
         sb.append("\", uniqueId \"");
         sb.append(uniqueId);
         sb.append("\", app ");

@@ -15,7 +15,6 @@
  */
 package com.android.server.usage;
 
-import static android.app.usage.UsageEvents.Event.ACTIVITY_DESTROYED;
 import static android.app.usage.UsageEvents.Event.ACTIVITY_PAUSED;
 import static android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED;
 import static android.app.usage.UsageEvents.Event.ACTIVITY_STOPPED;
@@ -67,7 +66,7 @@ public class IntervalStats {
     public final ArrayMap<String, UsageStats> packageStats = new ArrayMap<>();
     public final ArrayMap<Configuration, ConfigurationStats> configurations = new ArrayMap<>();
     public Configuration activeConfiguration;
-    public EventList events = new EventList();
+    public final EventList events = new EventList();
 
     // A string cache. This is important as when we're parsing XML files, we don't want to
     // keep hundreds of strings that have the same contents. We will read the string
@@ -83,7 +82,7 @@ public class IntervalStats {
 
         public void commitTime(long timeStamp) {
             if (curStartTime != 0) {
-                duration += timeStamp - duration;
+                duration += timeStamp - curStartTime;
                 curStartTime = 0;
             }
         }
@@ -302,32 +301,13 @@ public class IntervalStats {
                 UsageStats usageStats = packageStats.valueAt(i);
                 usageStats.update(null, timeStamp, eventType, instanceId);
             }
-        } else if (eventType == ACTIVITY_DESTROYED) {
-            UsageStats usageStats = packageStats.get(packageName);
-            if (usageStats != null) {
-                // If previous event is not ACTIVITY_STOPPED, convert ACTIVITY_DESTROYED
-                // to ACTIVITY_STOPPED and add to event list.
-                // Otherwise do not add anything to event list. (Because we want to save space
-                // and we do not want a ACTIVITY_STOPPED followed by
-                // ACTIVITY_DESTROYED in event list).
-                final int index = usageStats.mActivities.indexOfKey(instanceId);
-                if (index >= 0) {
-                    final int type = usageStats.mActivities.valueAt(index);
-                    if (type != ACTIVITY_STOPPED) {
-                        Event event = new Event(ACTIVITY_STOPPED, timeStamp);
-                        event.mPackage = packageName;
-                        event.mClass = className;
-                        event.mInstanceId = instanceId;
-                        addEvent(event);
-                    }
-                }
-                usageStats.update(className, timeStamp, ACTIVITY_DESTROYED, instanceId);
-            }
         } else {
             UsageStats usageStats = getOrCreateUsageStats(packageName);
             usageStats.update(className, timeStamp, eventType, instanceId);
         }
-        endTime = timeStamp;
+        if (timeStamp > endTime) {
+            endTime = timeStamp;
+        }
     }
 
     /**
@@ -350,6 +330,9 @@ public class IntervalStats {
             event.mNotificationChannelId = getCachedStringRef(event.mNotificationChannelId);
         }
         events.insert(event);
+        if (event.mTimeStamp > endTime) {
+            endTime = event.mTimeStamp;
+        }
     }
 
     void updateChooserCounts(String packageName, String category, String action) {
@@ -382,8 +365,9 @@ public class IntervalStats {
             configStats.mActivationCount += 1;
             activeConfiguration = configStats.mConfiguration;
         }
-
-        endTime = timeStamp;
+        if (timeStamp > endTime) {
+            endTime = timeStamp;
+        }
     }
 
     void incrementAppLaunchCount(String packageName) {

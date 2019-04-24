@@ -40,10 +40,9 @@ using ::android::base::StringPrintf;
 namespace aapt {
 namespace ResourceUtils {
 
-constexpr int32_t kNonBreakingSpace = 0xa0;
-
 Maybe<ResourceName> ToResourceName(
     const android::ResTable::resource_name& name_in) {
+  // TODO: Remove this when ResTable and AssetManager(1) are removed from AAPT2
   ResourceName name_out;
   if (!name_in.package) {
     return {};
@@ -73,6 +72,41 @@ Maybe<ResourceName> ToResourceName(
         util::Utf16ToUtf8(StringPiece16(name_in.name, name_in.nameLen));
   } else if (name_in.name8) {
     name_out.entry.assign(name_in.name8, name_in.nameLen);
+  } else {
+    return {};
+  }
+  return name_out;
+}
+
+Maybe<ResourceName> ToResourceName(const android::AssetManager2::ResourceName& name_in) {
+  ResourceName name_out;
+  if (!name_in.package) {
+    return {};
+  }
+
+  name_out.package = std::string(name_in.package, name_in.package_len);
+
+  const ResourceType* type;
+  if (name_in.type16) {
+    type = ParseResourceType(
+        util::Utf16ToUtf8(StringPiece16(name_in.type16, name_in.type_len)));
+  } else if (name_in.type) {
+    type = ParseResourceType(StringPiece(name_in.type, name_in.type_len));
+  } else {
+    return {};
+  }
+
+  if (!type) {
+    return {};
+  }
+
+  name_out.type = *type;
+
+  if (name_in.entry16) {
+    name_out.entry =
+        util::Utf16ToUtf8(StringPiece16(name_in.entry16, name_in.entry_len));
+  } else if (name_in.entry) {
+    name_out.entry = std::string(name_in.entry, name_in.entry_len);
   } else {
     return {};
   }
@@ -727,7 +761,7 @@ std::unique_ptr<Item> ParseBinaryResValue(const ResourceType& type, const Config
           // This must be a FileReference.
           std::unique_ptr<FileReference> file_ref =
               util::make_unique<FileReference>(dst_pool->MakeRef(
-                  str, StringPool::Context(StringPool::Context::kHighPriority, config), data));
+                  str, StringPool::Context(StringPool::Context::kHighPriority, config)));
           if (type == ResourceType::kRaw) {
             file_ref->type = ResourceFile::Type::kUnknown;
           } else if (util::EndsWith(*file_ref->path, ".xml")) {
@@ -739,7 +773,7 @@ std::unique_ptr<Item> ParseBinaryResValue(const ResourceType& type, const Config
         }
 
         // There are no styles associated with this string, so treat it as a simple string.
-        return util::make_unique<String>(dst_pool->MakeRef(str, StringPool::Context(config), data));
+        return util::make_unique<String>(dst_pool->MakeRef(str, StringPool::Context(config)));
       }
     } break;
 
@@ -809,20 +843,17 @@ StringBuilder::StringBuilder(bool preserve_spaces)
     : preserve_spaces_(preserve_spaces), quote_(preserve_spaces) {
 }
 
-StringBuilder& StringBuilder::AppendText(const std::string& text, bool preserve_spaces) {
+StringBuilder& StringBuilder::AppendText(const std::string& text) {
   if (!error_.empty()) {
     return *this;
   }
-
-  // Enable preserving spaces if it is enabled for this append or the StringBuilder was constructed
-  // to preserve spaces
-  preserve_spaces = (preserve_spaces) ? preserve_spaces : preserve_spaces_;
 
   const size_t previous_len = xml_string_.text.size();
   Utf8Iterator iter(text);
   while (iter.HasNext()) {
     char32_t codepoint = iter.Next();
-    if (!preserve_spaces && !quote_ && codepoint != kNonBreakingSpace && iswspace(codepoint)) {
+    if (!preserve_spaces_ && !quote_ && (codepoint <= std::numeric_limits<char>::max())
+                                         && isspace(static_cast<char>(codepoint))) {
       if (!last_codepoint_was_space_) {
         // Emit a space if it's the first.
         xml_string_.text += ' ';
@@ -870,11 +901,11 @@ StringBuilder& StringBuilder::AppendText(const std::string& text, bool preserve_
             break;
         }
       }
-    } else if (!preserve_spaces && codepoint == U'"') {
+    } else if (!preserve_spaces_ && codepoint == U'"') {
       // Only toggle the quote state when we are not preserving spaces.
       quote_ = !quote_;
 
-    } else if (!preserve_spaces && !quote_ && codepoint == U'\'') {
+    } else if (!preserve_spaces_ && !quote_ && codepoint == U'\'') {
       // This should be escaped when we are not preserving spaces
       error_ = StringPrintf("unescaped apostrophe in string\n\"%s\"", text.c_str());
       return *this;

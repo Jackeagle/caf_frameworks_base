@@ -27,7 +27,9 @@ import android.annotation.RequiresPermission;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
 import android.annotation.SystemApi;
+import android.annotation.TestApi;
 import android.annotation.UnsupportedAppUsage;
+import android.app.AppGlobals;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.ComponentInfo;
@@ -37,10 +39,12 @@ import android.content.pm.ShortcutInfo;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Rect;
+import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.IncidentManager;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.PersistableBundle;
@@ -49,6 +53,7 @@ import android.os.ResultReceiver;
 import android.os.ShellCommand;
 import android.os.StrictMode;
 import android.os.UserHandle;
+import android.os.storage.StorageManager;
 import android.provider.ContactsContract.QuickContact;
 import android.provider.DocumentsContract;
 import android.provider.DocumentsProvider;
@@ -66,6 +71,7 @@ import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlSerializer;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Serializable;
@@ -630,6 +636,8 @@ import java.util.Set;
  * of all possible flags.
  */
 public class Intent implements Parcelable, Cloneable {
+    private static final String TAG = "Intent";
+
     private static final String ATTR_ACTION = "action";
     private static final String TAG_CATEGORIES = "categories";
     private static final String ATTR_CATEGORY = "category";
@@ -817,28 +825,6 @@ public class Intent implements Parcelable, Cloneable {
             = "android.intent.action.SHOW_APP_INFO";
 
     /**
-     * Activity Action: Start an activity to show the app's detailed usage information for
-     * permission protected data.
-     *
-     * The Intent contains an extra {@link #EXTRA_PERMISSION_USAGE_PERMISSIONS} that is of
-     * type {@code String[]} and contains the specific permissions to show information for.
-     *
-     * Apps should handle this intent if they want to provide more information about permission
-     * usage to users beyond the information provided in the manifest.
-     */
-    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
-    public static final String ACTION_PERMISSION_USAGE_DETAILS =
-            "android.intent.action.PERMISSION_USAGE_DETAILS";
-
-    /**
-     * The name of the extra used to contain the permissions in
-     * {@link #ACTION_PERMISSION_USAGE_DETAILS}.
-     * @see #ACTION_PERMISSION_USAGE_DETAILS
-     */
-    public static final String EXTRA_PERMISSION_USAGE_PERMISSIONS =
-            "android.intent.extra.PERMISSION_USAGE_PERMISSIONS";
-
-    /**
      * Represents a shortcut/live folder icon resource.
      *
      * @see Intent#ACTION_CREATE_SHORTCUT
@@ -876,7 +862,7 @@ public class Intent implements Parcelable, Cloneable {
         /**
          * Used to read a ShortcutIconResource from a Parcel.
          */
-        public static final Parcelable.Creator<ShortcutIconResource> CREATOR =
+        public static final @android.annotation.NonNull Parcelable.Creator<ShortcutIconResource> CREATOR =
             new Parcelable.Creator<ShortcutIconResource>() {
 
                 public ShortcutIconResource createFromParcel(Parcel source) {
@@ -1812,6 +1798,35 @@ public class Intent implements Parcelable, Cloneable {
             "android.intent.action.MANAGE_APP_PERMISSIONS";
 
     /**
+     * Activity action: Launch UI to manage a specific permissions of an app.
+     * <p>
+     * Input: {@link #EXTRA_PACKAGE_NAME} specifies the package whose permission
+     * will be managed by the launched UI.
+     * </p>
+     * <p>
+     * Input: {@link #EXTRA_PERMISSION_NAME} specifies the (individual) permission
+     * that should be managed by the launched UI.
+     * </p>
+     * <p>
+     * <li> {@link #EXTRA_USER} specifies the UserHandle of the user that owns the app.
+     * </p>
+     * <p>
+     * Output: Nothing.
+     * </p>
+     *
+     * @see #EXTRA_PACKAGE_NAME
+     * @see #EXTRA_PERMISSION_NAME
+     * @see #EXTRA_USER
+     *
+     * @hide
+     */
+    @SystemApi
+    @RequiresPermission(android.Manifest.permission.GRANT_RUNTIME_PERMISSIONS)
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_MANAGE_APP_PERMISSION =
+            "android.intent.action.MANAGE_APP_PERMISSION";
+
+    /**
      * Activity action: Launch UI to manage permissions.
      * <p>
      * Input: Nothing.
@@ -1894,6 +1909,7 @@ public class Intent implements Parcelable, Cloneable {
      * @hide
      */
     @SystemApi
+    @TestApi
     public static final String EXTRA_ROLE_NAME = "android.intent.extra.ROLE_NAME";
 
     /**
@@ -1987,7 +2003,8 @@ public class Intent implements Parcelable, Cloneable {
     public static final String EXTRA_LAUNCHER_EXTRAS = "android.intent.extra.LAUNCHER_EXTRAS";
 
     /**
-     * Intent extra: ID of the shortcut used to send the share intent.
+     * Intent extra: ID of the shortcut used to send the share intent. Will be sent with
+     * {@link #ACTION_SEND}.
      *
      * @see ShortcutInfo#getId()
      *
@@ -2067,6 +2084,9 @@ public class Intent implements Parcelable, Cloneable {
      * <p>
      * Output: Nothing.
      * </p>
+     * <p class="note">
+     * This requires {@link android.Manifest.permission#GRANT_RUNTIME_PERMISSIONS} permission.
+     * </p>
      *
      * @see #EXTRA_PERMISSION_NAME
      * @see #EXTRA_PERMISSION_GROUP_NAME
@@ -2075,15 +2095,16 @@ public class Intent implements Parcelable, Cloneable {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.GRANT_RUNTIME_PERMISSIONS)
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_REVIEW_PERMISSION_USAGE =
             "android.intent.action.REVIEW_PERMISSION_USAGE";
 
     /**
-     * Activity action: Launch UI to review uses of permissions for a single app.
+     * Activity action: Launch UI to review ongoing app uses of permissions.
      * <p>
-     * Input: {@link #EXTRA_PACKAGE_NAME} specifies the package whose
-     * permissions will be reviewed (mandatory).
+     * Input: {@link #EXTRA_DURATION_MILLIS} specifies the minimum number of milliseconds of recent
+     * activity to show (optional).  Must be non-negative.
      * </p>
      * <p>
      * Output: Nothing.
@@ -2092,15 +2113,32 @@ public class Intent implements Parcelable, Cloneable {
      * This requires {@link android.Manifest.permission#GRANT_RUNTIME_PERMISSIONS} permission.
      * </p>
      *
-     * @see #EXTRA_PACKAGE_NAME
+     * @see #EXTRA_DURATION_MILLIS
      *
      * @hide
      */
     @SystemApi
     @RequiresPermission(android.Manifest.permission.GRANT_RUNTIME_PERMISSIONS)
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
-    public static final String ACTION_REVIEW_APP_PERMISSION_USAGE =
-            "android.intent.action.REVIEW_APP_PERMISSION_USAGE";
+    public static final String ACTION_REVIEW_ONGOING_PERMISSION_USAGE =
+            "android.intent.action.REVIEW_ONGOING_PERMISSION_USAGE";
+
+    /**
+     * Activity action: Launch UI to review running accessibility services.
+     * <p>
+     * Input: Nothing.
+     * </p>
+     * <p>
+     * Output: Nothing.
+     * </p>
+     *
+     * @hide
+     */
+    @SystemApi
+    @RequiresPermission(android.Manifest.permission.REVIEW_ACCESSIBILITY_SERVICES)
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_REVIEW_ACCESSIBILITY_SERVICES =
+            "android.intent.action.REVIEW_ACCESSIBILITY_SERVICES";
 
     // ---------------------------------------------------------------------
     // ---------------------------------------------------------------------
@@ -2410,11 +2448,11 @@ public class Intent implements Parcelable, Cloneable {
      * Broadcast Action: A rollback has been committed.
      *
      * <p class="note">This is a protected intent that can only be sent
-     * by the system.
+     * by the system. The receiver must hold MANAGE_ROLLBACK permission.
      *
      * @hide
      */
-    @SystemApi
+    @SystemApi @TestApi
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_ROLLBACK_COMMITTED =
             "android.intent.action.ROLLBACK_COMMITTED";
@@ -3071,19 +3109,19 @@ public class Intent implements Parcelable, Cloneable {
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_MEDIA_SCANNER_FINISHED = "android.intent.action.MEDIA_SCANNER_FINISHED";
 
-   /**
-     * Broadcast Action:  Request the media scanner to scan a file and add it to the media database.
-     * The path to the file is contained in the Intent.mData field.
-     */
-    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
-    public static final String ACTION_MEDIA_SCANNER_SCAN_FILE = "android.intent.action.MEDIA_SCANNER_SCAN_FILE";
-
     /**
-     * Broadcast Action:  Request the media scanner to scan a storage volume and add it to the media database.
-     * The path to the storage volume is contained in the Intent.mData field.
+     * Broadcast Action: Request the media scanner to scan a file and add it to
+     * the media database.
+     * <p>
+     * The path to the file is contained in {@link Intent#getData()}.
+     *
+     * @deprecated Callers should migrate to inserting items directly into
+     *             {@link MediaStore}, where they will be automatically scanned
+     *             after each mutation.
      */
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
-    public static final String ACTION_MEDIA_SCANNER_SCAN_VOLUME = "android.intent.action.MEDIA_SCANNER_SCAN_VOLUME";
+    @Deprecated
+    public static final String ACTION_MEDIA_SCANNER_SCAN_FILE = "android.intent.action.MEDIA_SCANNER_SCAN_FILE";
 
    /**
      * Broadcast Action:  The "Media Button" was pressed.  Includes a single
@@ -3438,6 +3476,7 @@ public class Intent implements Parcelable, Cloneable {
      * {@link android.Manifest.permission#MANAGE_USERS} to receive this broadcast.
      * @hide
      */
+    @SystemApi
     public static final String ACTION_USER_ADDED =
             "android.intent.action.USER_ADDED";
 
@@ -4313,6 +4352,18 @@ public class Intent implements Parcelable, Cloneable {
             "android.intent.action.DEVICE_CUSTOMIZATION_READY";
 
 
+    /**
+     * Activity Action: Display an activity state associated with an unique {@link LocusId}.
+     *
+     * <p>For example, a chat app could use the context to resume a conversation between 2 users.
+     *
+     * <p>Input: {@link #EXTRA_LOCUS_ID} specifies the unique identifier of the locus in the
+     * app domain. Should be stable across reboots and backup / restore.
+     * <p>Output: nothing.
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_VIEW_LOCUS = "android.intent.action.VIEW_LOCUS";
+
     // ---------------------------------------------------------------------
     // ---------------------------------------------------------------------
     // Standard intent categories (see addCategory()).
@@ -4679,6 +4730,18 @@ public class Intent implements Parcelable, Cloneable {
      */
     @SdkConstant(SdkConstantType.INTENT_CATEGORY)
     public static final String CATEGORY_APP_MUSIC = "android.intent.category.APP_MUSIC";
+
+    /**
+     * Used with {@link #ACTION_MAIN} to launch the files application.
+     * The activity should be able to browse and manage files stored on the device.
+     * <p>NOTE: This should not be used as the primary key of an Intent,
+     * since it will not result in the app launching with the correct
+     * action and category.  Instead, use this with
+     * {@link #makeMainSelectorActivity(String, String)} to generate a main
+     * Intent with this category in the selector.</p>
+     */
+    @SdkConstant(SdkConstantType.INTENT_CATEGORY)
+    public static final String CATEGORY_APP_FILES = "android.intent.category.APP_FILES";
 
     // ---------------------------------------------------------------------
     // ---------------------------------------------------------------------
@@ -5510,6 +5573,15 @@ public class Intent implements Parcelable, Cloneable {
      * @hide
      */
     public static final int EXTRA_MEDIA_RESOURCE_TYPE_AUDIO_CODEC = 1;
+
+    /**
+     * Intent extra: ID of the context used on {@link #ACTION_VIEW_LOCUS}.
+     *
+     * <p>
+     * Type: {@link LocusId}
+     * </p>
+     */
+    public static final String EXTRA_LOCUS_ID = "android.intent.extra.LOCUS_ID";
 
     // ---------------------------------------------------------------------
     // ---------------------------------------------------------------------
@@ -9746,7 +9818,7 @@ public class Intent implements Parcelable, Cloneable {
                 // may fail.  We really should handle this (i.e., the Bundle
                 // impl shouldn't be on top of a plain map), but for now just
                 // ignore it and keep the original contents. :(
-                Log.w("Intent", "Failure filling in extras", e);
+                Log.w(TAG, "Failure filling in extras", e);
             }
         }
         if (mayHaveCopiedUris && mContentUserHint == UserHandle.USER_CURRENT
@@ -10292,7 +10364,7 @@ public class Intent implements Parcelable, Cloneable {
         out.writeBundle(mExtras);
     }
 
-    public static final Parcelable.Creator<Intent> CREATOR
+    public static final @android.annotation.NonNull Parcelable.Creator<Intent> CREATOR
             = new Parcelable.Creator<Intent>() {
         public Intent createFromParcel(Parcel in) {
             return new Intent(in);
@@ -10462,7 +10534,7 @@ public class Intent implements Parcelable, Cloneable {
             } else if (ATTR_FLAGS.equals(attrName)) {
                 intent.setFlags(Integer.parseInt(attrValue, 16));
             } else {
-                Log.e("Intent", "restoreFromXml: unknown attribute=" + attrName);
+                Log.e(TAG, "restoreFromXml: unknown attribute=" + attrName);
             }
         }
 
@@ -10478,7 +10550,7 @@ public class Intent implements Parcelable, Cloneable {
                         intent.addCategory(in.getAttributeValue(attrNdx));
                     }
                 } else {
-                    Log.w("Intent", "restoreFromXml: unknown name=" + name);
+                    Log.w(TAG, "restoreFromXml: unknown name=" + name);
                     XmlUtils.skipCurrentTag(in);
                 }
             }
@@ -10590,6 +10662,20 @@ public class Intent implements Parcelable, Cloneable {
                     break;
                 default:
                     mData.checkContentUriWithoutPermission("Intent.getData()", getFlags());
+            }
+        }
+
+        // Translate raw filesystem paths out of storage sandbox
+        if (ACTION_MEDIA_SCANNER_SCAN_FILE.equals(mAction) && mData != null
+                && ContentResolver.SCHEME_FILE.equals(mData.getScheme()) && leavingPackage) {
+            final StorageManager sm = AppGlobals.getInitialApplication()
+                    .getSystemService(StorageManager.class);
+            final File before = new File(mData.getPath());
+            final File after = sm.translateAppToSystem(before,
+                    android.os.Process.myPid(), android.os.Process.myUid());
+            if (!Objects.equals(before, after)) {
+                Log.v(TAG, "Translated " + before + " to " + after);
+                mData = Uri.fromFile(after);
             }
         }
     }

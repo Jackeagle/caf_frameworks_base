@@ -22,8 +22,9 @@ import static org.junit.Assert.assertTrue;
 
 import android.os.Process;
 import android.os.SystemClock;
-import android.support.test.filters.LargeTest;
-import android.support.test.runner.AndroidJUnit4;
+
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.filters.LargeTest;
 
 import com.android.internal.os.KernelCpuThreadReader.ProcessCpuUsage;
 import com.android.internal.os.KernelCpuThreadReader.ThreadCpuUsage;
@@ -34,6 +35,7 @@ import org.junit.runner.RunWith;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.Consumer;
@@ -125,17 +127,21 @@ public class KernelCpuThreadReaderEndToEndTest {
         final KernelCpuThreadReader kernelCpuThreadReader =
                 KernelCpuThreadReader.create(8, uid -> uid == Process.myUid());
         assertNotNull(kernelCpuThreadReader);
-        final ProcessCpuUsage currentProcessCpuUsage =
-                kernelCpuThreadReader.getCurrentProcessCpuUsage();
+        kernelCpuThreadReader.setUidPredicate(uid -> uid == Process.myUid());
+        final Optional<ProcessCpuUsage> currentProcessCpuUsage =
+                kernelCpuThreadReader.getProcessCpuUsage().stream()
+                        .filter(p -> p.processId == Process.myPid())
+                        .findFirst();
+        assertTrue(currentProcessCpuUsage.isPresent());
 
         // Threads can terminate, as we've finished crawling them from /proc
         threadFinishedLatch.countDown();
 
         // Check that we've got times for every thread we spawned
-        final List<ThreadCpuUsage> threadCpuUsages = currentProcessCpuUsage.threadCpuUsages
-                .stream()
-                .filter((thread) -> thread.threadName.startsWith(tag))
-                .collect(Collectors.toList());
+        final List<ThreadCpuUsage> threadCpuUsages =
+                currentProcessCpuUsage.get().threadCpuUsages.stream()
+                        .filter((thread) -> thread.threadName.startsWith(tag))
+                        .collect(Collectors.toList());
         assertEquals(
                 "Incorrect number of threads returned by KernelCpuThreadReader",
                 numSamples, threadCpuUsages.size());

@@ -22,11 +22,10 @@ import android.net.Uri;
 import android.os.Handler;
 import android.provider.DeviceConfig;
 import android.provider.Settings;
-import android.text.TextUtils;
-import android.util.KeyValueListParser;
 import android.util.Log;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.config.sysui.SystemUiDeviceConfigFlags;
 
 /**
  * Observes the settings for {@link Assistant}.
@@ -37,6 +36,9 @@ final class AssistantSettings extends ContentObserver {
     private static final boolean DEFAULT_GENERATE_REPLIES = true;
     private static final boolean DEFAULT_GENERATE_ACTIONS = true;
     private static final int DEFAULT_NEW_INTERRUPTION_MODEL_INT = 1;
+    private static final int DEFAULT_MAX_MESSAGES_TO_EXTRACT = 5;
+    @VisibleForTesting
+    static final int DEFAULT_MAX_SUGGESTIONS = 3;
 
     private static final Uri STREAK_LIMIT_URI =
             Settings.Global.getUriFor(Settings.Global.BLOCKING_HELPER_STREAK_LIMIT);
@@ -46,7 +48,6 @@ final class AssistantSettings extends ContentObserver {
     private static final Uri NOTIFICATION_NEW_INTERRUPTION_MODEL_URI =
             Settings.Secure.getUriFor(Settings.Secure.NOTIFICATION_NEW_INTERRUPTION_MODEL);
 
-    private final KeyValueListParser mParser = new KeyValueListParser(',');
     private final ContentResolver mResolver;
     private final int mUserId;
 
@@ -55,12 +56,14 @@ final class AssistantSettings extends ContentObserver {
     @VisibleForTesting
     protected final Runnable mOnUpdateRunnable;
 
-    // Actuall configuration settings.
+    // Actual configuration settings.
     float mDismissToViewRatioLimit;
     int mStreakLimit;
     boolean mGenerateReplies = DEFAULT_GENERATE_REPLIES;
     boolean mGenerateActions = DEFAULT_GENERATE_ACTIONS;
     boolean mNewInterruptionModel;
+    int mMaxMessagesToExtract = DEFAULT_MAX_MESSAGES_TO_EXTRACT;
+    int mMaxSuggestions = DEFAULT_MAX_SUGGESTIONS;
 
     private AssistantSettings(Handler handler, ContentResolver resolver, int userId,
             Runnable onUpdateRunnable) {
@@ -100,7 +103,7 @@ final class AssistantSettings extends ContentObserver {
 
     private void registerDeviceConfigs() {
         DeviceConfig.addOnPropertyChangedListener(
-                DeviceConfig.NotificationAssistant.NAMESPACE,
+                DeviceConfig.NAMESPACE_SYSTEMUI,
                 this::postToHandler,
                 this::onDeviceConfigPropertyChanged);
 
@@ -114,7 +117,7 @@ final class AssistantSettings extends ContentObserver {
 
     @VisibleForTesting
     void onDeviceConfigPropertyChanged(String namespace, String name, String value) {
-        if (!DeviceConfig.NotificationAssistant.NAMESPACE.equals(namespace)) {
+        if (!DeviceConfig.NAMESPACE_SYSTEMUI.equals(namespace)) {
             Log.e(LOG_TAG, "Received update from DeviceConfig for unrelated namespace: "
                     + namespace + " " + name + "=" + value);
             return;
@@ -124,27 +127,18 @@ final class AssistantSettings extends ContentObserver {
     }
 
     private void updateFromDeviceConfigFlags() {
-        String generateRepliesFlag = DeviceConfig.getProperty(
-                DeviceConfig.NotificationAssistant.NAMESPACE,
-                DeviceConfig.NotificationAssistant.GENERATE_REPLIES);
-        if (TextUtils.isEmpty(generateRepliesFlag)) {
-            mGenerateReplies = DEFAULT_GENERATE_REPLIES;
-        } else {
-            // parseBoolean returns false for everything that isn't 'true' so there's no need to
-            // sanitise the flag string here.
-            mGenerateReplies = Boolean.parseBoolean(generateRepliesFlag);
-        }
+        mGenerateReplies = DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_SYSTEMUI,
+                SystemUiDeviceConfigFlags.NAS_GENERATE_REPLIES, DEFAULT_GENERATE_REPLIES);
 
-        String generateActionsFlag = DeviceConfig.getProperty(
-                DeviceConfig.NotificationAssistant.NAMESPACE,
-                DeviceConfig.NotificationAssistant.GENERATE_ACTIONS);
-        if (TextUtils.isEmpty(generateActionsFlag)) {
-            mGenerateActions = DEFAULT_GENERATE_ACTIONS;
-        } else {
-            // parseBoolean returns false for everything that isn't 'true' so there's no need to
-            // sanitise the flag string here.
-            mGenerateActions = Boolean.parseBoolean(generateActionsFlag);
-        }
+        mGenerateActions = DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_SYSTEMUI,
+                SystemUiDeviceConfigFlags.NAS_GENERATE_ACTIONS, DEFAULT_GENERATE_ACTIONS);
+
+        mMaxMessagesToExtract = DeviceConfig.getInt(DeviceConfig.NAMESPACE_SYSTEMUI,
+                SystemUiDeviceConfigFlags.NAS_MAX_MESSAGES_TO_EXTRACT,
+                DEFAULT_MAX_MESSAGES_TO_EXTRACT);
+
+        mMaxSuggestions = DeviceConfig.getInt(DeviceConfig.NAMESPACE_SYSTEMUI,
+                SystemUiDeviceConfigFlags.NAS_MAX_SUGGESTIONS, DEFAULT_MAX_SUGGESTIONS);
 
         mOnUpdateRunnable.run();
     }

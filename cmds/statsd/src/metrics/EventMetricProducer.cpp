@@ -77,6 +77,7 @@ EventMetricProducer::~EventMetricProducer() {
 
 void EventMetricProducer::dropDataLocked(const int64_t dropTimeNs) {
     mProto->clear();
+    StatsdStats::getInstance().noteBucketDropped(mMetricId);
 }
 
 void EventMetricProducer::onSlicedConditionMayChangeLocked(bool overallCondition,
@@ -89,12 +90,12 @@ std::unique_ptr<std::vector<uint8_t>> serializeProtoLocked(ProtoOutputStream& pr
     std::unique_ptr<std::vector<uint8_t>> buffer(new std::vector<uint8_t>(bufferSize));
 
     size_t pos = 0;
-    auto it = protoOutput.data();
-    while (it.readBuffer() != NULL) {
-        size_t toRead = it.currentToRead();
-        std::memcpy(&((*buffer)[pos]), it.readBuffer(), toRead);
+    sp<android::util::ProtoReader> reader = protoOutput.data();
+    while (reader->readBuffer() != NULL) {
+        size_t toRead = reader->currentToRead();
+        std::memcpy(&((*buffer)[pos]), reader->readBuffer(), toRead);
         pos += toRead;
-        it.rp()->move(toRead);
+        reader->move(toRead);
     }
 
     return buffer;
@@ -107,6 +108,7 @@ void EventMetricProducer::clearPastBucketsLocked(const int64_t dumpTimeNs) {
 void EventMetricProducer::onDumpReportLocked(const int64_t dumpTimeNs,
                                              const bool include_current_partial_bucket,
                                              const bool erase_data,
+                                             const DumpLatency dumpLatency,
                                              std::set<string> *str_set,
                                              ProtoOutputStream* protoOutput) {
     protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_ID, (long long)mMetricId);
@@ -131,7 +133,7 @@ void EventMetricProducer::onDumpReportLocked(const int64_t dumpTimeNs,
 void EventMetricProducer::onConditionChangedLocked(const bool conditionMet,
                                                    const int64_t eventTime) {
     VLOG("Metric %lld onConditionChanged", (long long)mMetricId);
-    mCondition = conditionMet;
+    mCondition = conditionMet ? ConditionState::kTrue : ConditionState::kFalse;
 }
 
 void EventMetricProducer::onMatchedLogEventInternalLocked(

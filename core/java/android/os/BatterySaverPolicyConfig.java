@@ -47,17 +47,19 @@ public final class BatterySaverPolicyConfig implements Parcelable {
     private final boolean mEnableAdjustBrightness;
     private final boolean mEnableDataSaver;
     private final boolean mEnableFirewall;
+    private final boolean mEnableNightMode;
     private final boolean mEnableQuickDoze;
     private final boolean mForceAllAppsStandby;
     private final boolean mForceBackgroundCheck;
-    private final int mGpsMode;
+    private final int mLocationMode;
 
     private BatterySaverPolicyConfig(Builder in) {
         mAdjustBrightnessFactor = Math.max(0, Math.min(in.mAdjustBrightnessFactor, 1f));
         mAdvertiseIsEnabled = in.mAdvertiseIsEnabled;
         mDeferFullBackup = in.mDeferFullBackup;
         mDeferKeyValueBackup = in.mDeferKeyValueBackup;
-        mDeviceSpecificSettings = Collections.unmodifiableMap(in.mDeviceSpecificSettings);
+        mDeviceSpecificSettings = Collections.unmodifiableMap(
+                new ArrayMap<>(in.mDeviceSpecificSettings));
         mDisableAnimation = in.mDisableAnimation;
         mDisableAod = in.mDisableAod;
         mDisableLaunchBoost = in.mDisableLaunchBoost;
@@ -67,11 +69,12 @@ public final class BatterySaverPolicyConfig implements Parcelable {
         mEnableAdjustBrightness = in.mEnableAdjustBrightness;
         mEnableDataSaver = in.mEnableDataSaver;
         mEnableFirewall = in.mEnableFirewall;
+        mEnableNightMode = in.mEnableNightMode;
         mEnableQuickDoze = in.mEnableQuickDoze;
         mForceAllAppsStandby = in.mForceAllAppsStandby;
         mForceBackgroundCheck = in.mForceBackgroundCheck;
-        mGpsMode = Math.max(PowerManager.MIN_LOCATION_MODE,
-                Math.min(in.mGpsMode, PowerManager.MAX_LOCATION_MODE));
+        mLocationMode = Math.max(PowerManager.MIN_LOCATION_MODE,
+                Math.min(in.mLocationMode, PowerManager.MAX_LOCATION_MODE));
     }
 
     private BatterySaverPolicyConfig(Parcel in) {
@@ -101,14 +104,15 @@ public final class BatterySaverPolicyConfig implements Parcelable {
         mEnableAdjustBrightness = in.readBoolean();
         mEnableDataSaver = in.readBoolean();
         mEnableFirewall = in.readBoolean();
+        mEnableNightMode = in.readBoolean();
         mEnableQuickDoze = in.readBoolean();
         mForceAllAppsStandby = in.readBoolean();
         mForceBackgroundCheck = in.readBoolean();
-        mGpsMode = Math.max(PowerManager.MIN_LOCATION_MODE,
+        mLocationMode = Math.max(PowerManager.MIN_LOCATION_MODE,
                 Math.min(in.readInt(), PowerManager.MAX_LOCATION_MODE));
     }
 
-    public static final Creator<BatterySaverPolicyConfig> CREATOR =
+    public static final @android.annotation.NonNull Creator<BatterySaverPolicyConfig> CREATOR =
             new Creator<BatterySaverPolicyConfig>() {
                 @Override
                 public BatterySaverPolicyConfig createFromParcel(Parcel in) {
@@ -150,10 +154,11 @@ public final class BatterySaverPolicyConfig implements Parcelable {
         dest.writeBoolean(mEnableAdjustBrightness);
         dest.writeBoolean(mEnableDataSaver);
         dest.writeBoolean(mEnableFirewall);
+        dest.writeBoolean(mEnableNightMode);
         dest.writeBoolean(mEnableQuickDoze);
         dest.writeBoolean(mForceAllAppsStandby);
         dest.writeBoolean(mForceBackgroundCheck);
-        dest.writeInt(mGpsMode);
+        dest.writeInt(mLocationMode);
     }
 
     @Override
@@ -168,11 +173,12 @@ public final class BatterySaverPolicyConfig implements Parcelable {
                 + "animation_disabled=" + mDisableAnimation + ","
                 + "aod_disabled=" + mDisableAod + ","
                 + "datasaver_disabled=" + !mEnableDataSaver + ","
+                + "enable_night_mode=" + mEnableNightMode + ","
                 + "firewall_disabled=" + !mEnableFirewall + ","
                 + "force_all_apps_standby=" + mForceAllAppsStandby + ","
                 + "force_background_check=" + mForceBackgroundCheck + ","
                 + "fullbackup_deferred=" + mDeferFullBackup + ","
-                + "gps_mode=" + mGpsMode + ","
+                + "gps_mode=" + mLocationMode + ","
                 + "keyvaluebackup_deferred=" + mDeferKeyValueBackup + ","
                 + "launch_boost_disabled=" + mDisableLaunchBoost + ","
                 + "optional_sensors_disabled=" + mDisableOptionalSensors + ","
@@ -235,7 +241,10 @@ public final class BatterySaverPolicyConfig implements Parcelable {
         return mDisableOptionalSensors;
     }
 
-    /** Whether or not to disable sound trigger while in Battery Saver. */
+    /**
+     * Whether or not to disable {@link android.hardware.soundtrigger.SoundTrigger}
+     * while in Battery Saver.
+     */
     public boolean getDisableSoundTrigger() {
         return mDisableSoundTrigger;
     }
@@ -255,9 +264,17 @@ public final class BatterySaverPolicyConfig implements Parcelable {
         return mEnableDataSaver;
     }
 
-    /** Whether or not to enable the network firewall while in Battery Saver. */
+    /**
+     * Whether or not to enable network firewall rules to restrict background network use
+     * while in Battery Saver.
+     */
     public boolean getEnableFirewall() {
         return mEnableFirewall;
+    }
+
+    /** Whether or not to enable night mode while in Battery Saver. */
+    public boolean getEnableNightMode() {
+        return mEnableNightMode;
     }
 
     /** Whether or not to enable Quick Doze while in Battery Saver. */
@@ -270,14 +287,19 @@ public final class BatterySaverPolicyConfig implements Parcelable {
         return mForceAllAppsStandby;
     }
 
-    /** Whether or not to force background check while in Battery Saver. */
+    /**
+     * Whether or not to force background check (disallow background services and manifest
+     * broadcast receivers) on all apps (not just apps targeting Android
+     * {@link Build.VERSION_CODES#O} and above)
+     * while in Battery Saver.
+     */
     public boolean getForceBackgroundCheck() {
         return mForceBackgroundCheck;
     }
 
-    /** The GPS mode while in Battery Saver. */
-    public int getGpsMode() {
-        return mGpsMode;
+    /** The location mode while in Battery Saver. */
+    public int getLocationMode() {
+        return mLocationMode;
     }
 
     /** Builder class for constructing {@link BatterySaverPolicyConfig} objects. */
@@ -297,10 +319,11 @@ public final class BatterySaverPolicyConfig implements Parcelable {
         private boolean mEnableAdjustBrightness = false;
         private boolean mEnableDataSaver = false;
         private boolean mEnableFirewall = false;
+        private boolean mEnableNightMode = false;
         private boolean mEnableQuickDoze = false;
         private boolean mForceAllAppsStandby = false;
         private boolean mForceBackgroundCheck = false;
-        private int mGpsMode = PowerManager.LOCATION_MODE_NO_CHANGE;
+        private int mLocationMode = PowerManager.LOCATION_MODE_NO_CHANGE;
 
         public Builder() {
         }
@@ -389,7 +412,10 @@ public final class BatterySaverPolicyConfig implements Parcelable {
             return this;
         }
 
-        /** Set whether or not to disable sound trigger while in Battery Saver. */
+        /**
+         * Set whether or not to disable  {@link android.hardware.soundtrigger.SoundTrigger}
+         * while in Battery Saver.
+         */
         @NonNull
         public Builder setDisableSoundTrigger(boolean disableSoundTrigger) {
             mDisableSoundTrigger = disableSoundTrigger;
@@ -417,10 +443,20 @@ public final class BatterySaverPolicyConfig implements Parcelable {
             return this;
         }
 
-        /** Set whether or not to enable the network firewall while in Battery Saver. */
+        /**
+         * Set whether or not to enable network firewall rules to restrict background network use
+         * while in Battery Saver.
+         */
         @NonNull
         public Builder setEnableFirewall(boolean enableFirewall) {
             mEnableFirewall = enableFirewall;
+            return this;
+        }
+
+        /** Set whether or not to enable night mode while in Battery Saver. */
+        @NonNull
+        public Builder setEnableNightMode(boolean enableNightMode) {
+            mEnableNightMode = enableNightMode;
             return this;
         }
 
@@ -438,17 +474,22 @@ public final class BatterySaverPolicyConfig implements Parcelable {
             return this;
         }
 
-        /** Set whether or not to force background check while in Battery Saver. */
+        /**
+         * Set whether or not to force background check (disallow background services and manifest
+         * broadcast receivers) on all apps (not just apps targeting Android
+         * {@link Build.VERSION_CODES#O} and above)
+         * while in Battery Saver.
+         */
         @NonNull
         public Builder setForceBackgroundCheck(boolean forceBackgroundCheck) {
             mForceBackgroundCheck = forceBackgroundCheck;
             return this;
         }
 
-        /** Set the GPS mode while in Battery Saver. */
+        /** Set the location mode while in Battery Saver. */
         @NonNull
-        public Builder setGpsMode(@PowerManager.LocationPowerSaveMode int gpsMode) {
-            mGpsMode = gpsMode;
+        public Builder setLocationMode(@PowerManager.LocationPowerSaveMode int locationMode) {
+            mLocationMode = locationMode;
             return this;
         }
 
@@ -458,10 +499,6 @@ public final class BatterySaverPolicyConfig implements Parcelable {
          */
         @NonNull
         public BatterySaverPolicyConfig build() {
-            if (!mEnableAdjustBrightness && Float.compare(1f, mAdjustBrightnessFactor) != 0) {
-                throw new IllegalArgumentException("Brightness adjustment factor changed without "
-                        + "enabling brightness adjustment");
-            }
             return new BatterySaverPolicyConfig(this);
         }
     }

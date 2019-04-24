@@ -16,17 +16,14 @@
 
 package android.provider;
 
+import static android.provider.DeviceConfig.OnPropertiesChangedListener;
 import static android.provider.DeviceConfig.OnPropertyChangedListener;
 
-import static junit.framework.Assert.assertEquals;
-import static junit.framework.Assert.assertNotNull;
-import static junit.framework.Assert.assertNull;
-import static junit.framework.Assert.fail;
+import static com.google.common.truth.Truth.assertThat;
 
 import android.app.ActivityThread;
 import android.content.ContentResolver;
 import android.os.Bundle;
-import android.os.SystemClock;
 import android.platform.test.annotations.Presubmit;
 
 import androidx.test.InstrumentationRegistry;
@@ -34,11 +31,12 @@ import androidx.test.filters.SmallTest;
 import androidx.test.runner.AndroidJUnit4;
 
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /** Tests that ensure appropriate settings are backed up. */
 @Presubmit
@@ -51,8 +49,6 @@ public class DeviceConfigTest {
     private static final String sValue = "value1";
     private static final long WAIT_FOR_PROPERTY_CHANGE_TIMEOUT_MILLIS = 2000; // 2 sec
 
-    private final Object mLock = new Object();
-
     @After
     public void cleanUp() {
         deleteViaContentProvider(sNamespace, sKey);
@@ -61,14 +57,285 @@ public class DeviceConfigTest {
     @Test
     public void getProperty_empty() {
         String result = DeviceConfig.getProperty(sNamespace, sKey);
-        assertNull(result);
+        assertThat(result).isNull();
+    }
+
+    @Test
+    public void getProperty_nullNamespace() {
+        try {
+            DeviceConfig.getProperty(null, sKey);
+            Assert.fail("Null namespace should have resulted in an NPE.");
+        } catch (NullPointerException e) {
+            // expected
+        }
+    }
+
+    @Test
+    public void getProperty_nullName() {
+        try {
+            DeviceConfig.getProperty(sNamespace, null);
+            Assert.fail("Null name should have resulted in an NPE.");
+        } catch (NullPointerException e) {
+            // expected
+        }
+    }
+
+    @Test
+    public void getString_empty() {
+        final String default_value = "default_value";
+        final String result = DeviceConfig.getString(sNamespace, sKey, default_value);
+        assertThat(result).isEqualTo(default_value);
+    }
+
+    @Test
+    public void getString_nullDefault() {
+        final String result = DeviceConfig.getString(sNamespace, sKey, null);
+        assertThat(result).isNull();
+    }
+
+    @Test
+    public void getString_nonEmpty() {
+        final String value = "new_value";
+        final String default_value = "default";
+        DeviceConfig.setProperty(sNamespace, sKey, value, false);
+
+        final String result = DeviceConfig.getString(sNamespace, sKey, default_value);
+        assertThat(result).isEqualTo(value);
+    }
+
+    @Test
+    public void getString_nullNamespace() {
+        try {
+            DeviceConfig.getString(null, sKey, "default_value");
+            Assert.fail("Null namespace should have resulted in an NPE.");
+        } catch (NullPointerException e) {
+            // expected
+        }
+    }
+
+    @Test
+    public void getString_nullName() {
+        try {
+            DeviceConfig.getString(sNamespace, null, "default_value");
+            Assert.fail("Null name should have resulted in an NPE.");
+        } catch (NullPointerException e) {
+            // expected
+        }
+    }
+
+    @Test
+    public void getBoolean_empty() {
+        final boolean default_value = true;
+        final boolean result = DeviceConfig.getBoolean(sNamespace, sKey, default_value);
+        assertThat(result).isEqualTo(default_value);
+    }
+
+    @Test
+    public void getBoolean_valid() {
+        final boolean value = true;
+        final boolean default_value = false;
+        DeviceConfig.setProperty(sNamespace, sKey, String.valueOf(value), false);
+
+        final boolean result = DeviceConfig.getBoolean(sNamespace, sKey, default_value);
+        assertThat(result).isEqualTo(value);
+    }
+
+    @Test
+    public void getBoolean_invalid() {
+        final boolean default_value = true;
+        DeviceConfig.setProperty(sNamespace, sKey, "not_a_boolean", false);
+
+        final boolean result = DeviceConfig.getBoolean(sNamespace, sKey, default_value);
+        // Anything non-null other than case insensitive "true" parses to false.
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    public void getBoolean_nullNamespace() {
+        try {
+            DeviceConfig.getBoolean(null, sKey, false);
+            Assert.fail("Null namespace should have resulted in an NPE.");
+        } catch (NullPointerException e) {
+            // expected
+        }
+    }
+
+    @Test
+    public void getBoolean_nullName() {
+        try {
+            DeviceConfig.getBoolean(sNamespace, null, false);
+            Assert.fail("Null name should have resulted in an NPE.");
+        } catch (NullPointerException e) {
+            // expected
+        }
+    }
+
+    @Test
+    public void getInt_empty() {
+        final int default_value = 999;
+        final int result = DeviceConfig.getInt(sNamespace, sKey, default_value);
+        assertThat(result).isEqualTo(default_value);
+    }
+
+    @Test
+    public void getInt_valid() {
+        final int value = 123;
+        final int default_value = 999;
+        DeviceConfig.setProperty(sNamespace, sKey, String.valueOf(value), false);
+
+        final int result = DeviceConfig.getInt(sNamespace, sKey, default_value);
+        assertThat(result).isEqualTo(value);
+    }
+
+    @Test
+    public void getInt_invalid() {
+        final int default_value = 999;
+        DeviceConfig.setProperty(sNamespace, sKey, "not_an_int", false);
+
+        final int result = DeviceConfig.getInt(sNamespace, sKey, default_value);
+        // Failure to parse results in using the default value
+        assertThat(result).isEqualTo(default_value);
+    }
+
+    @Test
+    public void getInt_nullNamespace() {
+        try {
+            DeviceConfig.getInt(null, sKey, 0);
+            Assert.fail("Null namespace should have resulted in an NPE.");
+        } catch (NullPointerException e) {
+            // expected
+        }
+    }
+
+    @Test
+    public void getInt_nullName() {
+        try {
+            DeviceConfig.getInt(sNamespace, null, 0);
+            Assert.fail("Null name should have resulted in an NPE.");
+        } catch (NullPointerException e) {
+            // expected
+        }
+    }
+
+    @Test
+    public void getLong_empty() {
+        final long default_value = 123456;
+        final long result = DeviceConfig.getLong(sNamespace, sKey, default_value);
+        assertThat(result).isEqualTo(default_value);
+    }
+
+    @Test
+    public void getLong_valid() {
+        final long value = 456789;
+        final long default_value = 123456;
+        DeviceConfig.setProperty(sNamespace, sKey, String.valueOf(value), false);
+
+        final long result = DeviceConfig.getLong(sNamespace, sKey, default_value);
+        assertThat(result).isEqualTo(value);
+    }
+
+    @Test
+    public void getLong_invalid() {
+        final long default_value = 123456;
+        DeviceConfig.setProperty(sNamespace, sKey, "not_a_long", false);
+
+        final long result = DeviceConfig.getLong(sNamespace, sKey, default_value);
+        // Failure to parse results in using the default value
+        assertThat(result).isEqualTo(default_value);
+    }
+
+    @Test
+    public void getLong_nullNamespace() {
+        try {
+            DeviceConfig.getLong(null, sKey, 0);
+            Assert.fail("Null namespace should have resulted in an NPE.");
+        } catch (NullPointerException e) {
+            // expected
+        }
+    }
+
+    @Test
+    public void getLong_nullName() {
+        try {
+            DeviceConfig.getLong(sNamespace, null, 0);
+            Assert.fail("Null name should have resulted in an NPE.");
+        } catch (NullPointerException e) {
+            // expected
+        }
+    }
+
+    @Test
+    public void getFloat_empty() {
+        final float default_value = 123.456f;
+        final float result = DeviceConfig.getFloat(sNamespace, sKey, default_value);
+        assertThat(result).isEqualTo(default_value);
+    }
+
+    @Test
+    public void getFloat_valid() {
+        final float value = 456.789f;
+        final float default_value = 123.456f;
+        DeviceConfig.setProperty(sNamespace, sKey, String.valueOf(value), false);
+
+        final float result = DeviceConfig.getFloat(sNamespace, sKey, default_value);
+        assertThat(result).isEqualTo(value);
+    }
+
+    @Test
+    public void getFloat_invalid() {
+        final float default_value = 123.456f;
+        DeviceConfig.setProperty(sNamespace, sKey, "not_a_float", false);
+
+        final float result = DeviceConfig.getFloat(sNamespace, sKey, default_value);
+        // Failure to parse results in using the default value
+        assertThat(result).isEqualTo(default_value);
+    }
+
+    @Test
+    public void getFloat_nullNamespace() {
+        try {
+            DeviceConfig.getFloat(null, sKey, 0);
+            Assert.fail("Null namespace should have resulted in an NPE.");
+        } catch (NullPointerException e) {
+            // expected
+        }
+    }
+
+    @Test
+    public void getFloat_nullName() {
+        try {
+            DeviceConfig.getFloat(sNamespace, null, 0);
+            Assert.fail("Null name should have resulted in an NPE.");
+        } catch (NullPointerException e) {
+            // expected
+        }
+    }
+
+    @Test
+    public void setProperty_nullNamespace() {
+        try {
+            DeviceConfig.setProperty(null, sKey, sValue, false);
+            Assert.fail("Null namespace should have resulted in an NPE.");
+        } catch (NullPointerException e) {
+            // expected
+        }
+    }
+
+    @Test
+    public void setProperty_nullName() {
+        try {
+            DeviceConfig.setProperty(sNamespace, null, sValue, false);
+            Assert.fail("Null name should have resulted in an NPE.");
+        } catch (NullPointerException e) {
+            // expected
+        }
     }
 
     @Test
     public void setAndGetProperty_sameNamespace() {
         DeviceConfig.setProperty(sNamespace, sKey, sValue, false);
         String result = DeviceConfig.getProperty(sNamespace, sKey);
-        assertEquals(sValue, result);
+        assertThat(result).isEqualTo(sValue);
     }
 
     @Test
@@ -76,7 +343,7 @@ public class DeviceConfigTest {
         String newNamespace = "namespace2";
         DeviceConfig.setProperty(sNamespace, sKey, sValue, false);
         String result = DeviceConfig.getProperty(newNamespace, sKey);
-        assertNull(result);
+        assertThat(result).isNull();
     }
 
     @Test
@@ -86,9 +353,9 @@ public class DeviceConfigTest {
         DeviceConfig.setProperty(sNamespace, sKey, sValue, false);
         DeviceConfig.setProperty(newNamespace, sKey, newValue, false);
         String result = DeviceConfig.getProperty(sNamespace, sKey);
-        assertEquals(sValue, result);
+        assertThat(result).isEqualTo(sValue);
         result = DeviceConfig.getProperty(newNamespace, sKey);
-        assertEquals(newValue, result);
+        assertThat(result).isEqualTo(newValue);
 
         // clean up
         deleteViaContentProvider(newNamespace, sKey);
@@ -100,59 +367,56 @@ public class DeviceConfigTest {
         DeviceConfig.setProperty(sNamespace, sKey, sValue, false);
         DeviceConfig.setProperty(sNamespace, sKey, newValue, false);
         String result = DeviceConfig.getProperty(sNamespace, sKey);
-        assertEquals(newValue, result);
+        assertThat(result).isEqualTo(newValue);
     }
 
     @Test
-    public void testListener() {
-        setPropertyAndAssertSuccessfulChange(sNamespace, sKey, sValue);
+    public void testOnPropertiesChangedListener() throws InterruptedException {
+        final CountDownLatch countDownLatch = new CountDownLatch(1);
+
+        OnPropertiesChangedListener changeListener = (properties) -> {
+            assertThat(properties.getNamespace()).isEqualTo(sNamespace);
+            assertThat(properties.getKeyset()).contains(sKey);
+            assertThat(properties.getString(sKey, "default_value")).isEqualTo(sValue);
+            countDownLatch.countDown();
+        };
+
+        try {
+            DeviceConfig.addOnPropertiesChangedListener(sNamespace,
+                    ActivityThread.currentApplication().getMainExecutor(), changeListener);
+            DeviceConfig.setProperty(sNamespace, sKey, sValue, false);
+            assertThat(countDownLatch.await(
+                    WAIT_FOR_PROPERTY_CHANGE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)).isTrue();
+        } catch (InterruptedException e) {
+            Assert.fail(e.getMessage());
+        } finally {
+            DeviceConfig.removeOnPropertiesChangedListener(changeListener);
+        }
     }
 
-    private void setPropertyAndAssertSuccessfulChange(String setNamespace, String setName,
-            String setValue) {
-        final AtomicBoolean success = new AtomicBoolean();
+    @Test
+    public void testOnPropertyChangedListener() throws InterruptedException {
+        CountDownLatch countDownLatch = new CountDownLatch(1);
 
-        OnPropertyChangedListener changeListener = new OnPropertyChangedListener() {
-                    @Override
-                    public void onPropertyChanged(String namespace, String name, String value) {
-                        assertEquals(setNamespace, namespace);
-                        assertEquals(setName, name);
-                        assertEquals(setValue, value);
-                        success.set(true);
+        OnPropertyChangedListener changeListener = (namespace, name, value) -> {
+            assertThat(namespace).isEqualTo(sNamespace);
+            assertThat(name).isEqualTo(sKey);
+            assertThat(value).isEqualTo(sValue);
+            countDownLatch.countDown();
+        };
 
-                        synchronized (mLock) {
-                            mLock.notifyAll();
-                        }
-                    }
-                };
-        Executor executor = ActivityThread.currentApplication().getMainExecutor();
-        DeviceConfig.addOnPropertyChangedListener(setNamespace, executor, changeListener);
         try {
-            DeviceConfig.setProperty(setNamespace, setName, setValue, false);
-
-            final long startTimeMillis = SystemClock.uptimeMillis();
-            synchronized (mLock) {
-                while (true) {
-                    if (success.get()) {
-                        return;
-                    }
-                    final long elapsedTimeMillis = SystemClock.uptimeMillis() - startTimeMillis;
-                    if (elapsedTimeMillis >= WAIT_FOR_PROPERTY_CHANGE_TIMEOUT_MILLIS) {
-                        fail("Could not change setting for "
-                                + WAIT_FOR_PROPERTY_CHANGE_TIMEOUT_MILLIS + " ms");
-                    }
-                    final long remainingTimeMillis = WAIT_FOR_PROPERTY_CHANGE_TIMEOUT_MILLIS
-                            - elapsedTimeMillis;
-                    try {
-                        mLock.wait(remainingTimeMillis);
-                    } catch (InterruptedException ie) {
-                        /* ignore */
-                    }
-                }
-            }
+            DeviceConfig.addOnPropertyChangedListener(sNamespace,
+                    ActivityThread.currentApplication().getMainExecutor(), changeListener);
+            DeviceConfig.setProperty(sNamespace, sKey, sValue, false);
+            assertThat(countDownLatch.await(
+                    WAIT_FOR_PROPERTY_CHANGE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)).isTrue();
+        } catch (InterruptedException e) {
+            Assert.fail(e.getMessage());
         } finally {
             DeviceConfig.removeOnPropertyChangedListener(changeListener);
         }
+
     }
 
     private static boolean deleteViaContentProvider(String namespace, String key) {
@@ -160,7 +424,7 @@ public class DeviceConfigTest {
         String compositeName = namespace + "/" + key;
         Bundle result = resolver.call(
                 DeviceConfig.CONTENT_URI, Settings.CALL_METHOD_DELETE_CONFIG, compositeName, null);
-        assertNotNull(result);
+        assertThat(result).isNotNull();
         return compositeName.equals(result.getString(Settings.NameValueTable.VALUE));
     }
 

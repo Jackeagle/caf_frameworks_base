@@ -16,6 +16,9 @@
 
 package android.permission;
 
+import static android.app.admin.DevicePolicyManager.PERMISSION_GRANT_STATE_DEFAULT;
+import static android.app.admin.DevicePolicyManager.PERMISSION_GRANT_STATE_DENIED;
+import static android.app.admin.DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED;
 import static android.permission.PermissionControllerManager.COUNT_ONLY_WHEN_GRANTED;
 import static android.permission.PermissionControllerManager.COUNT_WHEN_SYSTEM;
 
@@ -28,9 +31,11 @@ import static com.android.internal.util.Preconditions.checkStringNotEmpty;
 import static com.android.internal.util.function.pooled.PooledLambda.obtainMessage;
 
 import android.Manifest;
+import android.annotation.BinderThread;
 import android.annotation.NonNull;
 import android.annotation.SystemApi;
 import android.app.Service;
+import android.app.admin.DevicePolicyManager.PermissionGrantState;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
@@ -48,6 +53,7 @@ import android.util.Log;
 import com.android.internal.util.Preconditions;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -104,6 +110,32 @@ public abstract class PermissionControllerService extends Service {
             @NonNull OutputStream backup);
 
     /**
+     * Restore a backup of the runtime permissions.
+     *
+     * <p>If an app mentioned in the backup is not installed the state should be saved to later
+     * be restored via {@link #onRestoreDelayedRuntimePermissionsBackup}.
+     *
+     * @param user The user to restore
+     * @param backup The stream to read the backup from
+     */
+    @BinderThread
+    public abstract void onRestoreRuntimePermissionsBackup(@NonNull UserHandle user,
+            @NonNull InputStream backup);
+
+    /**
+     * Restore the permission state of an app that was provided in
+     * {@link #onRestoreRuntimePermissionsBackup} but could not be restored back then.
+     *
+     * @param packageName The app to restore
+     * @param user The user to restore
+     *
+     * @return {@code true} iff there is still delayed backup left
+     */
+    @BinderThread
+    public abstract boolean onRestoreDelayedRuntimePermissionsBackup(@NonNull String packageName,
+            @NonNull UserHandle user);
+
+    /**
      * Gets the runtime permissions for an app.
      *
      * @param packageName The package for which to query.
@@ -146,18 +178,30 @@ public abstract class PermissionControllerService extends Service {
             boolean countSystem, long numMillis);
 
     /**
-     * Check whether an application is qualified for a role.
+     * Grant or upgrade runtime permissions. The upgrade could be performed
+     * based on whether the device upgraded, whether the permission database
+     * version is old, or because the permission policy changed.
      *
-     * @param roleName name of the role to check for
-     * @param packageName package name of the application to check for
-     *
-     * @return whether the application is qualified for the role.
+     * @see PackageManager#isDeviceUpgrading()
+     * @see PermissionManager#getRuntimePermissionsVersion()
+     * @see PermissionManager#setRuntimePermissionsVersion(int)
      */
-    public abstract boolean onIsApplicationQualifiedForRole(@NonNull String roleName,
-            @NonNull String packageName);
+    public abstract void onGrantOrUpgradeDefaultRuntimePermissions();
+
+    /**
+     * Set the runtime permission state from a device admin.
+     *
+     * @param callerPackageName The package name of the admin requesting the change
+     * @param packageName Package the permission belongs to
+     * @param permission Permission to change
+     * @param grantState State to set the permission into
+     */
+    public abstract boolean onSetRuntimePermissionGrantStateByDeviceAdmin(
+            @NonNull String callerPackageName, @NonNull String packageName,
+            @NonNull String permission, @PermissionGrantState int grantState);
 
     @Override
-    public final IBinder onBind(Intent intent) {
+    public final @NonNull IBinder onBind(Intent intent) {
         return new IPermissionController.Stub() {
             @Override
             public void revokeRuntimePermissions(
@@ -204,6 +248,36 @@ public abstract class PermissionControllerService extends Service {
                 mHandler.sendMessage(obtainMessage(
                         PermissionControllerService::getRuntimePermissionsBackup,
                         PermissionControllerService.this, user, pipe));
+            }
+
+            @Override
+            public void restoreRuntimePermissionBackup(UserHandle user, ParcelFileDescriptor pipe) {
+                checkNotNull(user);
+                checkNotNull(pipe);
+
+                enforceCallingPermission(Manifest.permission.GRANT_RUNTIME_PERMISSIONS, null);
+
+                try (InputStream backup = new ParcelFileDescriptor.AutoCloseInputStream(pipe)) {
+                    onRestoreRuntimePermissionsBackup(user, backup);
+                } catch (IOException e) {
+                    Log.e(LOG_TAG, "Could not open pipe to read backup from", e);
+                }
+            }
+
+            @Override
+            public void restoreDelayedRuntimePermissionBackup(String packageName, UserHandle user,
+                    RemoteCallback callback) {
+                checkNotNull(packageName);
+                checkNotNull(user);
+                checkNotNull(callback);
+
+                enforceCallingPermission(Manifest.permission.GRANT_RUNTIME_PERMISSIONS, null);
+
+                boolean hasMoreBackup = onRestoreDelayedRuntimePermissionsBackup(packageName, user);
+
+                Bundle result = new Bundle();
+                result.putBoolean(PermissionControllerManager.KEY_RESULT, hasMoreBackup);
+                callback.sendResult(result);
             }
 
             @Override
@@ -260,17 +334,44 @@ public abstract class PermissionControllerService extends Service {
             }
 
             @Override
-            public void isApplicationQualifiedForRole(String roleName, String packageName,
+            public void setRuntimePermissionGrantStateByDeviceAdmin(String callerPackageName,
+                    String packageName, String permission, int grantState,
                     RemoteCallback callback) {
-                checkStringNotEmpty(roleName);
+                checkStringNotEmpty(callerPackageName);
                 checkStringNotEmpty(packageName);
-                checkNotNull(callback, "callback");
+                checkStringNotEmpty(permission);
+                checkArgument(grantState == PERMISSION_GRANT_STATE_GRANTED
+                        || grantState == PERMISSION_GRANT_STATE_DENIED
+                        || grantState == PERMISSION_GRANT_STATE_DEFAULT);
+                checkNotNull(callback);
 
-                enforceCallingPermission(Manifest.permission.MANAGE_ROLE_HOLDERS, null);
+                if (grantState == PERMISSION_GRANT_STATE_DENIED) {
+                    enforceCallingPermission(Manifest.permission.GRANT_RUNTIME_PERMISSIONS, null);
+                }
+
+                if (grantState == PERMISSION_GRANT_STATE_DENIED) {
+                    enforceCallingPermission(Manifest.permission.REVOKE_RUNTIME_PERMISSIONS, null);
+                }
+
+                enforceCallingPermission(Manifest.permission.ADJUST_RUNTIME_PERMISSIONS_POLICY,
+                        null);
 
                 mHandler.sendMessage(obtainMessage(
-                        PermissionControllerService::isApplicationQualifiedForRole,
-                        PermissionControllerService.this, roleName, packageName, callback));
+                        PermissionControllerService::setRuntimePermissionGrantStateByDeviceAdmin,
+                        PermissionControllerService.this, callerPackageName, packageName,
+                        permission, grantState, callback));
+            }
+
+            @Override
+            public void grantOrUpgradeDefaultRuntimePermissions(@NonNull RemoteCallback callback) {
+                checkNotNull(callback, "callback");
+
+                enforceCallingPermission(Manifest.permission.ADJUST_RUNTIME_PERMISSIONS_POLICY,
+                        null);
+
+                mHandler.sendMessage(obtainMessage(
+                        PermissionControllerService::grantOrUpgradeDefaultRuntimePermissions,
+                        PermissionControllerService.this, callback));
             }
         };
     }
@@ -338,11 +439,19 @@ public abstract class PermissionControllerService extends Service {
         }
     }
 
-    private void isApplicationQualifiedForRole(@NonNull String roleName,
-            @NonNull String packageName, @NonNull RemoteCallback callback) {
-        boolean qualified = onIsApplicationQualifiedForRole(roleName, packageName);
+    private void setRuntimePermissionGrantStateByDeviceAdmin(@NonNull String callerPackageName,
+            @NonNull String packageName, @NonNull String permission,
+            @PermissionGrantState int grantState, @NonNull RemoteCallback callback) {
+        boolean wasSet = onSetRuntimePermissionGrantStateByDeviceAdmin(callerPackageName,
+                packageName, permission, grantState);
+
         Bundle result = new Bundle();
-        result.putBoolean(PermissionControllerManager.KEY_RESULT, qualified);
+        result.putBoolean(PermissionControllerManager.KEY_RESULT, wasSet);
         callback.sendResult(result);
+    }
+
+    private void grantOrUpgradeDefaultRuntimePermissions(@NonNull RemoteCallback callback) {
+        onGrantOrUpgradeDefaultRuntimePermissions();
+        callback.sendResult(Bundle.EMPTY);
     }
 }

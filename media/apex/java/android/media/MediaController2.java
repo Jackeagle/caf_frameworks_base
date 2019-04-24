@@ -21,8 +21,9 @@ import static android.media.MediaConstants.KEY_PACKAGE_NAME;
 import static android.media.MediaConstants.KEY_PID;
 import static android.media.MediaConstants.KEY_PLAYBACK_ACTIVE;
 import static android.media.MediaConstants.KEY_SESSION2LINK;
-import static android.media.Session2Command.RESULT_ERROR_UNKNOWN_ERROR;
-import static android.media.Session2Command.RESULT_INFO_SKIPPED;
+import static android.media.MediaConstants.KEY_TOKEN_EXTRAS;
+import static android.media.Session2Command.Result.RESULT_ERROR_UNKNOWN_ERROR;
+import static android.media.Session2Command.Result.RESULT_INFO_SKIPPED;
 import static android.media.Session2Token.TYPE_SESSION;
 
 import android.annotation.NonNull;
@@ -180,6 +181,7 @@ public class MediaController2 implements AutoCloseable {
      *
      * @return Session2Token of the connected session, or {@code null} if not connected
      */
+    @Nullable
     public Session2Token getConnectedSessionToken() {
         synchronized (mLock) {
             return mConnectedToken;
@@ -264,6 +266,7 @@ public class MediaController2 implements AutoCloseable {
         Session2CommandGroup allowedCommands =
                 connectionResult.getParcelable(KEY_ALLOWED_COMMANDS);
         boolean playbackActive = connectionResult.getBoolean(KEY_PLAYBACK_ACTIVE);
+        Bundle tokenExtras = connectionResult.getBundle(KEY_TOKEN_EXTRAS);
         if (DEBUG) {
             Log.d(TAG, "notifyConnected sessionBinder=" + sessionBinder
                     + ", allowedCommands=" + allowedCommands);
@@ -282,7 +285,7 @@ public class MediaController2 implements AutoCloseable {
             // so can be used without worrying about deadlock.
             sessionBinder.linkToDeath(mDeathRecipient, 0);
             mConnectedToken = new Session2Token(mSessionToken.getUid(), TYPE_SESSION,
-                    mSessionToken.getPackageName(), sessionBinder);
+                    mSessionToken.getPackageName(), sessionBinder, tokenExtras);
         }
         mCallbackExecutor.execute(() -> {
             mCallback.onConnected(MediaController2.this, allowedCommands);
@@ -317,14 +320,16 @@ public class MediaController2 implements AutoCloseable {
                 isCanceled = !mRequestedCommandSeqNumbers.remove(seq);
             }
             if (isCanceled) {
-                resultReceiver.send(RESULT_INFO_SKIPPED, null);
+                if (resultReceiver != null) {
+                    resultReceiver.send(RESULT_INFO_SKIPPED, null);
+                }
                 return;
             }
             Session2Command.Result result = mCallback.onSessionCommand(
                     MediaController2.this, command, args);
             if (resultReceiver != null) {
                 if (result == null) {
-                    resultReceiver.send(Session2Command.RESULT_INFO_SKIPPED, null);
+                    resultReceiver.send(RESULT_INFO_SKIPPED, null);
                 } else {
                     resultReceiver.send(result.getResultCode(), result.getResultData());
                 }
@@ -425,7 +430,7 @@ public class MediaController2 implements AutoCloseable {
         public void onDisconnected(@NonNull MediaController2 controller) {}
 
         /**
-         * Called when the playback of the session's playback activeness is changed.
+         * Called when the session's playback activeness is changed.
          *
          * @param controller the controller for this event
          * @param playbackActive {@code true} if the session's playback is active.

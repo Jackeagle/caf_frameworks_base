@@ -316,6 +316,7 @@ class Task extends WindowContainer<AppWindowToken> implements ConfigurationConta
 
         mRotation = rotation;
 
+        updateSurfacePosition();
         return boundsChange;
     }
 
@@ -329,7 +330,7 @@ class Task extends WindowContainer<AppWindowToken> implements ConfigurationConta
         // No one in higher hierarchy handles this request, let's adjust our bounds to fulfill
         // it if possible.
         // TODO: Move to TaskRecord after unification is done.
-        if (mTaskRecord != null) {
+        if (mTaskRecord != null && mTaskRecord.getParent() != null) {
             mTaskRecord.onConfigurationChanged(mTaskRecord.getParent().getConfiguration());
             return true;
         }
@@ -358,6 +359,7 @@ class Task extends WindowContainer<AppWindowToken> implements ConfigurationConta
         } else {
             mOverrideDisplayedBounds.setEmpty();
         }
+        updateSurfacePosition();
     }
 
     /**
@@ -431,29 +433,6 @@ class Task extends WindowContainer<AppWindowToken> implements ConfigurationConta
         }
     }
 
-    /** Return true if the current bound can get outputted to the rest of the system as-is. */
-    private boolean useCurrentBounds() {
-        final DisplayContent displayContent = getDisplayContent();
-        return matchParentBounds()
-                || !inSplitScreenSecondaryWindowingMode()
-                || displayContent == null
-                || displayContent.getSplitScreenPrimaryStackIgnoringVisibility() != null;
-    }
-
-    @Override
-    public void getBounds(Rect out) {
-        if (useCurrentBounds()) {
-            // No need to adjust the output bounds if fullscreen or the docked stack is visible
-            // since it is already what we want to represent to the rest of the system.
-            super.getBounds(out);
-            return;
-        }
-
-        // The bounds has been adjusted to accommodate for a docked stack, but the docked stack is
-        // not currently visible. Go ahead a represent it as fullscreen to the rest of the system.
-        mStack.getDisplayContent().getBounds(out);
-    }
-
     @Override
     public Rect getDisplayedBounds() {
         if (mOverrideDisplayedBounds.isEmpty()) {
@@ -504,36 +483,28 @@ class Task extends WindowContainer<AppWindowToken> implements ConfigurationConta
         // a DimLayer anyway if we weren't visible.
         final boolean dockedResizing = displayContent != null
                 && displayContent.mDividerControllerLocked.isResizing();
-        if (useCurrentBounds()) {
-            if (inFreeformWindowingMode() && getMaxVisibleBounds(out)) {
-                return;
-            }
-
-            if (!matchParentBounds()) {
-                // When minimizing the docked stack when going home, we don't adjust the task bounds
-                // so we need to intersect the task bounds with the stack bounds here.
-                //
-                // If we are Docked Resizing with snap points, the task bounds could be smaller than the stack
-                // bounds and so we don't even want to use them. Even if the app should not be resized the Dim
-                // should keep up with the divider.
-                if (dockedResizing) {
-                    mStack.getBounds(out);
-                } else {
-                    mStack.getBounds(mTmpRect);
-                    mTmpRect.intersect(getBounds());
-                    out.set(mTmpRect);
-                }
-            } else {
-                out.set(getBounds());
-            }
+        if (inFreeformWindowingMode() && getMaxVisibleBounds(out)) {
             return;
         }
 
-        // The bounds has been adjusted to accommodate for a docked stack, but the docked stack is
-        // not currently visible. Go ahead a represent it as fullscreen to the rest of the system.
-        if (displayContent != null) {
-            displayContent.getBounds(out);
+        if (!matchParentBounds()) {
+            // When minimizing the docked stack when going home, we don't adjust the task bounds
+            // so we need to intersect the task bounds with the stack bounds here.
+            //
+            // If we are Docked Resizing with snap points, the task bounds could be smaller than the
+            // stack bounds and so we don't even want to use them. Even if the app should not be
+            // resized the Dim should keep up with the divider.
+            if (dockedResizing) {
+                mStack.getBounds(out);
+            } else {
+                mStack.getBounds(mTmpRect);
+                mTmpRect.intersect(getBounds());
+                out.set(mTmpRect);
+            }
+        } else {
+            out.set(getBounds());
         }
+        return;
     }
 
     void setDragResizing(boolean dragResizing, int dragResizeMode) {
@@ -700,16 +671,6 @@ class Task extends WindowContainer<AppWindowToken> implements ConfigurationConta
         positionChildAt(position, aToken, false /* includeParents */);
     }
 
-    boolean isFullscreen() {
-        if (useCurrentBounds()) {
-            return matchParentBounds();
-        }
-        // The bounds has been adjusted to accommodate for a docked stack, but the docked stack
-        // is not currently visible. Go ahead a represent it as fullscreen to the rest of the
-        // system.
-        return true;
-    }
-
     void forceWindowsScaleable(boolean force) {
         mWmService.openSurfaceTransaction();
         try {
@@ -795,13 +756,18 @@ class Task extends WindowContainer<AppWindowToken> implements ConfigurationConta
 
     @CallSuper
     @Override
-    public void writeToProto(ProtoOutputStream proto, long fieldId, boolean trim) {
+    public void writeToProto(ProtoOutputStream proto, long fieldId,
+            @WindowTraceLogLevel int logLevel) {
+        if (logLevel == WindowTraceLogLevel.CRITICAL && !isVisible()) {
+            return;
+        }
+
         final long token = proto.start(fieldId);
-        super.writeToProto(proto, WINDOW_CONTAINER, trim);
+        super.writeToProto(proto, WINDOW_CONTAINER, logLevel);
         proto.write(ID, mTaskId);
         for (int i = mChildren.size() - 1; i >= 0; i--) {
             final AppWindowToken appWindowToken = mChildren.get(i);
-            appWindowToken.writeToProto(proto, APP_WINDOW_TOKENS, trim);
+            appWindowToken.writeToProto(proto, APP_WINDOW_TOKENS, logLevel);
         }
         proto.write(FILLS_PARENT, matchParentBounds());
         getBounds().writeToProto(proto, BOUNDS);

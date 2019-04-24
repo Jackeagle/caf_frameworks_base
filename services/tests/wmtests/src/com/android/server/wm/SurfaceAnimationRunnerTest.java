@@ -167,7 +167,6 @@ public class SurfaceAnimationRunnerTest extends WindowTestsBase {
         verify(mMockAnimationSpec, atLeastOnce()).apply(any(), any(), eq(0L));
     }
 
-    @FlakyTest(bugId = 74780584)
     @Test
     public void testDeferStartingAnimations() throws Exception {
         mSurfaceAnimationRunner.deferStartingAnimations();
@@ -214,7 +213,8 @@ public class SurfaceAnimationRunnerTest extends WindowTestsBase {
         final Animation a = new TranslateAnimation(-10, 10, 0, 0);
         a.initialize(0, 0, 0, 0);
         a.setDuration(50);
-        return new WindowAnimationSpec(a, new Point(0, 0), false /* canSkipFirstFrame */);
+        return new WindowAnimationSpec(a, new Point(0, 0), false /* canSkipFirstFrame */,
+                0 /* windowCornerRadius */);
     }
 
     /**

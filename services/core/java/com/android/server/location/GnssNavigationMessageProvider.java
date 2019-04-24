@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License
+ * limitations under the License.
  */
 
 package com.android.server.location;
@@ -51,7 +51,6 @@ public abstract class GnssNavigationMessageProvider
         mNative = aNative;
     }
 
-    // TODO(b/37460011): Use this with death recovery logic.
     void resumeIfStarted() {
         if (DEBUG) {
             Log.d(TAG, "resumeIfStarted");
@@ -86,12 +85,13 @@ public abstract class GnssNavigationMessageProvider
     }
 
     public void onNavigationMessageAvailable(final GnssNavigationMessage event) {
-        foreach((IGnssNavigationMessageListener listener, int uid, String packageName) -> {
+        foreach((IGnssNavigationMessageListener listener, CallerIdentity callerIdentity) -> {
                     listener.onGnssNavigationMessageReceived(event);
                 }
         );
     }
 
+    /** Handle GNSS capabilities update from the GNSS HAL implementation */
     public void onCapabilitiesUpdated(boolean isGnssNavigationMessageSupported) {
         setSupported(isGnssNavigationMessageSupported);
         updateResult();
@@ -136,7 +136,7 @@ public abstract class GnssNavigationMessageProvider
 
         @Override
         public void execute(IGnssNavigationMessageListener listener,
-                int uid, String packageName) throws RemoteException {
+                CallerIdentity callerIdentity) throws RemoteException {
             listener.onStatusChanged(mStatus);
         }
     }

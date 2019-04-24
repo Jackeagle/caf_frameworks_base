@@ -65,7 +65,8 @@ public final class ColorDisplayManager {
     @SystemApi
     public static final int CAPABILITY_NONE = 0x0;
     /**
-     * The device can properly apply transforms over protected content.
+     * The device can use GPU composition on protected content (layers whose buffers are protected
+     * in the trusted memory zone).
      *
      * @hide
      */
@@ -365,6 +366,17 @@ public final class ColorDisplayManager {
     }
 
     /**
+     * Gets whether or not a non-default saturation level is currently applied to the display.
+     *
+     * @return {@code true} if the display is not at full saturation
+     * @hide
+     */
+    @RequiresPermission(Manifest.permission.CONTROL_DISPLAY_COLOR_TRANSFORMS)
+    public boolean isSaturationActivated() {
+        return mManager.isSaturationActivated();
+    }
+
+    /**
      * Set the level of color saturation to apply to a specific app.
      *
      * @param packageName the package name of the app whose windows should be desaturated
@@ -377,6 +389,26 @@ public final class ColorDisplayManager {
     public boolean setAppSaturationLevel(@NonNull String packageName,
             @IntRange(from = 0, to = 100) int saturationLevel) {
         return mManager.setAppSaturationLevel(packageName, saturationLevel);
+    }
+
+    /**
+     * Enables or disables display white balance.
+     *
+     * @hide
+     */
+    @RequiresPermission(android.Manifest.permission.CONTROL_DISPLAY_COLOR_TRANSFORMS)
+    public boolean setDisplayWhiteBalanceEnabled(boolean enabled) {
+        return mManager.setDisplayWhiteBalanceEnabled(enabled);
+    }
+
+    /**
+     * Returns whether display white balance is currently enabled. Even if enabled, it may or may
+     * not be active, if another transform with higher priority is active.
+     *
+     * @hide
+     */
+    public boolean isDisplayWhiteBalanceEnabled() {
+        return mManager.isDisplayWhiteBalanceEnabled();
     }
 
     /**
@@ -588,9 +620,33 @@ public final class ColorDisplayManager {
             }
         }
 
+        boolean isSaturationActivated() {
+            try {
+                return mCdm.isSaturationActivated();
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+
         boolean setAppSaturationLevel(String packageName, int saturationLevel) {
             try {
                 return mCdm.setAppSaturationLevel(packageName, saturationLevel);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+
+        boolean isDisplayWhiteBalanceEnabled() {
+            try {
+                return mCdm.isDisplayWhiteBalanceEnabled();
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+
+        boolean setDisplayWhiteBalanceEnabled(boolean enabled) {
+            try {
+                return mCdm.setDisplayWhiteBalanceEnabled(enabled);
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }

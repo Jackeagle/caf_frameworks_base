@@ -47,6 +47,7 @@ import android.util.Slog;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.util.DumpUtils;
+import com.android.server.backup.utils.RandomAccessFileUtils;
 
 import java.io.File;
 import java.io.FileDescriptor;
@@ -88,6 +89,12 @@ public class Trampoline extends IBackupManager.Stub {
      * disabled by default in non-system users.
      */
     private static final String BACKUP_ACTIVATED_FILENAME = "backup-activated";
+
+    /**
+     * Name of file for non-system users that remembers whether backup was explicitly activated or
+     * deactivated with a call to setBackupServiceActive.
+     */
+    private static final String REMEMBER_ACTIVATED_FILENAME = "backup-remember-activated";
 
     // Product-level suppression of backup/restore.
     private static final String BACKUP_DISABLE_PROPERTY = "ro.backup.disable";
@@ -134,11 +141,16 @@ public class Trampoline extends IBackupManager.Stub {
     }
 
     /** Stored in the system user's directory and the file is indexed by the user it refers to. */
-    protected File getActivatedFileForNonSystemUser(int userId) {
-        return new File(UserBackupManagerFiles.getBaseStateDir(UserHandle.USER_SYSTEM),
-                BACKUP_ACTIVATED_FILENAME + "-" + userId);
+    protected File getRememberActivatedFileForNonSystemUser(int userId) {
+        return UserBackupManagerFiles.getStateFileInSystemDir(REMEMBER_ACTIVATED_FILENAME, userId);
     }
 
+    /** Stored in the system user's directory and the file is indexed by the user it refers to. */
+    protected File getActivatedFileForNonSystemUser(int userId) {
+        return UserBackupManagerFiles.getStateFileInSystemDir(BACKUP_ACTIVATED_FILENAME, userId);
+    }
+
+    // TODO (b/124359804) move to util method in FileUtils
     private void createFile(File file) throws IOException {
         if (file.exists()) {
             return;
@@ -150,6 +162,7 @@ public class Trampoline extends IBackupManager.Stub {
         }
     }
 
+    // TODO (b/124359804) move to util method in FileUtils
     private void deleteFile(File file) {
         if (!file.exists()) {
             return;
@@ -312,6 +325,24 @@ public class Trampoline extends IBackupManager.Stub {
     public void setBackupServiceActive(int userId, boolean makeActive) {
         enforcePermissionsOnUser(userId);
 
+        // In Q, backup is OFF by default for non-system users. In the future, we will change that
+        // to ON unless backup was explicitly deactivated with a (permissioned) call to
+        // setBackupServiceActive.
+        // Therefore, remember this for use in the future. Basically the default in the future will
+        // be: rememberFile.exists() ? rememberFile.value() : ON
+        // Note that this has to be done right after the permission checks and before any other
+        // action since we need to remember that a permissioned call was made irrespective of
+        // whether the call changes the state or not.
+        if (userId != UserHandle.USER_SYSTEM) {
+            try {
+                File rememberFile = getRememberActivatedFileForNonSystemUser(userId);
+                createFile(rememberFile);
+                RandomAccessFileUtils.writeBoolean(rememberFile, makeActive);
+            } catch (IOException e) {
+                Slog.e(TAG, "Unable to persist backup service activity", e);
+            }
+        }
+
         if (mGlobalDisable) {
             Slog.i(TAG, "Backup service not supported");
             return;
@@ -367,7 +398,7 @@ public class Trampoline extends IBackupManager.Stub {
     @Override
     public boolean isBackupServiceActive(int userId) {
         synchronized (mStateLock) {
-            return isUserReadyForBackup(userId);
+            return mService != null && isBackupActivatedForUser(userId);
         }
     }
 
@@ -602,8 +633,7 @@ public class Trampoline extends IBackupManager.Stub {
             @Nullable Intent configurationIntent,
             String currentDestinationString,
             @Nullable Intent dataManagementIntent,
-            String dataManagementLabel) {
-
+            CharSequence dataManagementLabel) {
         if (isUserReadyForBackup(userId)) {
             mService.updateTransportAttributes(
                     userId,
@@ -682,16 +712,10 @@ public class Trampoline extends IBackupManager.Stub {
     }
 
     @Override
-    public String getDataManagementLabelForUser(int userId, String transport)
+    public CharSequence getDataManagementLabelForUser(int userId, String transport)
             throws RemoteException {
         return isUserReadyForBackup(userId) ? mService.getDataManagementLabel(userId, transport)
                 : null;
-    }
-
-    @Override
-    public String getDataManagementLabel(String transport)
-            throws RemoteException {
-        return getDataManagementLabelForUser(binderGetCallingUserId(), transport);
     }
 
     @Override
@@ -757,6 +781,21 @@ public class Trampoline extends IBackupManager.Stub {
     @Override
     public void cancelBackups() throws RemoteException {
         cancelBackupsForUser(binderGetCallingUserId());
+    }
+
+    @Override
+    @Nullable public UserHandle getUserForAncestralSerialNumber(long ancestralSerialNumber) {
+        if (mService != null) {
+            return mService.getUserForAncestralSerialNumber(ancestralSerialNumber);
+        }
+        return null;
+    }
+
+    @Override
+    public void setAncestralSerialNumber(long ancestralSerialNumber) {
+        if (mService != null) {
+            mService.setAncestralSerialNumber(ancestralSerialNumber);
+        }
     }
 
     @Override

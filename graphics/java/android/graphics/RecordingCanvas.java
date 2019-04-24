@@ -31,7 +31,7 @@ import dalvik.annotation.optimization.FastNative;
  * Bitmap objects that it draws, preventing the backing memory of Bitmaps from being released while
  * the RecordingCanvas is still holding a native reference to the memory.
  *
- * This is obtained by calling {@link RenderNode#startRecording()} and is valid until the matching
+ * This is obtained by calling {@link RenderNode#beginRecording()} and is valid until the matching
  * {@link RenderNode#endRecording()} is called. It must not be retained beyond that as it is
  * internally reused.
  */
@@ -166,7 +166,9 @@ public final class RecordingCanvas extends DisplayListCanvas {
      * @param drawGLFunction A native function pointer
      *
      * @hide
+     * @deprecated Use {@link #drawWebViewFunctor(int)}
      */
+    @Deprecated
     public void callDrawGLFunction2(long drawGLFunction) {
         nCallDrawGLFunction(mNativeCanvasWrapper, drawGLFunction, null);
     }
@@ -184,7 +186,9 @@ public final class RecordingCanvas extends DisplayListCanvas {
      * canvas's display list has been released.
      *
      * @hide
+     * @deprecated Use {@link #drawWebViewFunctor(int)}
      */
+    @Deprecated
     public void drawGLFunctor2(long drawGLFunctor, @Nullable Runnable releasedCallback) {
         nCallDrawGLFunction(mNativeCanvasWrapper, drawGLFunctor, releasedCallback);
     }

@@ -356,12 +356,6 @@ public abstract class CameraDevice implements AutoCloseable {
      * </table><br>
      * </p>
      *
-     * <p>MONOCHROME-capability ({@link CameraCharacteristics#REQUEST_AVAILABLE_CAPABILITIES}
-     * includes {@link CameraMetadata#REQUEST_AVAILABLE_CAPABILITIES_MONOCHROME MONOCHROME}) devices
-     * supporting {@link android.graphics.ImageFormat#Y8 Y8} support substituting {@code YUV}
-     * streams with {@code Y8} in all guaranteed stream combinations for the device's hardware level
-     * and capabilities.</p>
-     *
      * <p>FULL-level ({@link CameraCharacteristics#INFO_SUPPORTED_HARDWARE_LEVEL}
      * {@code == }{@link CameraMetadata#INFO_SUPPORTED_HARDWARE_LEVEL_FULL FULL}) devices
      * support at least the following stream combinations in addition to those for
@@ -435,6 +429,18 @@ public abstract class CameraDevice implements AutoCloseable {
      * </table><br>
      * </p>
      *
+     * <p>MONOCHROME-capability ({@link CameraCharacteristics#REQUEST_AVAILABLE_CAPABILITIES}
+     * includes {@link CameraMetadata#REQUEST_AVAILABLE_CAPABILITIES_MONOCHROME MONOCHROME}) devices
+     * supporting {@link android.graphics.ImageFormat#Y8 Y8} support substituting {@code YUV}
+     * streams with {@code Y8} in all guaranteed stream combinations for the device's hardware level
+     * and capabilities.</p>
+     *
+     * <p>Devices capable of outputting HEIC formats ({@link StreamConfigurationMap#getOutputFormats}
+     * contains {@link android.graphics.ImageFormat#HEIC}) will support substituting {@code JPEG}
+     * streams with {@code HEIC} in all guaranteed stream combinations for the device's hardware
+     * level and capabilities. Calling createCaptureSession with both JPEG and HEIC outputs is not
+     * supported.</p>
+     *
      * <p>Clients can access the above mandatory stream combination tables via
      * {@link android.hardware.camera2.params.MandatoryStreamCombination}.</p>
      *
@@ -442,6 +448,14 @@ public abstract class CameraDevice implements AutoCloseable {
      * target combinations with sizes outside of these guarantees, but this can only be tested for
      * by calling {@link #isSessionConfigurationSupported} or attempting to create a session with
      * such targets.</p>
+     *
+     * <p>Exception on 176x144 (QCIF) resolution:
+     * Camera devices usually have a fixed capability for downscaling from larger resolution to
+     * smaller, and the QCIF resolution sometimes is not fully supported due to this
+     * limitation on devices with high-resolution image sensors. Therefore, trying to configure a
+     * QCIF resolution stream together with any other stream larger than 1920x1080 resolution
+     * (either width or height) might not be supported, and capture session creation will fail if it
+     * is not.</p>
      *
      * @param outputs The new set of Surfaces that should be made available as
      *                targets for captured image data.

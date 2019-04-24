@@ -366,17 +366,22 @@ public class TrustManagerService extends SystemService {
         } catch (RemoteException e) {
         }
 
-        if (mSettingsObserver.getTrustAgentsExtendUnlock()) {
-            trusted = trusted && (!showingKeyguard || isFromUnlock) && userId == mCurrentUser;
-            if (DEBUG) {
-                Slog.d(TAG, "Extend unlock setting trusted as " + Boolean.toString(trusted)
-                        + " && " + Boolean.toString(!showingKeyguard)
-                        + " && " + Boolean.toString(userId == mCurrentUser));
-            }
-        }
-
         boolean changed;
         synchronized (mUserIsTrusted) {
+            if (mSettingsObserver.getTrustAgentsExtendUnlock()) {
+                // In extend unlock trust agents can only set the device to trusted if it already
+                // trusted or the device is unlocked. Attempting to set the device as trusted
+                // when the device is locked will be ignored.
+                changed = mUserIsTrusted.get(userId) != trusted;
+                trusted = trusted
+                        && (!showingKeyguard || isFromUnlock || !changed)
+                        && userId == mCurrentUser;
+                if (DEBUG) {
+                    Slog.d(TAG, "Extend unlock setting trusted as " + Boolean.toString(trusted)
+                            + " && " + Boolean.toString(!showingKeyguard)
+                            + " && " + Boolean.toString(userId == mCurrentUser));
+                }
+            }
             changed = mUserIsTrusted.get(userId) != trusted;
             mUserIsTrusted.put(userId, trusted);
         }
@@ -404,7 +409,10 @@ public class TrustManagerService extends SystemService {
     }
 
     public long addEscrowToken(byte[] token, int userId) {
-        return mLockPatternUtils.addEscrowToken(token, userId);
+        return mLockPatternUtils.addEscrowToken(token, userId,
+                (long handle, int userid) -> {
+                    dispatchEscrowTokenActivatedLocked(handle, userid);
+                });
     }
 
     public boolean removeEscrowToken(long handle, int userId) {
@@ -653,6 +661,15 @@ public class TrustManagerService extends SystemService {
                 } else{
                     agent.agent.onDeviceUnlocked();
                 }
+            }
+        }
+    }
+
+    private void dispatchEscrowTokenActivatedLocked(long handle, int userId) {
+        for (int i = 0; i < mActiveAgents.size(); i++) {
+            AgentInfo agent = mActiveAgents.valueAt(i);
+            if (agent.userId == userId) {
+                agent.agent.onEscrowTokenActivated(handle, userId);
             }
         }
     }

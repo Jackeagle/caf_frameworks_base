@@ -23,6 +23,7 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.StringRes;
 import android.annotation.StyleRes;
+import android.annotation.TestApi;
 import android.annotation.UnsupportedAppUsage;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration.NativeConfig;
@@ -47,6 +48,7 @@ import java.nio.channels.FileLock;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Provides access to an application's raw asset files; see {@link Resources}
@@ -354,6 +356,22 @@ public final class AssetManager implements AutoCloseable {
             }
         }
         return sEmptyApkAssets;
+    }
+
+    /** @hide */
+    @TestApi
+    public @NonNull String[] getApkPaths() {
+        synchronized (this) {
+            if (mOpen) {
+                String[] paths = new String[mApkAssets.length];
+                final int count = mApkAssets.length;
+                for (int i = 0; i < count; i++) {
+                    paths[i] = mApkAssets[i].getAssetPath();
+                }
+                return paths;
+            }
+        }
+        return new String[0];
     }
 
     /**
@@ -1051,6 +1069,14 @@ public final class AssetManager implements AutoCloseable {
         }
     }
 
+    int[] getAttributeResolutionStack(long themePtr, @AttrRes int defStyleAttr,
+            @StyleRes int defStyleRes, @StyleRes int xmlStyle) {
+        synchronized (this) {
+            return nativeAttributeResolutionStack(
+                    mObject, themePtr, xmlStyle, defStyleAttr, defStyleRes);
+        }
+    }
+
     @UnsupportedAppUsage
     boolean resolveAttrs(long themePtr, @AttrRes int defStyleAttr, @StyleRes int defStyleRes,
             @Nullable int[] inValues, @NonNull int[] inAttrs, @NonNull int[] outValues,
@@ -1254,12 +1280,19 @@ public final class AssetManager implements AutoCloseable {
      */
     @UnsupportedAppUsage
     public boolean isUpToDate() {
-        for (ApkAssets apkAssets : getApkAssets()) {
-            if (!apkAssets.isUpToDate()) {
+        synchronized (this) {
+            if (!mOpen) {
                 return false;
             }
+
+            for (ApkAssets apkAssets : mApkAssets) {
+                if (!apkAssets.isUpToDate()) {
+                    return false;
+                }
+            }
+
+            return true;
         }
-        return true;
     }
 
     /**
@@ -1334,6 +1367,18 @@ public final class AssetManager implements AutoCloseable {
         synchronized (this) {
             ensureValidLocked();
             return nativeGetAssignedPackageIdentifiers(mObject);
+        }
+    }
+
+    /**
+     * @hide
+     */
+    @TestApi
+    @GuardedBy("this")
+    public @Nullable Map<String, String> getOverlayableMap(String packageName) {
+        synchronized (this) {
+            ensureValidLocked();
+            return nativeGetOverlayableMap(mObject, packageName);
         }
     }
 
@@ -1419,6 +1464,8 @@ public final class AssetManager implements AutoCloseable {
     private static native @Nullable String nativeGetLastResourceResolution(long ptr);
 
     // Style attribute retrieval native methods.
+    private static native int[] nativeAttributeResolutionStack(long ptr, long themePtr,
+            @StyleRes int xmlStyleRes, @AttrRes int defStyleAttr, @StyleRes int defStyleRes);
     private static native void nativeApplyStyle(long ptr, long themePtr, @AttrRes int defStyleAttr,
             @StyleRes int defStyleRes, long xmlParserPtr, @NonNull int[] inAttrs,
             long outValuesAddress, long outIndicesAddress);
@@ -1452,6 +1499,8 @@ public final class AssetManager implements AutoCloseable {
 
     private static native void nativeVerifySystemIdmaps();
     private static native String[] nativeCreateIdmapsForStaticOverlaysTargetingAndroid();
+    private static native @Nullable Map nativeGetOverlayableMap(long ptr,
+            @NonNull String packageName);
 
     // Global debug native methods.
     /**

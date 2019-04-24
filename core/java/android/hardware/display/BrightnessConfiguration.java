@@ -16,6 +16,7 @@
 
 package android.hardware.display;
 
+import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SystemApi;
 import android.annotation.TestApi;
@@ -93,7 +94,7 @@ public final class BrightnessConfiguration implements Parcelable {
      *
      */
     @Nullable
-    public BrightnessCorrection getCorrectionByPackageName(String packageName) {
+    public BrightnessCorrection getCorrectionByPackageName(@NonNull String packageName) {
         return mCorrectionsByPackageName.get(packageName);
     }
 
@@ -106,7 +107,7 @@ public final class BrightnessConfiguration implements Parcelable {
      * @return The matching brightness correction, or null.
      */
     @Nullable
-    public BrightnessCorrection getCorrectionByCategory(int category) {
+    public BrightnessCorrection getCorrectionByCategory(@ApplicationInfo.Category int category) {
         return mCorrectionsByCategory.get(category);
     }
 
@@ -197,7 +198,7 @@ public final class BrightnessConfiguration implements Parcelable {
                 && Objects.equals(mDescription, other.mDescription);
     }
 
-    public static final Creator<BrightnessConfiguration> CREATOR =
+    public static final @android.annotation.NonNull Creator<BrightnessConfiguration> CREATOR =
             new Creator<BrightnessConfiguration>() {
         public BrightnessConfiguration createFromParcel(Parcel in) {
             float[] lux = in.createFloatArray();
@@ -238,7 +239,7 @@ public final class BrightnessConfiguration implements Parcelable {
      *
      * @hide
      */
-    public void saveToXml(XmlSerializer serializer) throws IOException {
+    public void saveToXml(@NonNull XmlSerializer serializer) throws IOException {
         serializer.startTag(null, TAG_BRIGHTNESS_CURVE);
         if (mDescription != null) {
             serializer.attribute(null, ATTR_DESCRIPTION, mDescription);
@@ -284,7 +285,7 @@ public final class BrightnessConfiguration implements Parcelable {
      *
      * @hide
      */
-    public static BrightnessConfiguration loadFromXml(XmlPullParser parser)
+    public static BrightnessConfiguration loadFromXml(@NonNull XmlPullParser parser)
             throws IOException, XmlPullParserException {
         String description = null;
         List<Float> luxList = new ArrayList<>();
@@ -443,8 +444,11 @@ public final class BrightnessConfiguration implements Parcelable {
          *      {@link #getMaxCorrectionsByPackageName}).
          *
          */
-        public Builder addCorrectionByPackageName(String packageName,
-                BrightnessCorrection correction) {
+        @NonNull
+        public Builder addCorrectionByPackageName(@NonNull String packageName,
+                @NonNull BrightnessCorrection correction) {
+            Objects.requireNonNull(packageName, "packageName must not be null");
+            Objects.requireNonNull(correction, "correction must not be null");
             if (mCorrectionsByPackageName.size() >= getMaxCorrectionsByPackageName()) {
                 throw new IllegalArgumentException("Too many corrections by package name");
             }
@@ -469,8 +473,10 @@ public final class BrightnessConfiguration implements Parcelable {
          *      {@link #getMaxCorrectionsByCategory}).
          *
          */
+        @NonNull
         public Builder addCorrectionByCategory(@ApplicationInfo.Category int category,
-                BrightnessCorrection correction) {
+                @NonNull BrightnessCorrection correction) {
+            Objects.requireNonNull(correction, "correction must not be null");
             if (mCorrectionsByCategory.size() >= getMaxCorrectionsByCategory()) {
                 throw new IllegalArgumentException("Too many corrections by category");
             }
@@ -484,6 +490,7 @@ public final class BrightnessConfiguration implements Parcelable {
          * @param description brief text describing the curve pushed. It maybe truncated
          *                    and will not be displayed in the UI
          */
+        @NonNull
         public Builder setDescription(@Nullable String description) {
             mDescription = description;
             return this;
@@ -492,6 +499,7 @@ public final class BrightnessConfiguration implements Parcelable {
         /**
          * Builds the {@link BrightnessConfiguration}.
          */
+        @NonNull
         public BrightnessConfiguration build() {
             if (mCurveLux == null || mCurveNits == null) {
                 throw new IllegalStateException("A curve must be set!");

@@ -39,7 +39,8 @@ public interface ServiceNameResolver {
         /**
          * The name change callback.
          */
-        void onNameResolved(@UserIdInt int userId, @Nullable String serviceName);
+        void onNameResolved(@UserIdInt int userId, @Nullable String serviceName,
+                boolean isTemporary);
     }
 
     /**
@@ -105,6 +106,38 @@ public interface ServiceNameResolver {
      */
     default void resetTemporaryService(@UserIdInt int userId) {
         throw new UnsupportedOperationException("temporary user not supported");
+    }
+
+    /**
+     * Sets whether the default service should be used when the temporary service is not set.
+     *
+     * <p>Typically used during CTS tests to make sure only the default service doesn't interfere
+     * with the test results.
+     *
+     * @param userId user handle
+     * @param enabled whether the default service should be used when the temporary service is not
+     * set. If the service enabled state is already that value, the command is ignored and this
+     * method return {@code false}.
+     *
+     * @return whether the enabled state changed.
+     * @throws UnsupportedOperationException if not implemented.
+     */
+    default boolean setDefaultServiceEnabled(@UserIdInt int userId, boolean enabled) {
+        throw new UnsupportedOperationException("changing default service not supported");
+    }
+
+    /**
+     * Checks whether the default service should be used when the temporary service is not set.
+     *
+     * <p>Typically used during CTS tests to make sure only the default service doesn't interfere
+     * with the test results.
+     *
+     * @param userId user handle
+     *
+     * @throws UnsupportedOperationException if not implemented.
+     */
+    default boolean isDefaultServiceEnabled(@UserIdInt int userId) {
+        throw new UnsupportedOperationException("checking default service not supported");
     }
 
     /**

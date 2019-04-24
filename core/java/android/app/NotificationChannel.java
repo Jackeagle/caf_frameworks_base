@@ -85,7 +85,7 @@ public final class NotificationChannel implements Parcelable {
     private static final String ATT_FG_SERVICE_SHOWN = "fgservice";
     private static final String ATT_GROUP = "group";
     private static final String ATT_BLOCKABLE_SYSTEM = "blockable_system";
-    private static final String ATT_ALLOW_BUBBLE = "allow_bubble";
+    private static final String ATT_ALLOW_BUBBLE = "can_bubble";
     private static final String DELIMITER = ",";
 
     /**
@@ -170,6 +170,7 @@ public final class NotificationChannel implements Parcelable {
     private boolean mBlockableSystem = false;
     private boolean mAllowBubbles = DEFAULT_ALLOW_BUBBLE;
     private boolean mImportanceLockedByOEM;
+    private boolean mImportanceLockedDefaultApp;
 
     /**
      * Creates a notification channel.
@@ -611,14 +612,6 @@ public final class NotificationChannel implements Parcelable {
      * shade, in a floating window on top of other apps.
      */
     public boolean canBubble() {
-        return isBubbleAllowed() && getImportance() >= IMPORTANCE_HIGH;
-    }
-
-    /**
-     * Like {@link #canBubble()}, but only checks the permission, not the importance.
-     * @hide
-     */
-    public boolean isBubbleAllowed() {
         return mAllowBubbles;
     }
 
@@ -664,8 +657,24 @@ public final class NotificationChannel implements Parcelable {
      * @hide
      */
     @TestApi
+    public void setImportanceLockedByCriticalDeviceFunction(boolean locked) {
+        mImportanceLockedDefaultApp = locked;
+    }
+
+    /**
+     * @hide
+     */
+    @TestApi
     public boolean isImportanceLockedByOEM() {
         return mImportanceLockedByOEM;
+    }
+
+    /**
+     * @hide
+     */
+    @TestApi
+    public boolean isImportanceLockedByCriticalDeviceFunction() {
+        return mImportanceLockedDefaultApp;
     }
 
     /**
@@ -842,6 +851,9 @@ public final class NotificationChannel implements Parcelable {
             out.attribute(null, ATT_ALLOW_BUBBLE, Boolean.toString(canBubble()));
         }
 
+        // mImportanceLockedDefaultApp and mImportanceLockedByOEM have a different source of
+        // truth and so aren't written to this xml file
+
         out.endTag(null, TAG_CHANNEL);
     }
 
@@ -950,7 +962,8 @@ public final class NotificationChannel implements Parcelable {
         return sb.toString();
     }
 
-    public static final Creator<NotificationChannel> CREATOR = new Creator<NotificationChannel>() {
+    public static final @android.annotation.NonNull Creator<NotificationChannel> CREATOR =
+            new Creator<NotificationChannel>() {
         @Override
         public NotificationChannel createFromParcel(Parcel in) {
             return new NotificationChannel(in);
@@ -991,7 +1004,8 @@ public final class NotificationChannel implements Parcelable {
                 && Arrays.equals(mVibration, that.mVibration)
                 && Objects.equals(getGroup(), that.getGroup())
                 && Objects.equals(getAudioAttributes(), that.getAudioAttributes())
-                && mImportanceLockedByOEM == that.mImportanceLockedByOEM;
+                && mImportanceLockedByOEM == that.mImportanceLockedByOEM
+                && mImportanceLockedDefaultApp == that.mImportanceLockedDefaultApp;
     }
 
     @Override
@@ -1001,7 +1015,7 @@ public final class NotificationChannel implements Parcelable {
                 getUserLockedFields(),
                 isFgServiceShown(), mVibrationEnabled, mShowBadge, isDeleted(), getGroup(),
                 getAudioAttributes(), isBlockableSystem(), mAllowBubbles,
-                mImportanceLockedByOEM);
+                mImportanceLockedByOEM, mImportanceLockedDefaultApp);
         result = 31 * result + Arrays.hashCode(mVibration);
         return result;
     }
@@ -1030,6 +1044,7 @@ public final class NotificationChannel implements Parcelable {
                 + ", mBlockableSystem=" + mBlockableSystem
                 + ", mAllowBubbles=" + mAllowBubbles
                 + ", mImportanceLockedByOEM=" + mImportanceLockedByOEM
+                + ", mImportanceLockedDefaultApp=" + mImportanceLockedDefaultApp
                 + '}';
         pw.println(prefix + output);
     }
@@ -1057,6 +1072,7 @@ public final class NotificationChannel implements Parcelable {
                 + ", mBlockableSystem=" + mBlockableSystem
                 + ", mAllowBubbles=" + mAllowBubbles
                 + ", mImportanceLockedByOEM=" + mImportanceLockedByOEM
+                + ", mImportanceLockedDefaultApp=" + mImportanceLockedDefaultApp
                 + '}';
     }
 

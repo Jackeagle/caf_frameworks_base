@@ -29,6 +29,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -38,13 +39,14 @@ import android.app.Fragment;
 import android.content.res.Configuration;
 import android.graphics.Rect;
 import android.os.Handler;
-import android.support.test.filters.SmallTest;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
 import android.testing.TestableLooper.RunWithLooper;
 import android.view.Display;
 import android.view.View;
 import android.view.WindowManager;
+
+import androidx.test.filters.SmallTest;
 
 import com.android.systemui.R.dimen;
 import com.android.systemui.ScreenDecorations.TunablePaddingTagListener;
@@ -82,6 +84,9 @@ public class ScreenDecorationsTest extends SysuiTestCase {
         mTestableLooper = TestableLooper.get(this);
         mDependency.injectTestDependency(Dependency.MAIN_HANDLER,
                 new Handler(mTestableLooper.getLooper()));
+        mTunablePaddingService = mDependency.injectMockDependency(TunablePaddingService.class);
+        mTunerService = mDependency.injectMockDependency(TunerService.class);
+        mFragmentService = mDependency.injectMockDependency(FragmentService.class);
 
         mStatusBar = mock(StatusBar.class);
         mWindowManager = mock(WindowManager.class);
@@ -93,11 +98,8 @@ public class ScreenDecorationsTest extends SysuiTestCase {
         when(mWindowManager.getDefaultDisplay()).thenReturn(display);
         mContext.addMockSystemService(WindowManager.class, mWindowManager);
 
-        mFragmentService = mDependency.injectMockDependency(FragmentService.class);
         mFragmentHostManager = mock(FragmentHostManager.class);
         when(mFragmentService.getFragmentHostManager(any())).thenReturn(mFragmentHostManager);
-
-        mTunerService = mDependency.injectMockDependency(TunerService.class);
 
 
         mScreenDecorations = new ScreenDecorations() {
@@ -126,8 +128,7 @@ public class ScreenDecorationsTest extends SysuiTestCase {
         };
         mScreenDecorations.mContext = mContext;
         mScreenDecorations.mComponents = mContext.getComponents();
-
-        mTunablePaddingService = mDependency.injectMockDependency(TunablePaddingService.class);
+        reset(mTunerService);
     }
 
     @Test

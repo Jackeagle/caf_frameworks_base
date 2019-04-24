@@ -449,7 +449,9 @@ public class ShortcutParser {
                 iconResId,
                 null, // icon res name
                 null, // bitmap path
-                disabledReason);
+                disabledReason,
+                null /* persons */,
+                null /* locusId */);
     }
 
     private static String parseCategory(ShortcutService service, AttributeSet attrs) {

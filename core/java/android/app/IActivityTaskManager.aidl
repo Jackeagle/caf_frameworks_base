@@ -129,6 +129,7 @@ interface IActivityTaskManager {
     oneway void activityIdle(in IBinder token, in Configuration config,
             in boolean stopProfiling);
     void activityResumed(in IBinder token);
+    void activityTopResumedStateLost();
     void activityPaused(in IBinder token);
     void activityStopped(in IBinder token, in Bundle state,
             in PersistableBundle persistentState, in CharSequence description);
@@ -215,7 +216,7 @@ interface IActivityTaskManager {
     void registerTaskStackListener(in ITaskStackListener listener);
     void unregisterTaskStackListener(in ITaskStackListener listener);
     void setTaskResizeable(int taskId, int resizeableMode);
-    void exitFreeformMode(in IBinder token);
+    void toggleFreeformWindowingMode(in IBinder token);
     void resizeTask(int taskId, in Rect bounds, int resizeMode);
     void moveStackToDisplay(int stackId, int displayId);
     void removeStack(int stackId);
@@ -247,8 +248,20 @@ interface IActivityTaskManager {
             boolean preserveWindows, boolean animate, int animationDuration);
     boolean setTaskWindowingModeSplitScreenPrimary(int taskId, int createMode, boolean toTop,
             boolean animate, in Rect initialBounds, boolean showRecents);
-
-
+    /**
+     * Use the offset to adjust the stack boundary with animation.
+     *
+     * @param stackId Id of the stack to adjust.
+     * @param compareBounds Offset is only applied if the current pinned stack bounds is equal to
+     *                      the compareBounds.
+     * @param xOffset The horizontal offset.
+     * @param yOffset The vertical offset.
+     * @param animationDuration The duration of the resize animation in milliseconds or -1 if the
+     *                          default animation duration should be used.
+     * @throws RemoteException
+     */
+    void offsetPinnedStackBounds(int stackId, in Rect compareBounds, int xOffset, int yOffset,
+            int animationDuration);
     /**
      * Removes stacks in the input windowing modes from the system if they are of activity type
      * ACTIVITY_TYPE_STANDARD or ACTIVITY_TYPE_UNDEFINED
@@ -265,12 +278,8 @@ interface IActivityTaskManager {
      *
      * @param showingKeyguard True if the keyguard is showing, false otherwise.
      * @param showingAod True if AOD is showing, false otherwise.
-     * @param secondaryDisplaysShowing The displayId's of the secondary displays on which the
-     * keyguard is showing, or {@code null} if there is no such display. Only meaningful if showing
-     * is {@code true}.
      */
-    void setLockScreenShown(boolean showingKeyguard, boolean showingAod,
-            in int[] secondaryDisplaysShowing);
+    void setLockScreenShown(boolean showingKeyguard, boolean showingAod);
     Bundle getAssistContextExtras(int requestType);
     boolean launchAssistIntent(in Intent intent, int requestType, in String hint, int userHandle,
             in Bundle args);
@@ -464,4 +473,14 @@ interface IActivityTaskManager {
      * contain one task.
      */
     void setDisplayToSingleTaskInstance(int displayId);
+
+    /**
+     * Restarts the activity by killing its process if it is visible. If the activity is not
+     * visible, the activity will not be restarted immediately and just keep the activity record in
+     * the stack. It also resets the current override configuration so the activity will use the
+     * configuration according to the latest state.
+     *
+     * @param activityToken The token of the target activity to restart.
+     */
+    void restartActivityProcessIfVisible(in IBinder activityToken);
 }

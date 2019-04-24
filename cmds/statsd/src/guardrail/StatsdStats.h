@@ -42,6 +42,13 @@ struct ConfigStats {
     bool is_valid;
 
     std::list<int32_t> broadcast_sent_time_sec;
+
+    // Times at which this config is activated.
+    std::list<int32_t> activation_time_sec;
+
+    // Times at which this config is deactivated.
+    std::list<int32_t> deactivation_time_sec;
+
     std::list<int32_t> data_drop_time_sec;
     // Number of bytes dropped at corresponding time.
     std::list<int64_t> data_drop_bytes;
@@ -132,6 +139,9 @@ public:
     /* Min period between two checks of byte size per config key in nanoseconds. */
     static const int64_t kMinByteSizeCheckPeriodNs = 60 * NS_PER_SEC;
 
+    /* Minimum period between two activation broadcasts in nanoseconds. */
+    static const int64_t kMinActivationBroadcastPeriodNs = 10 * NS_PER_SEC;
+
     // Maximum age (30 days) that files on disk can exist in seconds.
     static const int kMaxAgeSecond = 60 * 60 * 24 * 30;
 
@@ -146,6 +156,12 @@ public:
 
     // Max time to do a pull.
     static const int64_t kPullMaxDelayNs = 10 * NS_PER_SEC;
+
+    // Max platform atom tag number.
+    static const int32_t kMaxPlatformAtomTag = 100000;
+
+    static const int64_t kInt64Max = 0x7fffffffffffffffLL;
+
     /**
      * Report a new config has been received and report the static stats about the config.
      *
@@ -169,6 +185,13 @@ public:
      * Report a broadcast has been sent to a config owner to collect the data.
      */
     void noteBroadcastSent(const ConfigKey& key);
+
+    /**
+     * Report that a config has become activated or deactivated.
+     * This can be different from whether or not a broadcast is sent if the
+     * guardrail prevented the broadcast from being sent.
+     */
+    void noteActiveStatusChanged(const ConfigKey& key, bool activate);
 
     /**
      * Report a config's metrics data has been dropped.
@@ -315,7 +338,8 @@ public:
     /**
      * Records statsd skipped an event.
      */
-    void noteLogLost(int32_t wallClockTimeSec, int32_t count, int lastError);
+    void noteLogLost(int32_t wallClockTimeSec, int32_t count, int32_t lastError,
+                     int32_t lastAtomTag, int32_t uid, int32_t pid);
 
     /**
      * Records that the pull of an atom has failed
@@ -340,29 +364,66 @@ public:
     void noteEmptyData(int atomId);
 
     /**
+     * Records that a puller callback for the given atomId was registered or unregistered.
+     *
+     * @param registered True if the callback was registered, false if was unregistered.
+     */
+    void notePullerCallbackRegistrationChanged(int atomId, bool registered);
+
+    /**
      * Hard limit was reached in the cardinality of an atom
      */
-    void noteHardDimensionLimitReached(int atomId);
+    void noteHardDimensionLimitReached(int64_t metricId);
 
     /**
      * A log event was too late, arrived in the wrong bucket and was skipped
      */
-    void noteLateLogEventSkipped(int atomId);
+    void noteLateLogEventSkipped(int64_t metricId);
 
     /**
      * Buckets were skipped as time elapsed without any data for them
      */
-    void noteSkippedForwardBuckets(int atomId);
+    void noteSkippedForwardBuckets(int64_t metricId);
 
     /**
      * An unsupported value type was received
      */
-    void noteBadValueType(int atomId);
+    void noteBadValueType(int64_t metricId);
+
+    /**
+     * Buckets were dropped due to reclaim memory.
+     */
+    void noteBucketDropped(int64_t metricId);
 
     /**
      * A condition change was too late, arrived in the wrong bucket and was skipped
      */
-    void noteConditionChangeInNextBucket(int atomId);
+    void noteConditionChangeInNextBucket(int64_t metricId);
+
+    /**
+     * A bucket has been tagged as invalid.
+     */
+    void noteInvalidatedBucket(int64_t metricId);
+
+    /**
+     * Tracks the total number of buckets (include skipped/invalid buckets).
+     */
+    void noteBucketCount(int64_t metricId);
+
+    /**
+     * For pulls at bucket boundaries, it represents the misalignment between the real timestamp and
+     * the end of the bucket.
+     */
+    void noteBucketBoundaryDelayNs(int64_t metricId, int64_t timeDelayNs);
+
+    /**
+     * Number of buckets with unknown condition.
+     */
+    void noteBucketUnknownCondition(int64_t metricId);
+
+    /* Reports one event has been dropped due to queue overflow, and the oldest event timestamp in
+     * the queue */
+    void noteEventQueueOverflow(int64_t oldestEventTimestampNs);
 
     /**
      * Reset the historical stats. Including all stats in icebox, and the tracked stats about
@@ -400,6 +461,8 @@ public:
         long statsCompanionPullFailed = 0;
         long statsCompanionPullBinderTransactionFailed = 0;
         long emptyData = 0;
+        long registeredCount = 0;
+        long unregisteredCount = 0;
     } PulledAtomStats;
 
     typedef struct {
@@ -408,6 +471,12 @@ public:
         long skippedForwardBuckets = 0;
         long badValueType = 0;
         long conditionChangeInNextBucket = 0;
+        long invalidatedBucket = 0;
+        long bucketDropped = 0;
+        int64_t minBucketBoundaryDelayNs = 0;
+        int64_t maxBucketBoundaryDelayNs = 0;
+        long bucketUnknownCondition = 0;
+        long bucketCount = 0;
     } AtomMetricStats;
 
 private:
@@ -438,17 +507,37 @@ private:
     std::map<int, PulledAtomStats> mPulledAtomStats;
 
     // Maps metric ID to its stats. The size is capped by the number of metrics.
-    std::map<int, AtomMetricStats> mAtomMetricStats;
+    std::map<int64_t, AtomMetricStats> mAtomMetricStats;
 
     struct LogLossStats {
-        LogLossStats(int32_t sec, int32_t count, int32_t error)
-            : mWallClockSec(sec), mCount(count), mLastError(error) {
+        LogLossStats(int32_t sec, int32_t count, int32_t error, int32_t tag, int32_t uid,
+                     int32_t pid)
+            : mWallClockSec(sec),
+              mCount(count),
+              mLastError(error),
+              mLastTag(tag),
+              mUid(uid),
+              mPid(pid) {
         }
         int32_t mWallClockSec;
         int32_t mCount;
         // error code defined in linux/errno.h
         int32_t mLastError;
+        int32_t mLastTag;
+        int32_t mUid;
+        int32_t mPid;
     };
+
+    // Max of {(now - oldestEventTimestamp) when overflow happens}.
+    // This number is helpful to understand how SLOW statsd can be.
+    int64_t mMaxQueueHistoryNs = 0;
+
+    // Min of {(now - oldestEventTimestamp) when overflow happens}.
+    // This number is helpful to understand how FAST the events floods to statsd.
+    int64_t mMinQueueHistoryNs = kInt64Max;
+
+    // Total number of events that are lost due to queue overflow.
+    int32_t mOverflowCount = 0;
 
     // Timestamps when we detect log loss, and the number of logs lost.
     std::list<LogLossStats> mLogLossStats;
@@ -474,13 +563,15 @@ private:
 
     void noteBroadcastSent(const ConfigKey& key, int32_t timeSec);
 
+    void noteActiveStatusChanged(const ConfigKey& key, bool activate, int32_t timeSec);
+
     void addToIceBoxLocked(std::shared_ptr<ConfigStats>& stats);
 
     /**
      * Get a reference to AtomMetricStats for a metric. If none exists, create it. The reference
      * will live as long as `this`.
      */
-    StatsdStats::AtomMetricStats& getAtomMetricStats(int metricId);
+    StatsdStats::AtomMetricStats& getAtomMetricStats(int64_t metricId);
 
     FRIEND_TEST(StatsdStatsTest, TestValidConfigAdd);
     FRIEND_TEST(StatsdStatsTest, TestInvalidConfigAdd);
@@ -491,6 +582,7 @@ private:
     FRIEND_TEST(StatsdStatsTest, TestAnomalyMonitor);
     FRIEND_TEST(StatsdStatsTest, TestSystemServerCrash);
     FRIEND_TEST(StatsdStatsTest, TestPullAtomStats);
+    FRIEND_TEST(StatsdStatsTest, TestAtomMetricsStats);
 };
 
 }  // namespace statsd

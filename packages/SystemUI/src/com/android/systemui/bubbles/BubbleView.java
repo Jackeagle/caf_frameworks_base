@@ -17,27 +17,18 @@
 package com.android.systemui.bubbles;
 
 import android.annotation.Nullable;
-import android.app.ActivityView;
 import android.app.Notification;
-import android.app.PendingIntent;
 import android.content.Context;
 import android.graphics.Color;
-import android.graphics.PointF;
+import android.graphics.drawable.AdaptiveIconDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.Icon;
 import android.graphics.drawable.InsetDrawable;
-import android.graphics.drawable.LayerDrawable;
 import android.util.AttributeSet;
-import android.util.Log;
-import android.view.View;
-import android.view.ViewGroup;
 import android.widget.FrameLayout;
-import android.widget.LinearLayout;
-import android.widget.TextView;
 
 import com.android.internal.graphics.ColorUtils;
-import com.android.systemui.Dependency;
 import com.android.systemui.Interpolators;
 import com.android.systemui.R;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
@@ -46,24 +37,21 @@ import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow
 /**
  * A floating object on the screen that can post message updates.
  */
-public class BubbleView extends FrameLayout implements BubbleTouchHandler.FloatingView {
+public class BubbleView extends FrameLayout {
     private static final String TAG = "BubbleView";
 
+    private static final int DARK_ICON_ALPHA = 180;
+    private static final double ICON_MIN_CONTRAST = 4.1;
+    private static final int DEFAULT_BACKGROUND_COLOR =  Color.LTGRAY;
     // Same value as Launcher3 badge code
     private static final float WHITE_SCRIM_ALPHA = 0.54f;
     private Context mContext;
 
     private BadgedImageView mBadgedImageView;
-    private TextView mMessageView;
     private int mPadding;
     private int mIconInset;
 
     private NotificationEntry mEntry;
-    private PendingIntent mAppOverlayIntent;
-    private BubbleController mBubbleController;
-    private ActivityView mActivityView;
-    private boolean mActivityViewReady;
-    private boolean mActivityViewStarted;
 
     public BubbleView(Context context) {
         this(context, null);
@@ -83,49 +71,17 @@ public class BubbleView extends FrameLayout implements BubbleTouchHandler.Floati
         // XXX: can this padding just be on the view and we look it up?
         mPadding = getResources().getDimensionPixelSize(R.dimen.bubble_view_padding);
         mIconInset = getResources().getDimensionPixelSize(R.dimen.bubble_icon_inset);
-        mBubbleController = Dependency.get(BubbleController.class);
     }
 
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
-        mBadgedImageView = (BadgedImageView) findViewById(R.id.bubble_image);
-        mMessageView = (TextView) findViewById(R.id.message_view);
-        mMessageView.setVisibility(GONE);
-        mMessageView.setPivotX(0);
+        mBadgedImageView = findViewById(R.id.bubble_image);
     }
 
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        updateViews();
-    }
-
-    @Override
-    protected void onMeasure(int widthSpec, int heightSpec) {
-        measureChild(mBadgedImageView, widthSpec, heightSpec);
-        measureChild(mMessageView, widthSpec, heightSpec);
-        boolean messageGone = mMessageView.getVisibility() == GONE;
-        int imageHeight = mBadgedImageView.getMeasuredHeight();
-        int imageWidth = mBadgedImageView.getMeasuredWidth();
-        int messageHeight = messageGone ? 0 : mMessageView.getMeasuredHeight();
-        int messageWidth = messageGone ? 0 : mMessageView.getMeasuredWidth();
-        setMeasuredDimension(
-                getPaddingStart() + imageWidth + mPadding + messageWidth + getPaddingEnd(),
-                getPaddingTop() + Math.max(imageHeight, messageHeight) + getPaddingBottom());
-    }
-
-    @Override
-    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
-        left = getPaddingStart();
-        top = getPaddingTop();
-        int imageWidth = mBadgedImageView.getMeasuredWidth();
-        int imageHeight = mBadgedImageView.getMeasuredHeight();
-        int messageWidth = mMessageView.getMeasuredWidth();
-        int messageHeight = mMessageView.getMeasuredHeight();
-        mBadgedImageView.layout(left, top, left + imageWidth, top + imageHeight);
-        mMessageView.layout(left + imageWidth + mPadding, top,
-                left + imageWidth + mPadding + messageWidth, top + messageHeight);
     }
 
     /**
@@ -165,7 +121,6 @@ public class BubbleView extends FrameLayout implements BubbleTouchHandler.Floati
         updateViews();
     }
 
-
     /**
      * @return the {@link ExpandableNotificationRow} view to display notification content when the
      * bubble is expanded.
@@ -204,21 +159,24 @@ public class BubbleView extends FrameLayout implements BubbleTouchHandler.Floati
         }
     }
 
-    private void updateViews() {
+    void updateViews() {
         if (mEntry == null) {
             return;
         }
+        Notification.BubbleMetadata metadata = mEntry.getBubbleMetadata();
         Notification n = mEntry.notification.getNotification();
-        boolean isLarge = n.getLargeIcon() != null;
-        Icon ic = isLarge ? n.getLargeIcon() : n.getSmallIcon();
+        Icon ic;
+        boolean needsTint;
+        if (metadata != null) {
+            ic = metadata.getIcon();
+            needsTint = ic.getType() != Icon.TYPE_ADAPTIVE_BITMAP;
+        } else {
+            needsTint = n.getLargeIcon() == null;
+            ic = needsTint ? n.getSmallIcon() : n.getLargeIcon();
+        }
         Drawable iconDrawable = ic.loadDrawable(mContext);
-        if (!isLarge) {
-            // Center icon on coloured background
-            iconDrawable.setTint(Color.WHITE); // TODO: dark mode
-            Drawable bg = new ColorDrawable(n.color);
-            InsetDrawable d = new InsetDrawable(iconDrawable, mIconInset);
-            Drawable[] layers = {bg, d};
-            mBadgedImageView.setImageDrawable(new LayerDrawable(layers));
+        if (needsTint) {
+            mBadgedImageView.setImageDrawable(buildIconWithTint(iconDrawable, n.color));
         } else {
             mBadgedImageView.setImageDrawable(iconDrawable);
         }
@@ -227,109 +185,30 @@ public class BubbleView extends FrameLayout implements BubbleTouchHandler.Floati
         animateDot(mEntry.showInShadeWhenBubble() /* showDot */);
     }
 
+    private Drawable buildIconWithTint(Drawable iconDrawable, int backgroundColor) {
+        iconDrawable = checkTint(iconDrawable, backgroundColor);
+        InsetDrawable foreground = new InsetDrawable(iconDrawable, mIconInset);
+        ColorDrawable background = new ColorDrawable(backgroundColor);
+        return new AdaptiveIconDrawable(background, foreground);
+    }
+
+    private Drawable checkTint(Drawable iconDrawable, int backgroundColor) {
+        backgroundColor = ColorUtils.setAlphaComponent(backgroundColor, 255 /* alpha */);
+        if (backgroundColor == Color.TRANSPARENT) {
+            // ColorUtils throws exception when background is translucent.
+            backgroundColor = DEFAULT_BACKGROUND_COLOR;
+        }
+        iconDrawable.setTint(Color.WHITE);
+        double contrastRatio = ColorUtils.calculateContrast(Color.WHITE, backgroundColor);
+        if (contrastRatio < ICON_MIN_CONTRAST) {
+            int dark = ColorUtils.setAlphaComponent(Color.BLACK, DARK_ICON_ALPHA);
+            iconDrawable.setTint(dark);
+        }
+        return iconDrawable;
+    }
+
     private int determineDominateColor(Drawable d, int defaultTint) {
         // XXX: should we pull from the drawable, app icon, notif tint?
         return ColorUtils.blendARGB(defaultTint, Color.WHITE, WHITE_SCRIM_ALPHA);
-    }
-
-    /**
-     * @return a view used to display app overlay content when expanded.
-     */
-    public ActivityView getActivityView() {
-        if (mActivityView == null) {
-            mActivityView = new ActivityView(mContext, null /* attrs */, 0 /* defStyle */,
-                    true /* singleTaskInstance */);
-            Log.d(TAG, "[getActivityView] created: " + mActivityView);
-            mActivityView.setCallback(new ActivityView.StateCallback() {
-                @Override
-                public void onActivityViewReady(ActivityView view) {
-                    mActivityViewReady = true;
-                    mActivityView.startActivity(mAppOverlayIntent);
-                }
-
-                @Override
-                public void onActivityViewDestroyed(ActivityView view) {
-                    mActivityViewReady = false;
-                }
-
-                /**
-                 * This is only called for tasks on this ActivityView, which is also set to
-                 * single-task mode -- meaning never more than one task on this display. If a task
-                 * is being removed, it's the top Activity finishing and this bubble should
-                 * be removed or collapsed.
-                 */
-                @Override
-                public void onTaskRemovalStarted(int taskId) {
-                    if (mEntry != null) {
-                        // Must post because this is called from a binder thread.
-                        post(() -> mBubbleController.removeBubble(mEntry.key));
-                    }
-                }
-            });
-        }
-        return mActivityView;
-    }
-
-    /**
-     * Removes and releases an ActivityView if one was previously created for this bubble.
-     */
-    public void destroyActivityView(ViewGroup tmpParent) {
-        if (mActivityView == null) {
-            return;
-        }
-        if (!mActivityViewReady) {
-            // release not needed, never initialized?
-            mActivityView = null;
-            return;
-        }
-        // HACK: release() will crash if the view is not attached.
-        if (!mActivityView.isAttachedToWindow()) {
-            mActivityView.setVisibility(View.GONE);
-            tmpParent.addView(mActivityView, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT));
-        }
-
-        mActivityView.release();
-
-        ((ViewGroup) mActivityView.getParent()).removeView(mActivityView);
-        mActivityView = null;
-    }
-
-    @Override
-    public void setPosition(float x, float y) {
-        setPositionX(x);
-        setPositionY(y);
-    }
-
-    @Override
-    public void setPositionX(float x) {
-        setTranslationX(x);
-    }
-
-    @Override
-    public void setPositionY(float y) {
-        setTranslationY(y);
-    }
-
-    @Override
-    public PointF getPosition() {
-        return new PointF(getTranslationX(), getTranslationY());
-    }
-
-    /**
-     * @return whether an ActivityView should be used to display the content of this Bubble
-     */
-    public boolean hasAppOverlayIntent() {
-        return mAppOverlayIntent != null;
-    }
-
-    public PendingIntent getAppOverlayIntent() {
-        return mAppOverlayIntent;
-
-    }
-
-    public void setBubbleIntent(PendingIntent intent) {
-        mAppOverlayIntent = intent;
     }
 }

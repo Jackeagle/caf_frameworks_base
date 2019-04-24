@@ -16,9 +16,8 @@
 
 package com.android.systemui.power;
 
-import static android.test.MoreAsserts.assertNotEqual;
+import static com.google.common.truth.Truth.assertThat;
 
-import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
 
@@ -31,14 +30,15 @@ import static org.mockito.Mockito.verify;
 
 import android.app.Notification;
 import android.app.NotificationManager;
-import android.support.test.runner.AndroidJUnit4;
+import android.os.BatteryManager;
 import android.test.suitebuilder.annotation.SmallTest;
+
+import androidx.test.runner.AndroidJUnit4;
 
 import com.android.internal.messages.nano.SystemMessageProto.SystemMessage;
 import com.android.systemui.SysuiTestCase;
 import com.android.systemui.util.NotificationChannels;
 
-import java.util.concurrent.TimeUnit;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -58,6 +58,9 @@ public class PowerNotificationWarningsTest extends SysuiTestCase {
         // Test Instance.
         mContext.addMockSystemService(NotificationManager.class, mMockNotificationManager);
         mPowerNotificationWarnings = new PowerNotificationWarnings(mContext);
+        BatteryStateSnapshot snapshot = new BatteryStateSnapshot(100, false, false, 1,
+                BatteryManager.BATTERY_HEALTH_GOOD, 5, 15);
+        mPowerNotificationWarnings.updateSnapshot(snapshot);
     }
 
     @Test
@@ -150,5 +153,14 @@ public class PowerNotificationWarningsTest extends SysuiTestCase {
         mPowerNotificationWarnings.dismissThermalShutdownWarning();
         verify(mMockNotificationManager, times(1)).cancelAsUser(anyString(),
                 eq(SystemMessage.NOTE_THERMAL_SHUTDOWN), any());
+    }
+
+    @Test
+    public void testShowUsbHighTemperatureAlarm() {
+        mPowerNotificationWarnings.showUsbHighTemperatureAlarm();
+        waitForIdleSync(mContext.getMainThreadHandler());
+        assertThat(mPowerNotificationWarnings.mUsbHighTempDialog).isNotNull();
+
+        mPowerNotificationWarnings.mUsbHighTempDialog.dismiss();
     }
 }

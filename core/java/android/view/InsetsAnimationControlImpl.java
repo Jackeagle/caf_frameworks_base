@@ -20,6 +20,7 @@ import static android.view.InsetsState.INSET_SIDE_BOTTOM;
 import static android.view.InsetsState.INSET_SIDE_LEFT;
 import static android.view.InsetsState.INSET_SIDE_RIGHT;
 import static android.view.InsetsState.INSET_SIDE_TOP;
+import static android.view.InsetsState.toPublicType;
 
 import android.annotation.Nullable;
 import android.graphics.Insets;
@@ -33,6 +34,8 @@ import android.util.SparseSetArray;
 import android.view.InsetsState.InsetSide;
 import android.view.SyncRtSurfaceTransactionApplier.SurfaceParams;
 import android.view.WindowInsets.Type.InsetType;
+import android.view.WindowInsetsAnimationListener.InsetsAnimation;
+import android.view.WindowManager.LayoutParams;
 
 import com.android.internal.annotations.VisibleForTesting;
 
@@ -65,8 +68,12 @@ public class InsetsAnimationControlImpl implements WindowInsetsAnimationControll
     private final Supplier<SyncRtSurfaceTransactionApplier> mTransactionApplierSupplier;
     private final InsetsController mController;
     private final WindowInsetsAnimationListener.InsetsAnimation mAnimation;
+    private final Rect mFrame;
     private Insets mCurrentInsets;
     private Insets mPendingInsets;
+    private boolean mFinished;
+    private boolean mCancelled;
+    private int mFinishedShownTypes;
 
     @VisibleForTesting
     public InsetsAnimationControlImpl(SparseArray<InsetsSourceConsumer> consumers, Rect frame,
@@ -85,6 +92,7 @@ public class InsetsAnimationControlImpl implements WindowInsetsAnimationControll
                 null /* typeSideMap */);
         mShownInsets = calculateInsets(mInitialInsetsState, frame, consumers, true /* shown */,
                 mTypeSideMap);
+        mFrame = new Rect(frame);
         buildTypeSourcesMap(mTypeSideMap, mSideSourceMap, mConsumers);
 
         // TODO: Check for controllability first and wait for IME if needed.
@@ -118,36 +126,79 @@ public class InsetsAnimationControlImpl implements WindowInsetsAnimationControll
 
     @Override
     public void changeInsets(Insets insets) {
+        if (mFinished) {
+            throw new IllegalStateException(
+                    "Can't change insets on an animation that is finished.");
+        }
+        if (mCancelled) {
+            throw new IllegalStateException(
+                    "Can't change insets on an animation that is cancelled.");
+        }
         mPendingInsets = sanitize(insets);
         mController.scheduleApplyChangeInsets();
     }
 
     @VisibleForTesting
-    public void applyChangeInsets(InsetsState state) {
+    /**
+     * @return Whether the finish callback of this animation should be invoked.
+     */
+    public boolean applyChangeInsets(InsetsState state) {
+        if (mCancelled) {
+            return false;
+        }
         final Insets offset = Insets.subtract(mShownInsets, mPendingInsets);
         ArrayList<SurfaceParams> params = new ArrayList<>();
         if (offset.left != 0) {
-            updateLeashesForSide(INSET_SIDE_LEFT, offset.left, params, state);
+            updateLeashesForSide(INSET_SIDE_LEFT, offset.left, mPendingInsets.left, params, state);
         }
         if (offset.top != 0) {
-            updateLeashesForSide(INSET_SIDE_TOP, offset.top, params, state);
+            updateLeashesForSide(INSET_SIDE_TOP, offset.top, mPendingInsets.top, params, state);
         }
         if (offset.right != 0) {
-            updateLeashesForSide(INSET_SIDE_RIGHT, offset.right, params, state);
+            updateLeashesForSide(INSET_SIDE_RIGHT, offset.right, mPendingInsets.right, params,
+                    state);
         }
         if (offset.bottom != 0) {
-            updateLeashesForSide(INSET_SIDE_BOTTOM, offset.bottom, params, state);
+            updateLeashesForSide(INSET_SIDE_BOTTOM, offset.bottom, mPendingInsets.bottom, params,
+                    state);
         }
         SyncRtSurfaceTransactionApplier applier = mTransactionApplierSupplier.get();
         applier.scheduleApply(params.toArray(new SurfaceParams[params.size()]));
         mCurrentInsets = mPendingInsets;
+        if (mFinished) {
+            mController.notifyFinished(this, mFinishedShownTypes);
+        }
+        return mFinished;
     }
 
     @Override
     public void finish(int shownTypes) {
-        // TODO
+        if (mCancelled) {
+            return;
+        }
+        InsetsState state = new InsetsState(mController.getState());
+        for (int i = mConsumers.size() - 1; i >= 0; i--) {
+            InsetsSourceConsumer consumer = mConsumers.valueAt(i);
+            boolean visible = (shownTypes & toPublicType(consumer.getType())) != 0;
+            state.getSource(consumer.getType()).setVisible(visible);
+        }
+        Insets insets = getInsetsFromState(state, mFrame, null /* typeSideMap */);
+        changeInsets(insets);
+        mFinished = true;
+        mFinishedShownTypes = shownTypes;
+    }
 
-        mController.dispatchAnimationFinished(mAnimation);
+    @VisibleForTesting
+    public void onCancelled() {
+        if (mFinished) {
+            return;
+        }
+        mCancelled = true;
+        mListener.onCancelled();
+    }
+
+    InsetsAnimation getAnimation() {
+        return mAnimation;
     }
 
     private Insets calculateInsets(InsetsState state, Rect frame,
@@ -163,7 +214,8 @@ public class InsetsAnimationControlImpl implements WindowInsetsAnimationControll
             @Nullable @InsetSide SparseIntArray typeSideMap) {
         return state.calculateInsets(frame, false /* isScreenRound */,
                 false /* alwaysConsumerNavBar */, null /* displayCutout */,
-                null /* legacyContentInsets */, null /* legacyStableInsets */, typeSideMap)
+                null /* legacyContentInsets */, null /* legacyStableInsets */,
+                LayoutParams.SOFT_INPUT_ADJUST_RESIZE /* legacySoftInputMode*/, typeSideMap)
                .getInsets(mTypes);
     }
 
@@ -171,21 +223,22 @@ public class InsetsAnimationControlImpl implements WindowInsetsAnimationControll
         return Insets.max(Insets.min(insets, mShownInsets), mHiddenInsets);
     }
 
-    private void updateLeashesForSide(@InsetSide int side, int inset,
+    private void updateLeashesForSide(@InsetSide int side, int offset, int inset,
             ArrayList<SurfaceParams> surfaceParams, InsetsState state) {
         ArraySet<InsetsSourceConsumer> items = mSideSourceMap.get(side);
         // TODO: Implement behavior when inset spans over multiple types
         for (int i = items.size() - 1; i >= 0; i--) {
             final InsetsSourceConsumer consumer = items.valueAt(i);
             final InsetsSource source = mInitialInsetsState.getSource(consumer.getType());
+            final InsetsSourceControl control = consumer.getControl();
             final SurfaceControl leash = consumer.getControl().getLeash();
-            mTmpMatrix.setTranslate(source.getFrame().left, source.getFrame().top);
 
+            mTmpMatrix.setTranslate(control.getSurfacePosition().x, control.getSurfacePosition().y);
             mTmpFrame.set(source.getFrame());
-            addTranslationToMatrix(side, inset, mTmpMatrix, mTmpFrame);
+            addTranslationToMatrix(side, offset, mTmpMatrix, mTmpFrame);
 
             state.getSource(source.getType()).setFrame(mTmpFrame);
-            surfaceParams.add(new SurfaceParams(leash, 1f, mTmpMatrix, null, 0, 0f));
+            surfaceParams.add(new SurfaceParams(leash, 1f, mTmpMatrix, null, 0, 0f, inset != 0));
         }
     }
 
@@ -220,4 +273,3 @@ public class InsetsAnimationControlImpl implements WindowInsetsAnimationControll
         }
     }
 }
-

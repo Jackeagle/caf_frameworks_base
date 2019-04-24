@@ -104,7 +104,7 @@ public class ZenModeHelper {
     protected final RingerModeDelegate mRingerModeDelegate = new
             RingerModeDelegate();
     @VisibleForTesting protected final ZenModeConditions mConditions;
-    private final SparseArray<ZenModeConfig> mConfigs = new SparseArray<>();
+    @VisibleForTesting final SparseArray<ZenModeConfig> mConfigs = new SparseArray<>();
     private final Metrics mMetrics = new Metrics();
     private final ConditionProviders.Config mServiceConfig;
 
@@ -389,8 +389,8 @@ public class ZenModeHelper {
             if (mConfig == null) return;
 
             newConfig = mConfig.copy();
+            setAutomaticZenRuleStateLocked(newConfig, newConfig.automaticRules.get(id), condition);
         }
-        setAutomaticZenRuleState(newConfig, newConfig.automaticRules.get(id), condition);
     }
 
     public void setAutomaticZenRuleState(Uri ruleDefinition, Condition condition) {
@@ -398,14 +398,15 @@ public class ZenModeHelper {
         synchronized (mConfig) {
             if (mConfig == null) return;
             newConfig = mConfig.copy();
-        }
 
-        setAutomaticZenRuleState(newConfig,
-                findMatchingRule(newConfig, ruleDefinition, condition),
-                condition);
+            setAutomaticZenRuleStateLocked(newConfig,
+                    findMatchingRule(newConfig, ruleDefinition, condition),
+                    condition);
+        }
     }
 
-    private void setAutomaticZenRuleState(ZenModeConfig config, ZenRule rule, Condition condition) {
+    private void setAutomaticZenRuleStateLocked(ZenModeConfig config, ZenRule rule,
+            Condition condition) {
         if (rule == null) return;
 
         rule.condition = condition;
@@ -662,17 +663,14 @@ public class ZenModeHelper {
         }
     }
 
-    public void readXml(XmlPullParser parser, boolean forRestore)
+    public void readXml(XmlPullParser parser, boolean forRestore, int userId)
             throws XmlPullParserException, IOException {
         ZenModeConfig config = ZenModeConfig.readXml(parser);
         String reason = "readXml";
 
         if (config != null) {
             if (forRestore) {
-                //TODO: http://b/22388012
-                if (config.user != UserHandle.USER_SYSTEM) {
-                    return;
-                }
+                config.user = userId;
                 config.manualRule = null;  // don't restore the manual rule
             }
 
@@ -707,13 +705,15 @@ public class ZenModeHelper {
                 reason += ", reset to default rules";
             }
 
+            // Resolve user id for settings.
+            userId = userId == UserHandle.USER_ALL ? UserHandle.USER_SYSTEM : userId;
             if (config.version < ZenModeConfig.XML_VERSION) {
-                Settings.Secure.putInt(mContext.getContentResolver(),
-                        Settings.Secure.SHOW_ZEN_UPGRADE_NOTIFICATION, 1);
+                Settings.Secure.putIntForUser(mContext.getContentResolver(),
+                        Settings.Secure.SHOW_ZEN_UPGRADE_NOTIFICATION, 1, userId);
             } else {
                 // devices not restoring/upgrading already have updated zen settings
-                Settings.Secure.putInt(mContext.getContentResolver(),
-                        Settings.Secure.ZEN_SETTINGS_UPDATED, 1);
+                Settings.Secure.putIntForUser(mContext.getContentResolver(),
+                        Settings.Secure.ZEN_SETTINGS_UPDATED, 1, userId);
             }
             if (DEBUG) Log.d(TAG, reason);
             synchronized (mConfig) {
@@ -722,11 +722,11 @@ public class ZenModeHelper {
         }
     }
 
-    public void writeXml(XmlSerializer out, boolean forBackup, Integer version) throws IOException {
+    public void writeXml(XmlSerializer out, boolean forBackup, Integer version, int userId)
+            throws IOException {
         final int N = mConfigs.size();
         for (int i = 0; i < N; i++) {
-            //TODO: http://b/22388012
-            if (forBackup && mConfigs.keyAt(i) != UserHandle.USER_SYSTEM) {
+            if (forBackup && mConfigs.keyAt(i) != userId) {
                 continue;
             }
             mConfigs.valueAt(i).writeXml(out, version);

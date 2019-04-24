@@ -16,9 +16,16 @@
 
 package com.android.providers.settings;
 
+import static android.os.Process.INVALID_UID;
 import static android.os.Process.ROOT_UID;
 import static android.os.Process.SHELL_UID;
 import static android.os.Process.SYSTEM_UID;
+import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_2BUTTON;
+import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_2BUTTON_OVERLAY;
+import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_3BUTTON;
+import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_3BUTTON_OVERLAY;
+import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_GESTURAL;
+import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_GESTURAL_OVERLAY;
 
 import android.Manifest;
 import android.annotation.NonNull;
@@ -33,6 +40,8 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.om.IOverlayManager;
+import android.content.om.OverlayInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.IPackageManager;
 import android.content.pm.PackageInfo;
@@ -969,6 +978,11 @@ public class SettingsProvider extends ContentProvider {
                 try {
                     synchronized (mLock) {
                         Setting setting = getSecureSetting(
+                                Settings.Secure.LOCATION_MODE, userId);
+                        updateSecureSetting(Settings.Secure.LOCATION_MODE,
+                                setting != null ? setting.getValue() : null, null,
+                                true, userId, true);
+                        setting = getSecureSetting(
                                 Settings.Secure.LOCATION_PROVIDERS_ALLOWED, userId);
                         updateSecureSetting(Settings.Secure.LOCATION_PROVIDERS_ALLOWED,
                                 setting != null ? setting.getValue() : null, null,
@@ -1061,8 +1075,7 @@ public class SettingsProvider extends ContentProvider {
             Slog.v(LOG_TAG, "getConfigSetting(" + name + ")");
         }
 
-        // TODO(b/117663715): Ensure the caller can access the setting.
-        // enforceReadPermission(READ_DEVICE_CONFIG);
+        DeviceConfig.enforceReadPermission(getContext(), /*namespace=*/name.split("/")[0]);
 
         // Get the value.
         synchronized (mLock) {
@@ -1098,9 +1111,7 @@ public class SettingsProvider extends ContentProvider {
 
     private boolean mutateConfigSetting(String name, String value, String prefix,
             boolean makeDefault, int operation, int mode) {
-
-        // TODO(b/117663715): Ensure the caller can access the setting.
-        // enforceReadPermission(WRITE_DEVICE_CONFIG);
+        enforceWritePermission(Manifest.permission.WRITE_DEVICE_CONFIG);
 
         // Perform the mutation.
         synchronized (mLock) {
@@ -1379,8 +1390,8 @@ public class SettingsProvider extends ContentProvider {
             }
         }
         if (enableOverride) {
-            if (Secure.LOCATION_PROVIDERS_ALLOWED.equals(name)) {
-                final Setting overridden = getLocationProvidersAllowedSetting(owningUserId);
+            if (Secure.LOCATION_MODE.equals(name)) {
+                final Setting overridden = getLocationModeSetting(owningUserId);
                 if (overridden != null) {
                     return overridden;
                 }
@@ -1475,7 +1486,7 @@ public class SettingsProvider extends ContentProvider {
         return null;
     }
 
-    private Setting getLocationProvidersAllowedSetting(int owningUserId) {
+    private Setting getLocationModeSetting(int owningUserId) {
         synchronized (mLock) {
             final Setting setting = getGlobalSetting(
                     Global.LOCATION_GLOBAL_KILL_SWITCH);
@@ -1486,7 +1497,7 @@ public class SettingsProvider extends ContentProvider {
             final SettingsState settingsState = mSettingsRegistry.getSettingsLocked(
                     SETTINGS_TYPE_SECURE, owningUserId);
             return settingsState.new Setting(
-                    Secure.LOCATION_PROVIDERS_ALLOWED,
+                    Secure.LOCATION_MODE,
                     "", // value
                     "", // tag
                     "", // default value
@@ -1497,7 +1508,7 @@ public class SettingsProvider extends ContentProvider {
                 @Override
                 public boolean update(String value, boolean setDefault, String packageName,
                         String tag, boolean forceNonSystemPackage) {
-                    Slog.wtf(LOG_TAG, "update shoudln't be called on this instance.");
+                    Slog.wtf(LOG_TAG, "update shouldn't be called on this instance.");
                     return false;
                 }
             };
@@ -2767,7 +2778,7 @@ public class SettingsProvider extends ContentProvider {
                         boolean someSettingChanged = false;
                         Setting setting = settingsState.getSettingLocked(name);
                         if (!SettingsState.isSystemPackage(getContext(),
-                                setting.getPackageName())) {
+                                setting.getPackageName(), INVALID_UID, userId)) {
                             if (prefix != null && !setting.getName().startsWith(prefix)) {
                                 continue;
                             }
@@ -2787,7 +2798,7 @@ public class SettingsProvider extends ContentProvider {
                         boolean someSettingChanged = false;
                         Setting setting = settingsState.getSettingLocked(name);
                         if (!SettingsState.isSystemPackage(getContext(),
-                                setting.getPackageName())) {
+                                setting.getPackageName(), INVALID_UID, userId)) {
                             if (prefix != null && !setting.getName().startsWith(prefix)) {
                                 continue;
                             }
@@ -3115,7 +3126,7 @@ public class SettingsProvider extends ContentProvider {
                 final int key = makeKey(SETTINGS_TYPE_SECURE, userId);
                 mGenerationRegistry.incrementGeneration(key);
 
-                final Uri uri = getNotificationUriFor(key, Secure.LOCATION_PROVIDERS_ALLOWED);
+                final Uri uri = getNotificationUriFor(key, Secure.LOCATION_MODE);
                 mHandler.obtainMessage(MyHandler.MSG_NOTIFY_URI_CHANGED,
                         userId, 0, uri).sendToTarget();
             }
@@ -3232,7 +3243,7 @@ public class SettingsProvider extends ContentProvider {
         }
 
         private final class UpgradeController {
-            private static final int SETTINGS_VERSION = 173;
+            private static final int SETTINGS_VERSION = 177;
 
             private final int mUserId;
 
@@ -3599,7 +3610,7 @@ public class SettingsProvider extends ContentProvider {
 
                     final boolean isUpgrade;
                     try {
-                        isUpgrade = mPackageManager.isUpgrade();
+                        isUpgrade = mPackageManager.isDeviceUpgrading();
                     } catch (RemoteException e) {
                         throw new IllegalStateException("Package manager not available");
                     }
@@ -4229,28 +4240,135 @@ public class SettingsProvider extends ContentProvider {
                         final Setting locationProvidersAllowed = secureSettings.getSettingLocked(
                                 Secure.LOCATION_PROVIDERS_ALLOWED);
 
-                        String defLocationMode = Integer.toString(
-                                !TextUtils.isEmpty(locationProvidersAllowed.getValue())
-                                        ? Secure.LOCATION_MODE_ON
-                                        : Secure.LOCATION_MODE_OFF);
+                        final int defLocationMode;
+                        if (locationProvidersAllowed.isNull()) {
+                            defLocationMode = getContext().getResources().getInteger(
+                                    R.integer.def_location_mode);
+                        } else {
+                            defLocationMode =
+                                    !TextUtils.isEmpty(locationProvidersAllowed.getValue())
+                                            ? Secure.LOCATION_MODE_ON
+                                            : Secure.LOCATION_MODE_OFF;
+                        }
                         secureSettings.insertSettingLocked(
-                                Secure.LOCATION_MODE, defLocationMode,
-                                null, true, SettingsState.SYSTEM_PACKAGE_NAME);
-
-                        // also reset LOCATION_PROVIDERS_ALLOWED back to the default value - this
-                        // setting is now only for debug/test purposes, and will likely be removed
-                        // in a later release. LocationManagerService is responsible for adjusting
-                        // these settings to the proper state.
-
-                        String defLocationProvidersAllowed = getContext().getResources().getString(
-                                R.string.def_location_providers_allowed);
-                        secureSettings.insertSettingLocked(
-                                Secure.LOCATION_PROVIDERS_ALLOWED, defLocationProvidersAllowed,
+                                Secure.LOCATION_MODE, Integer.toString(defLocationMode),
                                 null, true, SettingsState.SYSTEM_PACKAGE_NAME);
                     }
 
                     currentVersion = 173;
                 }
+
+                if (currentVersion == 173) {
+                    // Version 173: Set the default value for Secure Settings: NOTIFICATION_BUBBLES
+
+                    final SettingsState secureSettings = getSecureSettingsLocked(userId);
+
+                    final Setting bubblesSetting = secureSettings.getSettingLocked(
+                            Secure.NOTIFICATION_BUBBLES);
+
+                    if (bubblesSetting.isNull()) {
+                        secureSettings.insertSettingLocked(Secure.NOTIFICATION_BUBBLES,
+                                getContext().getResources().getBoolean(
+                                        R.bool.def_notification_bubbles) ? "1" : "0", null,
+                                true, SettingsState.SYSTEM_PACKAGE_NAME);
+                    }
+
+                    currentVersion = 174;
+                }
+
+                if (currentVersion == 174) {
+                    // Version 174: Set the default value for Global Settings: APPLY_RAMPING_RINGER
+
+                    final SettingsState globalSettings = getGlobalSettingsLocked();
+
+                    Setting currentRampingRingerSetting = globalSettings.getSettingLocked(
+                            Settings.Global.APPLY_RAMPING_RINGER);
+                    if (currentRampingRingerSetting.isNull()) {
+                        globalSettings.insertSettingLocked(
+                                Settings.Global.APPLY_RAMPING_RINGER,
+                                getContext().getResources().getBoolean(
+                                        R.bool.def_apply_ramping_ringer) ? "1" : "0", null,
+                                true, SettingsState.SYSTEM_PACKAGE_NAME);
+                    }
+
+                    currentVersion = 175;
+                }
+
+                if (currentVersion == 175) {
+                    // Version 175: Set the default value for System Settings:
+                    // RING_VIBRATION_INTENSITY. If the notification vibration intensity has been
+                    // set and ring vibration intensity hasn't, the ring vibration intensity should
+                    // followed notification vibration intensity.
+
+                    final SettingsState systemSettings = getSystemSettingsLocked(userId);
+
+                    Setting notificationVibrationIntensity = systemSettings.getSettingLocked(
+                            Settings.System.NOTIFICATION_VIBRATION_INTENSITY);
+
+                    Setting ringVibrationIntensity = systemSettings.getSettingLocked(
+                            Settings.System.RING_VIBRATION_INTENSITY);
+
+                    if (!notificationVibrationIntensity.isNull()
+                            && ringVibrationIntensity.isNull()) {
+                        systemSettings.insertSettingLocked(
+                                Settings.System.RING_VIBRATION_INTENSITY,
+                                notificationVibrationIntensity.getValue(),
+                                null , true, SettingsState.SYSTEM_PACKAGE_NAME);
+                    }
+
+                    currentVersion = 176;
+                }
+
+                if (currentVersion == 176) {
+                    // Version 176: Migrate the existing swipe up setting into the resource overlay
+                    //              for the navigation bar interaction mode.
+
+                    final IOverlayManager overlayManager = IOverlayManager.Stub.asInterface(
+                            ServiceManager.getService(Context.OVERLAY_SERVICE));
+                    int navBarMode = -1;
+
+                    // Migrate the swipe up setting only if it is set
+                    final SettingsState secureSettings = getSecureSettingsLocked(userId);
+                    final Setting swipeUpSetting = secureSettings.getSettingLocked(
+                            "swipe_up_to_switch_apps_enabled");
+                    if (swipeUpSetting != null && !swipeUpSetting.isNull()) {
+                        navBarMode = swipeUpSetting.getValue().equals("1")
+                                ? NAV_BAR_MODE_2BUTTON
+                                : NAV_BAR_MODE_3BUTTON;
+                    }
+
+                    // Temporary: Only for migration for dogfooders, to be removed
+                    try {
+                        final OverlayInfo info = overlayManager.getOverlayInfo(
+                                "com.android.internal.experiment.navbar.type.inset",
+                                UserHandle.USER_CURRENT);
+                        if (info != null && info.isEnabled()) {
+                            navBarMode = NAV_BAR_MODE_GESTURAL;
+                        }
+                    } catch (RemoteException e) {
+                        // Ingore, fall through
+                    }
+
+                    if (navBarMode != -1) {
+                        try {
+                            overlayManager.setEnabled(NAV_BAR_MODE_3BUTTON_OVERLAY,
+                                    navBarMode == NAV_BAR_MODE_3BUTTON,
+                                    UserHandle.USER_CURRENT);
+                            overlayManager.setEnabled(NAV_BAR_MODE_2BUTTON_OVERLAY,
+                                    navBarMode == NAV_BAR_MODE_2BUTTON,
+                                    UserHandle.USER_CURRENT);
+                            overlayManager.setEnabled(NAV_BAR_MODE_GESTURAL_OVERLAY,
+                                    navBarMode == NAV_BAR_MODE_GESTURAL,
+                                    UserHandle.USER_CURRENT);
+                        } catch (RemoteException e) {
+                            throw new IllegalStateException(
+                                    "Failed to set nav bar interaction mode overlay");
+                        }
+                    }
+
+                    currentVersion = 177;
+                }
+
 
                 // vXXX: Add new settings above this point.
 
@@ -4293,7 +4411,7 @@ public class SettingsProvider extends ContentProvider {
                 }
                 try {
                     final boolean systemSet = SettingsState.isSystemPackage(getContext(),
-                            setting.getPackageName(), callingUid);
+                            setting.getPackageName(), callingUid, userId);
                     if (systemSet) {
                         settings.insertSettingLocked(name, setting.getValue(),
                                 setting.getTag(), true, setting.getPackageName());

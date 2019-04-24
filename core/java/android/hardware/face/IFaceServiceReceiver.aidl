@@ -28,4 +28,7 @@ oneway interface IFaceServiceReceiver {
     void onAuthenticationFailed(long deviceId);
     void onError(long deviceId, int error, int vendorCode);
     void onRemoved(long deviceId, int faceId, int remaining);
+    void onEnumerated(long deviceId, int faceId, int remaining);
+    void onFeatureSet(boolean success, int feature);
+    void onFeatureGet(boolean success, int feature, boolean value);
 }

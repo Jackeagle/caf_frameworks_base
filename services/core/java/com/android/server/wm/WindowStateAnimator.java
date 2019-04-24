@@ -26,7 +26,6 @@ import static android.view.WindowManager.TRANSIT_NONE;
 
 import static com.android.server.policy.WindowManagerPolicy.FINISH_LAYOUT_REDO_ANIM;
 import static com.android.server.policy.WindowManagerPolicy.FINISH_LAYOUT_REDO_WALLPAPER;
-import static com.android.server.wm.DragResizeMode.DRAG_RESIZE_MODE_FREEFORM;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_ANIM;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_LAYOUT_REPEATS;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_ORIENTATION;
@@ -75,6 +74,7 @@ import java.io.PrintWriter;
 class WindowStateAnimator {
     static final String TAG = TAG_WITH_CLASS_NAME ? "WindowStateAnimator" : TAG_WM;
     static final int WINDOW_FREEZE_LAYER = TYPE_LAYER_MULTIPLIER * 200;
+    static final int PRESERVED_SURFACE_LAYER = 1;
 
     /**
      * Mode how the window gets clipped by the stack bounds during an animation: The clipping should
@@ -247,14 +247,6 @@ class WindowStateAnimator {
         mWallpaperControllerLocked = win.getDisplayContent().mWallpaperController;
     }
 
-    void cancelExitAnimationForNextAnimationLocked() {
-        if (DEBUG_ANIM) Slog.d(TAG,
-                "cancelExitAnimationForNextAnimationLocked: " + mWin);
-
-        mWin.cancelAnimation();
-        mWin.destroySurfaceUnchecked();
-    }
-
     void onAnimationFinished() {
         // Done animating, clean up.
         if (DEBUG_ANIM) Slog.v(
@@ -373,8 +365,8 @@ class WindowStateAnimator {
         if (mSurfaceController != null) {
             // Our SurfaceControl is always at layer 0 within the parent Surface managed by
             // window-state. We want this old Surface to stay on top of the new one
-            // until we do the swap, so we place it at layer 1.
-            mSurfaceController.mSurfaceControl.setLayer(1);
+            // until we do the swap, so we place it at a positive layer.
+            mSurfaceController.mSurfaceControl.setLayer(PRESERVED_SURFACE_LAYER);
         }
         mDestroyPreservedSurfaceUponRedraw = true;
         mSurfaceDestroyDeferred = true;
@@ -494,6 +486,8 @@ class WindowStateAnimator {
             mSurfaceController = new WindowSurfaceController(mSession.mSurfaceSession,
                     attrs.getTitle().toString(), width, height, format, flags, this,
                     windowType, ownerUid);
+            mSurfaceController.setColorSpaceAgnostic((attrs.privateFlags
+                    & WindowManager.LayoutParams.PRIVATE_FLAG_COLOR_SPACE_AGNOSTIC) != 0);
 
             setOffsetPositionForStackResize(false);
             mSurfaceFormat = format;
@@ -797,16 +791,10 @@ class WindowStateAnimator {
         if (DEBUG_WINDOW_CROP) Slog.d(TAG, "Applying decor to crop win=" + w + " mDecorFrame="
                 + w.getDecorFrame() + " mSystemDecorRect=" + mSystemDecorRect);
 
-        final Task task = w.getTask();
-        final boolean fullscreen = w.fillsDisplay() || (task != null && task.isFullscreen());
-        final boolean isFreeformResizing =
-                w.isDragResizing() && w.getResizeMode() == DRAG_RESIZE_MODE_FREEFORM;
-
         // We use the clip rect as provided by the tranformation for non-fullscreen windows to
         // avoid premature clipping with the system decor rect.
         clipRect.set(mSystemDecorRect);
-        if (DEBUG_WINDOW_CROP) Slog.d(TAG, "win=" + w + " Initial clip rect: " + clipRect
-                + " fullscreen=" + fullscreen);
+        if (DEBUG_WINDOW_CROP) Slog.d(TAG, "win=" + w + " Initial clip rect: " + clipRect);
 
         w.expandForSurfaceInsets(clipRect);
 
@@ -1263,6 +1251,13 @@ class WindowStateAnimator {
             return;
         }
         mSurfaceController.setSecure(isSecure);
+    }
+
+    void setColorSpaceAgnosticLocked(boolean agnostic) {
+        if (mSurfaceController == null) {
+            return;
+        }
+        mSurfaceController.setColorSpaceAgnostic(agnostic);
     }
 
     /**

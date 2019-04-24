@@ -27,6 +27,7 @@ import android.util.Slog;
 import android.util.TimeUtils;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.util.IndentingPrintWriter;
 
 import libcore.io.IoUtils;
 
@@ -43,8 +44,8 @@ import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.FilenameFilter;
-import java.io.InputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
@@ -84,6 +85,9 @@ public class UsageStatsDatabase {
     @VisibleForTesting
     public static final int BACKUP_VERSION = 4;
 
+    @VisibleForTesting
+    static final int[] MAX_FILES_PER_INTERVAL_TYPE = new int[]{100, 50, 12, 10};
+
     // Key under which the payload blob is stored
     // same as UsageStatsBackupHelper.KEY_USAGE_STATS
     static final String KEY_USAGE_STATS = "usage_stats";
@@ -104,7 +108,8 @@ public class UsageStatsDatabase {
 
     private final Object mLock = new Object();
     private final File[] mIntervalDirs;
-    private final TimeSparseArray<AtomicFile>[] mSortedStatFiles;
+    @VisibleForTesting
+    final TimeSparseArray<AtomicFile>[] mSortedStatFiles;
     private final UnixCalendar mCal;
     private final File mVersionFile;
     private final File mBackupsDir;
@@ -126,10 +131,10 @@ public class UsageStatsDatabase {
     @VisibleForTesting
     public UsageStatsDatabase(File dir, int version) {
         mIntervalDirs = new File[]{
-                new File(dir, "daily"),
-                new File(dir, "weekly"),
-                new File(dir, "monthly"),
-                new File(dir, "yearly"),
+            new File(dir, "daily"),
+            new File(dir, "weekly"),
+            new File(dir, "monthly"),
+            new File(dir, "yearly"),
         };
         mCurrentVersion = version;
         mVersionFile = new File(dir, "version");
@@ -248,6 +253,14 @@ public class UsageStatsDatabase {
         return true;
     }
 
+    /** @hide */
+    @VisibleForTesting
+    void forceIndexFiles() {
+        synchronized (mLock) {
+            indexFilesLocked();
+        }
+    }
+
     private void indexFilesLocked() {
         final FilenameFilter backupFileFilter = new FilenameFilter() {
             @Override
@@ -255,7 +268,6 @@ public class UsageStatsDatabase {
                 return !name.endsWith(BAK_SUFFIX);
             }
         };
-
         // Index the available usage stat files on disk.
         for (int i = 0; i < mSortedStatFiles.length; i++) {
             if (mSortedStatFiles[i] == null) {
@@ -268,14 +280,25 @@ public class UsageStatsDatabase {
                 if (DEBUG) {
                     Slog.d(TAG, "Found " + files.length + " stat files for interval " + i);
                 }
-
-                for (File f : files) {
+                final int len = files.length;
+                for (int j = 0; j < len; j++) {
+                    final File f = files[j];
                     final AtomicFile af = new AtomicFile(f);
                     try {
                         mSortedStatFiles[i].put(parseBeginTime(af), af);
                     } catch (IOException e) {
                         Slog.e(TAG, "failed to index file: " + f, e);
                     }
+                }
+
+                // only keep the max allowed number of files for each interval type.
+                final int toDelete = mSortedStatFiles[i].size() - MAX_FILES_PER_INTERVAL_TYPE[i];
+                if (toDelete > 0) {
+                    for (int j = 0; j < toDelete; j++) {
+                        mSortedStatFiles[i].valueAt(0).delete();
+                        mSortedStatFiles[i].removeAt(0);
+                    }
+                    Slog.d(TAG, "Deleted " + toDelete + " stat files for interval " + i);
                 }
             }
         }
@@ -908,39 +931,37 @@ public class UsageStatsDatabase {
             }
         }
 
-        if (statsOut.events != null) {
-            final int eventSize = statsOut.events.size();
-            for (int i = 0; i < eventSize; i++) {
-                final UsageEvents.Event event = statsOut.events.get(i);
-                if (event.mPackage.isEmpty()) {
-                    if (failures++ < failureLogLimit) {
-                        sb.append("\nUnexpected empty empty package name loaded");
-                    }
+        final int eventSize = statsOut.events.size();
+        for (int i = 0; i < eventSize; i++) {
+            final UsageEvents.Event event = statsOut.events.get(i);
+            if (event.mPackage.isEmpty()) {
+                if (failures++ < failureLogLimit) {
+                    sb.append("\nUnexpected empty empty package name loaded");
                 }
-                if (event.mTimeStamp < statsOut.beginTime || event.mTimeStamp > statsOut.endTime) {
-                    if (failures++ < failureLogLimit) {
-                        sb.append("\nUnexpected event timestamp ");
-                        sb.append(event.mTimeStamp);
-                        sb.append(" loaded (beginTime : ");
-                        sb.append(statsOut.beginTime);
-                        sb.append(", endTime : ");
-                        sb.append(statsOut.endTime);
-                        sb.append(")");
-                    }
+            }
+            if (event.mTimeStamp < statsOut.beginTime || event.mTimeStamp > statsOut.endTime) {
+                if (failures++ < failureLogLimit) {
+                    sb.append("\nUnexpected event timestamp ");
+                    sb.append(event.mTimeStamp);
+                    sb.append(" loaded (beginTime : ");
+                    sb.append(statsOut.beginTime);
+                    sb.append(", endTime : ");
+                    sb.append(statsOut.endTime);
+                    sb.append(")");
                 }
-                if (event.mEventType < 0 || event.mEventType > UsageEvents.Event.MAX_EVENT_TYPE) {
-                    if (failures++ < failureLogLimit) {
-                        sb.append("\nUnexpected event type ");
-                        sb.append(event.mEventType);
-                        sb.append(" loaded");
-                    }
+            }
+            if (event.mEventType < 0 || event.mEventType > UsageEvents.Event.MAX_EVENT_TYPE) {
+                if (failures++ < failureLogLimit) {
+                    sb.append("\nUnexpected event type ");
+                    sb.append(event.mEventType);
+                    sb.append(" loaded");
                 }
-                if ((event.mFlags & ~UsageEvents.Event.VALID_FLAG_BITS) != 0) {
-                    if (failures++ < failureLogLimit) {
-                        sb.append("\nUnexpected event flag bit 0b");
-                        sb.append(Integer.toBinaryString(event.mFlags));
-                        sb.append(" loaded");
-                    }
+            }
+            if ((event.mFlags & ~UsageEvents.Event.VALID_FLAG_BITS) != 0) {
+                if (failures++ < failureLogLimit) {
+                    sb.append("\nUnexpected event flag bit 0b");
+                    sb.append(Integer.toBinaryString(event.mFlags));
+                    sb.append(" loaded");
                 }
             }
         }
@@ -1145,7 +1166,8 @@ public class UsageStatsDatabase {
         if (beingRestored == null) return null;
         beingRestored.activeConfiguration = onDevice.activeConfiguration;
         beingRestored.configurations.putAll(onDevice.configurations);
-        beingRestored.events = onDevice.events;
+        beingRestored.events.clear();
+        beingRestored.events.merge(onDevice.events);
         return beingRestored;
     }
 
@@ -1176,7 +1198,7 @@ public class UsageStatsDatabase {
         if (stats == null) return;
         stats.activeConfiguration = null;
         stats.configurations.clear();
-        if (stats.events != null) stats.events.clear();
+        stats.events.clear();
     }
 
     private byte[] serializeIntervalStats(IntervalStats stats, int version) {
@@ -1225,5 +1247,37 @@ public class UsageStatsDatabase {
             }
         }
         directory.delete();
+    }
+
+    /**
+     * print total number and list of stats files for each interval type.
+     * @param pw
+     */
+    public void dump(IndentingPrintWriter pw, boolean compact) {
+        synchronized (mLock) {
+            pw.println("UsageStatsDatabase:");
+            pw.increaseIndent();
+            for (int i = 0; i < mSortedStatFiles.length; i++) {
+                final TimeSparseArray<AtomicFile> files = mSortedStatFiles[i];
+                final int size = files.size();
+                pw.print(UserUsageStatsService.intervalToString(i));
+                pw.print(" stats files: ");
+                pw.print(size);
+                pw.println(", sorted list of files:");
+                pw.increaseIndent();
+                for (int f = 0; f < size; f++) {
+                    final long fileName = files.keyAt(f);
+                    if (compact) {
+                        pw.print(UserUsageStatsService.formatDateTime(fileName, false));
+                    } else {
+                        pw.printPair(Long.toString(fileName),
+                                UserUsageStatsService.formatDateTime(fileName, true));
+                    }
+                    pw.println();
+                }
+                pw.decreaseIndent();
+            }
+            pw.decreaseIndent();
+        }
     }
 }

@@ -1029,10 +1029,18 @@ public class ActivityInfo extends ComponentInfo implements Parcelable {
     }
 
     /**
+     * Returns true if the activity has maximum or minimum aspect ratio.
+     * @hide
+     */
+    public boolean hasFixedAspectRatio() {
+        return maxAspectRatio != 0 || minAspectRatio != 0;
+    }
+
+    /**
      * Returns true if the activity's orientation is fixed.
      * @hide
      */
-    boolean isFixedOrientation() {
+    public boolean isFixedOrientation() {
         return isFixedOrientationLandscape() || isFixedOrientationPortrait()
                 || screenOrientation == SCREEN_ORIENTATION_LOCKED;
     }
@@ -1306,7 +1314,7 @@ public class ActivityInfo extends ComponentInfo implements Parcelable {
         }
     }
 
-    public static final Parcelable.Creator<ActivityInfo> CREATOR
+    public static final @android.annotation.NonNull Parcelable.Creator<ActivityInfo> CREATOR
             = new Parcelable.Creator<ActivityInfo>() {
         public ActivityInfo createFromParcel(Parcel source) {
             return new ActivityInfo(source);

@@ -15,15 +15,18 @@
  */
 package com.android.server.contentcapture;
 
+import static android.view.contentcapture.ContentCaptureHelper.sDebug;
+import static android.view.contentcapture.ContentCaptureHelper.sVerbose;
+
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.content.ComponentName;
 import android.content.Context;
 import android.os.IBinder;
+import android.service.contentcapture.ActivityEvent;
 import android.service.contentcapture.IContentCaptureService;
 import android.service.contentcapture.IContentCaptureServiceCallback;
 import android.service.contentcapture.SnapshotData;
-import android.text.format.DateUtils;
 import android.util.Slog;
 import android.view.contentcapture.ContentCaptureContext;
 import android.view.contentcapture.UserDataRemovalRequest;
@@ -35,20 +38,24 @@ final class RemoteContentCaptureService
         extends AbstractMultiplePendingRequestsRemoteService<RemoteContentCaptureService,
         IContentCaptureService> {
 
-    private static final long TIMEOUT_REMOTE_REQUEST_MILLIS = 2 * DateUtils.SECOND_IN_MILLIS;
-
     private final IBinder mServerCallback;
+    private final int mIdleUnbindTimeoutMs;
+    private final ContentCapturePerUserService mPerUserService;
 
     RemoteContentCaptureService(Context context, String serviceInterface,
             ComponentName serviceComponentName, IContentCaptureServiceCallback callback, int userId,
-            ContentCaptureServiceCallbacks callbacks, boolean bindInstantServiceAllowed,
-            boolean verbose) {
-        super(context, serviceInterface, serviceComponentName, userId, callbacks,
-                bindInstantServiceAllowed, verbose, /* initialCapacity= */ 2);
+            ContentCapturePerUserService perUserService, boolean bindInstantServiceAllowed,
+            boolean verbose, int idleUnbindTimeoutMs) {
+        super(context, serviceInterface, serviceComponentName, userId, perUserService,
+                context.getMainThreadHandler(),
+                bindInstantServiceAllowed ? Context.BIND_ALLOW_INSTANT : 0, verbose,
+                /* initialCapacity= */ 2);
+        mPerUserService = perUserService;
         mServerCallback = callback.asBinder();
+        mIdleUnbindTimeoutMs = idleUnbindTimeoutMs;
 
         // Bind right away, which will trigger a onConnected() on service's
-        scheduleBind();
+        ensureBoundLocked();
     }
 
     @Override // from AbstractRemoteService
@@ -58,54 +65,57 @@ final class RemoteContentCaptureService
 
     @Override // from AbstractRemoteService
     protected long getTimeoutIdleBindMillis() {
-        // TODO(b/111276913): read from Settings so it can be changed in the field
-        return PERMANENT_BOUND_TIMEOUT_MS;
+        return mIdleUnbindTimeoutMs;
     }
 
     @Override // from AbstractRemoteService
-    protected long getRemoteRequestMillis() {
-        // TODO(b/111276913): read from Settings so it can be changed in the field
-        return TIMEOUT_REMOTE_REQUEST_MILLIS;
-    }
-
-    @Override // from RemoteService
-    protected void handleOnConnectedStateChanged(boolean state) {
-        if (state && getTimeoutIdleBindMillis() != PERMANENT_BOUND_TIMEOUT_MS) {
+    protected void handleOnConnectedStateChanged(boolean connected) {
+        if (connected && getTimeoutIdleBindMillis() != PERMANENT_BOUND_TIMEOUT_MS) {
             scheduleUnbind();
         }
         try {
-            if (state) {
-                mService.onConnected(mServerCallback);
+            if (connected) {
+                try {
+                    mService.onConnected(mServerCallback, sVerbose, sDebug);
+                } finally {
+                    // Update the system-service state, in case the service reconnected after
+                    // dying
+                    mPerUserService.onConnected();
+                }
             } else {
                 mService.onDisconnected();
             }
         } catch (Exception e) {
-            Slog.w(mTag, "Exception calling onConnectedStateChanged(" + state + "): " + e);
+            Slog.w(mTag, "Exception calling onConnectedStateChanged(" + connected + "): " + e);
         }
+    }
+
+    public void ensureBoundLocked() {
+        scheduleBind();
     }
 
     /**
      * Called by {@link ContentCaptureServerSession} to generate a call to the
      * {@link RemoteContentCaptureService} to indicate the session was created.
      */
-    public void onSessionStarted(@Nullable ContentCaptureContext context,
-            @NonNull String sessionId, int uid, @NonNull IResultReceiver clientReceiver) {
-        scheduleAsyncRequest((s) -> s.onSessionStarted(context, sessionId, uid, clientReceiver));
+    public void onSessionStarted(@Nullable ContentCaptureContext context, int sessionId, int uid,
+            @NonNull IResultReceiver clientReceiver, int initialState) {
+        scheduleAsyncRequest(
+                (s) -> s.onSessionStarted(context, sessionId, uid, clientReceiver, initialState));
     }
 
     /**
      * Called by {@link ContentCaptureServerSession} to generate a call to the
      * {@link RemoteContentCaptureService} to indicate the session was finished.
      */
-    public void onSessionFinished(@NonNull String sessionId) {
+    public void onSessionFinished(int sessionId) {
         scheduleAsyncRequest((s) -> s.onSessionFinished(sessionId));
     }
 
     /**
      * Called by {@link ContentCaptureServerSession} to send snapshot data to the service.
      */
-    public void onActivitySnapshotRequest(@NonNull String sessionId,
-            @NonNull SnapshotData snapshotData) {
+    public void onActivitySnapshotRequest(int sessionId, @NonNull SnapshotData snapshotData) {
         scheduleAsyncRequest((s) -> s.onActivitySnapshot(sessionId, snapshotData));
     }
 
@@ -114,6 +124,13 @@ final class RemoteContentCaptureService
      */
     public void onUserDataRemovalRequest(@NonNull UserDataRemovalRequest request) {
         scheduleAsyncRequest((s) -> s.onUserDataRemovalRequest(request));
+    }
+
+    /**
+     * Called by {@link ContentCaptureServerSession} to notify a high-level activity event.
+     */
+    public void onActivityLifecycleEvent(@NonNull ActivityEvent event) {
+        scheduleAsyncRequest((s) -> s.onActivityEvent(event));
     }
 
     public interface ContentCaptureServiceCallbacks

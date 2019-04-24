@@ -300,9 +300,9 @@ class PackageManagerShellCommand extends ShellCommand {
                 pw.println("appPackageName = " + session.getAppPackageName()
                         + "; sessionId = " + session.getSessionId()
                         + "; isStaged = " + session.isStaged()
-                        + "; isSessionReady = " + session.isSessionReady()
-                        + "; isSessionApplied = " + session.isSessionApplied()
-                        + "; isSessionFailed = " + session.isSessionFailed() + ";");
+                        + "; isStagedSessionReady = " + session.isStagedSessionReady()
+                        + "; isStagedSessionApplied = " + session.isStagedSessionApplied()
+                        + "; isStagedSessionFailed = " + session.isStagedSessionFailed() + ";");
             }
         } catch (RemoteException e) {
             pw.println("Failure ["
@@ -1114,6 +1114,7 @@ class PackageManagerShellCommand extends ShellCommand {
         int userId = UserHandle.USER_SYSTEM;
         int installFlags = 0;
         String opt;
+        boolean waitTillComplete = false;
         while ((opt = getNextOption()) != null) {
             switch (opt) {
                 case "--user":
@@ -1128,6 +1129,9 @@ class PackageManagerShellCommand extends ShellCommand {
                     installFlags &= ~PackageManager.INSTALL_INSTANT_APP;
                     installFlags |= PackageManager.INSTALL_FULL_APP;
                     break;
+                case "--wait":
+                    waitTillComplete = true;
+                    break;
                 default:
                     pw.println("Error: Unknown option: " + opt);
                     return 1;
@@ -1140,9 +1144,23 @@ class PackageManagerShellCommand extends ShellCommand {
             return 1;
         }
 
+        int installReason = PackageManager.INSTALL_REASON_UNKNOWN;
         try {
+            if (waitTillComplete) {
+                final LocalIntentReceiver receiver = new LocalIntentReceiver();
+                final IPackageInstaller installer = mInterface.getPackageInstaller();
+                pw.println("Installing package " + packageName + " for user: " + userId);
+                installer.installExistingPackage(packageName, installFlags, installReason,
+                        receiver.getIntentSender(), userId);
+                final Intent result = receiver.getResult();
+                final int status = result.getIntExtra(PackageInstaller.EXTRA_STATUS,
+                        PackageInstaller.STATUS_FAILURE);
+                pw.println("Received intent for package install");
+                return status == PackageInstaller.STATUS_SUCCESS ? 0 : 1;
+            }
+
             final int res = mInterface.installExistingPackageAsUser(packageName, userId,
-                    installFlags, PackageManager.INSTALL_REASON_UNKNOWN);
+                    installFlags, installReason);
             if (res == PackageManager.INSTALL_FAILED_INVALID_URI) {
                 throw new NameNotFoundException("Package " + packageName + " doesn't exist");
             }
@@ -1601,30 +1619,36 @@ class PackageManagerShellCommand extends ShellCommand {
         }
 
         userId = translateUserId(userId, true /*allowAll*/, "runUninstall");
-        if (userId == UserHandle.USER_ALL) {
-            userId = UserHandle.USER_SYSTEM;
-            flags |= PackageManager.DELETE_ALL_USERS;
-        } else {
-            final PackageInfo info = mInterface.getPackageInfo(packageName,
-                    PackageManager.MATCH_STATIC_SHARED_LIBRARIES, userId);
-            if (info == null) {
-                pw.println("Failure [not installed for " + userId + "]");
-                return 1;
-            }
-            final boolean isSystem =
-                    (info.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
-            // If we are being asked to delete a system app for just one
-            // user set flag so it disables rather than reverting to system
-            // version of the app.
-            if (isSystem) {
-                flags |= PackageManager.DELETE_SYSTEM_APP;
-            }
-        }
-
         final LocalIntentReceiver receiver = new LocalIntentReceiver();
-        mInterface.getPackageInstaller().uninstall(new VersionedPackage(packageName,
-                versionCode), null /*callerPackageName*/, flags,
-                receiver.getIntentSender(), userId);
+        PackageManagerInternal internal = LocalServices.getService(PackageManagerInternal.class);
+
+        if (internal.isApexPackage(packageName)) {
+            internal.uninstallApex(packageName, versionCode, userId, receiver.getIntentSender());
+        } else {
+            if (userId == UserHandle.USER_ALL) {
+                userId = UserHandle.USER_SYSTEM;
+                flags |= PackageManager.DELETE_ALL_USERS;
+            } else {
+                final PackageInfo info = mInterface.getPackageInfo(packageName,
+                        PackageManager.MATCH_STATIC_SHARED_LIBRARIES, userId);
+                if (info == null) {
+                    pw.println("Failure [not installed for " + userId + "]");
+                    return 1;
+                }
+                final boolean isSystem =
+                        (info.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
+                // If we are being asked to delete a system app for just one
+                // user set flag so it disables rather than reverting to system
+                // version of the app.
+                if (isSystem) {
+                    flags |= PackageManager.DELETE_SYSTEM_APP;
+                }
+            }
+
+            mInterface.getPackageInstaller().uninstall(new VersionedPackage(packageName,
+                            versionCode), null /*callerPackageName*/, flags,
+                    receiver.getIntentSender(), userId);
+        }
 
         final Intent result = receiver.getResult();
         final int status = result.getIntExtra(PackageInstaller.EXTRA_STATUS,
@@ -2319,10 +2343,13 @@ class PackageManagerShellCommand extends ShellCommand {
                     sessionParams.installFlags |= PackageManager.INSTALL_INTERNAL;
                     break;
                 case "-d":
-                    sessionParams.installFlags |= PackageManager.INSTALL_ALLOW_DOWNGRADE;
+                    sessionParams.installFlags |= PackageManager.INSTALL_REQUEST_DOWNGRADE;
                     break;
                 case "-g":
                     sessionParams.installFlags |= PackageManager.INSTALL_GRANT_RUNTIME_PERMISSIONS;
+                case "-w":
+                    sessionParams.installFlags |=
+                            PackageManager.INSTALL_ALL_WHITELIST_RESTRICTED_PERMISSIONS;
                     break;
                 case "--dont-kill":
                     sessionParams.installFlags |= PackageManager.INSTALL_DONT_KILL_APP;
@@ -2383,8 +2410,7 @@ class PackageManagerShellCommand extends ShellCommand {
                         sessionParams.volumeUuid = null;
                     }
                     break;
-                case "--force-sdk":
-                    sessionParams.installFlags |= PackageManager.INSTALL_FORCE_SDK;
+                case "--force-sdk": // ignore
                     break;
                 case "--apex":
                     sessionParams.setInstallAsApex();
@@ -2927,7 +2953,7 @@ class PackageManagerShellCommand extends ShellCommand {
         pw.println("       [--user USER_ID] INTENT");
         pw.println("    Prints all broadcast receivers that can handle the given INTENT.");
         pw.println("");
-        pw.println("  install [-lrtsfdg] [-i PACKAGE] [--user USER_ID|all|current]");
+        pw.println("  install [-lrtsfdgw] [-i PACKAGE] [--user USER_ID|all|current]");
         pw.println("       [-p INHERIT_PACKAGE] [--install-location 0/1/2]");
         pw.println("       [--install-reason 0/1/2/3/4] [--originating-uri URI]");
         pw.println("       [--referrer URI] [--abi ABI_NAME] [--force-sdk]");
@@ -2946,6 +2972,7 @@ class PackageManagerShellCommand extends ShellCommand {
         pw.println("      -d: allow version code downgrade (debuggable packages only)");
         pw.println("      -p: partial application install (new split on top of existing pkg)");
         pw.println("      -g: grant all runtime permissions");
+        pw.println("      -w: whitelist all restricted permissions");
         pw.println("      -S: size in bytes of package, required for stdin");
         pw.println("      --user: install under the given user.");
         pw.println("      --dont-kill: installing a new feature split, don't kill running app");
@@ -2961,8 +2988,6 @@ class PackageManagerShellCommand extends ShellCommand {
         pw.println("          0=unknown, 1=admin policy, 2=device restore,");
         pw.println("          3=device setup, 4=user request");
         pw.println("      --force-uuid: force install on to disk volume with given UUID");
-        pw.println("      --force-sdk: allow install even when existing app targets platform");
-        pw.println("          codename but new one targets a final API level");
         pw.println("      --apex: install an .apex file, not an .apk");
         pw.println("");
         pw.println("  install-create [-lrtsfdg] [-i PACKAGE] [--user USER_ID|all|current]");

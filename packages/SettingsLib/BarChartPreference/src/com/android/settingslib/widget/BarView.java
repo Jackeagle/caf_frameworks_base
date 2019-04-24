@@ -71,9 +71,9 @@ public class BarView extends LinearLayout {
         //Set height of bar view
         mBarView.getLayoutParams().height = barViewInfo.getNormalizedHeight();
         mIcon.setImageDrawable(barViewInfo.getIcon());
-        // For now, we use the bar number as title.
-        mBarTitle.setText(Integer.toString(barViewInfo.getHeight()));
+        mBarTitle.setText(barViewInfo.getTitle());
         mBarSummary.setText(barViewInfo.getSummary());
+        mIcon.setContentDescription(barViewInfo.getContentDescription());
     }
 
     @VisibleForTesting
@@ -89,7 +89,7 @@ public class BarView extends LinearLayout {
     private void init() {
         LayoutInflater.from(getContext()).inflate(R.layout.settings_bar_view, this);
         setOrientation(LinearLayout.VERTICAL);
-        setGravity(Gravity.CENTER);
+        setGravity(Gravity.CENTER | Gravity.BOTTOM);
 
         mBarView = findViewById(R.id.bar_view);
         mIcon = findViewById(R.id.icon_view);

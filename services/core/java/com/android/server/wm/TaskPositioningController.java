@@ -83,7 +83,7 @@ class TaskPositioningController {
         final DisplayContent dc = mService.mRoot.getDisplayContent(displayId);
         if (mInputSurface == null) {
             mInputSurface = mService.makeSurfaceBuilder(dc.getSession())
-                    .setContainerLayer(true)
+                    .setContainerLayer()
                     .setName("Drag and Drop Input Consumer").build();
         }
 
@@ -127,7 +127,6 @@ class TaskPositioningController {
 
     void handleTapOutsideTask(DisplayContent displayContent, int x, int y) {
         mHandler.post(() -> {
-            int taskId = -1;
             synchronized (mService.mGlobalLock) {
                 final Task task = displayContent.findTaskForResizePoint(x, y);
                 if (task != null) {
@@ -135,15 +134,10 @@ class TaskPositioningController {
                             task.preserveOrientationOnResize(), x, y)) {
                         return;
                     }
-                    taskId = task.mTaskId;
-                } else {
-                    taskId = displayContent.taskForTapOutside(x, y);
-                }
-            }
-            if (taskId >= 0) {
-                try {
-                    mActivityManager.setFocusedTask(taskId);
-                } catch (RemoteException e) {
+                    try {
+                        mActivityManager.setFocusedTask(task.mTaskId);
+                    } catch (RemoteException e) {
+                    }
                 }
             }
         });

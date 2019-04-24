@@ -17,23 +17,31 @@
 package com.android.systemui;
 
 import android.content.Context;
+import android.content.res.Configuration;
 import android.util.AttributeSet;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.BaseAdapter;
 import android.widget.LinearLayout;
+
+import com.android.systemui.util.leak.RotationUtils;
+
+import java.util.ArrayList;
 
 /**
  * Layout class representing the Global Actions menu which appears when the power button is held.
  */
 public abstract class MultiListLayout extends LinearLayout {
     protected boolean mHasOutsideTouch;
-    protected boolean mHasSeparatedView;
+    protected MultiListAdapter mAdapter;
+    protected boolean mSnapToEdge;
 
-    protected int mExpectedSeparatedItemCount;
-    protected int mExpectedListItemCount;
+    protected int mRotation;
+    protected RotationListener mRotationListener;
 
     public MultiListLayout(Context context, AttributeSet attrs) {
         super(context, attrs);
+        mRotation = RotationUtils.getRotation(context);
     }
 
     protected abstract ViewGroup getSeparatedView();
@@ -44,16 +52,6 @@ public abstract class MultiListLayout extends LinearLayout {
      * Removes all child items from the separated and list views, if they exist.
      */
     public abstract void removeAllItems();
-
-    /**
-     * Get the parent view which will be used to contain the item at the specified index.
-     * @param separated Whether or not this index refers to a position in the separated or list
-     *                  container.
-     * @param index The index of the item within the container.
-     * @return The parent ViewGroup which will be used to contain the specified item
-     * after it has been added to the layout.
-     */
-    public abstract ViewGroup getParentView(boolean separated, int index);
 
     /**
      * Sets the divided view, which may have a differently-colored background.
@@ -72,32 +70,17 @@ public abstract class MultiListLayout extends LinearLayout {
     }
 
     /**
-     * Sets the number of items expected to be rendered in the separated container. This allows the
-     * layout to correctly determine which parent containers will be used for items before they have
-     * beenadded to the layout.
-     * @param count The number of items expected.
+     * Sets whether the GlobalActions view should snap to the edge of the screen.
      */
-    public void setExpectedSeparatedItemCount(int count) {
-        mExpectedSeparatedItemCount = count;
+    public void setSnapToEdge(boolean snap) {
+        mSnapToEdge = snap;
     }
 
     /**
-     * Sets the number of items expected to be rendered in the list container. This allows the
-     * layout to correctly determine which parent containers will be used for items before they have
-     * beenadded to the layout.
-     * @param count The number of items expected.
+     * Sets the adapter used to inflate items.
      */
-    public void setExpectedListItemCount(int count) {
-        mExpectedListItemCount = count;
-    }
-
-    /**
-     * Sets whether the separated view should be shown, and handles updating visibility on
-     * that view.
-     */
-    public void setHasSeparatedView(boolean hasSeparatedView) {
-        mHasSeparatedView = hasSeparatedView;
-        setSeparatedViewVisibility(hasSeparatedView);
+    public void setAdapter(MultiListAdapter adapter) {
+        mAdapter = adapter;
     }
 
     /**
@@ -111,6 +94,41 @@ public abstract class MultiListLayout extends LinearLayout {
         setFocusable(true);
     }
 
+    @Override
+    protected void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        int newRotation = RotationUtils.getRotation(mContext);
+        if (newRotation != mRotation) {
+            rotate(mRotation, newRotation);
+            mRotation = newRotation;
+        }
+    }
+
+    protected void rotate(int from, int to) {
+        if (mRotationListener != null) {
+            mRotationListener.onRotate(from, to);
+        }
+    }
+
+    /**
+     * Update the list of items in both the separated and list views.
+     * For this to work, mAdapter must already have been set.
+     */
+    public void updateList() {
+        if (mAdapter == null) {
+            throw new IllegalStateException("mAdapter must be set before calling updateList");
+        }
+        onUpdateList();
+    }
+
+    protected void onUpdateList() {
+        setSeparatedViewVisibility(mAdapter.hasSeparatedItems());
+    }
+
+    public void setRotationListener(RotationListener listener) {
+        mRotationListener = listener;
+    }
+
     /**
      * Retrieve the MultiListLayout associated with the given view.
      */
@@ -120,5 +138,61 @@ public abstract class MultiListLayout extends LinearLayout {
             return get((View) v.getParent());
         }
         return null;
+    }
+
+    /**
+     * Interface to provide callbacks which trigger when this list detects a rotation.
+     */
+    public interface RotationListener {
+        void onRotate(int from, int to);
+    }
+
+    /**
+     * Get the X offset in pixels for use when animating the view onto or off of the screen.
+     */
+    public abstract float getAnimationOffsetX();
+
+    /**
+     * Get the Y offset in pixels for use when animating the view onto or off of the screen.
+     */
+    public abstract float getAnimationOffsetY();
+
+    /**
+     * Adapter class for converting items into child views for MultiListLayout and handling
+     * callbacks for input events.
+     */
+    public abstract static class MultiListAdapter extends BaseAdapter {
+        /**
+         * Creates an ArrayList of items which should be rendered in the separated view.
+         * @param useSeparatedView is true if the separated view will be used, false otherwise.
+         */
+        public abstract ArrayList getSeparatedItems();
+
+        /**
+         * Creates an ArrayList of items which should be rendered in the list view.
+         * @param useSeparatedView True if the separated view will be used, false otherwise.
+         */
+        public abstract ArrayList getListItems();
+
+        /**
+         * Callback to run when an individual item is clicked or pressed.
+         * @param position The index of the item which was clicked.
+         */
+        public abstract void onClickItem(int position);
+
+        /**
+         * Callback to run when an individual item is long-clicked or long-pressed.
+         * @param position The index of the item which was long-clicked.
+         * @return True if the long-click was handled, false otherwise.
+         */
+        public abstract boolean onLongClickItem(int position);
+
+        /**
+         * Determines whether the mAdapter contains any separated items, used to determine whether
+         * or not to hide the separated list from view.
+         */
+        public boolean hasSeparatedItems() {
+            return getSeparatedItems().size() > 0;
+        }
     }
 }

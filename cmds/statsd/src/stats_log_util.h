@@ -74,17 +74,17 @@ void writePullerStatsToStream(const std::pair<int, StatsdStats::PulledAtomStats>
                               util::ProtoOutputStream* protoOutput);
 
 // Helper function to write AtomMetricStats to ProtoOutputStream
-void writeAtomMetricStatsToStream(const std::pair<int, StatsdStats::AtomMetricStats> &pair,
+void writeAtomMetricStatsToStream(const std::pair<int64_t, StatsdStats::AtomMetricStats> &pair,
                                   util::ProtoOutputStream *protoOutput);
 
 template<class T>
 bool parseProtoOutputStream(util::ProtoOutputStream& protoOutput, T* message) {
     std::string pbBytes;
-    auto iter = protoOutput.data();
-    while (iter.readBuffer() != NULL) {
-        size_t toRead = iter.currentToRead();
-         pbBytes.append(reinterpret_cast<const char*>(iter.readBuffer()), toRead);
-        iter.rp()->move(toRead);
+    sp<android::util::ProtoReader> reader = protoOutput.data();
+    while (reader->readBuffer() != NULL) {
+        size_t toRead = reader->currentToRead();
+         pbBytes.append(reinterpret_cast<const char*>(reader->readBuffer()), toRead);
+        reader->move(toRead);
     }
     return message->ParseFromArray(pbBytes.c_str(), pbBytes.size());
 }

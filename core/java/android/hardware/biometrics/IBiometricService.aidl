@@ -17,6 +17,7 @@
 package android.hardware.biometrics;
 
 import android.os.Bundle;
+import android.hardware.biometrics.IBiometricConfirmDeviceCredentialCallback;
 import android.hardware.biometrics.IBiometricEnabledOnKeyguardCallback;
 import android.hardware.biometrics.IBiometricServiceReceiver;
 
@@ -30,8 +31,10 @@ import android.hardware.biometrics.IBiometricServiceReceiver;
 interface IBiometricService {
     // Requests authentication. The service choose the appropriate biometric to use, and show
     // the corresponding BiometricDialog.
+    // TODO(b/123378871): Remove callback when moved.
     void authenticate(IBinder token, long sessionId, int userId,
-            IBiometricServiceReceiver receiver, String opPackageName, in Bundle bundle);
+            IBiometricServiceReceiver receiver, String opPackageName, in Bundle bundle,
+            IBiometricConfirmDeviceCredentialCallback callback);
 
     // Cancel authentication for the given sessionId
     void cancelAuthentication(IBinder token, String opPackageName);
@@ -49,14 +52,18 @@ interface IBiometricService {
     // Client lifecycle is still managed in <Biometric>Service.
     void onReadyForAuthentication(int cookie, boolean requireConfirmation, int userId);
 
-    // Reset the timeout when user authenticates with strong auth (e.g. PIN, pattern or password)
-    void resetTimeout(in byte [] token);
+    // Reset the lockout when user authenticates with strong auth (e.g. PIN, pattern or password)
+    void resetLockout(in byte [] token);
 
     // TODO(b/123378871): Remove when moved.
     // CDCA needs to send results to BiometricService if it was invoked using BiometricPrompt's
-    // setEnableFallback method, since there's no way for us to intercept onActivityResult.
+    // setAllowDeviceCredential method, since there's no way for us to intercept onActivityResult.
     // CDCA is launched from BiometricService (startActivityAsUser) instead of *ForResult.
     void onConfirmDeviceCredentialSuccess();
     // TODO(b/123378871): Remove when moved.
     void onConfirmDeviceCredentialError(int error, String message);
+    // TODO(b/123378871): Remove when moved.
+    // When ConfirmLock* is invoked from BiometricPrompt, it needs to register a callback so that
+    // it can receive the cancellation signal.
+    void registerCancellationCallback(IBiometricConfirmDeviceCredentialCallback callback);
 }

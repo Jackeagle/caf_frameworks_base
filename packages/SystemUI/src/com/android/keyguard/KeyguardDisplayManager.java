@@ -17,7 +17,6 @@ package com.android.keyguard;
 
 import static android.view.Display.DEFAULT_DISPLAY;
 
-import android.annotation.Nullable;
 import android.app.Presentation;
 import android.content.Context;
 import android.graphics.Point;
@@ -29,20 +28,20 @@ import android.util.Log;
 import android.util.SparseArray;
 import android.view.Display;
 import android.view.DisplayInfo;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.WindowManager;
 
-import java.util.function.BooleanSupplier;
+import com.android.systemui.util.InjectionInflationController;
 
 // TODO(multi-display): Support multiple external displays
 public class KeyguardDisplayManager {
     protected static final String TAG = "KeyguardDisplayManager";
     private static boolean DEBUG = KeyguardConstants.DEBUG;
 
-    private final ViewMediatorCallback mCallback;
-
     private final MediaRouter mMediaRouter;
     private final DisplayManager mDisplayService;
+    private final InjectionInflationController mInjectableInflater;
     private final Context mContext;
 
     private boolean mShowing;
@@ -57,7 +56,7 @@ public class KeyguardDisplayManager {
         public void onDisplayAdded(int displayId) {
             final Display display = mDisplayService.getDisplay(displayId);
             if (mShowing) {
-                notifyIfChanged(() -> showPresentation(display));
+                showPresentation(display);
             }
         }
 
@@ -76,13 +75,14 @@ public class KeyguardDisplayManager {
 
         @Override
         public void onDisplayRemoved(int displayId) {
-            notifyIfChanged(() -> hidePresentation(displayId));
+            hidePresentation(displayId);
         }
     };
 
-    public KeyguardDisplayManager(Context context, ViewMediatorCallback callback) {
+    public KeyguardDisplayManager(Context context,
+            InjectionInflationController injectableInflater) {
         mContext = context;
-        mCallback = callback;
+        mInjectableInflater = injectableInflater;
         mMediaRouter = mContext.getSystemService(MediaRouter.class);
         mDisplayService = mContext.getSystemService(DisplayManager.class);
         mDisplayService.registerDisplayListener(mDisplayListener, null /* handler */);
@@ -116,7 +116,7 @@ public class KeyguardDisplayManager {
         final int displayId = display.getDisplayId();
         Presentation presentation = mPresentations.get(displayId);
         if (presentation == null) {
-            presentation = new KeyguardPresentation(mContext, display);
+            presentation = new KeyguardPresentation(mContext, display, mInjectableInflater);
             presentation.setOnDismissListener(dialog -> {
                 if (null != mPresentations.get(displayId)) {
                     mPresentations.remove(displayId);
@@ -138,42 +138,13 @@ public class KeyguardDisplayManager {
 
     /**
      * @param displayId The id of the display to hide the presentation off.
-     * @return {@code true} if the a presentation was removed.
-     *         {@code false} if the presentation was not added before.
      */
-    private boolean hidePresentation(int displayId) {
+    private void hidePresentation(int displayId) {
         final Presentation presentation = mPresentations.get(displayId);
         if (presentation != null) {
             presentation.dismiss();
             mPresentations.remove(displayId);
-            return true;
         }
-        return false;
-    }
-
-    private void notifyIfChanged(BooleanSupplier updateMethod) {
-        if (updateMethod.getAsBoolean()) {
-            final int[] displayList = getPresentationDisplayIds();
-            mCallback.onSecondaryDisplayShowingChanged(displayList);
-        }
-    }
-
-    /**
-     * @return An array of displayId's on which a {@link KeyguardPresentation} is showing on.
-     */
-    @Nullable
-    private int[] getPresentationDisplayIds() {
-        final int size = mPresentations.size();
-        if (size == 0) return null;
-
-        final int[] displayIds = new int[size];
-        for (int i = mPresentations.size() - 1; i >= 0; i--) {
-            final Presentation presentation = mPresentations.valueAt(i);
-            if (presentation != null) {
-                displayIds[i] = presentation.getDisplay().getDisplayId();
-            }
-        }
-        return displayIds;
     }
 
     public void show() {
@@ -181,7 +152,7 @@ public class KeyguardDisplayManager {
             if (DEBUG) Log.v(TAG, "show");
             mMediaRouter.addCallback(MediaRouter.ROUTE_TYPE_REMOTE_DISPLAY,
                     mMediaRouterCallback, MediaRouter.CALLBACK_FLAG_PASSIVE_DISCOVERY);
-            notifyIfChanged(() -> updateDisplays(true /* showing */));
+            updateDisplays(true /* showing */);
         }
         mShowing = true;
     }
@@ -190,7 +161,7 @@ public class KeyguardDisplayManager {
         if (mShowing) {
             if (DEBUG) Log.v(TAG, "hide");
             mMediaRouter.removeCallback(mMediaRouterCallback);
-            notifyIfChanged(() -> updateDisplays(false /* showing */));
+            updateDisplays(false /* showing */);
         }
         mShowing = false;
     }
@@ -200,19 +171,19 @@ public class KeyguardDisplayManager {
         @Override
         public void onRouteSelected(MediaRouter router, int type, RouteInfo info) {
             if (DEBUG) Log.d(TAG, "onRouteSelected: type=" + type + ", info=" + info);
-            notifyIfChanged(() -> updateDisplays(mShowing));
+            updateDisplays(mShowing);
         }
 
         @Override
         public void onRouteUnselected(MediaRouter router, int type, RouteInfo info) {
             if (DEBUG) Log.d(TAG, "onRouteUnselected: type=" + type + ", info=" + info);
-            notifyIfChanged(() -> updateDisplays(mShowing));
+            updateDisplays(mShowing);
         }
 
         @Override
         public void onRoutePresentationDisplayChanged(MediaRouter router, RouteInfo info) {
             if (DEBUG) Log.d(TAG, "onRoutePresentationDisplayChanged: info=" + info);
-            notifyIfChanged(() -> updateDisplays(mShowing));
+            updateDisplays(mShowing);
         }
     };
 
@@ -236,6 +207,7 @@ public class KeyguardDisplayManager {
     private final static class KeyguardPresentation extends Presentation {
         private static final int VIDEO_SAFE_REGION = 80; // Percentage of display width & height
         private static final int MOVE_CLOCK_TIMEOUT = 10000; // 10s
+        private final InjectionInflationController mInjectableInflater;
         private View mClock;
         private int mUsableWidth;
         private int mUsableHeight;
@@ -252,8 +224,10 @@ public class KeyguardDisplayManager {
             }
         };
 
-        KeyguardPresentation(Context context, Display display) {
+        KeyguardPresentation(Context context, Display display,
+                InjectionInflationController injectionInflater) {
             super(context, display, R.style.keyguard_presentation_theme);
+            mInjectableInflater = injectionInflater;
             getWindow().setType(WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG);
             setCancelable(false);
         }
@@ -274,7 +248,9 @@ public class KeyguardDisplayManager {
             mMarginLeft = (100 - VIDEO_SAFE_REGION) * p.x / 200;
             mMarginTop = (100 - VIDEO_SAFE_REGION) * p.y / 200;
 
-            setContentView(R.layout.keyguard_presentation);
+            LayoutInflater inflater = mInjectableInflater.injectable(
+                    LayoutInflater.from(getContext()));
+            setContentView(inflater.inflate(R.layout.keyguard_presentation, null));
             mClock = findViewById(R.id.clock);
 
             // Avoid screen burn in

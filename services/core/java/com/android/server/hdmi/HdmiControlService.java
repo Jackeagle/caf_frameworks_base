@@ -147,6 +147,10 @@ public class HdmiControlService extends SystemService {
     @GuardedBy("mLock")
     protected final ActiveSource mActiveSource = new ActiveSource();
 
+    // Whether System Audio Mode is activated or not.
+    @GuardedBy("mLock")
+    private boolean mSystemAudioActivated = false;
+
     private static final boolean isHdmiCecNeverClaimPlaybackLogicAddr =
             SystemProperties.getBoolean(
                     Constants.PROPERTY_HDMI_CEC_NEVER_CLAIM_PLAYBACK_LOGICAL_ADDRESS, false);
@@ -572,7 +576,8 @@ public class HdmiControlService extends SystemService {
                 Global.HDMI_SYSTEM_AUDIO_CONTROL_ENABLED,
                 Global.MHL_INPUT_SWITCHING_ENABLED,
                 Global.MHL_POWER_CHARGE_ENABLED,
-                Global.HDMI_CEC_SWITCH_ENABLED
+                Global.HDMI_CEC_SWITCH_ENABLED,
+                Global.DEVICE_NAME
         };
         for (String s : settings) {
             resolver.registerContentObserver(Global.getUriFor(s), false, mSettingsObserver,
@@ -638,6 +643,10 @@ public class HdmiControlService extends SystemService {
                 case Global.MHL_POWER_CHARGE_ENABLED:
                     mMhlController.setOption(OPTION_MHL_POWER_CHARGE, toInt(enabled));
                     break;
+                case Global.DEVICE_NAME:
+                    String deviceName = readStringSetting(option, Build.MODEL);
+                    setDisplayName(deviceName);
+                    break;
             }
         }
     }
@@ -664,6 +673,15 @@ public class HdmiControlService extends SystemService {
     @VisibleForTesting
     boolean readBooleanSystemProperty(String key, boolean defVal) {
         return SystemProperties.getBoolean(key, defVal);
+    }
+
+    String readStringSetting(String key, String defVal) {
+        ContentResolver cr = getContext().getContentResolver();
+        String content = Global.getString(cr, key);
+        if (TextUtils.isEmpty(content)) {
+            return defVal;
+        }
+        return content;
     }
 
     private void initializeCec(int initiatedBy) {
@@ -1174,11 +1192,27 @@ public class HdmiControlService extends SystemService {
     }
 
     private HdmiDeviceInfo createDeviceInfo(int logicalAddress, int deviceType, int powerStatus) {
-        // TODO: find better name instead of model name.
-        String displayName = Build.MODEL;
+        String displayName = readStringSetting(Global.DEVICE_NAME, Build.MODEL);
         return new HdmiDeviceInfo(logicalAddress,
                 getPhysicalAddress(), pathToPortId(getPhysicalAddress()), deviceType,
                 getVendorId(), displayName, powerStatus);
+    }
+
+    // Set the display name in HdmiDeviceInfo of the current devices to content provided by
+    // Global.DEVICE_NAME. Only set and broadcast if the new name is different.
+    private void setDisplayName(String newDisplayName) {
+        for (HdmiCecLocalDevice device : getAllLocalDevices()) {
+            HdmiDeviceInfo deviceInfo = device.getDeviceInfo();
+            if (deviceInfo.getDisplayName().equals(newDisplayName)) {
+                continue;
+            }
+            device.setDeviceInfo(new HdmiDeviceInfo(
+                    deviceInfo.getLogicalAddress(), deviceInfo.getPhysicalAddress(),
+                    deviceInfo.getPortId(), deviceInfo.getDeviceType(), deviceInfo.getVendorId(),
+                    newDisplayName, deviceInfo.getDevicePowerStatus()));
+            sendCecCommand(HdmiCecMessageBuilder.buildSetOsdNameCommand(
+                    device.mAddress, Constants.ADDR_TV, newDisplayName));
+        }
     }
 
     @ServiceThreadOnly
@@ -1533,11 +1567,33 @@ public class HdmiControlService extends SystemService {
                     if (mCecController != null) {
                         HdmiCecLocalDevice localDevice = mCecController.getLocalDevice(deviceType);
                         if (localDevice == null) {
-                            Slog.w(TAG, "Local device not available");
+                            Slog.w(TAG, "Local device not available to send key event.");
                             return;
                         }
                         localDevice.sendKeyEvent(keyCode, isPressed);
                     }
+                }
+            });
+        }
+
+        @Override
+        public void sendVolumeKeyEvent(
+            final int deviceType, final int keyCode, final boolean isPressed) {
+            enforceAccessPermission();
+            runOnServiceThread(new Runnable() {
+                @Override
+                public void run() {
+                    if (mCecController == null) {
+                        Slog.w(TAG, "CEC controller not available to send volume key event.");
+                        return;
+                    }
+                    HdmiCecLocalDevice localDevice = mCecController.getLocalDevice(deviceType);
+                    if (localDevice == null) {
+                        Slog.w(TAG, "Local device " + deviceType
+                              + " not available to send volume key event.");
+                        return;
+                    }
+                    localDevice.sendVolumeKeyEvent(keyCode, isPressed);
                 }
             });
         }
@@ -1708,7 +1764,7 @@ public class HdmiControlService extends SystemService {
         }
 
         @Override
-        // TODO(AMYJOJO): add a result callback
+        // TODO(b/128427908): add a result callback
         public void askRemoteDeviceToBecomeActiveSource(int physicalAddress) {
             enforceAccessPermission();
             runOnServiceThread(new Runnable() {
@@ -2010,6 +2066,7 @@ public class HdmiControlService extends SystemService {
             pw.increaseIndent();
             pw.println("mHdmiControlEnabled: " + mHdmiControlEnabled);
             pw.println("mMhlInputChangeEnabled: " + mMhlInputChangeEnabled);
+            pw.println("mSystemAudioActivated: " + isSystemAudioActivated());
             pw.decreaseIndent();
 
             pw.println("mMhlController: ");
@@ -2385,7 +2442,8 @@ public class HdmiControlService extends SystemService {
     void wakeUp() {
         assertRunOnServiceThread();
         mWakeUpMessageReceived = true;
-        mPowerManager.wakeUp(SystemClock.uptimeMillis(), "android.server.hdmi:WAKE");
+        mPowerManager.wakeUp(SystemClock.uptimeMillis(), PowerManager.WAKE_REASON_HDMI,
+                "android.server.hdmi:WAKE");
         // PowerManger will send the broadcast Intent.ACTION_SCREEN_ON and after this gets
         // the intent, the sequence will continue at onWakeUp().
     }
@@ -2610,7 +2668,8 @@ public class HdmiControlService extends SystemService {
                 playback().sendStandby(0 /* unused */);
             }
         } else if (isPowerStandbyOrTransient() && !isStandbyModeOn) {
-            mPowerManager.wakeUp(SystemClock.uptimeMillis(), "android.server.hdmi:WAKE");
+            mPowerManager.wakeUp(SystemClock.uptimeMillis(), PowerManager.WAKE_REASON_HDMI,
+                    "android.server.hdmi:WAKE");
             if (playback() != null) {
                 oneTouchPlay(new IHdmiControlCallback.Stub() {
                     @Override
@@ -2633,6 +2692,18 @@ public class HdmiControlService extends SystemService {
     void setProhibitMode(boolean enabled) {
         synchronized (mLock) {
             mProhibitMode = enabled;
+        }
+    }
+
+    boolean isSystemAudioActivated() {
+        synchronized (mLock) {
+            return mSystemAudioActivated;
+        }
+    }
+
+    void setSystemAudioActivated(boolean on) {
+        synchronized (mLock) {
+            mSystemAudioActivated = on;
         }
     }
 

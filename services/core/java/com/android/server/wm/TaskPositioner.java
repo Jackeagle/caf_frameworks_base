@@ -43,16 +43,15 @@ import android.util.Slog;
 import android.view.BatchedInputEventReceiver;
 import android.view.Choreographer;
 import android.view.Display;
+import android.view.InputApplicationHandle;
 import android.view.InputChannel;
 import android.view.InputDevice;
 import android.view.InputEvent;
+import android.view.InputWindowHandle;
 import android.view.MotionEvent;
 import android.view.WindowManager;
 
 import com.android.internal.annotations.VisibleForTesting;
-import android.view.InputApplicationHandle;
-import android.view.InputWindowHandle;
-import com.android.server.wm.WindowManagerService.H;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -105,7 +104,8 @@ class TaskPositioner {
     private int mMinVisibleWidth;
     private int mMinVisibleHeight;
 
-    private Task mTask;
+    @VisibleForTesting
+    Task mTask;
     private boolean mResizing;
     private boolean mPreserveOrientation;
     private boolean mStartOrientationWasLandscape;
@@ -356,12 +356,10 @@ class TaskPositioner {
                     + startY + "}");
         }
         mTask = win.getTask();
-        // Use the dim bounds, not the original task bounds. The cursor
-        // movement should be calculated relative to the visible bounds.
-        // Also, use the dim bounds of the task which accounts for
+        // Use the bounds of the task which accounts for
         // multiple app windows. Don't use any bounds from win itself as it
         // may not be the same size as the task.
-        mTask.getDimBounds(mTmpRect);
+        mTask.getBounds(mTmpRect);
         startDrag(resize, preserveOrientation, startX, startY, mTmpRect);
     }
 

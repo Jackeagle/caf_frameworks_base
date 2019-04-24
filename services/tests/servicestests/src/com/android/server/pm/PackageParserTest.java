@@ -15,6 +15,8 @@
  */
 package com.android.server.pm;
 
+import static android.content.res.Resources.ID_NULL;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
@@ -31,7 +33,6 @@ import android.content.pm.ProviderInfo;
 import android.content.pm.ServiceInfo;
 import android.content.pm.SharedLibraryInfo;
 import android.content.pm.Signature;
-import android.content.pm.UsesPermissionInfo;
 import android.os.Bundle;
 import android.os.Parcel;
 import android.platform.test.annotations.Presubmit;
@@ -454,8 +455,8 @@ public class PackageParserTest {
         pkg.splitPrivateFlags = new int[] { 100 };
         pkg.applicationInfo = new ApplicationInfo();
 
-        pkg.permissions.add(new PackageParser.Permission(pkg));
-        pkg.permissionGroups.add(new PackageParser.PermissionGroup(pkg));
+        pkg.permissions.add(new PackageParser.Permission(pkg, (String) null));
+        pkg.permissionGroups.add(new PackageParser.PermissionGroup(pkg, ID_NULL, ID_NULL, ID_NULL));
 
         final PackageParser.ParseComponentArgs dummy = new PackageParser.ParseComponentArgs(
                 pkg, new String[1], 0, 0, 0, 0, 0, 0, null, 0, 0, 0);
@@ -466,7 +467,6 @@ public class PackageParserTest {
         pkg.services.add(new PackageParser.Service(dummy, new ServiceInfo()));
         pkg.instrumentation.add(new PackageParser.Instrumentation(dummy, new InstrumentationInfo()));
         pkg.requestedPermissions.add("foo7");
-        pkg.usesPermissionInfos.add(new UsesPermissionInfo("foo7"));
         pkg.implicitPermissions.add("foo25");
 
         pkg.protectedBroadcasts = new ArrayList<>();

@@ -324,6 +324,12 @@ message IncidentdDetails {
     EXPLICIT = 1;
   }
   optional Destination dest = 2;
+
+  // Package name of the incident report receiver.
+  optional string receiver_pkg = 3;
+
+  // Class name of the incident report receiver.
+  optional string receiver_cls = 4;
 }
 
 message PerfettoDetails {
@@ -374,10 +380,18 @@ message Subscription {
 message EventActivation {
   optional int64 atom_matcher_id = 1;
   optional int64 ttl_seconds = 2;
+  optional int64 deactivation_atom_matcher_id = 3;
 }
 
 message MetricActivation {
   optional int64 metric_id = 1;
+
+  enum ActivationType {
+      UNKNOWN = 0;
+      ACTIVATE_IMMEDIATELY = 1;
+      ACTIVATE_ON_BOOT = 2;
+  }
+  optional ActivationType activation_type = 3;
 
   repeated EventActivation event_activation = 2;
 }

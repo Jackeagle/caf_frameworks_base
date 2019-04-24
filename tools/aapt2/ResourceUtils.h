@@ -20,6 +20,7 @@
 #include <functional>
 #include <memory>
 
+#include "androidfw/AssetManager2.h"
 #include "androidfw/ConfigDescription.h"
 #include "androidfw/ResourceTypes.h"
 #include "androidfw/StringPiece.h"
@@ -76,6 +77,12 @@ bool IsAttributeReference(const android::StringPiece& str);
  */
 Maybe<ResourceName> ToResourceName(
     const android::ResTable::resource_name& name);
+
+/**
+ * Convert an android::AssetManager2::ResourceName to an aapt::ResourceName struct.
+ */
+Maybe<ResourceName> ToResourceName(
+    const android::AssetManager2::ResourceName& name_in);
 
 /**
  * Returns a boolean value if the string is equal to TRUE, true, True, FALSE,
@@ -269,10 +276,8 @@ class StringBuilder {
   // single quotations can be used without escaping them.
   explicit StringBuilder(bool preserve_spaces = false);
 
-  // Appends a chunk of text. If preserve_spaces is true, whitespace removal is not performed, and
-  // single quotations can be used without escaping them for this append. Otherwise, the
-  // StringBuilder will behave as it was constructed.
-  StringBuilder& AppendText(const std::string& text, bool preserve_spaces = false);
+  // Appends a chunk of text.
+  StringBuilder& AppendText(const std::string& text);
 
   // Starts a Span (tag) with the given name. The name is expected to be of the form:
   //  "tag_name;attr1=value;attr2=value;"

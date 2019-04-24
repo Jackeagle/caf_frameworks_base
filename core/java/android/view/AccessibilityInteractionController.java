@@ -16,6 +16,7 @@
 
 package android.view;
 
+import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD;
 import static android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_ACCESSIBLE_CLICKABLE_SPAN;
 import static android.view.accessibility.AccessibilityNodeInfo.EXTRA_DATA_REQUESTED_KEY;
 import static android.view.accessibility.AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY;
@@ -40,6 +41,7 @@ import android.util.Slog;
 import android.view.View.AttachInfo;
 import android.view.accessibility.AccessibilityInteractionClient;
 import android.view.accessibility.AccessibilityManager;
+import android.view.accessibility.AccessibilityNodeIdManager;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction;
 import android.view.accessibility.AccessibilityNodeProvider;
@@ -154,13 +156,7 @@ public final class AccessibilityInteractionController {
     }
 
     private boolean isShown(View view) {
-        // The first two checks are made also made by isShown() which
-        // however traverses the tree up to the parent to catch that.
-        // Therefore, we do some fail fast check to minimize the up
-        // tree traversal.
-        return (view.mAttachInfo != null
-                && view.mAttachInfo.mWindowVisibility == View.VISIBLE
-                && view.isShown());
+        return (view != null) && (view.getWindowVisibility() == View.VISIBLE && view.isShown());
     }
 
     public void findAccessibilityNodeInfoByAccessibilityIdClientThread(
@@ -340,12 +336,7 @@ public final class AccessibilityInteractionController {
                 return;
             }
             mViewRootImpl.mAttachInfo.mAccessibilityFetchFlags = flags;
-            View root = null;
-            if (accessibilityViewId == AccessibilityNodeInfo.ROOT_ITEM_ID) {
-                root = mViewRootImpl.mView;
-            } else {
-                root = findViewByAccessibilityId(accessibilityViewId);
-            }
+            final View root = findViewByAccessibilityId(accessibilityViewId);
             if (root != null && isShown(root)) {
                 mPrefetcher.prefetchAccessibilityNodeInfos(
                         root, virtualDescendantId, flags, infos, arguments);
@@ -396,12 +387,7 @@ public final class AccessibilityInteractionController {
                 return;
             }
             mViewRootImpl.mAttachInfo.mAccessibilityFetchFlags = flags;
-            View root = null;
-            if (accessibilityViewId != AccessibilityNodeInfo.ROOT_ITEM_ID) {
-                root = findViewByAccessibilityId(accessibilityViewId);
-            } else {
-                root = mViewRootImpl.mView;
-            }
+            final View root = findViewByAccessibilityId(accessibilityViewId);
             if (root != null) {
                 final int resolvedViewId = root.getContext().getResources()
                         .getIdentifier(viewId, null, null);
@@ -462,12 +448,7 @@ public final class AccessibilityInteractionController {
                 return;
             }
             mViewRootImpl.mAttachInfo.mAccessibilityFetchFlags = flags;
-            View root = null;
-            if (accessibilityViewId != AccessibilityNodeInfo.ROOT_ITEM_ID) {
-                root = findViewByAccessibilityId(accessibilityViewId);
-            } else {
-                root = mViewRootImpl.mView;
-            }
+            final View root = findViewByAccessibilityId(accessibilityViewId);
             if (root != null && isShown(root)) {
                 AccessibilityNodeProvider provider = root.getAccessibilityNodeProvider();
                 if (provider != null) {
@@ -550,12 +531,7 @@ public final class AccessibilityInteractionController {
                 return;
             }
             mViewRootImpl.mAttachInfo.mAccessibilityFetchFlags = flags;
-            View root = null;
-            if (accessibilityViewId != AccessibilityNodeInfo.ROOT_ITEM_ID) {
-                root = findViewByAccessibilityId(accessibilityViewId);
-            } else {
-                root = mViewRootImpl.mView;
-            }
+            final View root = findViewByAccessibilityId(accessibilityViewId);
             if (root != null && isShown(root)) {
                 switch (focusType) {
                     case AccessibilityNodeInfo.FOCUS_ACCESSIBILITY: {
@@ -583,7 +559,7 @@ public final class AccessibilityInteractionController {
                     } break;
                     case AccessibilityNodeInfo.FOCUS_INPUT: {
                         View target = root.findFocus();
-                        if (target == null || !isShown(target)) {
+                        if (!isShown(target)) {
                             break;
                         }
                         AccessibilityNodeProvider provider = target.getAccessibilityNodeProvider();
@@ -645,12 +621,7 @@ public final class AccessibilityInteractionController {
                 return;
             }
             mViewRootImpl.mAttachInfo.mAccessibilityFetchFlags = flags;
-            View root = null;
-            if (accessibilityViewId != AccessibilityNodeInfo.ROOT_ITEM_ID) {
-                root = findViewByAccessibilityId(accessibilityViewId);
-            } else {
-                root = mViewRootImpl.mView;
-            }
+            final View root = findViewByAccessibilityId(accessibilityViewId);
             if (root != null && isShown(root)) {
                 View nextView = root.focusSearch(direction);
                 if (nextView != null) {
@@ -705,12 +676,7 @@ public final class AccessibilityInteractionController {
                 return;
             }
             mViewRootImpl.mAttachInfo.mAccessibilityFetchFlags = flags;
-            View target = null;
-            if (accessibilityViewId != AccessibilityNodeInfo.ROOT_ITEM_ID) {
-                target = findViewByAccessibilityId(accessibilityViewId);
-            } else {
-                target = mViewRootImpl.mView;
-            }
+            final View target = findViewByAccessibilityId(accessibilityViewId);
             if (target != null && isShown(target)) {
                 if (action == R.id.accessibilityActionClickOnClickableSpan) {
                     // Handle this hidden action separately
@@ -791,15 +757,11 @@ public final class AccessibilityInteractionController {
     }
 
     private View findViewByAccessibilityId(int accessibilityId) {
-        View root = mViewRootImpl.mView;
-        if (root == null) {
-            return null;
+        if (accessibilityId == AccessibilityNodeInfo.ROOT_ITEM_ID) {
+            return mViewRootImpl.mView;
+        } else {
+            return AccessibilityNodeIdManager.getInstance().findView(accessibilityId);
         }
-        View foundView = root.findViewByAccessibilityId(accessibilityId);
-        if (foundView != null && !isShown(foundView)) {
-            return null;
-        }
-        return foundView;
     }
 
     private void applyAppScaleAndMagnificationSpecIfNeeded(List<AccessibilityNodeInfo> infos,
@@ -836,9 +798,17 @@ public final class AccessibilityInteractionController {
         }
         Rect boundsInScreen = mTempRect;
         info.getBoundsInScreen(boundsInScreen);
-        if (interactiveRegion.quickReject(boundsInScreen)) {
+        if (interactiveRegion.quickReject(boundsInScreen) && !shouldBypassAdjustIsVisible()) {
             info.setVisibleToUser(false);
         }
+    }
+
+    private boolean shouldBypassAdjustIsVisible() {
+        final int windowType = mViewRootImpl.mOrigWindowType;
+        if (windowType == TYPE_INPUT_METHOD) {
+            return true;
+        }
+        return false;
     }
 
     private void applyAppScaleAndMagnificationSpecIfNeeded(AccessibilityNodeInfo info,
@@ -1171,7 +1141,7 @@ public final class AccessibilityInteractionController {
                         }
                         View child = children.get(i);
                         if (child.getAccessibilityViewId() != current.getAccessibilityViewId()
-                                &&  isShown(child)) {
+                                && isShown(child)) {
                             AccessibilityNodeInfo info = null;
                             AccessibilityNodeProvider provider =
                                 child.getAccessibilityNodeProvider();

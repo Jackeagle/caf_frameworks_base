@@ -30,7 +30,6 @@ import android.content.ContentResolver;
 import android.media.MediaMetadata;
 import android.net.Uri;
 import android.provider.Settings;
-import android.support.test.filters.SmallTest;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
 import android.testing.TestableLooper.RunWithLooper;
@@ -41,11 +40,12 @@ import androidx.slice.SliceProvider;
 import androidx.slice.SliceSpecs;
 import androidx.slice.builders.ListBuilder;
 import androidx.slice.core.SliceQuery;
+import androidx.test.filters.SmallTest;
 
 import com.android.keyguard.KeyguardUpdateMonitor;
 import com.android.systemui.SysuiTestCase;
+import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.statusbar.NotificationMediaManager;
-import com.android.systemui.statusbar.StatusBarStateController;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -166,25 +166,22 @@ public class KeyguardSliceProviderTest extends SysuiTestCase {
 
     @Test
     public void onMetadataChanged_updatesSlice() {
-        mProvider.onMetadataChanged(mock(MediaMetadata.class));
         mProvider.onDozingChanged(true);
+        reset(mContentResolver);
+        mProvider.onMetadataChanged(mock(MediaMetadata.class));
         verify(mContentResolver).notifyChange(eq(mProvider.getUri()), eq(null));
 
         // Hides after waking up
         reset(mContentResolver);
         mProvider.onDozingChanged(false);
         verify(mContentResolver).notifyChange(eq(mProvider.getUri()), eq(null));
-
-        // And won't update slice if device is awake
-        reset(mContentResolver);
-        mProvider.onMetadataChanged(mock(MediaMetadata.class));
-        verify(mContentResolver, never()).notifyChange(eq(mProvider.getUri()), eq(null));
     }
 
     @Test
     public void onDozingChanged_updatesSliceIfMedia() {
-        // Show media when dozing
         mProvider.onMetadataChanged(mock(MediaMetadata.class));
+        reset(mContentResolver);
+        // Show media when dozing
         mProvider.onDozingChanged(true);
         verify(mContentResolver).notifyChange(eq(mProvider.getUri()), eq(null));
 

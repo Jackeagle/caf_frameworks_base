@@ -34,7 +34,6 @@ import android.view.SurfaceControl.Builder;
 import android.view.SurfaceControl.Transaction;
 import android.view.SurfaceSession;
 
-import androidx.test.filters.FlakyTest;
 import androidx.test.filters.SmallTest;
 
 import com.android.server.wm.SurfaceAnimator.Animatable;
@@ -51,7 +50,7 @@ import org.mockito.MockitoAnnotations;
  * Test class for {@link SurfaceAnimatorTest}.
  *
  * Build/Install/Run:
- *  atest FrameworksServicesTests:SurfaceAnimatorTest
+ *  atest WmTests:SurfaceAnimatorTest
  */
 @SmallTest
 @Presubmit
@@ -96,7 +95,7 @@ public class SurfaceAnimatorTest extends WindowTestsBase {
         callbackCaptor.getValue().onAnimationFinished(mSpec);
         assertNotAnimating(mAnimatable);
         assertTrue(mAnimatable.mFinishedCallbackCalled);
-        verify(mTransaction).reparent(eq(mAnimatable.mLeash), eq(null));
+        verify(mTransaction).remove(eq(mAnimatable.mLeash));
         // TODO: Verify reparenting once we use mPendingTransaction to reparent it back
     }
 
@@ -106,7 +105,7 @@ public class SurfaceAnimatorTest extends WindowTestsBase {
         final SurfaceControl firstLeash = mAnimatable.mLeash;
         mAnimatable.mSurfaceAnimator.startAnimation(mTransaction, mSpec2, true /* hidden */);
 
-        verify(mTransaction).reparent(eq(firstLeash), eq(null));
+        verify(mTransaction).remove(eq(firstLeash));
         assertFalse(mAnimatable.mFinishedCallbackCalled);
 
         final ArgumentCaptor<OnAnimationFinishedCallback> callbackCaptor = ArgumentCaptor.forClass(
@@ -133,7 +132,7 @@ public class SurfaceAnimatorTest extends WindowTestsBase {
         assertNotAnimating(mAnimatable);
         verify(mSpec).onAnimationCancelled(any());
         assertTrue(mAnimatable.mFinishedCallbackCalled);
-        verify(mTransaction).reparent(eq(mAnimatable.mLeash), eq(null));
+        verify(mTransaction).remove(eq(mAnimatable.mLeash));
     }
 
     @Test
@@ -155,7 +154,7 @@ public class SurfaceAnimatorTest extends WindowTestsBase {
         verifyZeroInteractions(mSpec);
         assertNotAnimating(mAnimatable);
         assertTrue(mAnimatable.mFinishedCallbackCalled);
-        verify(mTransaction).reparent(eq(mAnimatable.mLeash), eq(null));
+        verify(mTransaction).remove(eq(mAnimatable.mLeash));
     }
 
     @Test
@@ -171,34 +170,58 @@ public class SurfaceAnimatorTest extends WindowTestsBase {
         assertNotAnimating(mAnimatable);
         assertAnimating(mAnimatable2);
         assertEquals(leash, mAnimatable2.mSurfaceAnimator.mLeash);
-        verify(mTransaction, never()).reparent(eq(leash), eq(null));
+        verify(mTransaction, never()).remove(eq(leash));
         callbackCaptor.getValue().onAnimationFinished(mSpec);
         assertNotAnimating(mAnimatable2);
         assertTrue(mAnimatable2.mFinishedCallbackCalled);
-        verify(mTransaction).reparent(eq(leash), eq(null));
+        verify(mTransaction).remove(eq(leash));
     }
 
     @Test
-    @FlakyTest(detail = "Promote once confirmed non-flaky")
     public void testDeferFinish() {
 
         // Start animation
-        mDeferFinishAnimatable.mSurfaceAnimator.startAnimation(mTransaction, mSpec,
-                true /* hidden */);
-        final ArgumentCaptor<OnAnimationFinishedCallback> callbackCaptor = ArgumentCaptor.forClass(
-                OnAnimationFinishedCallback.class);
-        assertAnimating(mDeferFinishAnimatable);
-        verify(mSpec).startAnimation(any(), any(), callbackCaptor.capture());
+        final OnAnimationFinishedCallback onFinishedCallback = startDeferFinishAnimatable(mSpec);
 
         // Finish the animation but then make sure we are deferring.
-        callbackCaptor.getValue().onAnimationFinished(mSpec);
+        onFinishedCallback.onAnimationFinished(mSpec);
         assertAnimating(mDeferFinishAnimatable);
 
         // Now end defer finishing.
         mDeferFinishAnimatable.mEndDeferFinishCallback.run();
         assertNotAnimating(mAnimatable2);
         assertTrue(mDeferFinishAnimatable.mFinishedCallbackCalled);
-        verify(mTransaction).reparent(eq(mDeferFinishAnimatable.mLeash), eq(null));
+        verify(mTransaction).remove(eq(mDeferFinishAnimatable.mLeash));
+    }
+
+    @Test
+    public void testDeferFinishDoNotFinishNextAnimation() {
+        // Start the first animation.
+        final OnAnimationFinishedCallback onFinishedCallback = startDeferFinishAnimatable(mSpec);
+        onFinishedCallback.onAnimationFinished(mSpec);
+        // The callback is the resetAndInvokeFinish in {@link SurfaceAnimator#getFinishedCallback}.
+        final Runnable firstDeferFinishCallback = mDeferFinishAnimatable.mEndDeferFinishCallback;
+
+        // Start the second animation.
+        mDeferFinishAnimatable.mSurfaceAnimator.cancelAnimation();
+        startDeferFinishAnimatable(mSpec2);
+        mDeferFinishAnimatable.mFinishedCallbackCalled = false;
+
+        // Simulate the first deferred callback is executed from
+        // {@link AnimatingAppWindowTokenRegistry#endDeferringFinished}.
+        firstDeferFinishCallback.run();
+        // The second animation should not be finished.
+        assertFalse(mDeferFinishAnimatable.mFinishedCallbackCalled);
+    }
+
+    private OnAnimationFinishedCallback startDeferFinishAnimatable(AnimationAdapter anim) {
+        mDeferFinishAnimatable.mSurfaceAnimator.startAnimation(mTransaction, anim,
+                true /* hidden */);
+        final ArgumentCaptor<OnAnimationFinishedCallback> callbackCaptor = ArgumentCaptor.forClass(
+                OnAnimationFinishedCallback.class);
+        assertAnimating(mDeferFinishAnimatable);
+        verify(anim).startAnimation(any(), any(), callbackCaptor.capture());
+        return callbackCaptor.getValue();
     }
 
     private void assertAnimating(MyAnimatable animatable) {

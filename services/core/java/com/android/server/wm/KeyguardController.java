@@ -29,6 +29,7 @@ import static android.view.WindowManagerPolicyConstants.KEYGUARD_GOING_AWAY_FLAG
 import static android.view.WindowManagerPolicyConstants.KEYGUARD_GOING_AWAY_FLAG_TO_SHADE;
 import static android.view.WindowManagerPolicyConstants.KEYGUARD_GOING_AWAY_FLAG_WITH_WALLPAPER;
 
+import static com.android.server.am.KeyguardControllerProto.AOD_SHOWING;
 import static com.android.server.am.KeyguardControllerProto.KEYGUARD_OCCLUDED_STATES;
 import static com.android.server.am.KeyguardControllerProto.KEYGUARD_SHOWING;
 import static com.android.server.am.KeyguardOccludedProto.DISPLAY_ID;
@@ -49,7 +50,6 @@ import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.wm.ActivityTaskManagerInternal.SleepToken;
 
 import java.io.PrintWriter;
-import java.util.Arrays;
 
 /**
  * Controls Keyguard occluding, dismissing and transitions depending on what kind of activities are
@@ -87,11 +87,23 @@ class KeyguardController {
 
     /**
      * @return true if either Keyguard or AOD are showing, not going away, and not being occluded
-     *         on the given display, false otherwise
+     *         on the given display, false otherwise.
      */
     boolean isKeyguardOrAodShowing(int displayId) {
         return (mKeyguardShowing || mAodShowing) && !mKeyguardGoingAway
                 && !isDisplayOccluded(displayId);
+    }
+
+    /**
+     * @return {@code true} for default display when AOD is showing. Otherwise, same as
+     *         {@link #isKeyguardOrAodShowing(int)}
+     * TODO(b/125198167): Replace isKeyguardOrAodShowing() by this logic.
+     */
+    boolean isKeyguardUnoccludedOrAodShowing(int displayId) {
+        if (displayId == DEFAULT_DISPLAY && mAodShowing) {
+            return true;
+        }
+        return isKeyguardOrAodShowing(displayId);
     }
 
     /**
@@ -120,18 +132,15 @@ class KeyguardController {
     /**
      * Update the Keyguard showing state.
      */
-    void setKeyguardShown(boolean keyguardShowing, boolean aodShowing,
-            int[] secondaryDisplaysShowing) {
+    void setKeyguardShown(boolean keyguardShowing, boolean aodShowing) {
         boolean showingChanged = keyguardShowing != mKeyguardShowing || aodShowing != mAodShowing;
         // If keyguard is going away, but SystemUI aborted the transition, need to reset state.
         showingChanged |= mKeyguardGoingAway && keyguardShowing;
-        if (!showingChanged && Arrays.equals(secondaryDisplaysShowing,
-                mSecondaryDisplayIdsShowing)) {
+        if (!showingChanged) {
             return;
         }
         mKeyguardShowing = keyguardShowing;
         mAodShowing = aodShowing;
-        mSecondaryDisplayIdsShowing = secondaryDisplaysShowing;
         mWindowManager.setAodShowing(aodShowing);
         if (showingChanged) {
             dismissDockedStackIfNeeded();
@@ -262,7 +271,8 @@ class KeyguardController {
      * @return True if we may show an activity while Keyguard is occluded, false otherwise.
      */
     boolean canShowWhileOccluded(boolean dismissKeyguard, boolean showWhenLocked) {
-        return showWhenLocked || dismissKeyguard && !mWindowManager.isKeyguardSecure();
+        return showWhenLocked || dismissKeyguard
+                && !mWindowManager.isKeyguardSecure(mService.getCurrentUserId());
     }
 
     private void visibilitiesUpdated() {
@@ -310,7 +320,7 @@ class KeyguardController {
         // We only allow dismissing Keyguard via the flag when Keyguard is secure for legacy
         // reasons, because that's how apps used to dismiss Keyguard in the secure case. In the
         // insecure case, we actually show it on top of the lockscreen. See #canShowWhileOccluded.
-        if (!mWindowManager.isKeyguardSecure()) {
+        if (!mWindowManager.isKeyguardSecure(mService.getCurrentUserId())) {
             return;
         }
 
@@ -338,7 +348,8 @@ class KeyguardController {
      * @return true if Keyguard can be currently dismissed without entering credentials.
      */
     boolean canDismissKeyguard() {
-        return mWindowManager.isKeyguardTrusted() || !mWindowManager.isKeyguardSecure();
+        return mWindowManager.isKeyguardTrusted()
+                || !mWindowManager.isKeyguardSecure(mService.getCurrentUserId());
     }
 
     private int resolveOccludeTransit() {
@@ -384,10 +395,11 @@ class KeyguardController {
         for (int displayNdx = mRootActivityContainer.getChildCount() - 1;
              displayNdx >= 0; displayNdx--) {
             final ActivityDisplay display = mRootActivityContainer.getChildAt(displayNdx);
-            final KeyguardDisplayState state = getDisplay(display.mDisplayId);
-            if (isKeyguardOrAodShowing(display.mDisplayId) && state.mSleepToken == null) {
+            final int displayId = display.mDisplayId;
+            final KeyguardDisplayState state = getDisplay(displayId);
+            if (isKeyguardUnoccludedOrAodShowing(displayId) && state.mSleepToken == null) {
                 state.acquiredSleepToken();
-            } else if (!isKeyguardOrAodShowing(display.mDisplayId) && state.mSleepToken != null) {
+            } else if (!isKeyguardUnoccludedOrAodShowing(displayId) && state.mSleepToken != null) {
                 state.releaseSleepToken();
             }
         }
@@ -479,7 +491,8 @@ class KeyguardController {
             }
             if (lastDismissActivity != mDismissingKeyguardActivity && !mOccluded
                     && mDismissingKeyguardActivity != null
-                    && controller.mWindowManager.isKeyguardSecure()) {
+                    && controller.mWindowManager.isKeyguardSecure(
+                            controller.mService.getCurrentUserId())) {
                 mRequestDismissKeyguard = true;
             }
         }
@@ -532,6 +545,7 @@ class KeyguardController {
 
     void writeToProto(ProtoOutputStream proto, long fieldId) {
         final long token = proto.start(fieldId);
+        proto.write(AOD_SHOWING, mAodShowing);
         proto.write(KEYGUARD_SHOWING, mKeyguardShowing);
         writeDisplayStatesToProto(proto, KEYGUARD_OCCLUDED_STATES);
         proto.end(token);

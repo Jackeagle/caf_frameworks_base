@@ -16,6 +16,8 @@
 
 package com.android.server.autofill;
 
+import static com.android.server.autofill.Helper.sDebug;
+
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.UserIdInt;
@@ -26,12 +28,13 @@ import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.ICancellationSignal;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.service.autofill.augmented.AugmentedAutofillService;
 import android.service.autofill.augmented.IAugmentedAutofillService;
 import android.service.autofill.augmented.IFillCallback;
-import android.text.format.DateUtils;
+import android.util.Pair;
 import android.util.Slog;
 import android.view.autofill.AutofillId;
 import android.view.autofill.AutofillManager;
@@ -47,17 +50,25 @@ final class RemoteAugmentedAutofillService
 
     private static final String TAG = RemoteAugmentedAutofillService.class.getSimpleName();
 
-    private static final long TIMEOUT_REMOTE_REQUEST_MILLIS = 2 * DateUtils.SECOND_IN_MILLIS;
+    private final int mIdleUnbindTimeoutMs;
+    private final int mRequestTimeoutMs;
 
     RemoteAugmentedAutofillService(Context context, ComponentName serviceName,
             int userId, RemoteAugmentedAutofillServiceCallbacks callbacks,
-            boolean bindInstantServiceAllowed, boolean verbose) {
+            boolean bindInstantServiceAllowed, boolean verbose, int idleUnbindTimeoutMs,
+            int requestTimeoutMs) {
         super(context, AugmentedAutofillService.SERVICE_INTERFACE, serviceName, userId, callbacks,
-                bindInstantServiceAllowed, verbose);
+                context.getMainThreadHandler(),
+                bindInstantServiceAllowed ? Context.BIND_ALLOW_INSTANT : 0, verbose);
+        mIdleUnbindTimeoutMs = idleUnbindTimeoutMs;
+        mRequestTimeoutMs = requestTimeoutMs;
+
+        // Bind right away.
+        scheduleBind();
     }
 
     @Nullable
-    public static ComponentName getComponentName(@NonNull String componentName,
+    static Pair<ServiceInfo, ComponentName> getComponentName(@NonNull String componentName,
             @UserIdInt int userId, boolean isTemporary) {
         int flags = PackageManager.GET_META_DATA;
         if (!isTemporary) {
@@ -78,7 +89,23 @@ final class RemoteAugmentedAutofillService
             Slog.e(TAG, "Error getting service info for '" + componentName + "': " + e);
             return null;
         }
-        return serviceComponent;
+        return new Pair<>(serviceInfo, serviceComponent);
+    }
+
+    @Override // from RemoteService
+    protected void handleOnConnectedStateChanged(boolean state) {
+        if (state && getTimeoutIdleBindMillis() != PERMANENT_BOUND_TIMEOUT_MS) {
+            scheduleUnbind();
+        }
+        try {
+            if (state) {
+                mService.onConnected();
+            } else {
+                mService.onDisconnected();
+            }
+        } catch (Exception e) {
+            Slog.w(mTag, "Exception calling onConnectedStateChanged(" + state + "): " + e);
+        }
     }
 
     @Override // from AbstractRemoteService
@@ -88,12 +115,12 @@ final class RemoteAugmentedAutofillService
 
     @Override // from AbstractRemoteService
     protected long getTimeoutIdleBindMillis() {
-        return PERMANENT_BOUND_TIMEOUT_MS;
+        return mIdleUnbindTimeoutMs;
     }
 
     @Override // from AbstractRemoteService
     protected long getRemoteRequestMillis() {
-        return TIMEOUT_REMOTE_REQUEST_MILLIS;
+        return mRequestTimeoutMs;
     }
 
     /**
@@ -106,11 +133,27 @@ final class RemoteAugmentedAutofillService
                 activityComponent, focusedId, focusedValue));
     }
 
+    @Override
+    public String toString() {
+        return "RemoteAugmentedAutofillService["
+                + ComponentName.flattenToShortString(getComponentName()) + "]";
+    }
+
     /**
      * Called by {@link Session} when it's time to destroy all augmented autofill requests.
      */
     public void onDestroyAutofillWindowsRequest() {
         scheduleAsyncRequest((s) -> s.onDestroyAllFillWindowsRequest());
+    }
+
+    private void dispatchOnFillTimeout(@NonNull ICancellationSignal cancellation) {
+        mHandler.post(() -> {
+            try {
+                cancellation.cancel();
+            } catch (RemoteException e) {
+                Slog.w(mTag, "Error calling cancellation signal: " + e);
+            }
+        });
     }
 
     // TODO(b/123100811): inline into PendingAutofillRequest if it doesn't have any other subclass
@@ -132,6 +175,7 @@ final class RemoteAugmentedAutofillService
         private final int mTaskId;
         private final long mRequestTime = SystemClock.elapsedRealtime();
         private final @NonNull IFillCallback mCallback;
+        private ICancellationSignal mCancellation;
 
         protected PendingAutofillRequest(@NonNull RemoteAugmentedAutofillService service,
                 int sessionId, @NonNull IAutoFillManagerClient client, int taskId,
@@ -149,11 +193,55 @@ final class RemoteAugmentedAutofillService
                     if (!finish()) return;
                     // NOTE: so far we don't need notify RemoteAugmentedAutofillServiceCallbacks
                 }
+
+                @Override
+                public void onCancellable(ICancellationSignal cancellation) {
+                    synchronized (mLock) {
+                        final boolean cancelled;
+                        synchronized (mLock) {
+                            mCancellation = cancellation;
+                            cancelled = isCancelledLocked();
+                        }
+                        if (cancelled) {
+                            try {
+                                cancellation.cancel();
+                            } catch (RemoteException e) {
+                                Slog.e(mTag, "Error requesting a cancellation", e);
+                            }
+                        }
+                    }
+                }
+
+                @Override
+                public boolean isCompleted() {
+                    return isRequestCompleted();
+                }
+
+                @Override
+                public void cancel() {
+                    synchronized (mLock) {
+                        final boolean cancelled = isCancelledLocked();
+                        final ICancellationSignal cancellation = mCancellation;
+                        if (!cancelled) {
+                            try {
+                                cancellation.cancel();
+                            } catch (RemoteException e) {
+                                Slog.e(mTag, "Error requesting a cancellation", e);
+                            }
+                        }
+                    }
+                }
             };
         }
 
         @Override
         public void run() {
+            synchronized (mLock) {
+                if (isCancelledLocked()) {
+                    if (sDebug) Slog.d(mTag, "run() called after canceled");
+                    return;
+                }
+            }
             final RemoteAugmentedAutofillService remoteService = getService();
             if (remoteService == null) return;
 
@@ -181,11 +269,38 @@ final class RemoteAugmentedAutofillService
 
         @Override
         protected void onTimeout(RemoteAugmentedAutofillService remoteService) {
-            Slog.wtf(TAG, "timed out: " + this);
+            // TODO(b/122858578): must update the logged AUTOFILL_AUGMENTED_REQUEST with the
+            // timeout
+            Slog.w(TAG, "PendingAutofillRequest timed out (" + remoteService.mRequestTimeoutMs
+                    + "ms) for " + remoteService);
             // NOTE: so far we don't need notify RemoteAugmentedAutofillServiceCallbacks
+            final ICancellationSignal cancellation;
+            synchronized (mLock) {
+                cancellation = mCancellation;
+            }
+            if (cancellation != null) {
+                remoteService.dispatchOnFillTimeout(cancellation);
+            }
             finish();
         }
 
+        @Override
+        public boolean cancel() {
+            if (!super.cancel()) return false;
+
+            final ICancellationSignal cancellation;
+            synchronized (mLock) {
+                cancellation = mCancellation;
+            }
+            if (cancellation != null) {
+                try {
+                    cancellation.cancel();
+                } catch (RemoteException e) {
+                    Slog.e(mTag, "Error cancelling a fill request", e);
+                }
+            }
+            return true;
+        }
     }
 
     public interface RemoteAugmentedAutofillServiceCallbacks

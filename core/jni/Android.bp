@@ -1,10 +1,10 @@
 
 genrule {
-    name: "android_util_StatsLog.cpp",
+    name: "android_util_StatsLogInternal.cpp",
     tools: ["stats-log-api-gen"],
-    cmd: "$(location stats-log-api-gen) --jni $(genDir)/android_util_StatsLog.cpp",
+    cmd: "$(location stats-log-api-gen) --jni $(genDir)/android_util_StatsLogInternal.cpp",
     out: [
-        "android_util_StatsLog.cpp",
+        "android_util_StatsLogInternal.cpp",
     ],
 }
 
@@ -62,6 +62,7 @@ cc_library_shared {
         "android_graphics_drawable_AnimatedVectorDrawable.cpp",
         "android_graphics_drawable_VectorDrawable.cpp",
         "android_graphics_Picture.cpp",
+        "android_view_CompositionSamplingListener.cpp",
         "android_view_DisplayEventReceiver.cpp",
         "android_view_DisplayListCanvas.cpp",
         "android_view_TextureLayer.cpp",
@@ -110,6 +111,7 @@ cc_library_shared {
         "android_util_Binder.cpp",
         "android_util_EventLog.cpp",
         "android_util_Log.cpp",
+        "android_util_StatsLog.cpp",
         "android_util_MemoryIntArray.cpp",
         "android_util_PathParser.cpp",
         "android_util_Process.cpp",
@@ -163,6 +165,9 @@ cc_library_shared {
         "android_media_AudioSystem.cpp",
         "android_media_AudioTrack.cpp",
         "android_media_AudioAttributes.cpp",
+        "android_media_AudioProductStrategies.cpp",
+        "android_media_AudioVolumeGroups.cpp",
+        "android_media_AudioVolumeGroupCallback.cpp",
         "android_media_DeviceCallback.cpp",
         "android_media_JetPlayer.cpp",
         "android_media_MediaMetricsJNI.cpp",
@@ -199,7 +204,6 @@ cc_library_shared {
         "android_content_res_Configuration.cpp",
         "android_animation_PropertyValuesHolder.cpp",
         "android_security_Scrypt.cpp",
-        "com_android_internal_net_NetworkStatsFactory.cpp",
         "com_android_internal_os_AtomicDirectory.cpp",
         "com_android_internal_os_ClassLoaderFactory.cpp",
         "com_android_internal_os_FuseAppLoop.cpp",
@@ -230,6 +234,7 @@ cc_library_shared {
     ],
 
     static_libs: [
+        "libasync_safe",
         "libgif",
         "libseccomp_policy",
         "libgrallocusage",
@@ -276,6 +281,7 @@ cc_library_shared {
         "libmediametrics",
         "libmeminfo",
         "libaudioclient",
+        "libaudiopolicy",
         "libjpeg",
         "libusbhost",
         "libharfbuzz_ng",
@@ -286,8 +292,8 @@ cc_library_shared {
         "libsoundtrigger",
         "libminikin",
         "libprocessgroup",
-        "libnativebridge",
-        "libnativeloader",
+        "libnativebridge_lazy",
+        "libnativeloader_lazy",
         "libmemunreachable",
         "libhidlbase",
         "libhidltransport",
@@ -296,11 +302,12 @@ cc_library_shared {
         "libnativewindow",
         "libhwui",
         "libdl",
+        "libdl_android",
         "libstatslog",
         "server_configurable_flags",
     ],
 
-    generated_sources: ["android_util_StatsLog.cpp"],
+    generated_sources: ["android_util_StatsLogInternal.cpp"],
 
     local_include_dirs: ["android/graphics"],
     export_include_dirs: [

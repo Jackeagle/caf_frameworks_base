@@ -27,6 +27,7 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.Person;
 import android.app.RemoteInput;
+import android.content.ComponentName;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.IPackageManager;
 import android.content.pm.PackageManager;
@@ -46,25 +47,28 @@ import java.util.Objects;
 public class NotificationEntry {
     static final String TAG = "NotificationEntry";
 
-    private StatusBarNotification mSbn;
+    private final StatusBarNotification mSbn;
     private final IPackageManager mPackageManager;
     private int mTargetSdkVersion = Build.VERSION_CODES.N_MR1;
-    private boolean mPreChannelsNotification = true;
-    private AudioAttributes mAttributes;
-    private NotificationChannel mChannel;
-    private int mImportance;
+    private final boolean mPreChannelsNotification;
+    private final AudioAttributes mAttributes;
+    private final NotificationChannel mChannel;
+    private final int mImportance;
     private boolean mSeen;
-    private boolean mExpanded;
     private boolean mIsShowActionEventLogged;
+    private final SmsHelper mSmsHelper;
+
+    private final Object mLock = new Object();
 
     public NotificationEntry(IPackageManager packageManager, StatusBarNotification sbn,
-            NotificationChannel channel) {
+            NotificationChannel channel, SmsHelper smsHelper) {
         mSbn = sbn;
         mChannel = channel;
         mPackageManager = packageManager;
         mPreChannelsNotification = isPreChannelsNotification();
         mAttributes = calculateAudioAttributes();
         mImportance = calculateInitialImportance();
+        mSmsHelper = smsHelper;
     }
 
     private boolean isPreChannelsNotification() {
@@ -192,7 +196,16 @@ public class NotificationEntry {
     protected boolean involvesPeople() {
         return isMessaging()
                 || hasStyle(Notification.InboxStyle.class)
-                || hasPerson();
+                || hasPerson()
+                || isDefaultSmsApp();
+    }
+
+    private boolean isDefaultSmsApp() {
+        ComponentName defaultSmsApp = mSmsHelper.getDefaultSmsApplication();
+        if (defaultSmsApp == null) {
+            return false;
+        }
+        return mSbn.getPackageName().equals(defaultSmsApp.getPackageName());
     }
 
     protected boolean isMessaging() {
@@ -221,23 +234,27 @@ public class NotificationEntry {
     }
 
     public void setSeen() {
-        mSeen = true;
-    }
-
-    public void setExpanded(boolean expanded) {
-        mExpanded = expanded;
+        synchronized (mLock) {
+            mSeen = true;
+        }
     }
 
     public void setShowActionEventLogged() {
-        mIsShowActionEventLogged = true;
+        synchronized (mLock) {
+            mIsShowActionEventLogged = true;
+        }
     }
 
     public boolean hasSeen() {
-        return mSeen;
+        synchronized (mLock) {
+            return mSeen;
+        }
     }
 
     public boolean isShowActionEventLogged() {
-        return mIsShowActionEventLogged;
+        synchronized (mLock) {
+            return mIsShowActionEventLogged;
+        }
     }
 
     public StatusBarNotification getSbn() {

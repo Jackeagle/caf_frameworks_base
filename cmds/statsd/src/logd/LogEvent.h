@@ -55,6 +55,14 @@ struct AttributionNodeInternal {
     int32_t mUid;
     std::string mTag;
 };
+
+struct InstallTrainInfo {
+    int64_t trainVersionCode;
+    std::string trainName;
+    int32_t status;
+    std::vector<int64_t> experimentIds;
+};
+
 /**
  * Wrapper for the log_msg structure.
  */
@@ -97,35 +105,16 @@ public:
                       const std::map<int32_t, std::string>& string_map,
                       const std::map<int32_t, float>& float_map);
 
-    explicit LogEvent(int64_t wallClockTimestampNs, int64_t elapsedTimestampNs,
-                      const SpeakerImpedance& speakerImpedance);
-
-    explicit LogEvent(int64_t wallClockTimestampNs, int64_t elapsedTimestampNs,
-                      const HardwareFailed& hardwareFailed);
-
-    explicit LogEvent(int64_t wallClockTimestampNs, int64_t elapsedTimestampNs,
-                      const PhysicalDropDetected& physicalDropDetected);
-
-    explicit LogEvent(int64_t wallClockTimestampNs, int64_t elapsedTimestampNs,
-                      const ChargeCycles& chargeCycles);
-
-    explicit LogEvent(int64_t wallClockTimestampNs, int64_t elapsedTimestampNs,
-                      const BatteryHealthSnapshotArgs& batteryHealthSnapshotArgs);
-
-    explicit LogEvent(int64_t wallClockTimestampNs, int64_t elapsedTimestampNs,
-                      const SlowIo& slowIo);
-
-    explicit LogEvent(int64_t wallClockTimestampNs, int64_t elapsedTimestampNs,
-                      const BatteryCausedShutdown& batteryCausedShutdown);
-
-    explicit LogEvent(int64_t wallClockTimestampNs, int64_t elapsedTimestampNs,
-                      const UsbPortOverheatEvent& usbPortOverheatEvent);
-
-    explicit LogEvent(int64_t wallClockTimestampNs, int64_t elapsedTimestampNs,
-                      const SpeechDspStat& speechDspStat);
+    // Constructs a BinaryPushStateChanged LogEvent from API call.
+    explicit LogEvent(const std::string& trainName, int64_t trainVersionCode, bool requiresStaging,
+                      bool rollbackEnabled, bool requiresLowLatencyMonitor, int32_t state,
+                      const std::vector<uint8_t>& experimentIds, int32_t userId);
 
     explicit LogEvent(int64_t wallClockTimestampNs, int64_t elapsedTimestampNs,
                       const VendorAtom& vendorAtom);
+
+    explicit LogEvent(int64_t wallClockTimestampNs, int64_t elapsedTimestampNs,
+                      const InstallTrainInfo& installTrainInfo);
 
     ~LogEvent();
 
@@ -250,6 +239,8 @@ private:
 
     uint32_t mLogUid;
 };
+
+void writeExperimentIdsToProto(const std::vector<int64_t>& experimentIds, std::vector<uint8_t>* protoOut);
 
 }  // namespace statsd
 }  // namespace os

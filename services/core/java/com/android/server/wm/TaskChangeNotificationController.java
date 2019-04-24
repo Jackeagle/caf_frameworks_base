@@ -16,12 +16,15 @@
 
 package com.android.server.wm;
 
+import android.app.ActivityManager;
+import android.app.ActivityManager.RunningTaskInfo;
 import android.app.ActivityManager.TaskSnapshot;
 import android.app.ITaskStackListener;
-import android.app.ActivityManager.TaskDescription;
+import android.app.TaskInfo;
 import android.content.ComponentName;
 import android.os.Binder;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
 import android.os.RemoteCallbackList;
@@ -48,6 +51,8 @@ class TaskChangeNotificationController {
     private static final int NOTIFY_PINNED_STACK_ANIMATION_STARTED_LISTENERS_MSG = 16;
     private static final int NOTIFY_ACTIVITY_UNPINNED_LISTENERS_MSG = 17;
     private static final int NOTIFY_ACTIVITY_LAUNCH_ON_SECONDARY_DISPLAY_FAILED_MSG = 18;
+    private static final int NOTIFY_ACTIVITY_LAUNCH_ON_SECONDARY_DISPLAY_REROUTED_MSG = 19;
+    private static final int NOTIFY_SIZE_COMPAT_MODE_ACTIVITY_CHANGED_MSG = 20;
 
     // Delay in notifying task stack change listeners (in millis)
     private static final int NOTIFY_TASK_STACK_CHANGE_LISTENERS_DELAY = 100;
@@ -80,11 +85,11 @@ class TaskChangeNotificationController {
     };
 
     private final TaskStackConsumer mNotifyTaskMovedToFront = (l, m) -> {
-        l.onTaskMovedToFront(m.arg1);
+        l.onTaskMovedToFront((RunningTaskInfo) m.obj);
     };
 
     private final TaskStackConsumer mNotifyTaskDescriptionChanged = (l, m) -> {
-        l.onTaskDescriptionChanged(m.arg1, (TaskDescription) m.obj);
+        l.onTaskDescriptionChanged((RunningTaskInfo) m.obj);
     };
 
     private final TaskStackConsumer mNotifyActivityRequestedOrientationChanged = (l, m) -> {
@@ -92,7 +97,7 @@ class TaskChangeNotificationController {
     };
 
     private final TaskStackConsumer mNotifyTaskRemovalStarted = (l, m) -> {
-        l.onTaskRemovalStarted(m.arg1);
+        l.onTaskRemovalStarted((RunningTaskInfo) m.obj);
     };
 
     private final TaskStackConsumer mNotifyActivityPinned = (l, m) -> {
@@ -125,7 +130,11 @@ class TaskChangeNotificationController {
     };
 
     private final TaskStackConsumer mNotifyActivityLaunchOnSecondaryDisplayFailed = (l, m) -> {
-        l.onActivityLaunchOnSecondaryDisplayFailed();
+        l.onActivityLaunchOnSecondaryDisplayFailed((RunningTaskInfo) m.obj, m.arg1);
+    };
+
+    private final TaskStackConsumer mNotifyActivityLaunchOnSecondaryDisplayRerouted = (l, m) -> {
+        l.onActivityLaunchOnSecondaryDisplayRerouted((RunningTaskInfo) m.obj, m.arg1);
     };
 
     private final TaskStackConsumer mNotifyTaskProfileLocked = (l, m) -> {
@@ -134,6 +143,10 @@ class TaskChangeNotificationController {
 
     private final TaskStackConsumer mNotifyTaskSnapshotChanged = (l, m) -> {
         l.onTaskSnapshotChanged(m.arg1, (TaskSnapshot) m.obj);
+    };
+
+    private final TaskStackConsumer mOnSizeCompatModeActivityChanged = (l, m) -> {
+        l.onSizeCompatModeActivityChanged(m.arg1, (IBinder) m.obj);
     };
 
     @FunctionalInterface
@@ -200,11 +213,17 @@ class TaskChangeNotificationController {
                 case NOTIFY_ACTIVITY_LAUNCH_ON_SECONDARY_DISPLAY_FAILED_MSG:
                     forAllRemoteListeners(mNotifyActivityLaunchOnSecondaryDisplayFailed, msg);
                     break;
+                case NOTIFY_ACTIVITY_LAUNCH_ON_SECONDARY_DISPLAY_REROUTED_MSG:
+                    forAllRemoteListeners(mNotifyActivityLaunchOnSecondaryDisplayRerouted, msg);
+                    break;
                 case NOTIFY_TASK_PROFILE_LOCKED_LISTENERS_MSG:
                     forAllRemoteListeners(mNotifyTaskProfileLocked, msg);
                     break;
                 case NOTIFY_TASK_SNAPSHOT_CHANGED_LISTENERS_MSG:
                     forAllRemoteListeners(mNotifyTaskSnapshotChanged, msg);
+                    break;
+                case NOTIFY_SIZE_COMPAT_MODE_ACTIVITY_CHANGED_MSG:
+                    forAllRemoteListeners(mOnSizeCompatModeActivityChanged, msg);
                     break;
             }
         }
@@ -344,11 +363,21 @@ class TaskChangeNotificationController {
         msg.sendToTarget();
     }
 
-    void notifyActivityLaunchOnSecondaryDisplayFailed() {
+    void notifyActivityLaunchOnSecondaryDisplayFailed(TaskInfo ti, int requestedDisplayId) {
         mHandler.removeMessages(NOTIFY_ACTIVITY_LAUNCH_ON_SECONDARY_DISPLAY_FAILED_MSG);
         final Message msg = mHandler.obtainMessage(
-                NOTIFY_ACTIVITY_LAUNCH_ON_SECONDARY_DISPLAY_FAILED_MSG);
+                NOTIFY_ACTIVITY_LAUNCH_ON_SECONDARY_DISPLAY_FAILED_MSG, requestedDisplayId,
+                0 /* unused */, ti);
         forAllLocalListeners(mNotifyActivityLaunchOnSecondaryDisplayFailed, msg);
+        msg.sendToTarget();
+    }
+
+    void notifyActivityLaunchOnSecondaryDisplayRerouted(TaskInfo ti, int requestedDisplayId) {
+        mHandler.removeMessages(NOTIFY_ACTIVITY_LAUNCH_ON_SECONDARY_DISPLAY_REROUTED_MSG);
+        final Message msg = mHandler.obtainMessage(
+                NOTIFY_ACTIVITY_LAUNCH_ON_SECONDARY_DISPLAY_REROUTED_MSG, requestedDisplayId,
+                0 /* unused */, ti);
+        forAllLocalListeners(mNotifyActivityLaunchOnSecondaryDisplayRerouted, msg);
         msg.sendToTarget();
     }
 
@@ -366,16 +395,15 @@ class TaskChangeNotificationController {
         msg.sendToTarget();
     }
 
-    void notifyTaskMovedToFront(int taskId) {
-        final Message msg = mHandler.obtainMessage(NOTIFY_TASK_MOVED_TO_FRONT_LISTENERS_MSG,
-                taskId, 0 /* unused */);
+    void notifyTaskMovedToFront(TaskInfo ti) {
+        final Message msg = mHandler.obtainMessage(NOTIFY_TASK_MOVED_TO_FRONT_LISTENERS_MSG, ti);
         forAllLocalListeners(mNotifyTaskMovedToFront, msg);
         msg.sendToTarget();
     }
 
-    void notifyTaskDescriptionChanged(int taskId, TaskDescription taskDescription) {
+    void notifyTaskDescriptionChanged(TaskInfo taskInfo) {
         final Message msg = mHandler.obtainMessage(NOTIFY_TASK_DESCRIPTION_CHANGED_LISTENERS_MSG,
-                taskId, 0 /* unused */, taskDescription);
+                taskInfo);
         forAllLocalListeners(mNotifyTaskDescriptionChanged, msg);
         msg.sendToTarget();
 
@@ -393,12 +421,10 @@ class TaskChangeNotificationController {
      * the window manager. This allows interested parties to perform relevant animations before
      * the window disappears.
      */
-    void notifyTaskRemovalStarted(int taskId) {
-        final Message msg = mHandler.obtainMessage(NOTIFY_TASK_REMOVAL_STARTED_LISTENERS, taskId,
-                0 /* unused */);
+    void notifyTaskRemovalStarted(ActivityManager.RunningTaskInfo taskInfo) {
+        final Message msg = mHandler.obtainMessage(NOTIFY_TASK_REMOVAL_STARTED_LISTENERS, taskInfo);
         forAllLocalListeners(mNotifyTaskRemovalStarted, msg);
         msg.sendToTarget();
-
     }
 
     /**
@@ -419,6 +445,17 @@ class TaskChangeNotificationController {
         final Message msg = mHandler.obtainMessage(NOTIFY_TASK_SNAPSHOT_CHANGED_LISTENERS_MSG,
                 taskId, 0, snapshot);
         forAllLocalListeners(mNotifyTaskSnapshotChanged, msg);
+        msg.sendToTarget();
+    }
+
+    /**
+     * Notify listeners that whether a size compatibility mode activity is using the override
+     * bounds which is not fit its parent.
+     */
+    void notifySizeCompatModeActivityChanged(int displayId, IBinder activityToken) {
+        final Message msg = mHandler.obtainMessage(NOTIFY_SIZE_COMPAT_MODE_ACTIVITY_CHANGED_MSG,
+                displayId, 0 /* unused */, activityToken);
+        forAllLocalListeners(mOnSizeCompatModeActivityChanged, msg);
         msg.sendToTarget();
     }
 }

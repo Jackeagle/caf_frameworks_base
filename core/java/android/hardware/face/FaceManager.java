@@ -45,6 +45,7 @@ import android.util.Log;
 import android.util.Slog;
 
 import com.android.internal.R;
+import com.android.internal.os.SomeArgs;
 
 import java.util.List;
 
@@ -63,6 +64,8 @@ public class FaceManager implements BiometricAuthenticator, BiometricFaceConstan
     private static final int MSG_AUTHENTICATION_FAILED = 103;
     private static final int MSG_ERROR = 104;
     private static final int MSG_REMOVED = 105;
+    private static final int MSG_GET_FEATURE_COMPLETED = 106;
+    private static final int MSG_SET_FEATURE_COMPLETED = 107;
 
     private IFaceService mService;
     private final Context mContext;
@@ -70,6 +73,8 @@ public class FaceManager implements BiometricAuthenticator, BiometricFaceConstan
     private AuthenticationCallback mAuthenticationCallback;
     private EnrollmentCallback mEnrollmentCallback;
     private RemovalCallback mRemovalCallback;
+    private SetFeatureCallback mSetFeatureCallback;
+    private GetFeatureCallback mGetFeatureCallback;
     private CryptoObject mCryptoObject;
     private Face mRemovalFace;
     private Handler mHandler;
@@ -106,6 +111,25 @@ public class FaceManager implements BiometricAuthenticator, BiometricFaceConstan
         public void onRemoved(long deviceId, int faceId, int remaining) {
             mHandler.obtainMessage(MSG_REMOVED, remaining, 0,
                     new Face(null, faceId, deviceId)).sendToTarget();
+        }
+
+        @Override
+        public void onEnumerated(long deviceId, int faceId, int remaining) {
+            // TODO: Finish. Low priority since it's not used.
+        }
+
+        @Override
+        public void onFeatureSet(boolean success, int feature) {
+            mHandler.obtainMessage(MSG_SET_FEATURE_COMPLETED, feature, 0, success).sendToTarget();
+        }
+
+        @Override
+        public void onFeatureGet(boolean success, int feature, boolean value) {
+            SomeArgs args = SomeArgs.obtain();
+            args.arg1 = success;
+            args.argi1 = feature;
+            args.arg2 = value;
+            mHandler.obtainMessage(MSG_GET_FEATURE_COMPLETED, args).sendToTarget();
         }
     };
 
@@ -281,10 +305,12 @@ public class FaceManager implements BiometricAuthenticator, BiometricFaceConstan
      * @hide
      */
     @RequiresPermission(MANAGE_BIOMETRIC)
-    public void setFeature(int feature, boolean enabled, byte[] token) {
+    public void setFeature(int feature, boolean enabled, byte[] token,
+            SetFeatureCallback callback) {
         if (mService != null) {
             try {
-                mService.setFeature(feature, enabled, token);
+                mSetFeatureCallback = callback;
+                mService.setFeature(feature, enabled, token, mServiceReceiver);
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
@@ -295,16 +321,15 @@ public class FaceManager implements BiometricAuthenticator, BiometricFaceConstan
      * @hide
      */
     @RequiresPermission(MANAGE_BIOMETRIC)
-    public boolean getFeature(int feature) {
-        boolean result = true;
+    public void getFeature(int feature, GetFeatureCallback callback) {
         if (mService != null) {
             try {
-                result = mService.getFeature(feature);
+                mGetFeatureCallback = callback;
+                mService.getFeature(feature, mServiceReceiver);
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
         }
-        return result;
     }
 
     /**
@@ -474,25 +499,6 @@ public class FaceManager implements BiometricAuthenticator, BiometricFaceConstan
     }
 
     /**
-     * Reset the lockout timer when asked to do so by keyguard.
-     *
-     * @param token an opaque token returned by password confirmation.
-     * @hide
-     */
-    @RequiresPermission(MANAGE_BIOMETRIC)
-    public void resetTimeout(byte[] token) {
-        if (mService != null) {
-            try {
-                mService.resetTimeout(token);
-            } catch (RemoteException e) {
-                throw e.rethrowFromSystemServer();
-            }
-        } else {
-            Log.w(TAG, "resetTimeout(): Service not connected!");
-        }
-    }
-
-    /**
      * @hide
      */
     @RequiresPermission(USE_BIOMETRIC_INTERNAL)
@@ -565,16 +571,16 @@ public class FaceManager implements BiometricAuthenticator, BiometricFaceConstan
      */
     public static String getErrorString(Context context, int errMsg, int vendorCode) {
         switch (errMsg) {
-            case FACE_ERROR_UNABLE_TO_PROCESS:
-                return context.getString(
-                        com.android.internal.R.string.face_error_unable_to_process);
             case FACE_ERROR_HW_UNAVAILABLE:
                 return context.getString(
                         com.android.internal.R.string.face_error_hw_not_available);
-            case FACE_ERROR_NO_SPACE:
-                return context.getString(com.android.internal.R.string.face_error_no_space);
+            case FACE_ERROR_UNABLE_TO_PROCESS:
+                return context.getString(
+                        com.android.internal.R.string.face_error_unable_to_process);
             case FACE_ERROR_TIMEOUT:
                 return context.getString(com.android.internal.R.string.face_error_timeout);
+            case FACE_ERROR_NO_SPACE:
+                return context.getString(com.android.internal.R.string.face_error_no_space);
             case FACE_ERROR_CANCELED:
                 return context.getString(com.android.internal.R.string.face_error_canceled);
             case FACE_ERROR_LOCKOUT:
@@ -629,6 +635,26 @@ public class FaceManager implements BiometricAuthenticator, BiometricFaceConstan
                 return context.getString(R.string.face_acquired_poor_gaze);
             case FACE_ACQUIRED_NOT_DETECTED:
                 return context.getString(R.string.face_acquired_not_detected);
+            case FACE_ACQUIRED_TOO_MUCH_MOTION:
+                return context.getString(R.string.face_acquired_too_much_motion);
+            case FACE_ACQUIRED_RECALIBRATE:
+                return context.getString(R.string.face_acquired_recalibrate);
+            case FACE_ACQUIRED_TOO_DIFFERENT:
+                return context.getString(R.string.face_acquired_too_different);
+            case FACE_ACQUIRED_TOO_SIMILAR:
+                return context.getString(R.string.face_acquired_too_similar);
+            case FACE_ACQUIRED_PAN_TOO_EXTREME:
+                return context.getString(R.string.face_acquired_pan_too_extreme);
+            case FACE_ACQUIRED_TILT_TOO_EXTREME:
+                return context.getString(R.string.face_acquired_tilt_too_extreme);
+            case FACE_ACQUIRED_ROLL_TOO_EXTREME:
+                return context.getString(R.string.face_acquired_roll_too_extreme);
+            case FACE_ACQUIRED_FACE_OBSCURED:
+                return context.getString(R.string.face_acquired_obscured);
+            case FACE_ACQUIRED_START:
+                return null;
+            case FACE_ACQUIRED_SENSOR_DIRTY:
+                return context.getString(R.string.face_acquired_sensor_dirty);
             case FACE_ACQUIRED_VENDOR: {
                 String[] msgArray = context.getResources().getStringArray(
                         R.array.face_acquired_vendor);
@@ -867,6 +893,20 @@ public class FaceManager implements BiometricAuthenticator, BiometricFaceConstan
         }
     }
 
+    /**
+     * @hide
+     */
+    public abstract static class SetFeatureCallback {
+        public abstract void onCompleted(boolean success, int feature);
+    }
+
+    /**
+     * @hide
+     */
+    public abstract static class GetFeatureCallback {
+        public abstract void onCompleted(boolean success, int feature, boolean value);
+    }
+
     private class OnEnrollCancelListener implements OnCancelListener {
         @Override
         public void onCancel() {
@@ -919,9 +959,36 @@ public class FaceManager implements BiometricAuthenticator, BiometricFaceConstan
                 case MSG_REMOVED:
                     sendRemovedResult((Face) msg.obj, msg.arg1 /* remaining */);
                     break;
+                case MSG_SET_FEATURE_COMPLETED:
+                    sendSetFeatureCompleted((boolean) msg.obj /* success */,
+                            msg.arg1 /* feature */);
+                    break;
+                case MSG_GET_FEATURE_COMPLETED:
+                    SomeArgs args = (SomeArgs) msg.obj;
+                    sendGetFeatureCompleted((boolean) args.arg1 /* success */,
+                            args.argi1 /* feature */,
+                            (boolean) args.arg2 /* value */);
+                    args.recycle();
+                    break;
+                default:
+                    Log.w(TAG, "Unknown message: " + msg.what);
             }
         }
-    };
+    }
+
+    private void sendSetFeatureCompleted(boolean success, int feature) {
+        if (mSetFeatureCallback == null) {
+            return;
+        }
+        mSetFeatureCallback.onCompleted(success, feature);
+    }
+
+    private void sendGetFeatureCompleted(boolean success, int feature, boolean value) {
+        if (mGetFeatureCallback == null) {
+            return;
+        }
+        mGetFeatureCallback.onCompleted(success, feature, value);
+    }
 
     private void sendRemovedResult(Face face, int remaining) {
         if (mRemovalCallback == null) {

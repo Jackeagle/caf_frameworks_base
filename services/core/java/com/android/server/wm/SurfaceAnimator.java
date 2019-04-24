@@ -82,6 +82,11 @@ class SurfaceAnimator {
                     return;
                 }
                 final Runnable resetAndInvokeFinish = () -> {
+                    // We need to check again if the animation has been replaced with a new
+                    // animation because the animatable may defer to finish.
+                    if (anim != mAnimation) {
+                        return;
+                    }
                     reset(mAnimatable.getPendingTransaction(), true /* destroyLeash */);
                     if (animationFinishedCallback != null) {
                         animationFinishedCallback.run();
@@ -251,7 +256,7 @@ class SurfaceAnimator {
         if (DEBUG_ANIM) Slog.i(TAG, "Cancelling animation restarting=" + restarting);
         final SurfaceControl leash = mLeash;
         final AnimationAdapter animation = mAnimation;
-        reset(t, forwardCancel);
+        reset(t, false);
         if (animation != null) {
             if (!mAnimationStartDelayed && forwardCancel) {
                 animation.onAnimationCancelled(leash);
@@ -260,6 +265,12 @@ class SurfaceAnimator {
                 mAnimationFinishedCallback.run();
             }
         }
+
+        if (forwardCancel && leash != null) {
+            t.remove(leash);
+            mService.scheduleAnimationLocked();
+        }
+
         if (!restarting) {
             mAnimationStartDelayed = false;
         }
@@ -280,7 +291,7 @@ class SurfaceAnimator {
         }
         mService.mAnimationTransferMap.remove(mAnimation);
         if (mLeash != null && destroyLeash) {
-            t.reparent(mLeash, null);
+            t.remove(mLeash);
             scheduleAnim = true;
         }
         mLeash = null;
@@ -325,7 +336,7 @@ class SurfaceAnimator {
         if (mAnimation != null) {
             mAnimation.writeToProto(proto, ANIMATION_ADAPTER);
         }
-        if (mLeash != null){
+        if (mLeash != null) {
             mLeash.writeToProto(proto, LEASH);
         }
         proto.write(ANIMATION_START_DELAYED, mAnimationStartDelayed);
@@ -399,11 +410,13 @@ class SurfaceAnimator {
 
         /**
          * @return The surface of the object to be animated.
+         *         This SurfaceControl must be valid if non-null.
          */
         @Nullable SurfaceControl getSurfaceControl();
 
         /**
          * @return The parent of the surface object to be animated.
+         *         This SurfaceControl must be valid if non-null.
          */
         @Nullable SurfaceControl getParentSurfaceControl();
 

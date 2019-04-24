@@ -22,6 +22,7 @@ import android.content.res.Resources;
 import android.util.AttributeSet;
 import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.FrameLayout.LayoutParams;
 
 import com.android.keyguard.R;
 
@@ -75,13 +76,16 @@ public class ClockLayout extends FrameLayout {
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         super.onLayout(changed, left, top, right, bottom);
 
-        final float offsetX = getBurnInOffset(mBurnInPreventionOffsetX, true);
-        final float offsetY = getBurnInOffset(mBurnInPreventionOffsetY, false);
+        final float offsetX = getBurnInOffset(mBurnInPreventionOffsetX * 2, true)
+                - mBurnInPreventionOffsetX;
+        final float offsetY = getBurnInOffset(mBurnInPreventionOffsetY * 2, false)
+                - mBurnInPreventionOffsetY;
 
         // Put digital clock in two left corner of the screen.
         if (mDigitalClock != null) {
-            mDigitalClock.setX(0.1f * getWidth() + offsetX);
-            mDigitalClock.setY(0.1f * getHeight() + offsetY);
+            LayoutParams params = (LayoutParams) mDigitalClock.getLayoutParams();
+            mDigitalClock.setX(offsetX + params.leftMargin);
+            mDigitalClock.setY(offsetY + params.topMargin);
         }
 
         // Put the analog clock in the middle of the screen.

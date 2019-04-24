@@ -34,16 +34,15 @@ import com.android.systemui.pip.phone.PipDismissViewController;
  * dismissing, and flings.
  */
 class BubbleTouchHandler implements View.OnTouchListener {
+    /** Velocity required to dismiss a bubble without dragging it into the dismiss target. */
+    private static final float DISMISS_MIN_VELOCITY = 4000f;
+
+    private final PointF mTouchDown = new PointF();
+    private final PointF mViewPositionOnTouchDown = new PointF();
+    private final BubbleStackView mStack;
 
     private BubbleController mController = Dependency.get(BubbleController.class);
     private PipDismissViewController mDismissViewController;
-
-    // The position of the bubble on down event
-    private float mBubbleDownPosX;
-    private float mBubbleDownPosY;
-    // The touch position on down event
-    private float mDownX = -1;
-    private float mDownY = -1;
 
     private boolean mMovedEnough;
     private int mTouchSlopSquared;
@@ -58,154 +57,146 @@ class BubbleTouchHandler implements View.OnTouchListener {
         }
     };
 
-    // Bubble being dragged from the row of bubbles when the stack is expanded
-    private BubbleView mBubbleDraggingOut;
+    /** View that was initially touched, when we received the first ACTION_DOWN event. */
+    private View mTouchedView;
 
-    /**
-     * Views movable by this touch handler should implement this interface.
-     */
-    public interface FloatingView {
-
-        /**
-         * Sets the position of the view.
-         */
-        void setPosition(float x, float y);
-
-        /**
-         * Sets the x position of the view.
-         */
-        void setPositionX(float x);
-
-        /**
-         * Sets the y position of the view.
-         */
-        void setPositionY(float y);
-
-        /**
-         * @return the position of the view.
-         */
-        PointF getPosition();
-    }
-
-    public BubbleTouchHandler(Context context) {
+    BubbleTouchHandler(Context context, BubbleStackView stackView) {
         final int touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
         mTouchSlopSquared = touchSlop * touchSlop;
         mDismissViewController = new PipDismissViewController(context);
+        mStack = stackView;
     }
 
     @Override
     public boolean onTouch(View v, MotionEvent event) {
-        int action = event.getActionMasked();
+        final int action = event.getActionMasked();
 
-        BubbleStackView stack = (BubbleStackView) v;
-        View targetView = mBubbleDraggingOut != null
-                ? mBubbleDraggingOut
-                : stack.getTargetView(event);
-        boolean isFloating = targetView instanceof FloatingView;
-        if (!isFloating || targetView == null || action == MotionEvent.ACTION_OUTSIDE) {
-            stack.collapseStack();
-            cleanUpDismissTarget();
-            resetTouches();
+        // If we aren't currently in the process of touching a view, figure out what we're touching.
+        // It'll be the stack, an individual bubble, or nothing.
+        if (mTouchedView == null) {
+            mTouchedView = mStack.getTargetView(event);
+        }
+
+        // If this is an ACTION_OUTSIDE event, or the stack reported that we aren't touching
+        // anything, collapse the stack.
+        if (action == MotionEvent.ACTION_OUTSIDE || mTouchedView == null) {
+            mStack.collapseStack();
+            resetForNextGesture();
             return false;
         }
 
-        FloatingView floatingView = (FloatingView) targetView;
-        boolean isBubbleStack = floatingView instanceof BubbleStackView;
+        final boolean isStack = mStack.equals(mTouchedView);
+        final boolean isFlyout = mStack.getFlyoutView().equals(mTouchedView);
+        final float rawX = event.getRawX();
+        final float rawY = event.getRawY();
 
-        PointF startPos = floatingView.getPosition();
-        float rawX = event.getRawX();
-        float rawY = event.getRawY();
-        float x = mBubbleDownPosX + rawX - mDownX;
-        float y = mBubbleDownPosY + rawY - mDownY;
+        // The coordinates of the touch event, in terms of the touched view's position.
+        final float viewX = mViewPositionOnTouchDown.x + rawX - mTouchDown.x;
+        final float viewY = mViewPositionOnTouchDown.y + rawY - mTouchDown.y;
         switch (action) {
             case MotionEvent.ACTION_DOWN:
                 trackMovement(event);
 
-                mDismissViewController.createDismissTarget();
-                mHandler.postDelayed(mShowDismissAffordance, SHOW_TARGET_DELAY);
+                mTouchDown.set(rawX, rawY);
 
-                mBubbleDownPosX = startPos.x;
-                mBubbleDownPosY = startPos.y;
-                mDownX = rawX;
-                mDownY = rawY;
-                mMovedEnough = false;
+                if (!isFlyout) {
+                    mDismissViewController.createDismissTarget();
+                    mHandler.postDelayed(mShowDismissAffordance, SHOW_TARGET_DELAY);
+                }
 
-                if (isBubbleStack) {
-                    stack.onDragStart();
+                if (isStack) {
+                    mViewPositionOnTouchDown.set(mStack.getStackPosition());
+                    mStack.onDragStart();
+                } else if (isFlyout) {
+                    // TODO(b/129768381): Make the flyout dismissable with a gesture.
                 } else {
-                    stack.onBubbleDragStart((BubbleView) floatingView);
+                    mViewPositionOnTouchDown.set(
+                            mTouchedView.getTranslationX(), mTouchedView.getTranslationY());
+                    mStack.onBubbleDragStart(mTouchedView);
                 }
 
                 break;
-
             case MotionEvent.ACTION_MOVE:
                 trackMovement(event);
+                final float deltaX = rawX - mTouchDown.x;
+                final float deltaY = rawY - mTouchDown.y;
 
-                if (mBubbleDownPosX == -1 || mDownX == -1) {
-                    mBubbleDownPosX = startPos.x;
-                    mBubbleDownPosY = startPos.y;
-                    mDownX = rawX;
-                    mDownY = rawY;
-                }
-                final float deltaX = rawX - mDownX;
-                final float deltaY = rawY - mDownY;
                 if ((deltaX * deltaX) + (deltaY * deltaY) > mTouchSlopSquared && !mMovedEnough) {
                     mMovedEnough = true;
                 }
 
                 if (mMovedEnough) {
-                    if (floatingView instanceof BubbleView) {
-                        mBubbleDraggingOut = ((BubbleView) floatingView);
-                        stack.onBubbleDragged(mBubbleDraggingOut, x, y);
+                    if (isStack) {
+                        mStack.onDragged(viewX, viewY);
+                    } else if (isFlyout) {
+                        // TODO(b/129768381): Make the flyout dismissable with a gesture.
                     } else {
-                        stack.onDragged(x, y);
+                        mStack.onBubbleDragged(mTouchedView, viewX, viewY);
                     }
                 }
+
                 // TODO - when we're in the target stick to it / animate in some way?
                 mInDismissTarget = mDismissViewController.updateTarget(
-                        isBubbleStack ? stack.getBubbleAt(0) : (View) floatingView);
+                        isStack ? mStack.getBubbleAt(0) : mTouchedView);
                 break;
 
             case MotionEvent.ACTION_CANCEL:
-                resetTouches();
-                cleanUpDismissTarget();
+                resetForNextGesture();
                 break;
 
             case MotionEvent.ACTION_UP:
                 trackMovement(event);
-                if (mInDismissTarget) {
-                    if (isBubbleStack) {
-                        mController.dismissStack();
-                    } else {
-                        mController.removeBubble(((BubbleView) floatingView).getKey());
+                if (mInDismissTarget && isStack) {
+                    mController.dismissStack(BubbleController.DISMISS_USER_GESTURE);
+                } else if (isFlyout) {
+                    // TODO(b/129768381): Expand if tapped, dismiss if swiped away.
+                    if (!mStack.isExpanded() && !mMovedEnough) {
+                        mStack.expandStack();
                     }
                 } else if (mMovedEnough) {
-                    mVelocityTracker.computeCurrentVelocity(1000);
+                    mVelocityTracker.computeCurrentVelocity(/* maxVelocity */ 1000);
                     final float velX = mVelocityTracker.getXVelocity();
                     final float velY = mVelocityTracker.getYVelocity();
-                    if (isBubbleStack) {
-                        stack.onDragFinish(x, y, velX, velY);
+                    if (isStack) {
+                        mStack.onDragFinish(viewX, viewY, velX, velY);
                     } else {
-                        stack.onBubbleDragFinish(mBubbleDraggingOut, x, y, velX, velY);
+                        final boolean dismissed = mInDismissTarget || velY > DISMISS_MIN_VELOCITY;
+                        mStack.onBubbleDragFinish(
+                                mTouchedView, viewX, viewY, velX, velY, /* dismissed */ dismissed);
+                        if (dismissed) {
+                            mController.removeBubble(((BubbleView) mTouchedView).getKey(),
+                                    BubbleController.DISMISS_USER_GESTURE);
+                        }
                     }
-                } else if (floatingView.equals(stack.getExpandedBubble())) {
-                    stack.collapseStack();
-                } else if (isBubbleStack) {
-                    if (stack.isExpanded()) {
-                        stack.collapseStack();
+                } else if (mTouchedView == mStack.getExpandedBubbleView()) {
+                    mStack.collapseStack();
+                } else if (isStack) {
+                    if (mStack.isExpanded()) {
+                        mStack.collapseStack();
                     } else {
-                        stack.expandStack();
+                        mStack.expandStack();
                     }
                 } else {
-                    stack.setExpandedBubble((BubbleView) floatingView);
+                    mStack.setExpandedBubble(((BubbleView) mTouchedView).getKey());
                 }
-                cleanUpDismissTarget();
-                mVelocityTracker.recycle();
-                mVelocityTracker = null;
-                resetTouches();
+
+                resetForNextGesture();
                 break;
         }
+
         return true;
+    }
+
+    /** Clears all touch-related state. */
+    private void resetForNextGesture() {
+        cleanUpDismissTarget();
+        if (mVelocityTracker != null) {
+            mVelocityTracker.recycle();
+            mVelocityTracker = null;
+        }
+        mTouchedView = null;
+        mMovedEnough = false;
+        mInDismissTarget = false;
     }
 
     /**
@@ -216,16 +207,6 @@ class BubbleTouchHandler implements View.OnTouchListener {
         mDismissViewController.destroyDismissTarget();
     }
 
-    /**
-     * Resets anything we care about after a gesture is complete.
-     */
-    private void resetTouches() {
-        mDownX = -1;
-        mDownY = -1;
-        mBubbleDownPosX = -1;
-        mBubbleDownPosY = -1;
-        mBubbleDraggingOut = null;
-    }
 
     private void trackMovement(MotionEvent event) {
         if (mVelocityTracker == null) {

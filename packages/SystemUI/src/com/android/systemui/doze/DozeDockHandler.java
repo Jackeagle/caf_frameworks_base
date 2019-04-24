@@ -17,11 +17,11 @@
 package com.android.systemui.doze;
 
 import android.content.Context;
+import android.hardware.display.AmbientDisplayConfiguration;
 import android.os.Handler;
 import android.os.UserHandle;
 import android.util.Log;
 
-import com.android.internal.hardware.AmbientDisplayConfiguration;
 import com.android.systemui.dock.DockManager;
 import com.android.systemui.doze.DozeMachine.State;
 
@@ -87,7 +87,8 @@ public class DozeDockHandler implements DozeMachine.Part {
     }
 
     private void requestPulseOutNow(State dozeState) {
-        if (dozeState == State.DOZE_REQUEST_PULSE || dozeState == State.DOZE_PULSING) {
+        if (dozeState == State.DOZE_REQUEST_PULSE || dozeState == State.DOZE_PULSING
+                || dozeState == State.DOZE_PULSING_BRIGHT) {
             final int pulseReason = mMachine.getPulseReason();
             if (pulseReason == DozeLog.PULSE_REASON_DOCKING) {
                 mDozeHost.stopPulsing();
@@ -121,11 +122,17 @@ public class DozeDockHandler implements DozeMachine.Part {
                     if (dozeState == State.DOZE
                             && mConfig.alwaysOnEnabled(UserHandle.USER_CURRENT)) {
                         mMachine.requestState(State.DOZE_AOD);
-                        break;
                     }
-                    // continue below
+                    else {
+                        requestPulseOutNow(dozeState);
+                    }
+                    break;
                 case DockManager.STATE_DOCKED_HIDE:
-                    requestPulseOutNow(dozeState);
+                    if (dozeState == State.DOZE_AOD) {
+                        mMachine.requestState(State.DOZE);
+                    } else {
+                        requestPulseOutNow(dozeState);
+                    }
                     break;
                 default:
                     // no-op

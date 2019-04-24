@@ -23,6 +23,7 @@ import android.os.Parcelable;
 import android.text.TextUtils;
 
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * CellIdentity represents the identity of a unique cell. This is the base class for
@@ -48,10 +49,10 @@ public abstract class CellIdentity implements Parcelable {
 
     // long alpha Operator Name String or Enhanced Operator Name String
     /** @hide */
-    protected final String mAlphaLong;
+    protected String mAlphaLong;
     // short alpha Operator Name String or Enhanced Operator Name String
     /** @hide */
-    protected final String mAlphaShort;
+    protected String mAlphaShort;
 
     /** @hide */
     protected CellIdentity(String tag, int type, String mcc, String mnc, String alphal,
@@ -83,6 +84,13 @@ public abstract class CellIdentity implements Parcelable {
             mMncStr = null;
             log("invalid MNC format: " + mnc);
         }
+
+        if ((mMccStr != null && mMncStr == null) || (mMccStr == null && mMncStr != null)) {
+            AnomalyReporter.reportAnomaly(
+                    UUID.fromString("a3ab0b9d-f2aa-4baf-911d-7096c0d4645a"),
+                    "CellIdentity Missing Half of PLMN ID");
+        }
+
         mAlphaLong = alphal;
         mAlphaShort = alphas;
     }
@@ -99,6 +107,22 @@ public abstract class CellIdentity implements Parcelable {
      */
     public @CellInfo.Type int getType() {
         return mType;
+    }
+
+    /**
+     * @return MCC or null for CDMA
+     * @hide
+     */
+    public String getMccString() {
+        return mMccStr;
+    }
+
+    /**
+     * @return MNC or null for CDMA
+     * @hide
+     */
+    public String getMncString() {
+        return mMncStr;
     }
 
     /**
@@ -121,12 +145,26 @@ public abstract class CellIdentity implements Parcelable {
     }
 
     /**
+     * @hide
+     */
+    public void setOperatorAlphaLong(String alphaLong) {
+        mAlphaLong = alphaLong;
+    }
+
+    /**
      * @return The short alpha tag associated with the current scan result (may be the operator
      * name string or extended operator name string).  May be null if unknown.
      */
     @Nullable
     public CharSequence getOperatorAlphaShort() {
         return mAlphaShort;
+    }
+
+    /**
+     * @hide
+     */
+    public void setOperatorAlphaShort(String alphaShort) {
+        mAlphaShort = alphaShort;
     }
 
     /**
@@ -178,7 +216,7 @@ public abstract class CellIdentity implements Parcelable {
     }
 
     /** Implement the Parcelable interface */
-    public static final Creator<CellIdentity> CREATOR =
+    public static final @android.annotation.NonNull Creator<CellIdentity> CREATOR =
             new Creator<CellIdentity>() {
                 @Override
                 public CellIdentity createFromParcel(Parcel in) {

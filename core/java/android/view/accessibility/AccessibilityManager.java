@@ -36,6 +36,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.content.res.Resources;
 import android.os.Binder;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -173,7 +174,7 @@ public final class AccessibilityManager {
 
     final Handler.Callback mCallback;
 
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     boolean mIsEnabled;
 
     int mRelevantEventTypes = AccessibilityEvent.TYPES_ALL_MASK;
@@ -183,7 +184,7 @@ public final class AccessibilityManager {
 
     boolean mIsTouchExplorationEnabled;
 
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 123768939)
     boolean mIsHighTextContrastEnabled;
 
     AccessibilityPolicy mAccessibilityPolicy;
@@ -847,7 +848,7 @@ public final class AccessibilityManager {
         if (mRequestPreparerLists == null) {
             mRequestPreparerLists = new SparseArray<>(1);
         }
-        int id = preparer.getView().getAccessibilityViewId();
+        int id = preparer.getAccessibilityViewId();
         List<AccessibilityRequestPreparer> requestPreparerList = mRequestPreparerLists.get(id);
         if (requestPreparerList == null) {
             requestPreparerList = new ArrayList<>(1);
@@ -863,7 +864,7 @@ public final class AccessibilityManager {
         if (mRequestPreparerLists == null) {
             return;
         }
-        int viewId = preparer.getView().getAccessibilityViewId();
+        int viewId = preparer.getAccessibilityViewId();
         List<AccessibilityRequestPreparer> requestPreparerList = mRequestPreparerLists.get(viewId);
         if (requestPreparerList != null) {
             requestPreparerList.remove(preparer);

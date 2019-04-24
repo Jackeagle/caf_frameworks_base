@@ -51,8 +51,10 @@ import java.util.function.ToDoubleFunction;
 public class BinderCallsStats implements BinderInternal.Observer {
     public static final boolean ENABLED_DEFAULT = true;
     public static final boolean DETAILED_TRACKING_DEFAULT = true;
-    public static final int PERIODIC_SAMPLING_INTERVAL_DEFAULT = 100;
-    public static final int MAX_BINDER_CALL_STATS_COUNT_DEFAULT = 5000;
+    public static final int PERIODIC_SAMPLING_INTERVAL_DEFAULT = 1000;
+    public static final boolean DEFAULT_TRACK_SCREEN_INTERACTIVE = false;
+    public static final boolean DEFAULT_TRACK_DIRECT_CALLING_UID = true;
+    public static final int MAX_BINDER_CALL_STATS_COUNT_DEFAULT = 1500;
     private static final String DEBUG_ENTRY_PREFIX = "__DEBUG_";
 
     private static class OverflowBinder extends Binder {}
@@ -85,6 +87,8 @@ public class BinderCallsStats implements BinderInternal.Observer {
     private long mStartElapsedTime = SystemClock.elapsedRealtime();
     private long mCallStatsCount = 0;
     private boolean mAddDebugEntries = false;
+    private boolean mTrackDirectCallingUid = DEFAULT_TRACK_DIRECT_CALLING_UID;
+    private boolean mTrackScreenInteractive = DEFAULT_TRACK_SCREEN_INTERACTIVE;
 
     private CachedDeviceState.Readonly mDeviceState;
     private CachedDeviceState.TimeInStateStopwatch mBatteryStopwatch;
@@ -160,7 +164,12 @@ public class BinderCallsStats implements BinderInternal.Observer {
             duration = 0;
             latencyDuration = 0;
         }
-        final int callingUid = getCallingUid();
+        final boolean screenInteractive = mTrackScreenInteractive
+                ? mDeviceState.isScreenInteractive()
+                : OVERFLOW_SCREEN_INTERACTIVE;
+        final int callingUid = mTrackDirectCallingUid
+                ? getCallingUid()
+                : OVERFLOW_DIRECT_CALLING_UID;
 
         synchronized (mLock) {
             // This was already checked in #callStart but check again while synchronized.
@@ -177,7 +186,7 @@ public class BinderCallsStats implements BinderInternal.Observer {
 
                 final CallStat callStat = uidEntry.getOrCreate(
                         callingUid, s.binderClass, s.transactionCode,
-                        mDeviceState.isScreenInteractive(),
+                        screenInteractive,
                         mCallStatsCount >= mMaxBinderCallStatsCount);
                 final boolean isNewCallStat = callStat.callCount == 0;
                 if (isNewCallStat) {
@@ -203,7 +212,7 @@ public class BinderCallsStats implements BinderInternal.Observer {
                 // It helps to keep the memory usage down when sampling is enabled.
                 final CallStat callStat = uidEntry.get(
                         callingUid, s.binderClass, s.transactionCode,
-                        mDeviceState.isScreenInteractive());
+                        screenInteractive);
                 if (callStat != null) {
                     callStat.callCount++;
                 }
@@ -335,6 +344,7 @@ public class BinderCallsStats implements BinderInternal.Observer {
             resultCallStats.add(createDebugEntry("end_time_millis", SystemClock.elapsedRealtime()));
             resultCallStats.add(
                     createDebugEntry("battery_time_millis", mBatteryStopwatch.getMillis()));
+            resultCallStats.add(createDebugEntry("sampling_interval", mPeriodicSamplingInterval));
         }
 
         return resultCallStats;
@@ -484,6 +494,30 @@ public class BinderCallsStats implements BinderInternal.Observer {
         }
     }
 
+    /**
+     * Whether to track the screen state.
+     */
+    public void setTrackScreenInteractive(boolean enabled) {
+        synchronized (mLock) {
+            if (enabled != mTrackScreenInteractive) {
+                mTrackScreenInteractive = enabled;
+                reset();
+            }
+        }
+    }
+
+    /**
+     * Whether to track direct caller uid.
+     */
+    public void setTrackDirectCallerUid(boolean enabled) {
+        synchronized (mLock) {
+            if (enabled != mTrackDirectCallingUid) {
+                mTrackDirectCallingUid = enabled;
+                reset();
+            }
+        }
+    }
+
     public void setAddDebugEntries(boolean addDebugEntries) {
         mAddDebugEntries = addDebugEntries;
     }
@@ -535,7 +569,7 @@ public class BinderCallsStats implements BinderInternal.Observer {
     }
 
     /**
-     * Aggregated data by uid/class/method to be sent through WestWorld.
+     * Aggregated data by uid/class/method to be sent through statsd.
      */
     public static class ExportedCallStat {
         public int callingUid;

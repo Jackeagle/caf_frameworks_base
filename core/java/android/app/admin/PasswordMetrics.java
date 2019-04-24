@@ -24,7 +24,11 @@ import static android.app.admin.DevicePolicyManager.PASSWORD_QUALITY_ALPHABETIC;
 import static android.app.admin.DevicePolicyManager.PASSWORD_QUALITY_ALPHANUMERIC;
 import static android.app.admin.DevicePolicyManager.PASSWORD_QUALITY_COMPLEX;
 import static android.app.admin.DevicePolicyManager.PASSWORD_QUALITY_NUMERIC;
+import static android.app.admin.DevicePolicyManager.PASSWORD_QUALITY_SOMETHING;
 import static android.app.admin.DevicePolicyManager.PASSWORD_QUALITY_UNSPECIFIED;
+
+import static com.android.internal.widget.LockPatternUtils.CREDENTIAL_TYPE_PASSWORD;
+import static com.android.internal.widget.LockPatternUtils.CREDENTIAL_TYPE_PATTERN;
 
 import android.annotation.IntDef;
 import android.annotation.NonNull;
@@ -33,13 +37,15 @@ import android.os.Parcel;
 import android.os.Parcelable;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.util.Preconditions;
+import com.android.internal.widget.LockPatternUtils.CredentialType;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
 /**
- * A class that represents the metrics of a password that are used to decide whether or not a
- * password meets the requirements.
+ * A class that represents the metrics of a credential that are used to decide whether or not a
+ * credential meets the requirements. If the credential is a pattern, only quality matters.
  *
  * {@hide}
  */
@@ -48,8 +54,6 @@ public class PasswordMetrics implements Parcelable {
     // consider it a complex PIN/password.
     public static final int MAX_ALLOWED_SEQUENCE = 3;
 
-    // TODO(b/120536847): refactor isActivePasswordSufficient logic so that the actual password
-    // quality is not overwritten
     public int quality = DevicePolicyManager.PASSWORD_QUALITY_UNSPECIFIED;
     public int length = 0;
     public int letters = 0;
@@ -210,7 +214,7 @@ public class PasswordMetrics implements Parcelable {
         dest.writeInt(nonLetter);
     }
 
-    public static final Parcelable.Creator<PasswordMetrics> CREATOR
+    public static final @android.annotation.NonNull Parcelable.Creator<PasswordMetrics> CREATOR
             = new Parcelable.Creator<PasswordMetrics>() {
         public PasswordMetrics createFromParcel(Parcel in) {
             return new PasswordMetrics(in);
@@ -221,7 +225,29 @@ public class PasswordMetrics implements Parcelable {
         }
     };
 
-    public static PasswordMetrics computeForPassword(@NonNull String password) {
+    /**
+     * Returnsthe {@code PasswordMetrics} for a given credential.
+     *
+     * If the credential is a pin or a password, equivalent to {@link #computeForPassword(byte[])}.
+     * {@code credential} cannot be null when {@code type} is
+     * {@link com.android.internal.widget.LockPatternUtils#CREDENTIAL_TYPE_PASSWORD}.
+     */
+    public static PasswordMetrics computeForCredential(
+            @CredentialType int type, byte[] credential) {
+        if (type == CREDENTIAL_TYPE_PASSWORD) {
+            Preconditions.checkNotNull(credential, "credential cannot be null");
+            return PasswordMetrics.computeForPassword(credential);
+        } else if (type == CREDENTIAL_TYPE_PATTERN)  {
+            return new PasswordMetrics(PASSWORD_QUALITY_SOMETHING);
+        } else /* if (type == CREDENTIAL_TYPE_NONE) */ {
+            return new PasswordMetrics(PASSWORD_QUALITY_UNSPECIFIED);
+        }
+    }
+
+    /**
+     * Returns the {@code PasswordMetrics} for a given password
+     */
+    public static PasswordMetrics computeForPassword(@NonNull byte[] password) {
         // Analyse the characters used
         int letters = 0;
         int upperCase = 0;
@@ -229,9 +255,9 @@ public class PasswordMetrics implements Parcelable {
         int numeric = 0;
         int symbols = 0;
         int nonLetter = 0;
-        final int length = password.length();
-        for (int i = 0; i < length; i++) {
-            switch (categoryChar(password.charAt(i))) {
+        final int length = password.length;
+        for (byte b : password) {
+            switch (categoryChar((char) b)) {
                 case CHAR_LOWER_CASE:
                     letters++;
                     lowerCase++;
@@ -296,7 +322,7 @@ public class PasswordMetrics implements Parcelable {
         return false;
     }
 
-    /*
+    /**
      * Returns the maximum length of a sequential characters. A sequence is defined as
      * monotonically increasing characters with a constant interval or the same character repeated.
      *
@@ -310,19 +336,19 @@ public class PasswordMetrics implements Parcelable {
      * maxLengthSequence(";;;;") == 4 (anything that repeats)
      * maxLengthSequence(":;<=>") == 1  (ordered, but not composed of alphas or digits)
      *
-     * @param string the pass
+     * @param bytes the pass
      * @return the number of sequential letters or digits
      */
-    public static int maxLengthSequence(@NonNull String string) {
-        if (string.length() == 0) return 0;
-        char previousChar = string.charAt(0);
+    public static int maxLengthSequence(@NonNull byte[] bytes) {
+        if (bytes.length == 0) return 0;
+        char previousChar = (char) bytes[0];
         @CharacterCatagory int category = categoryChar(previousChar); //current sequence category
         int diff = 0; //difference between two consecutive characters
         boolean hasDiff = false; //if we are currently targeting a sequence
         int maxLength = 0; //maximum length of a sequence already found
         int startSequence = 0; //where the current sequence started
-        for (int current = 1; current < string.length(); current++) {
-            char currentChar = string.charAt(current);
+        for (int current = 1; current < bytes.length; current++) {
+            char currentChar = (char) bytes[current];
             @CharacterCatagory int categoryCurrent = categoryChar(currentChar);
             int currentDiff = (int) currentChar - (int) previousChar;
             if (categoryCurrent != category || Math.abs(currentDiff) > maxDiffCategory(category)) {
@@ -341,7 +367,7 @@ public class PasswordMetrics implements Parcelable {
             }
             previousChar = currentChar;
         }
-        maxLength = Math.max(maxLength, string.length() - startSequence);
+        maxLength = Math.max(maxLength, bytes.length - startSequence);
         return maxLength;
     }
 

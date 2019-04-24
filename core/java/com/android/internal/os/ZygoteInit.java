@@ -19,6 +19,9 @@ package com.android.internal.os;
 import static android.system.OsConstants.S_IRWXG;
 import static android.system.OsConstants.S_IRWXO;
 
+import android.annotation.UnsupportedAppUsage;
+import android.app.ApplicationLoaders;
+import android.content.pm.SharedLibraryInfo;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.os.Build;
@@ -96,12 +99,13 @@ public class ZygoteInit {
     private static final String ABI_LIST_ARG = "--abi-list=";
 
     // TODO (chriswailes): Re-name this --zygote-socket-name= and then add a
-    // --blastula-socket-name parameter.
+    // --usap-socket-name parameter.
     private static final String SOCKET_NAME_ARG = "--socket-name=";
 
     /**
      * Used to pre-load resources.
      */
+    @UnsupportedAppUsage
     private static Resources mResources;
 
     /**
@@ -122,6 +126,12 @@ public class ZygoteInit {
 
     private static boolean sPreloadComplete;
 
+    /**
+     * Cached classloader to use for the system server. Will only be populated in the system
+     * server process.
+     */
+    private static ClassLoader sCachedSystemServerClassLoader = null;
+
     static void preload(TimingsTraceLog bootTimingsTraceLog) {
         Log.d(TAG, "begin preload");
         bootTimingsTraceLog.traceBegin("BeginPreload");
@@ -130,6 +140,9 @@ public class ZygoteInit {
         bootTimingsTraceLog.traceBegin("PreloadClasses");
         preloadClasses();
         bootTimingsTraceLog.traceEnd(); // PreloadClasses
+        bootTimingsTraceLog.traceBegin("CacheNonBootClasspathClassLoaders");
+        cacheNonBootClasspathClassLoaders();
+        bootTimingsTraceLog.traceEnd(); // CacheNonBootClasspathClassLoaders
         bootTimingsTraceLog.traceBegin("PreloadResources");
         preloadResources();
         bootTimingsTraceLog.traceEnd(); // PreloadResources
@@ -336,6 +349,32 @@ public class ZygoteInit {
     }
 
     /**
+     * Load in things which are used by many apps but which cannot be put in the boot
+     * classpath.
+     */
+    private static void cacheNonBootClasspathClassLoaders() {
+        // These libraries used to be part of the bootclasspath, but had to be removed.
+        // Old system applications still get them for backwards compatibility reasons,
+        // so they are cached here in order to preserve performance characteristics.
+        SharedLibraryInfo hidlBase = new SharedLibraryInfo(
+                "/system/framework/android.hidl.base-V1.0-java.jar", null /*packageName*/,
+                null /*codePaths*/, null /*name*/, 0 /*version*/, SharedLibraryInfo.TYPE_BUILTIN,
+                null /*declaringPackage*/, null /*dependentPackages*/, null /*dependencies*/);
+        SharedLibraryInfo hidlManager = new SharedLibraryInfo(
+                "/system/framework/android.hidl.manager-V1.0-java.jar", null /*packageName*/,
+                null /*codePaths*/, null /*name*/, 0 /*version*/, SharedLibraryInfo.TYPE_BUILTIN,
+                null /*declaringPackage*/, null /*dependentPackages*/, null /*dependencies*/);
+        hidlManager.addDependency(hidlBase);
+
+        ApplicationLoaders.getDefault().createAndCacheNonBootclasspathSystemClassLoaders(
+                new SharedLibraryInfo[]{
+                    // ordered dependencies first
+                    hidlBase,
+                    hidlManager,
+                });
+    }
+
+    /**
      * Load in commonly used resources, so they can be shared across processes.
      *
      * These tend to be a few Kbytes, but are frequently in the 20-40K range, and occasionally even
@@ -443,7 +482,13 @@ public class ZygoteInit {
 
         final String systemServerClasspath = Os.getenv("SYSTEMSERVERCLASSPATH");
         if (systemServerClasspath != null) {
-            performSystemServerDexOpt(systemServerClasspath);
+            if (performSystemServerDexOpt(systemServerClasspath)) {
+                // Throw away the cached classloader. If we compiled here, the classloader would
+                // not have had AoT-ed artifacts.
+                // Note: This only works in a very special environment where selinux enforcement is
+                // disabled, e.g., Mac builds.
+                sCachedSystemServerClassLoader = null;
+            }
             // Capturing profiles is only supported for debug or eng builds since selinux normally
             // prevents it.
             boolean profileSystemServer = SystemProperties.getBoolean(
@@ -476,10 +521,9 @@ public class ZygoteInit {
 
             throw new IllegalStateException("Unexpected return from WrapperInit.execApplication");
         } else {
-            ClassLoader cl = null;
-            if (systemServerClasspath != null) {
-                cl = createPathClassLoader(systemServerClasspath, parsedArgs.mTargetSdkVersion);
-
+            createSystemServerClassLoader();
+            ClassLoader cl = sCachedSystemServerClassLoader;
+            if (cl != null) {
                 Thread.currentThread().setContextClassLoader(cl);
             }
 
@@ -491,6 +535,24 @@ public class ZygoteInit {
         }
 
         /* should never reach here */
+    }
+
+    /**
+     * Create the classloader for the system server and store it in
+     * {@link sCachedSystemServerClassLoader}. This function may be called through JNI in
+     * system server startup, when the runtime is in a critically low state. Do not do
+     * extended computation etc here.
+     */
+    private static void createSystemServerClassLoader() {
+        if (sCachedSystemServerClassLoader != null) {
+            return;
+        }
+        final String systemServerClasspath = Os.getenv("SYSTEMSERVERCLASSPATH");
+        // TODO: Should we run optimization here?
+        if (systemServerClasspath != null) {
+            sCachedSystemServerClassLoader = createPathClassLoader(systemServerClasspath,
+                    VMRuntime.SDK_VERSION_CUR_DEVELOPMENT);
+        }
     }
 
     /**
@@ -557,15 +619,16 @@ public class ZygoteInit {
 
     /**
      * Performs dex-opt on the elements of {@code classPath}, if needed. We choose the instruction
-     * set of the current runtime.
+     * set of the current runtime. If something was compiled, return true.
      */
-    private static void performSystemServerDexOpt(String classPath) {
+    private static boolean performSystemServerDexOpt(String classPath) {
         final String[] classPathElements = classPath.split(":");
         final IInstalld installd = IInstalld.Stub
                 .asInterface(ServiceManager.getService("installd"));
         final String instructionSet = VMRuntime.getRuntime().vmInstructionSet();
 
         String classPathForElement = "";
+        boolean compiledSomething = false;
         for (String classPathElement : classPathElements) {
             // System server is fully AOTed and never profiled
             // for profile guided compilation.
@@ -607,6 +670,7 @@ public class ZygoteInit {
                             uuid, classLoaderContext, seInfo, false /* downgrade */,
                             targetSdkVersion, /*profileName*/ null, /*dexMetadataPath*/ null,
                             "server-dexopt");
+                    compiledSomething = true;
                 } catch (RemoteException | ServiceSpecificException e) {
                     // Ignore (but log), we need this on the classpath for fallback mode.
                     Log.w(TAG, "Failed compiling classpath element for system server: "
@@ -617,6 +681,8 @@ public class ZygoteInit {
             classPathForElement = encodeSystemServerClassPath(
                     classPathForElement, classPathElement);
         }
+
+        return compiledSomething;
     }
 
     /**
@@ -744,8 +810,9 @@ public class ZygoteInit {
         return result;
     }
 
+    @UnsupportedAppUsage
     public static void main(String argv[]) {
-        ZygoteServer zygoteServer = new ZygoteServer();
+        ZygoteServer zygoteServer = null;
 
         // Mark zygote start. This ensures that thread creation will throw
         // an error.
@@ -773,7 +840,7 @@ public class ZygoteInit {
             RuntimeInit.enableDdms();
 
             boolean startSystemServer = false;
-            String socketName = "zygote";
+            String zygoteSocketName = "zygote";
             String abiList = null;
             boolean enableLazyPreload = false;
             for (int i = 1; i < argv.length; i++) {
@@ -784,26 +851,17 @@ public class ZygoteInit {
                 } else if (argv[i].startsWith(ABI_LIST_ARG)) {
                     abiList = argv[i].substring(ABI_LIST_ARG.length());
                 } else if (argv[i].startsWith(SOCKET_NAME_ARG)) {
-                    socketName = argv[i].substring(SOCKET_NAME_ARG.length());
+                    zygoteSocketName = argv[i].substring(SOCKET_NAME_ARG.length());
                 } else {
                     throw new RuntimeException("Unknown command line argument: " + argv[i]);
                 }
             }
 
+            final boolean isPrimaryZygote = zygoteSocketName.equals(Zygote.PRIMARY_SOCKET_NAME);
+
             if (abiList == null) {
                 throw new RuntimeException("No ABI list supplied.");
             }
-
-            // TODO (chriswailes): Wrap these three calls in a helper function?
-            final String blastulaSocketName =
-                    socketName.equals(ZygoteProcess.ZYGOTE_SOCKET_NAME)
-                            ? ZygoteProcess.BLASTULA_POOL_SOCKET_NAME
-                            : ZygoteProcess.BLASTULA_POOL_SECONDARY_SOCKET_NAME;
-
-            zygoteServer.createZygoteSocket(socketName);
-            Zygote.createBlastulaSocket(blastulaSocketName);
-
-            Zygote.getSocketFDs(socketName.equals(ZygoteProcess.ZYGOTE_SOCKET_NAME));
 
             // In some configurations, we avoid preloading resources and classes eagerly.
             // In such cases, we will preload things prior to our first fork.
@@ -829,15 +887,15 @@ public class ZygoteInit {
             // Zygote.
             Trace.setTracingEnabled(false, 0);
 
-            Zygote.nativeSecurityInit();
 
-            // Zygote process unmounts root storage spaces.
-            Zygote.nativeUnmountStorageOnInit();
+            Zygote.initNativeState(isPrimaryZygote);
 
             ZygoteHooks.stopZygoteNoThreadCreation();
 
+            zygoteServer = new ZygoteServer(isPrimaryZygote);
+
             if (startSystemServer) {
-                Runnable r = forkSystemServer(abiList, socketName, zygoteServer);
+                Runnable r = forkSystemServer(abiList, zygoteSocketName, zygoteServer);
 
                 // {@code r == null} in the parent (zygote) process, and {@code r != null} in the
                 // child (system_server) process.
@@ -847,23 +905,18 @@ public class ZygoteInit {
                 }
             }
 
-            // If the return value is null then this is the zygote process
-            // returning to the normal control flow.  If it returns a Runnable
-            // object then this is a blastula that has finished specializing.
-            caller = Zygote.initBlastulaPool();
+            Log.i(TAG, "Accepting command socket connections");
 
-            if (caller == null) {
-                Log.i(TAG, "Accepting command socket connections");
-
-                // The select loop returns early in the child process after a fork and
-                // loops forever in the zygote.
-                caller = zygoteServer.runSelectLoop(abiList);
-            }
+            // The select loop returns early in the child process after a fork and
+            // loops forever in the zygote.
+            caller = zygoteServer.runSelectLoop(abiList);
         } catch (Throwable ex) {
             Log.e(TAG, "System zygote died with exception", ex);
             throw ex;
         } finally {
-            zygoteServer.closeServerSocket();
+            if (zygoteServer != null) {
+                zygoteServer.closeServerSocket();
+            }
         }
 
         // We're in the child process and have exited the select loop. Proceed to execute the
@@ -884,8 +937,8 @@ public class ZygoteInit {
     }
 
     private static void waitForSecondaryZygote(String socketName) {
-        String otherZygoteName = ZygoteProcess.ZYGOTE_SOCKET_NAME.equals(socketName)
-                ? ZygoteProcess.ZYGOTE_SECONDARY_SOCKET_NAME : ZygoteProcess.ZYGOTE_SOCKET_NAME;
+        String otherZygoteName = Zygote.PRIMARY_SOCKET_NAME.equals(socketName)
+                ? Zygote.SECONDARY_SOCKET_NAME : Zygote.PRIMARY_SOCKET_NAME;
         ZygoteProcess.waitForConnectionToZygote(otherZygoteName);
     }
 

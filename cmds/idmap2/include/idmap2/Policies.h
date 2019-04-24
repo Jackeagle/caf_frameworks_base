@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include <ostream>
 #include <string>
 #include <vector>
 
@@ -28,13 +27,20 @@
 
 namespace android::idmap2 {
 
+constexpr const char* kPolicyPublic = "public";
+constexpr const char* kPolicyProduct = "product";
+constexpr const char* kPolicySystem = "system";
+constexpr const char* kPolicyVendor = "vendor";
+constexpr const char* kPolicySignature = "signature";
+
 using PolicyFlags = ResTable_overlayable_policy_header::PolicyFlags;
 using PolicyBitmask = uint32_t;
 
-// Parses a the string representation of a set of policies into a bitmask. The format of the string
-// is the same as for the <policy> element.
-Result<PolicyBitmask> PoliciesToBitmask(const std::vector<std::string>& policies,
-                                        std::ostream& err);
+// Parses the string representations of policies into a bitmask.
+Result<PolicyBitmask> PoliciesToBitmask(const std::vector<std::string>& policies);
+
+// Retrieves the string representations of policies in the bitmask.
+std::vector<std::string> BitmaskToPolicies(const PolicyBitmask& bitmask);
 
 }  // namespace android::idmap2
 

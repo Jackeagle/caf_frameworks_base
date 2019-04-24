@@ -91,6 +91,13 @@ public final class CellIdentityWcdma extends CellIdentity {
                 cid.mMncStr, cid.mAlphaLong, cid.mAlphaShort);
     }
 
+    /** @hide */
+    public CellIdentityWcdma sanitizeLocationInfo() {
+        return new CellIdentityWcdma(CellInfo.UNAVAILABLE, CellInfo.UNAVAILABLE,
+                CellInfo.UNAVAILABLE, CellInfo.UNAVAILABLE, mMccStr, mMncStr,
+                mAlphaLong, mAlphaShort);
+    }
+
     CellIdentityWcdma copy() {
         return new CellIdentityWcdma(this);
     }
@@ -143,6 +150,7 @@ public final class CellIdentityWcdma extends CellIdentity {
     /**
      * @return Mobile Country Code in string version, null if unavailable.
      */
+    @Nullable
     public String getMccString() {
         return mMccStr;
     }
@@ -150,6 +158,7 @@ public final class CellIdentityWcdma extends CellIdentity {
     /**
      * @return Mobile Network Code in string version, null if unavailable.
      */
+    @Nullable
     public String getMncString() {
         return mMncStr;
     }
@@ -251,7 +260,7 @@ public final class CellIdentityWcdma extends CellIdentity {
 
     /** Implement the Parcelable interface */
     @SuppressWarnings("hiding")
-    public static final Creator<CellIdentityWcdma> CREATOR =
+    public static final @android.annotation.NonNull Creator<CellIdentityWcdma> CREATOR =
             new Creator<CellIdentityWcdma>() {
                 @Override
                 public CellIdentityWcdma createFromParcel(Parcel in) {

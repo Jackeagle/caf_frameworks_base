@@ -23,9 +23,11 @@ import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertTrue;
 
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -36,6 +38,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.IPackageManager;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
@@ -61,6 +64,7 @@ import com.google.android.collect.Lists;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.invocation.InvocationOnMock;
@@ -74,6 +78,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -305,6 +310,82 @@ public class ManagedServicesTest extends UiServiceTestCase {
         }
     }
 
+    /** Test that restore ignores the user id attribute and applies the data to the target user. */
+    @Test
+    public void testReadXml_onlyRestoresForTargetUser() throws Exception {
+        for (int approvalLevel : new int[] {APPROVAL_BY_COMPONENT, APPROVAL_BY_PACKAGE}) {
+            ManagedServices service =
+                    new TestManagedServices(
+                            getContext(), mLock, mUserProfiles, mIpm, approvalLevel);
+            String testPackage = "user.test.package";
+            String testComponent = "user.test.component/C1";
+            String resolvedValue =
+                    (approvalLevel == APPROVAL_BY_COMPONENT) ? testComponent : testPackage;
+            XmlPullParser parser =
+                    getParserWithEntries(service, getXmlEntry(resolvedValue, 0, true));
+
+            service.readXml(parser, null, true, 10);
+
+            assertFalse(service.isPackageOrComponentAllowed(resolvedValue, 0));
+            assertTrue(service.isPackageOrComponentAllowed(resolvedValue, 10));
+        }
+    }
+
+    /** Test that backup only writes packages/components that belong to the target user. */
+    @Test
+    public void testWriteXml_onlyBackupsForTargetUser() throws Exception {
+        for (int approvalLevel : new int[] {APPROVAL_BY_COMPONENT, APPROVAL_BY_PACKAGE}) {
+            ManagedServices service =
+                    new TestManagedServices(
+                            getContext(), mLock, mUserProfiles, mIpm, approvalLevel);
+            // Set up components.
+            String testPackage0 = "user0.test.package";
+            String testComponent0 = "user0.test.component/C1";
+            String testPackage10 = "user10.test.package";
+            String testComponent10 = "user10.test.component/C1";
+            String resolvedValue0 =
+                    (approvalLevel == APPROVAL_BY_COMPONENT) ? testComponent0 : testPackage0;
+            String resolvedValue10 =
+                    (approvalLevel == APPROVAL_BY_COMPONENT) ? testComponent10 : testPackage10;
+            addExpectedServices(
+                    service, Collections.singletonList(service.getPackageName(resolvedValue0)), 0);
+            addExpectedServices(
+                    service,
+                    Collections.singletonList(service.getPackageName(resolvedValue10)),
+                    10);
+            XmlPullParser parser =
+                    getParserWithEntries(
+                            service,
+                            getXmlEntry(resolvedValue0, 0, true),
+                            getXmlEntry(resolvedValue10, 10, true));
+            service.readXml(parser, null, false, UserHandle.USER_ALL);
+
+            // Write backup.
+            XmlSerializer serializer = new FastXmlSerializer();
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            serializer.setOutput(new BufferedOutputStream(baos), "utf-8");
+            serializer.startDocument(null, true);
+            service.writeXml(serializer, true, 10);
+            serializer.endDocument();
+            serializer.flush();
+
+            // Reset values.
+            service.setPackageOrComponentEnabled(resolvedValue0, 0, true, false);
+            service.setPackageOrComponentEnabled(resolvedValue10, 10, true, false);
+
+            // Parse backup via restore.
+            XmlPullParser restoreParser = Xml.newPullParser();
+            restoreParser.setInput(
+                    new BufferedInputStream(new ByteArrayInputStream(baos.toByteArray())), null);
+            restoreParser.nextTag();
+            service.readXml(restoreParser, null, true, 10);
+
+            assertFalse(service.isPackageOrComponentAllowed(resolvedValue0, 0));
+            assertFalse(service.isPackageOrComponentAllowed(resolvedValue0, 10));
+            assertTrue(service.isPackageOrComponentAllowed(resolvedValue10, 10));
+        }
+    }
+
     @Test
     public void testWriteXml_trimsMissingServices() throws Exception {
         for (int approvalLevel : new int[] {APPROVAL_BY_COMPONENT, APPROVAL_BY_PACKAGE}) {
@@ -348,7 +429,9 @@ public class ManagedServicesTest extends UiServiceTestCase {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             serializer.setOutput(new BufferedOutputStream(baos), "utf-8");
             serializer.startDocument(null, true);
-            service.writeXml(serializer, true);
+            for (UserInfo userInfo : mUm.getUsers()) {
+                service.writeXml(serializer, true, userInfo.id);
+            }
             serializer.endDocument();
             serializer.flush();
 
@@ -356,7 +439,9 @@ public class ManagedServicesTest extends UiServiceTestCase {
             parser.setInput(new BufferedInputStream(
                     new ByteArrayInputStream(baos.toByteArray())), null);
             parser.nextTag();
-            service.readXml(parser, null);
+            for (UserInfo userInfo : mUm.getUsers()) {
+                service.readXml(parser, null, true, userInfo.id);
+            }
 
             verifyExpectedApprovedEntries(service);
             assertFalse(service.isPackageOrComponentAllowed("this.is.a.package.name", 0));
@@ -376,7 +461,7 @@ public class ManagedServicesTest extends UiServiceTestCase {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             serializer.setOutput(new BufferedOutputStream(baos), "utf-8");
             serializer.startDocument(null, true);
-            service.writeXml(serializer, false);
+            service.writeXml(serializer, false, UserHandle.USER_ALL);
             serializer.endDocument();
             serializer.flush();
 
@@ -884,6 +969,62 @@ public class ManagedServicesTest extends UiServiceTestCase {
     }
 
     @Test
+    public void testOnNullBinding() throws Exception {
+        Context context = mock(Context.class);
+        PackageManager pm = mock(PackageManager.class);
+        ApplicationInfo ai = new ApplicationInfo();
+        ai.targetSdkVersion = Build.VERSION_CODES.CUR_DEVELOPMENT;
+
+        when(context.getPackageName()).thenReturn(mContext.getPackageName());
+        when(context.getUserId()).thenReturn(mContext.getUserId());
+        when(context.getPackageManager()).thenReturn(pm);
+        when(pm.getApplicationInfo(anyString(), anyInt())).thenReturn(ai);
+
+        ManagedServices service = new TestManagedServices(context, mLock, mUserProfiles, mIpm,
+                APPROVAL_BY_COMPONENT);
+        ComponentName cn = ComponentName.unflattenFromString("a/a");
+
+        service.registerSystemService(cn, 0);
+        when(context.bindServiceAsUser(any(), any(), anyInt(), any())).thenAnswer(invocation -> {
+            Object[] args = invocation.getArguments();
+            ServiceConnection sc = (ServiceConnection) args[1];
+            sc.onNullBinding(cn);
+            return true;
+        });
+
+        service.registerSystemService(cn, 0);
+        assertFalse(service.isBound(cn, 0));
+    }
+
+    @Test
+    public void testOnServiceConnected() throws Exception {
+        Context context = mock(Context.class);
+        PackageManager pm = mock(PackageManager.class);
+        ApplicationInfo ai = new ApplicationInfo();
+        ai.targetSdkVersion = Build.VERSION_CODES.CUR_DEVELOPMENT;
+
+        when(context.getPackageName()).thenReturn(mContext.getPackageName());
+        when(context.getUserId()).thenReturn(mContext.getUserId());
+        when(context.getPackageManager()).thenReturn(pm);
+        when(pm.getApplicationInfo(anyString(), anyInt())).thenReturn(ai);
+
+        ManagedServices service = new TestManagedServices(context, mLock, mUserProfiles, mIpm,
+                APPROVAL_BY_COMPONENT);
+        ComponentName cn = ComponentName.unflattenFromString("a/a");
+
+        service.registerSystemService(cn, 0);
+        when(context.bindServiceAsUser(any(), any(), anyInt(), any())).thenAnswer(invocation -> {
+            Object[] args = invocation.getArguments();
+            ServiceConnection sc = (ServiceConnection) args[1];
+            sc.onServiceConnected(cn, mock(IBinder.class));
+            return true;
+        });
+
+        service.registerSystemService(cn, 0);
+        assertTrue(service.isBound(cn, 0));
+    }
+
+    @Test
     public void testOnPackagesChanged_nullValuesPassed_noNullPointers() {
         for (int approvalLevel : new int[] {APPROVAL_BY_COMPONENT, APPROVAL_BY_PACKAGE}) {
             ManagedServices service = new TestManagedServices(getContext(), mLock, mUserProfiles,
@@ -921,7 +1062,23 @@ public class ManagedServicesTest extends UiServiceTestCase {
         parser.setInput(new BufferedInputStream(
                 new ByteArrayInputStream(xml.toString().getBytes())), null);
         parser.nextTag();
-        service.readXml(parser, null);
+        service.readXml(parser, null, false, UserHandle.USER_ALL);
+    }
+
+    private XmlPullParser getParserWithEntries(ManagedServices service, String... xmlEntries)
+            throws Exception {
+        final StringBuffer xml = new StringBuffer();
+        xml.append("<" + service.getConfig().xmlTag + ">\n");
+        for (String xmlEntry : xmlEntries) {
+            xml.append(xmlEntry);
+        }
+        xml.append("</" + service.getConfig().xmlTag + ">");
+
+        XmlPullParser parser = Xml.newPullParser();
+        parser.setInput(new BufferedInputStream(
+                new ByteArrayInputStream(xml.toString().getBytes())), null);
+        parser.nextTag();
+        return parser;
     }
 
     private void addExpectedServices(final ManagedServices service, final List<String> packages,
@@ -1130,6 +1287,11 @@ public class ManagedServicesTest extends UiServiceTestCase {
         @Override
         protected void onServiceAdded(ManagedServiceInfo info) {
 
+        }
+
+        @Override
+        protected String getRequiredPermission() {
+            return null;
         }
     }
 }

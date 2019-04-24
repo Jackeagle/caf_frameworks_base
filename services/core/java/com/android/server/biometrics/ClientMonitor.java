@@ -158,6 +158,7 @@ public abstract class ClientMonitor extends LoggableMonitor implements IBinder.D
      */
     public boolean onAcquired(int acquiredInfo, int vendorCode) {
         super.logOnAcquired(acquiredInfo, vendorCode, getTargetUserId());
+        if (DEBUG) Slog.v(getLogTag(), "Acquired: " + acquiredInfo + " " + vendorCode);
         try {
             if (mListener != null) {
                 mListener.onAcquired(getHalDeviceId(), acquiredInfo, vendorCode);
@@ -209,11 +210,7 @@ public abstract class ClientMonitor extends LoggableMonitor implements IBinder.D
     public void binderDied() {
         // If the current client dies we should cancel the current operation.
         Slog.e(getLogTag(), "Binder died, cancelling client");
-        try {
-            getDaemonWrapper().cancel();
-        } catch (RemoteException e) {
-            Slog.e(getLogTag(), "Remote exception", e);
-        }
+        stop(false /* initiatedByClient */);
         mToken = null;
         mListener = null;
     }

@@ -24,6 +24,7 @@ import android.annotation.IntDef;
 import android.annotation.TestApi;
 import android.annotation.UnsupportedAppUsage;
 import android.graphics.Matrix;
+import android.os.Build;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.SystemClock;
@@ -1513,7 +1514,7 @@ public final class MotionEvent extends InputEvent implements Parcelable {
     }
 
     // Pointer to the native MotionEvent object that contains the actual data.
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     private long mNativePtr;
 
     private MotionEvent mNext;
@@ -3659,7 +3660,7 @@ public final class MotionEvent extends InputEvent implements Parcelable {
         return (getButtonState() & button) == button;
     }
 
-    public static final Parcelable.Creator<MotionEvent> CREATOR
+    public static final @android.annotation.NonNull Parcelable.Creator<MotionEvent> CREATOR
             = new Parcelable.Creator<MotionEvent>() {
         public MotionEvent createFromParcel(Parcel in) {
             in.readInt(); // skip token, we already know this is a MotionEvent

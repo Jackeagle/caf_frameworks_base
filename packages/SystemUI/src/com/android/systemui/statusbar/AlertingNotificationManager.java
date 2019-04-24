@@ -28,7 +28,7 @@ import android.view.accessibility.AccessibilityEvent;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
-import com.android.systemui.statusbar.notification.row.NotificationInflater.InflationFlag;
+import com.android.systemui.statusbar.notification.row.NotificationContentInflater.InflationFlag;
 
 import java.util.stream.Stream;
 
@@ -237,7 +237,8 @@ public abstract class AlertingNotificationManager implements NotificationLifetim
      */
     protected boolean canRemoveImmediately(String key) {
         AlertEntry alertEntry = mAlertEntries.get(key);
-        return alertEntry == null || alertEntry.wasShownLongEnough();
+        return alertEntry == null || alertEntry.wasShownLongEnough()
+                || alertEntry.mEntry.isRowDismissed();
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////

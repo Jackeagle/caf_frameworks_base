@@ -140,6 +140,13 @@ public class ServiceInfo extends ComponentInfo
     public static final int FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE = 1 << 4;
 
     /**
+     * Constant corresponding to {@code mediaProjection} in
+     * the {@link android.R.attr#foregroundServiceType} attribute.
+     * Managing a media projection session, e.g for screen recording or taking screenshots.
+     */
+    public static final int FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION = 1 << 5;
+
+    /**
      * A special value indicates to use all types set in manifest file.
      */
     public static final int FOREGROUND_SERVICE_TYPE_MANIFEST = -1;
@@ -151,12 +158,14 @@ public class ServiceInfo extends ComponentInfo
      * @hide
      */
     @IntDef(flag = true, prefix = { "FOREGROUND_SERVICE_TYPE_" }, value = {
+            FOREGROUND_SERVICE_TYPE_MANIFEST,
             FOREGROUND_SERVICE_TYPE_NONE,
             FOREGROUND_SERVICE_TYPE_DATA_SYNC,
             FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
             FOREGROUND_SERVICE_TYPE_PHONE_CALL,
             FOREGROUND_SERVICE_TYPE_LOCATION,
             FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
+            FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface ForegroundServiceType {}
@@ -180,10 +189,10 @@ public class ServiceInfo extends ComponentInfo
     }
 
     /**
-     * Return the current foreground service type.
-     * @return the current foreground service type.
+     * Return foreground service type specified in the manifest..
+     * @return foreground service type specified in the manifest.
      */
-    public int getForegroundServiceType() {
+    public @ForegroundServiceType int getForegroundServiceType() {
         return mForegroundServiceType;
     }
 
@@ -216,7 +225,7 @@ public class ServiceInfo extends ComponentInfo
         dest.writeInt(mForegroundServiceType);
     }
 
-    public static final Creator<ServiceInfo> CREATOR =
+    public static final @android.annotation.NonNull Creator<ServiceInfo> CREATOR =
         new Creator<ServiceInfo>() {
         public ServiceInfo createFromParcel(Parcel source) {
             return new ServiceInfo(source);

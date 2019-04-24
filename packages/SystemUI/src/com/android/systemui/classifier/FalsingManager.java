@@ -35,9 +35,9 @@ import android.view.accessibility.AccessibilityManager;
 import com.android.systemui.Dependency;
 import com.android.systemui.UiOffloadThread;
 import com.android.systemui.analytics.DataCollector;
+import com.android.systemui.plugins.statusbar.StatusBarStateController;
+import com.android.systemui.plugins.statusbar.StatusBarStateController.StateListener;
 import com.android.systemui.statusbar.StatusBarState;
-import com.android.systemui.statusbar.StatusBarStateController;
-import com.android.systemui.statusbar.StatusBarStateController.StateListener;
 import com.android.systemui.util.AsyncSensorManager;
 
 import java.io.PrintWriter;
@@ -408,8 +408,20 @@ public class FalsingManager implements SensorEventListener, StateListener {
         mDataCollector.onNotificatonStartDraggingDown();
     }
 
+    public void onStartExpandingFromPulse() {
+        if (FalsingLog.ENABLED) {
+            FalsingLog.i("onStartExpandingFromPulse", "");
+        }
+        mHumanInteractionClassifier.setType(Classifier.PULSE_EXPAND);
+        mDataCollector.onStartExpandingFromPulse();
+    }
+
     public void onNotificatonStopDraggingDown() {
         mDataCollector.onNotificatonStopDraggingDown();
+    }
+
+    public void onExpansionFromPulseStopped() {
+        mDataCollector.onExpansionFromPulseStopped();
     }
 
     public void onNotificationDismissed() {

@@ -51,10 +51,12 @@ import android.database.ContentObserver;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.inputmethodservice.InputMethodService;
+import android.net.Uri;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.RemoteException;
 import android.os.UserHandle;
 import android.provider.Settings;
@@ -85,14 +87,15 @@ import com.android.systemui.SysUiServiceProvider;
 import com.android.systemui.assist.AssistManager;
 import com.android.systemui.fragments.FragmentHostManager;
 import com.android.systemui.fragments.FragmentHostManager.FragmentListener;
+import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.recents.OverviewProxyService;
 import com.android.systemui.recents.Recents;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
+import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.stackdivider.Divider;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.CommandQueue.Callbacks;
 import com.android.systemui.statusbar.StatusBarState;
-import com.android.systemui.statusbar.StatusBarStateController;
 import com.android.systemui.statusbar.notification.stack.StackStateAnimator;
 import com.android.systemui.statusbar.phone.ContextualButton.ContextButtonListener;
 import com.android.systemui.statusbar.policy.AccessibilityManagerWrapper;
@@ -137,6 +140,7 @@ public class NavigationBarFragment extends LifecycleFragment implements Callback
     private AccessibilityManager mAccessibilityManager;
     private MagnificationContentObserver mMagnificationObserver;
     private ContentResolver mContentResolver;
+    private boolean mAssistantAvailable;
 
     private int mDisabledFlags1;
     private int mDisabledFlags2;
@@ -156,7 +160,8 @@ public class NavigationBarFragment extends LifecycleFragment implements Callback
 
     private OverviewProxyService mOverviewProxyService;
 
-    private int mDisplayId;
+    @VisibleForTesting
+    public int mDisplayId;
     private boolean mIsOnDefaultDisplay;
     public boolean mHomeBlockedThisTouch;
 
@@ -167,6 +172,11 @@ public class NavigationBarFragment extends LifecycleFragment implements Callback
         public void onConnectionChanged(boolean isConnected) {
             mNavigationBarView.updateStates();
             updateScreenPinningGestures();
+
+            // Send the assistant availability upon connection
+            if (isConnected) {
+                mNavigationBarView.setAssistantAvailable(mAssistantAvailable);
+            }
         }
 
         @Override
@@ -185,9 +195,16 @@ public class NavigationBarFragment extends LifecycleFragment implements Callback
         }
 
         @Override
+        public void startAssistant(Bundle bundle) {
+            mAssistManager.startAssist(bundle);
+        }
+
+        @Override
         public void onBackButtonAlphaChanged(float alpha, boolean animate) {
             final ButtonDispatcher backButton = mNavigationBarView.getBackButton();
-            if (QuickStepController.shouldhideBackButton(getContext())) {
+            final boolean useAltBack =
+                    (mNavigationIconHints & StatusBarManager.NAVIGATION_HINT_BACK_ALT) != 0;
+            if (QuickStepContract.isGesturalMode(getContext()) && !useAltBack) {
                 // If property was changed to hide/show back button, going home will trigger
                 // launcher to to change the back button alpha to reflect property change
                 backButton.setVisibility(View.GONE);
@@ -208,6 +225,19 @@ public class NavigationBarFragment extends LifecycleFragment implements Callback
 
     private final Runnable mAutoDim = () -> getBarTransitions().setAutoDim(true);
 
+    private final ContentObserver mAssistContentObserver = new ContentObserver(
+            new Handler(Looper.getMainLooper())) {
+        @Override
+        public void onChange(boolean selfChange, Uri uri) {
+            boolean available = mAssistManager
+                    .getAssistInfoForUser(UserHandle.USER_CURRENT) != null;
+            if (mAssistantAvailable != available) {
+                mNavigationBarView.setAssistantAvailable(available);
+                mAssistantAvailable = available;
+            }
+        }
+    };
+
     @Inject
     public NavigationBarFragment(AccessibilityManagerWrapper accessibilityManagerWrapper,
             DeviceProvisionedController deviceProvisionedController, MetricsLogger metricsLogger,
@@ -216,6 +246,7 @@ public class NavigationBarFragment extends LifecycleFragment implements Callback
         mDeviceProvisionedController = deviceProvisionedController;
         mMetricsLogger = metricsLogger;
         mAssistManager = assistManager;
+        mAssistantAvailable = mAssistManager.getAssistInfoForUser(UserHandle.USER_CURRENT) != null;
         mOverviewProxyService = overviewProxyService;
     }
 
@@ -237,6 +268,9 @@ public class NavigationBarFragment extends LifecycleFragment implements Callback
         mContentResolver.registerContentObserver(Settings.Secure.getUriFor(
                 Settings.Secure.ACCESSIBILITY_DISPLAY_MAGNIFICATION_NAVBAR_ENABLED), false,
                 mMagnificationObserver, UserHandle.USER_ALL);
+        mContentResolver.registerContentObserver(
+                Settings.Secure.getUriFor(Settings.Secure.ASSISTANT),
+                false /* notifyForDescendants */, mAssistContentObserver, UserHandle.USER_ALL);
 
         if (savedInstanceState != null) {
             mDisabledFlags1 = savedInstanceState.getInt(EXTRA_DISABLE_STATE, 0);
@@ -253,6 +287,7 @@ public class NavigationBarFragment extends LifecycleFragment implements Callback
         super.onDestroy();
         mAccessibilityManagerWrapper.removeCallback(mAccessibilityListener);
         mContentResolver.unregisterContentObserver(mMagnificationObserver);
+        mContentResolver.unregisterContentObserver(mAssistContentObserver);
     }
 
     @Override
@@ -445,8 +480,11 @@ public class NavigationBarFragment extends LifecycleFragment implements Callback
         // Respect the disabled flag, no need for action as flag change callback will handle hiding
         if (rotateSuggestionsDisabled) return;
 
-        mNavigationBarView.getRotateSuggestionButton()
-                .onRotationProposal(rotation, winRotation, isValid);
+        View rotationButton = mNavigationBarView.getRotateSuggestionButton().getCurrentView();
+        if (rotationButton != null && rotationButton.isAttachedToWindow()) {
+            mNavigationBarView.getRotateSuggestionButton()
+                    .onRotationProposal(rotation, winRotation, isValid);
+        }
     }
 
     /**
@@ -953,11 +991,11 @@ public class NavigationBarFragment extends LifecycleFragment implements Callback
                 if (Intent.ACTION_SCREEN_ON.equals(action)) {
                     // Enabled and screen is on, start it again if enabled
                     if (NavBarTintController.isEnabled(getContext())) {
-                        mNavigationBarView.getColorAdaptionController().start();
+                        mNavigationBarView.getTintController().start();
                     }
                 } else {
                     // Screen off disable it
-                    mNavigationBarView.getColorAdaptionController().end();
+                    mNavigationBarView.getTintController().stop();
                 }
             }
             if (Intent.ACTION_USER_SWITCHED.equals(action)) {
@@ -982,6 +1020,7 @@ public class NavigationBarFragment extends LifecycleFragment implements Callback
         lp.setTitle("NavigationBar" + context.getDisplayId());
         lp.accessibilityTitle = context.getString(R.string.nav_bar);
         lp.windowAnimations = 0;
+        lp.privateFlags |= WindowManager.LayoutParams.PRIVATE_FLAG_COLOR_SPACE_AGNOSTIC;
 
         View navigationBarView = LayoutInflater.from(context).inflate(
                 R.layout.navigation_bar_window, null);

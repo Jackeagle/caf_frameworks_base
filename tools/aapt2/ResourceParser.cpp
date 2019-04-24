@@ -206,15 +206,6 @@ class SegmentNode : public Node {
   }
 };
 
-// A chunk of text in the XML string within a CDATA tags.
-class CdataSegmentNode : public SegmentNode {
- public:
-
-  void Build(StringBuilder* builder) const override {
-    builder->AppendText(data, /* preserve_spaces */ true);
-  }
-};
-
 // A tag that will be encoded into the final flattened string. Tags like <b> or <i>.
 class SpanNode : public Node {
  public:
@@ -251,7 +242,6 @@ bool ResourceParser::FlattenXmlSubtree(
   std::vector<Node*> node_stack;
   node_stack.push_back(&root);
 
-  bool cdata_block = false;
   bool saw_span_node = false;
   SegmentNode* first_segment = nullptr;
   SegmentNode* last_segment = nullptr;
@@ -262,12 +252,9 @@ bool ResourceParser::FlattenXmlSubtree(
 
     // First take care of any SegmentNodes that should be created.
     if (event == xml::XmlPullParser::Event::kStartElement
-        || event == xml::XmlPullParser::Event::kEndElement
-        || event == xml::XmlPullParser::Event::kCdataStart
-        || event == xml::XmlPullParser::Event::kCdataEnd) {
+        || event == xml::XmlPullParser::Event::kEndElement) {
       if (!current_text.empty()) {
-        std::unique_ptr<SegmentNode> segment_node = (cdata_block)
-            ? util::make_unique<CdataSegmentNode>() : util::make_unique<SegmentNode>();
+        auto segment_node = util::make_unique<SegmentNode>();
         segment_node->data = std::move(current_text);
 
         last_segment = node_stack.back()->AddChild(std::move(segment_node));
@@ -344,16 +331,6 @@ bool ResourceParser::FlattenXmlSubtree(
           untranslatable_start_depth = {};
         }
       } break;
-
-      case xml::XmlPullParser::Event::kCdataStart: {
-        cdata_block = true;
-        break;
-      }
-
-      case xml::XmlPullParser::Event::kCdataEnd: {
-        cdata_block = false;
-        break;
-      }
 
       default:
         // ignore.
@@ -1084,7 +1061,7 @@ bool ResourceParser::ParseOverlayable(xml::XmlPullParser* parser, ParsedResource
   // Create a overlayable entry grouping that represents this <overlayable>
   auto overlayable = std::make_shared<Overlayable>(
       overlayable_name.value(), (overlayable_actor) ? overlayable_actor.value() : "",
-      out_resource->source);
+      source_);
 
   bool error = false;
   std::string comment;
@@ -1113,6 +1090,13 @@ bool ResourceParser::ParseOverlayable(xml::XmlPullParser* parser, ParsedResource
     const std::string& element_name = parser->element_name();
     const std::string& element_namespace = parser->element_namespace();
     if (element_namespace.empty() && element_name == "item") {
+      if (current_policies == OverlayableItem::Policy::kNone) {
+        diag_->Error(DiagMessage(element_source)
+                         << "<item> within an <overlayable> must be inside a <policy> block");
+        error = true;
+        continue;
+      }
+
       // Items specify the name and type of resource that should be overlayable
       Maybe<StringPiece> item_name = xml::FindNonEmptyAttribute(parser, "name");
       if (!item_name) {
@@ -1169,6 +1153,8 @@ bool ResourceParser::ParseOverlayable(xml::XmlPullParser* parser, ParsedResource
             current_policies |= OverlayableItem::Policy::kSystem;
           } else if (trimmed_part == "vendor") {
             current_policies |= OverlayableItem::Policy::kVendor;
+          } else if (trimmed_part == "signature") {
+            current_policies |= OverlayableItem::Policy::kSignature;
           } else {
             diag_->Error(DiagMessage(element_source)
                          << "<policy> has unsupported type '" << trimmed_part << "'");
@@ -1176,6 +1162,11 @@ bool ResourceParser::ParseOverlayable(xml::XmlPullParser* parser, ParsedResource
             continue;
           }
         }
+      } else {
+        diag_->Error(DiagMessage(element_source)
+                         << "<policy> must have a 'type' attribute");
+        error = true;
+        continue;
       }
     } else if (!ShouldIgnoreElement(element_namespace, element_name)) {
       diag_->Error(DiagMessage(element_source) << "invalid element <" << element_name << "> "
@@ -1623,7 +1614,9 @@ bool ResourceParser::ParsePlural(xml::XmlPullParser* parser,
       if (!(plural->values[index] = ParseXml(
                 parser, android::ResTable_map::TYPE_STRING, kNoRawString))) {
         error = true;
+        continue;
       }
+
       plural->values[index]->SetSource(item_source);
 
     } else if (!ShouldIgnoreElement(element_namespace, element_name)) {

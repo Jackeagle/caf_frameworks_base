@@ -16,6 +16,7 @@
 
 package android.service.notification;
 
+import android.annotation.CurrentTimeMillisLong;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.SdkConstant;
@@ -425,8 +426,9 @@ public abstract class NotificationListenerService extends Service {
      * @hide
      */
     @TestApi
-    public void onNotificationRemoved(StatusBarNotification sbn, RankingMap rankingMap,
-            NotificationStats stats, int reason) {
+    @SystemApi
+    public void onNotificationRemoved(@NonNull StatusBarNotification sbn,
+            @NonNull RankingMap rankingMap, @NonNull NotificationStats stats, int reason) {
         onNotificationRemoved(sbn, rankingMap, reason);
     }
 
@@ -475,7 +477,7 @@ public abstract class NotificationListenerService extends Service {
      * @param hideSilentStatusIcons whether or not status bar icons should be hidden for silent
      *                              notifications
      */
-    public void onStatusBarIconsBehaviorChanged(boolean hideSilentStatusIcons) {
+    public void onSilentStatusBarIconsVisibilityChanged(boolean hideSilentStatusIcons) {
         // optional
     }
 
@@ -1398,6 +1400,11 @@ public abstract class NotificationListenerService extends Service {
         }
 
         @Override
+        public void onAllowedAdjustmentsChanged() {
+            // no-op in the listener
+        }
+
+        @Override
         public void onNotificationChannelModification(String pkgName, UserHandle user,
                 NotificationChannel channel,
                 @ChannelOrGroupModificationTypes int modificationType) {
@@ -1503,6 +1510,7 @@ public abstract class NotificationListenerService extends Service {
         private boolean mNoisy;
         private ArrayList<Notification.Action> mSmartActions;
         private ArrayList<CharSequence> mSmartReplies;
+        private boolean mCanBubble;
 
         public Ranking() {}
 
@@ -1637,7 +1645,7 @@ public abstract class NotificationListenerService extends Service {
          * Returns a list of smart {@link Notification.Action} that can be added by the
          * {@link NotificationAssistantService}
          */
-        public List<Notification.Action> getSmartActions() {
+        public @NonNull List<Notification.Action> getSmartActions() {
             return mSmartActions;
         }
 
@@ -1645,7 +1653,7 @@ public abstract class NotificationListenerService extends Service {
          * Returns a list of smart replies that can be added by the
          * {@link NotificationAssistantService}
          */
-        public List<CharSequence> getSmartReplies() {
+        public @NonNull List<CharSequence> getSmartReplies() {
             return mSmartReplies;
         }
 
@@ -1673,8 +1681,20 @@ public abstract class NotificationListenerService extends Service {
          *
          * @return the time of the last alerting behavior, in milliseconds.
          */
+        @CurrentTimeMillisLong
         public long getLastAudiblyAlertedMillis() {
             return mLastAudiblyAlertedMs;
+        }
+
+        /**
+         * Returns whether the user has allowed bubbles globally, at the app level, and at the
+         * channel level for this notification.
+         *
+         * <p>This does not take into account the current importance of the notification, the
+         * current DND state, or whether the posting app is foreground.</p>
+         */
+        public boolean canBubble() {
+            return mCanBubble;
         }
 
         /** @hide */
@@ -1693,7 +1713,7 @@ public abstract class NotificationListenerService extends Service {
                 ArrayList<SnoozeCriterion> snoozeCriteria, boolean showBadge,
                 int userSentiment, boolean hidden, long lastAudiblyAlertedMs,
                 boolean noisy, ArrayList<Notification.Action> smartActions,
-                ArrayList<CharSequence> smartReplies) {
+                ArrayList<CharSequence> smartReplies, boolean canBubble) {
             mKey = key;
             mRank = rank;
             mIsAmbient = importance < NotificationManager.IMPORTANCE_LOW;
@@ -1713,6 +1733,7 @@ public abstract class NotificationListenerService extends Service {
             mNoisy = noisy;
             mSmartActions = smartActions;
             mSmartReplies = smartReplies;
+            mCanBubble = canBubble;
         }
 
         /**
@@ -1766,6 +1787,7 @@ public abstract class NotificationListenerService extends Service {
         private ArrayMap<String, Boolean> mNoisy;
         private ArrayMap<String, ArrayList<Notification.Action>> mSmartActions;
         private ArrayMap<String, ArrayList<CharSequence>> mSmartReplies;
+        private boolean[] mCanBubble;
 
         private RankingMap(NotificationRankingUpdate rankingUpdate) {
             mRankingUpdate = rankingUpdate;
@@ -1796,7 +1818,7 @@ public abstract class NotificationListenerService extends Service {
                     getChannel(key), getOverridePeople(key), getSnoozeCriteria(key),
                     getShowBadge(key), getUserSentiment(key), getHidden(key),
                     getLastAudiblyAlerted(key), getNoisy(key), getSmartActions(key),
-                    getSmartReplies(key));
+                    getSmartReplies(key), canBubble(key));
             return rank >= 0;
         }
 
@@ -1972,6 +1994,19 @@ public abstract class NotificationListenerService extends Service {
             return mSmartReplies.get(key);
         }
 
+        private boolean canBubble(String key) {
+            synchronized (this) {
+                if (mRanks == null) {
+                    buildRanksLocked();
+                }
+                if (mCanBubble == null) {
+                    mCanBubble = mRankingUpdate.getCanBubble();
+                }
+            }
+            int keyIndex = mRanks.getOrDefault(key, -1);
+            return keyIndex >= 0 ? mCanBubble[keyIndex] : false;
+        }
+
         // Locked by 'this'
         private void buildRanksLocked() {
             String[] orderedKeys = mRankingUpdate.getOrderedKeys();
@@ -2136,7 +2171,7 @@ public abstract class NotificationListenerService extends Service {
             dest.writeParcelable(mRankingUpdate, flags);
         }
 
-        public static final Creator<RankingMap> CREATOR = new Creator<RankingMap>() {
+        public static final @android.annotation.NonNull Creator<RankingMap> CREATOR = new Creator<RankingMap>() {
             @Override
             public RankingMap createFromParcel(Parcel source) {
                 NotificationRankingUpdate rankingUpdate = source.readParcelable(null);
@@ -2227,7 +2262,7 @@ public abstract class NotificationListenerService extends Service {
                 } break;
 
                 case MSG_ON_STATUS_BAR_ICON_BEHAVIOR_CHANGED: {
-                    onStatusBarIconsBehaviorChanged((Boolean) msg.obj);
+                    onSilentStatusBarIconsVisibilityChanged((Boolean) msg.obj);
                 } break;
             }
         }

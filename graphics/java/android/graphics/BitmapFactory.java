@@ -151,12 +151,9 @@ public class BitmapFactory {
          * the decoder will pick either the color space embedded in the image
          * or the color space best suited for the requested image configuration
          * (for instance {@link ColorSpace.Named#SRGB sRGB} for
-         * the {@link Bitmap.Config#ARGB_8888} configuration).</p>
-         *
-         * <p>{@link Bitmap.Config#RGBA_F16} always uses the
-         * {@link ColorSpace.Named#LINEAR_EXTENDED_SRGB scRGB} color space).
-         * Bitmaps in other configurations without an embedded color space are
-         * assumed to be in the {@link ColorSpace.Named#SRGB sRGB} color space.</p>
+         * {@link Bitmap.Config#ARGB_8888} configuration and
+         * {@link ColorSpace.Named#EXTENDED_SRGB EXTENDED_SRGB} for
+         * {@link Bitmap.Config#RGBA_F16}).</p>
          *
          * <p class="note">Only {@link ColorSpace.Model#RGB} color spaces are
          * currently supported. An <code>IllegalArgumentException</code> will
@@ -439,9 +436,15 @@ public class BitmapFactory {
         static void validate(Options opts) {
             if (opts == null) return;
 
-            if (opts.inBitmap != null && opts.inBitmap.getConfig() == Bitmap.Config.HARDWARE) {
-                throw new IllegalArgumentException(
-                        "Bitmaps with Config.HARDWARE are always immutable");
+            if (opts.inBitmap != null) {
+                if (opts.inBitmap.getConfig() == Bitmap.Config.HARDWARE) {
+                    throw new IllegalArgumentException(
+                            "Bitmaps with Config.HARDWARE are always immutable");
+                }
+                if (opts.inBitmap.isRecycled()) {
+                    throw new IllegalArgumentException(
+                            "Cannot reuse a recycled Bitmap");
+                }
             }
 
             if (opts.inMutable && opts.inPreferredConfig == Bitmap.Config.HARDWARE) {
@@ -459,6 +462,17 @@ public class BitmapFactory {
                             "ICC parametric transfer function");
                 }
             }
+        }
+
+        /**
+         *  Helper for passing inBitmap's native pointer to native.
+         */
+        static long nativeInBitmap(Options opts) {
+            if (opts == null || opts.inBitmap == null) {
+                return 0;
+            }
+
+            return opts.inBitmap.getNativeInstance();
         }
 
         /**
@@ -649,6 +663,7 @@ public class BitmapFactory {
         Trace.traceBegin(Trace.TRACE_TAG_GRAPHICS, "decodeBitmap");
         try {
             bm = nativeDecodeByteArray(data, offset, length, opts,
+                    Options.nativeInBitmap(opts),
                     Options.nativeColorSpace(opts));
 
             if (bm == null && opts != null && opts.inBitmap != null) {
@@ -744,7 +759,8 @@ public class BitmapFactory {
         try {
             if (is instanceof AssetManager.AssetInputStream) {
                 final long asset = ((AssetManager.AssetInputStream) is).getNativeAsset();
-                bm = nativeDecodeAsset(asset, outPadding, opts, Options.nativeColorSpace(opts));
+                bm = nativeDecodeAsset(asset, outPadding, opts, Options.nativeInBitmap(opts),
+                    Options.nativeColorSpace(opts));
             } else {
                 bm = decodeStreamInternal(is, outPadding, opts);
             }
@@ -772,6 +788,7 @@ public class BitmapFactory {
         if (opts != null) tempStorage = opts.inTempStorage;
         if (tempStorage == null) tempStorage = new byte[DECODE_BUFFER_SIZE];
         return nativeDecodeStream(is, tempStorage, outPadding, opts,
+                Options.nativeInBitmap(opts),
                 Options.nativeColorSpace(opts));
     }
 
@@ -816,6 +833,7 @@ public class BitmapFactory {
         try {
             if (nativeIsSeekable(fd)) {
                 bm = nativeDecodeFileDescriptor(fd, outPadding, opts,
+                        Options.nativeInBitmap(opts),
                         Options.nativeColorSpace(opts));
             } else {
                 FileInputStream fis = new FileInputStream(fd);
@@ -853,15 +871,15 @@ public class BitmapFactory {
 
     @UnsupportedAppUsage
     private static native Bitmap nativeDecodeStream(InputStream is, byte[] storage,
-            Rect padding, Options opts, long colorSpaceHandle);
+            Rect padding, Options opts, long inBitmapHandle, long colorSpaceHandle);
     @UnsupportedAppUsage
     private static native Bitmap nativeDecodeFileDescriptor(FileDescriptor fd,
-            Rect padding, Options opts, long colorSpaceHandle);
+            Rect padding, Options opts, long inBitmapHandle, long colorSpaceHandle);
     @UnsupportedAppUsage
     private static native Bitmap nativeDecodeAsset(long nativeAsset, Rect padding, Options opts,
-            long colorSpaceHandle);
+            long inBitmapHandle, long colorSpaceHandle);
     @UnsupportedAppUsage
     private static native Bitmap nativeDecodeByteArray(byte[] data, int offset,
-            int length, Options opts, long colorSpaceHandle);
+            int length, Options opts, long inBitmapHandle, long colorSpaceHandle);
     private static native boolean nativeIsSeekable(FileDescriptor fd);
 }

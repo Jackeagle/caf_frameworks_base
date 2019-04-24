@@ -84,7 +84,7 @@ public class WifiTracker implements LifecycleObserver, OnStart, OnStop, OnDestro
     private static final long DEFAULT_MAX_CACHED_SCORE_AGE_MILLIS = 20 * DateUtils.MINUTE_IN_MILLIS;
 
     /** Maximum age of scan results to hold onto while actively scanning. **/
-    private static final long MAX_SCAN_RESULT_AGE_MILLIS = 15000;
+    @VisibleForTesting static final long MAX_SCAN_RESULT_AGE_MILLIS = 15000;
 
     private static final String TAG = "WifiTracker";
     private static final boolean DBG() {
@@ -141,6 +141,13 @@ public class WifiTracker implements LifecycleObserver, OnStart, OnStop, OnDestro
      * update the UI with stale data / clear out existing UI elements prematurely.
      */
     private boolean mStaleScanResults = true;
+
+    /**
+     * Tracks whether the latest SCAN_RESULTS_AVAILABLE_ACTION contained new scans. If not, then
+     * we treat the last scan as an aborted scan and increase the eviction timeout window to avoid
+     * completely flushing the AP list before the next successful scan completes.
+     */
+    private boolean mLastScanSucceeded = true;
 
     // Does not need to be locked as it only updated on the worker thread, with the exception of
     // during onStart, which occurs before the receiver is registered on the work handler.
@@ -478,17 +485,22 @@ public class WifiTracker implements LifecycleObserver, OnStart, OnStop, OnDestro
     }
 
     /**
-     * Remove old scan results from the cache.
+     * Remove old scan results from the cache. If {@link #mLastScanSucceeded} is false, then
+     * increase the timeout window to avoid completely flushing the AP list before the next
+     * successful scan completes.
      *
      * <p>Should only ever be invoked from {@link #updateScanResultCache(List)} when
      * {@link #mStaleScanResults} is false.
      */
     private void evictOldScans() {
+        long evictionTimeoutMillis = mLastScanSucceeded ? MAX_SCAN_RESULT_AGE_MILLIS
+                : MAX_SCAN_RESULT_AGE_MILLIS * 2;
+
         long nowMs = SystemClock.elapsedRealtime();
         for (Iterator<ScanResult> iter = mScanResultCache.values().iterator(); iter.hasNext(); ) {
             ScanResult result = iter.next();
             // result timestamp is in microseconds
-            if (nowMs - result.timestamp / 1000 > MAX_SCAN_RESULT_AGE_MILLIS) {
+            if (nowMs - result.timestamp / 1000 > evictionTimeoutMillis) {
                 iter.remove();
             }
         }
@@ -566,9 +578,6 @@ public class WifiTracker implements LifecycleObserver, OnStart, OnStop, OnDestro
 
                 AccessPoint accessPoint =
                         getCachedOrCreate(entry.getValue(), cachedAccessPoints);
-                if (mLastInfo != null && mLastNetworkInfo != null) {
-                    accessPoint.update(connectionConfig, mLastInfo, mLastNetworkInfo);
-                }
 
                 // Update the matching config if there is one, to populate saved network info
                 accessPoint.update(configsByKey.get(entry.getKey()));
@@ -578,67 +587,19 @@ public class WifiTracker implements LifecycleObserver, OnStart, OnStop, OnDestro
 
             List<ScanResult> cachedScanResults = new ArrayList<>(mScanResultCache.values());
 
-            // Add a unique Passpoint R1 AccessPoint for each Passpoint profile's FQDN.
-            List<Pair<WifiConfiguration, Map<Integer, List<ScanResult>>>> passpointConfigsAndScans =
-                    mWifiManager.getAllMatchingWifiConfigs(cachedScanResults);
-            Set<String> seenFQDNs = new ArraySet<>();
-            for (Pair<WifiConfiguration,
-                    Map<Integer, List<ScanResult>>> pairing : passpointConfigsAndScans) {
-                WifiConfiguration config = pairing.first;
+            // Add a unique Passpoint AccessPoint for each Passpoint profile's FQDN.
+            accessPoints.addAll(updatePasspointAccessPoints(
+                    mWifiManager.getAllMatchingWifiConfigs(cachedScanResults), cachedAccessPoints));
 
-                List<ScanResult> scanResults = new ArrayList<>();
+            // Add OSU Provider AccessPoints
+            accessPoints.addAll(updateOsuAccessPoints(
+                    mWifiManager.getMatchingOsuProviders(cachedScanResults), cachedAccessPoints));
 
-                List<ScanResult> homeScans =
-                        pairing.second.get(WifiManager.PASSPOINT_HOME_NETWORK);
-                List<ScanResult> roamingScans =
-                        pairing.second.get(WifiManager.PASSPOINT_ROAMING_NETWORK);
-
-                if (homeScans == null) {
-                    homeScans = new ArrayList<>();
-                }
-                if (roamingScans == null) {
-                    roamingScans = new ArrayList<>();
-                }
-
-                // TODO(b/118705403): Differentiate home network vs roaming network for summary info
-                if (!homeScans.isEmpty()) {
-                    scanResults.addAll(homeScans);
-                } else {
-                    scanResults.addAll(roamingScans);
-                }
-
-                if (seenFQDNs.add(config.FQDN)) {
-                    int bestRssi = Integer.MIN_VALUE;
-                    for (ScanResult result : scanResults) {
-                        if (result.level >= bestRssi) {
-                            bestRssi = result.level;
-                            config.SSID = AccessPoint.convertToQuotedString(result.SSID);
-                        }
-                    }
-
-                    AccessPoint accessPoint =
-                            getCachedOrCreatePasspoint(scanResults, cachedAccessPoints, config);
-                    accessPoint.update(connectionConfig, mLastInfo, mLastNetworkInfo);
-                    accessPoints.add(accessPoint);
+            if (mLastInfo != null && mLastNetworkInfo != null) {
+                for (AccessPoint ap : accessPoints) {
+                    ap.update(connectionConfig, mLastInfo, mLastNetworkInfo);
                 }
             }
-
-            // Add Passpoint OSU Provider AccessPoints
-            Map<OsuProvider, List<ScanResult>> providersAndScans =
-                    mWifiManager.getMatchingOsuProviders(cachedScanResults);
-            Set<OsuProvider> alreadyProvisioned = mWifiManager
-                    .getMatchingPasspointConfigsForOsuProviders(
-                            providersAndScans.keySet()).keySet();
-            for (OsuProvider provider : providersAndScans.keySet()) {
-                if (!alreadyProvisioned.contains(provider)) {
-                    AccessPoint accessPointOsu =
-                            getCachedOrCreateOsu(providersAndScans.get(provider),
-                                    cachedAccessPoints, provider);
-                    accessPointOsu.update(connectionConfig, mLastInfo, mLastNetworkInfo);
-                    accessPoints.add(accessPointOsu);
-                }
-            }
-
 
             // If there were no scan results, create an AP for the currently connected network (if
             // it exists).
@@ -659,23 +620,23 @@ public class WifiTracker implements LifecycleObserver, OnStart, OnStop, OnDestro
 
             // Log accesspoints that are being removed
             if (DBG()) {
-                Log.d(TAG, "------ Dumping SSIDs that were not seen on this scan ------");
+                Log.d(TAG,
+                        "------ Dumping AccessPoints that were not seen on this scan ------");
                 for (AccessPoint prevAccessPoint : mInternalAccessPoints) {
-                    if (prevAccessPoint.getSsid() == null)
-                        continue;
-                    String prevSsid = prevAccessPoint.getSsidStr();
+                    String prevTitle = prevAccessPoint.getTitle();
                     boolean found = false;
                     for (AccessPoint newAccessPoint : accessPoints) {
-                        if (newAccessPoint.getSsidStr() != null && newAccessPoint.getSsidStr()
-                                .equals(prevSsid)) {
+                        if (newAccessPoint.getTitle() != null && newAccessPoint.getTitle()
+                                .equals(prevTitle)) {
                             found = true;
                             break;
                         }
                     }
                     if (!found)
-                        Log.d(TAG, "Did not find " + prevSsid + " in this scan");
+                        Log.d(TAG, "Did not find " + prevTitle + " in this scan");
                 }
-                Log.d(TAG, "---- Done dumping SSIDs that were not seen on this scan ----");
+                Log.d(TAG,
+                        "---- Done dumping AccessPoints that were not seen on this scan ----");
             }
 
             mInternalAccessPoints.clear();
@@ -686,7 +647,51 @@ public class WifiTracker implements LifecycleObserver, OnStart, OnStop, OnDestro
     }
 
     @VisibleForTesting
-    AccessPoint getCachedOrCreate(
+    List<AccessPoint> updatePasspointAccessPoints(
+            List<Pair<WifiConfiguration, Map<Integer, List<ScanResult>>>> passpointConfigsAndScans,
+            List<AccessPoint> accessPointCache) {
+        List<AccessPoint> accessPoints = new ArrayList<>();
+
+        Set<String> seenFQDNs = new ArraySet<>();
+        for (Pair<WifiConfiguration,
+                Map<Integer, List<ScanResult>>> pairing : passpointConfigsAndScans) {
+            WifiConfiguration config = pairing.first;
+            if (seenFQDNs.add(config.FQDN)) {
+                List<ScanResult> homeScans =
+                        pairing.second.get(WifiManager.PASSPOINT_HOME_NETWORK);
+                List<ScanResult> roamingScans =
+                        pairing.second.get(WifiManager.PASSPOINT_ROAMING_NETWORK);
+
+                AccessPoint accessPoint =
+                        getCachedOrCreatePasspoint(config, homeScans, roamingScans,
+                                accessPointCache);
+                accessPoints.add(accessPoint);
+            }
+        }
+        return accessPoints;
+    }
+
+    @VisibleForTesting
+    List<AccessPoint> updateOsuAccessPoints(
+            Map<OsuProvider, List<ScanResult>> providersAndScans,
+            List<AccessPoint> accessPointCache) {
+        List<AccessPoint> accessPoints = new ArrayList<>();
+
+        Set<OsuProvider> alreadyProvisioned = mWifiManager
+                .getMatchingPasspointConfigsForOsuProviders(
+                        providersAndScans.keySet()).keySet();
+        for (OsuProvider provider : providersAndScans.keySet()) {
+            if (!alreadyProvisioned.contains(provider)) {
+                AccessPoint accessPointOsu =
+                        getCachedOrCreateOsu(provider, providersAndScans.get(provider),
+                                accessPointCache);
+                accessPoints.add(accessPointOsu);
+            }
+        }
+        return accessPoints;
+    }
+
+    private AccessPoint getCachedOrCreate(
             List<ScanResult> scanResults,
             List<AccessPoint> cache) {
         AccessPoint accessPoint = getCachedByKey(cache, AccessPoint.getKey(scanResults.get(0)));
@@ -699,26 +704,29 @@ public class WifiTracker implements LifecycleObserver, OnStart, OnStop, OnDestro
     }
 
     private AccessPoint getCachedOrCreatePasspoint(
-            List<ScanResult> scanResults,
-            List<AccessPoint> cache,
-            WifiConfiguration config) {
+            WifiConfiguration config,
+            List<ScanResult> homeScans,
+            List<ScanResult> roamingScans,
+            List<AccessPoint> cache) {
         AccessPoint accessPoint = getCachedByKey(cache, AccessPoint.getKey(config));
         if (accessPoint == null) {
-            accessPoint = new AccessPoint(mContext, config);
+            accessPoint = new AccessPoint(mContext, config, homeScans, roamingScans);
+        } else {
+            accessPoint.setScanResultsPasspoint(homeScans, roamingScans);
         }
-        accessPoint.setScanResults(scanResults);
         return accessPoint;
     }
 
     private AccessPoint getCachedOrCreateOsu(
+            OsuProvider provider,
             List<ScanResult> scanResults,
-            List<AccessPoint> cache,
-            OsuProvider provider) {
+            List<AccessPoint> cache) {
         AccessPoint accessPoint = getCachedByKey(cache, AccessPoint.getKey(provider));
         if (accessPoint == null) {
-            accessPoint = new AccessPoint(mContext, provider);
+            accessPoint = new AccessPoint(mContext, provider, scanResults);
+        } else {
+            accessPoint.setScanResults(scanResults);
         }
-        accessPoint.setScanResults(scanResults);
         return accessPoint;
     }
 
@@ -844,6 +852,8 @@ public class WifiTracker implements LifecycleObserver, OnStart, OnStop, OnDestro
                                 WifiManager.WIFI_STATE_UNKNOWN));
             } else if (WifiManager.SCAN_RESULTS_AVAILABLE_ACTION.equals(action)) {
                 mStaleScanResults = false;
+                mLastScanSucceeded =
+                        intent.getBooleanExtra(WifiManager.EXTRA_RESULTS_UPDATED, true);
 
                 fetchScansAndConfigsAndUpdateAccessPoints();
             } else if (WifiManager.CONFIGURED_NETWORKS_CHANGED_ACTION.equals(action)
@@ -1058,7 +1068,7 @@ public class WifiTracker implements LifecycleObserver, OnStart, OnStop, OnDestro
         }
 
         // Get and cache advanced capabilities
-        final boolean isOweSupported = mWifiManager.isOweSupported();
+        final boolean isOweSupported = mWifiManager.isEnhancedOpenSupported();
         final boolean isSaeSupported = mWifiManager.isWpa3SaeSupported();
         final boolean isSuiteBSupported = mWifiManager.isWpa3SuiteBSupported();
 

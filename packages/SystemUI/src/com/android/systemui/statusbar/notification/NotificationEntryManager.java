@@ -35,9 +35,10 @@ import com.android.systemui.statusbar.NotificationUpdateHandler;
 import com.android.systemui.statusbar.notification.collection.NotificationData;
 import com.android.systemui.statusbar.notification.collection.NotificationData.KeyguardEnvironment;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
+import com.android.systemui.statusbar.notification.collection.NotificationRowBinder;
 import com.android.systemui.statusbar.notification.logging.NotificationLogger;
-import com.android.systemui.statusbar.notification.row.NotificationInflater;
-import com.android.systemui.statusbar.notification.row.NotificationInflater.InflationFlag;
+import com.android.systemui.statusbar.notification.row.NotificationContentInflater;
+import com.android.systemui.statusbar.notification.row.NotificationContentInflater.InflationFlag;
 import com.android.systemui.statusbar.notification.stack.NotificationListContainer;
 import com.android.systemui.statusbar.policy.HeadsUpManager;
 import com.android.systemui.util.leak.LeakDetector;
@@ -47,6 +48,7 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * NotificationEntryManager is responsible for the adding, removing, and updating of notifications.
@@ -55,7 +57,7 @@ import java.util.List;
  */
 public class NotificationEntryManager implements
         Dumpable,
-        NotificationInflater.InflationCallback,
+        NotificationContentInflater.InflationCallback,
         NotificationUpdateHandler,
         VisualStabilityManager.Callback {
     private static final String TAG = "NotificationEntryMgr";
@@ -63,6 +65,9 @@ public class NotificationEntryManager implements
 
     @VisibleForTesting
     protected final HashMap<String, NotificationEntry> mPendingNotifications = new HashMap<>();
+
+    private final Map<NotificationEntry, NotificationLifetimeExtender> mRetainedNotifications =
+            new ArrayMap<>();
 
     // Lazily retrieved dependencies
     private NotificationRemoteInputManager mRemoteInputManager;
@@ -89,6 +94,16 @@ public class NotificationEntryManager implements
                 pw.println(entry.notification);
             }
         }
+        pw.println("  Lifetime-extended notifications:");
+        if (mRetainedNotifications.isEmpty()) {
+            pw.println("    None");
+        } else {
+            for (Map.Entry<NotificationEntry, NotificationLifetimeExtender> entry
+                    : mRetainedNotifications.entrySet()) {
+                pw.println("    " + entry.getKey().notification + " retained by "
+                        + entry.getValue().getClass().getName());
+            }
+        }
     }
 
     public NotificationEntryManager(Context context) {
@@ -110,16 +125,7 @@ public class NotificationEntryManager implements
         return mRemoteInputManager;
     }
 
-    private NotificationRowBinder getRowBinder() {
-        if (mNotificationRowBinder == null) {
-            mNotificationRowBinder = Dependency.get(NotificationRowBinder.class);
-        }
-        return mNotificationRowBinder;
-    }
-
-    // TODO: Remove this once we can always use a mocked row binder in our tests
-    @VisibleForTesting
-    void setRowBinder(NotificationRowBinder notificationRowBinder) {
+    public void setRowBinder(NotificationRowBinder notificationRowBinder) {
         mNotificationRowBinder = notificationRowBinder;
     }
 
@@ -153,14 +159,17 @@ public class NotificationEntryManager implements
     }
 
     public void performRemoveNotification(StatusBarNotification n) {
-        final int rank = mNotificationData.getRank(n.getKey());
-        final int count = mNotificationData.getActiveNotifications().size();
-        NotificationVisibility.NotificationLocation location =
-                NotificationLogger.getNotificationLocation(getNotificationData().get(n.getKey()));
-        final NotificationVisibility nv = NotificationVisibility.obtain(n.getKey(), rank, count,
-                true, location);
+        final NotificationVisibility nv = obtainVisibility(n.getKey());
         removeNotificationInternal(
                 n.getKey(), null, nv, false /* forceRemove */, true /* removedByUser */);
+    }
+
+    private NotificationVisibility obtainVisibility(String key) {
+        final int rank = mNotificationData.getRank(key);
+        final int count = mNotificationData.getActiveNotifications().size();
+        NotificationVisibility.NotificationLocation location =
+                NotificationLogger.getNotificationLocation(getNotificationData().get(key));
+        return NotificationVisibility.obtain(key, rank, count, true, location);
     }
 
     private void abortExistingInflation(String key) {
@@ -216,13 +225,12 @@ public class NotificationEntryManager implements
                 }
             }
         }
-        entry.setLowPriorityStateUpdated(false);
     }
 
     @Override
     public void removeNotification(String key, NotificationListenerService.RankingMap ranking) {
-        removeNotificationInternal(
-                key, ranking, null, false /* forceRemove */, false /* removedByUser */);
+        removeNotificationInternal(key, ranking, obtainVisibility(key), false /* forceRemove */,
+                false /* removedByUser */);
     }
 
     private void removeNotificationInternal(
@@ -240,11 +248,12 @@ public class NotificationEntryManager implements
         if (entry != null) {
             // If a manager needs to keep the notification around for whatever reason, we
             // keep the notification
-            if (!forceRemove) {
+            boolean entryDismissed = entry.isRowDismissed();
+            if (!forceRemove && !entryDismissed) {
                 for (NotificationLifetimeExtender extender : mNotificationLifetimeExtenders) {
                     if (extender.shouldExtendLifetime(entry)) {
                         mLatestRankingMap = ranking;
-                        extender.setShouldManageLifetime(entry, true /* shouldManage */);
+                        extendLifetime(entry, extender);
                         lifetimeExtended = true;
                         break;
                     }
@@ -255,9 +264,7 @@ public class NotificationEntryManager implements
                 // At this point, we are guaranteed the notification will be removed
 
                 // Ensure any managers keeping the lifetime extended stop managing the entry
-                for (NotificationLifetimeExtender extender : mNotificationLifetimeExtenders) {
-                    extender.setShouldManageLifetime(entry, false /* shouldManage */);
-                }
+                cancelLifetimeExtension(entry);
 
                 if (entry.rowExists()) {
                     entry.removeRow();
@@ -269,6 +276,7 @@ public class NotificationEntryManager implements
                 mNotificationData.remove(key, ranking);
                 updateNotifications();
                 Dependency.get(LeakDetector.class).trackGarbage(entry);
+                removedByUser |= entryDismissed;
 
                 for (NotificationEntryListener listener : mNotificationEntryListeners) {
                     listener.onEntryRemoved(entry, visibility, removedByUser);
@@ -334,8 +342,7 @@ public class NotificationEntryManager implements
 
         Dependency.get(LeakDetector.class).trackInstance(entry);
         // Construct the expanded view.
-        getRowBinder().inflateViews(entry, () -> performRemoveNotification(notification),
-                mNotificationData.get(entry.key) != null);
+        requireBinder().inflateViews(entry, () -> performRemoveNotification(notification));
 
         abortExistingInflation(key);
 
@@ -368,19 +375,15 @@ public class NotificationEntryManager implements
 
         // Notification is updated so it is essentially re-added and thus alive again.  Don't need
         // to keep its lifetime extended.
-        for (NotificationLifetimeExtender extender : mNotificationLifetimeExtenders) {
-            extender.setShouldManageLifetime(entry, false /* shouldManage */);
-        }
+        cancelLifetimeExtension(entry);
 
         mNotificationData.update(entry, ranking, notification);
-
-        getRowBinder().inflateViews(entry, () -> performRemoveNotification(notification),
-                mNotificationData.get(entry.key) != null);
 
         for (NotificationEntryListener listener : mNotificationEntryListeners) {
             listener.onPreEntryUpdated(entry);
         }
 
+        requireBinder().inflateViews(entry, () -> performRemoveNotification(notification));
         updateNotifications();
 
         if (DEBUG) {
@@ -412,6 +415,7 @@ public class NotificationEntryManager implements
         }
     }
 
+    @Override
     public void updateNotificationRanking(NotificationListenerService.RankingMap rankingMap) {
         List<NotificationEntry> entries = new ArrayList<>();
         entries.addAll(mNotificationData.getActiveNotifications());
@@ -433,12 +437,11 @@ public class NotificationEntryManager implements
 
         // By comparing the old and new UI adjustments, reinflate the view accordingly.
         for (NotificationEntry entry : entries) {
-            getRowBinder().onNotificationRankingUpdated(
+            requireBinder().onNotificationRankingUpdated(
                     entry,
                     oldImportances.get(entry.key),
                     oldAdjustments.get(entry.key),
-                    NotificationUiAdjustment.extractFromNotificationEntry(entry),
-                    mNotificationData.get(entry.key) != null);
+                    NotificationUiAdjustment.extractFromNotificationEntry(entry));
         }
 
         updateNotifications();
@@ -463,5 +466,29 @@ public class NotificationEntryManager implements
      */
     public Iterable<NotificationEntry> getPendingNotificationsIterator() {
         return mPendingNotifications.values();
+    }
+
+    private void extendLifetime(NotificationEntry entry, NotificationLifetimeExtender extender) {
+        NotificationLifetimeExtender activeExtender = mRetainedNotifications.get(entry);
+        if (activeExtender != null && activeExtender != extender) {
+            activeExtender.setShouldManageLifetime(entry, false);
+        }
+        mRetainedNotifications.put(entry, extender);
+        extender.setShouldManageLifetime(entry, true);
+    }
+
+    private void cancelLifetimeExtension(NotificationEntry entry) {
+        NotificationLifetimeExtender activeExtender = mRetainedNotifications.remove(entry);
+        if (activeExtender != null) {
+            activeExtender.setShouldManageLifetime(entry, false);
+        }
+    }
+
+    private NotificationRowBinder requireBinder() {
+        if (mNotificationRowBinder == null) {
+            throw new RuntimeException("You must initialize NotificationEntryManager by calling"
+                    + "setRowBinder() before using.");
+        }
+        return mNotificationRowBinder;
     }
 }

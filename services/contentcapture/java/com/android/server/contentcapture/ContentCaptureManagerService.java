@@ -18,12 +18,21 @@ package com.android.server.contentcapture;
 
 import static android.Manifest.permission.MANAGE_CONTENT_CAPTURE;
 import static android.content.Context.CONTENT_CAPTURE_MANAGER_SERVICE;
+import static android.view.contentcapture.ContentCaptureHelper.toList;
+import static android.view.contentcapture.ContentCaptureManager.RESULT_CODE_FALSE;
+import static android.view.contentcapture.ContentCaptureManager.RESULT_CODE_OK;
+import static android.view.contentcapture.ContentCaptureManager.RESULT_CODE_SECURITY_EXCEPTION;
+import static android.view.contentcapture.ContentCaptureManager.RESULT_CODE_TRUE;
+
+import static com.android.internal.util.SyncResultReceiver.bundleFor;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.UserIdInt;
 import android.app.ActivityManagerInternal;
+import android.app.ActivityThread;
 import android.content.ComponentName;
+import android.content.ContentCaptureOptions;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.pm.ActivityPresentationInfo;
@@ -32,6 +41,7 @@ import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.UserInfo;
 import android.database.ContentObserver;
 import android.os.Binder;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -39,19 +49,26 @@ import android.os.ResultReceiver;
 import android.os.ShellCallback;
 import android.os.UserHandle;
 import android.os.UserManager;
+import android.provider.DeviceConfig;
 import android.provider.Settings;
+import android.service.contentcapture.ActivityEvent.ActivityEventType;
+import android.util.ArraySet;
 import android.util.LocalLog;
 import android.util.Slog;
+import android.util.SparseArray;
 import android.util.SparseBooleanArray;
+import android.view.contentcapture.ContentCaptureCondition;
+import android.view.contentcapture.ContentCaptureHelper;
 import android.view.contentcapture.ContentCaptureManager;
 import android.view.contentcapture.IContentCaptureManager;
 import android.view.contentcapture.UserDataRemovalRequest;
 
 import com.android.internal.annotations.GuardedBy;
+import com.android.internal.infra.AbstractRemoteService;
+import com.android.internal.infra.GlobalWhitelistState;
 import com.android.internal.os.IResultReceiver;
 import com.android.internal.util.DumpUtils;
 import com.android.internal.util.Preconditions;
-import com.android.internal.util.SyncResultReceiver;
 import com.android.server.LocalServices;
 import com.android.server.infra.AbstractMasterSystemService;
 import com.android.server.infra.FrameworkResourcesServiceNameResolver;
@@ -77,36 +94,75 @@ public final class ContentCaptureManagerService extends
 
     private final LocalService mLocalService = new LocalService();
 
-    private final LocalLog mRequestsHistory = new LocalLog(20);
+    @Nullable
+    final LocalLog mRequestsHistory;
 
     @GuardedBy("mLock")
     private ActivityManagerInternal mAm;
 
     /**
-     * Users disabled by {@link android.provider.Settings.Secure#CONTENT_CAPTURE_ENABLED}.
+     * Users disabled by {@link android.provider.Settings.Secure#CONTENT_CAPTURE_ENABLED}
      */
     @GuardedBy("mLock")
     @Nullable
-    private SparseBooleanArray mDisabledUsers;
+    private SparseBooleanArray mDisabledBySettings;
 
+    /**
+     * Global kill-switch based on value defined by
+     * {@link ContentCaptureManager#DEVICE_CONFIG_PROPERTY_SERVICE_EXPLICITLY_ENABLED}.
+     */
+    @GuardedBy("mLock")
+    @Nullable
+    private boolean mDisabledByDeviceConfig;
+
+    // Device-config settings that are cached and passed back to apps
+    @GuardedBy("mLock") int mDevCfgLoggingLevel;
+    @GuardedBy("mLock") int mDevCfgMaxBufferSize;
+    @GuardedBy("mLock") int mDevCfgIdleFlushingFrequencyMs;
+    @GuardedBy("mLock") int mDevCfgTextChangeFlushingFrequencyMs;
+    @GuardedBy("mLock") int mDevCfgLogHistorySize;
+    @GuardedBy("mLock") int mDevCfgIdleUnbindTimeoutMs;
+
+    final GlobalContentCaptureOptions mGlobalContentCaptureOptions =
+            new GlobalContentCaptureOptions();
 
     public ContentCaptureManagerService(@NonNull Context context) {
         super(context, new FrameworkResourcesServiceNameResolver(context,
                 com.android.internal.R.string.config_defaultContentCaptureService),
-                UserManager.DISALLOW_CONTENT_CAPTURE);
-        // Sets which serviecs are disabled
+                UserManager.DISALLOW_CONTENT_CAPTURE,
+                /*packageUpdatePolicy=*/ PACKAGE_UPDATE_POLICY_NO_REFRESH);
+        DeviceConfig.addOnPropertyChangedListener(DeviceConfig.NAMESPACE_CONTENT_CAPTURE,
+                ActivityThread.currentApplication().getMainExecutor(),
+                (namespace, key, value) -> onDeviceConfigChange(key, value));
+        setDeviceConfigProperties();
+
+        if (mDevCfgLogHistorySize > 0) {
+            if (debug) Slog.d(mTag, "log history size: " + mDevCfgLogHistorySize);
+            mRequestsHistory = new LocalLog(mDevCfgLogHistorySize);
+        } else {
+            if (debug) {
+                Slog.d(mTag, "disabled log history because size is " + mDevCfgLogHistorySize);
+            }
+            mRequestsHistory = null;
+        }
+
         final UserManager um = getContext().getSystemService(UserManager.class);
         final List<UserInfo> users = um.getUsers();
         for (int i = 0; i < users.size(); i++) {
             final int userId = users.get(i).id;
-            final boolean disabled = isDisabledBySettings(userId);
+            final boolean disabled = !isEnabledBySettings(userId);
+            // Sets which services are disabled by settings
             if (disabled) {
                 Slog.i(mTag, "user " + userId + " disabled by settings");
-                if (mDisabledUsers == null) {
-                    mDisabledUsers = new SparseBooleanArray(1);
+                if (mDisabledBySettings == null) {
+                    mDisabledBySettings = new SparseBooleanArray(1);
                 }
-                mDisabledUsers.put(userId, true);
+                mDisabledBySettings.put(userId, true);
             }
+            // Sets the global options for the service.
+            mGlobalContentCaptureOptions.setServiceInfo(userId,
+                    mServiceNameResolver.getServiceName(userId),
+                    mServiceNameResolver.isTemporary(userId));
         }
     }
 
@@ -127,6 +183,30 @@ public final class ContentCaptureManagerService extends
     protected void onServiceRemoved(@NonNull ContentCapturePerUserService service,
             @UserIdInt int userId) {
         service.destroyLocked();
+    }
+
+    @Override // from AbstractMasterSystemService
+    protected void onServicePackageUpdatingLocked(int userId) {
+        final ContentCapturePerUserService service = getServiceForUserLocked(userId);
+        if (service != null) {
+            service.onPackageUpdatingLocked();
+        }
+    }
+
+    @Override // from AbstractMasterSystemService
+    protected void onServicePackageUpdatedLocked(@UserIdInt int userId) {
+        final ContentCapturePerUserService service = getServiceForUserLocked(userId);
+        if (service != null) {
+            service.onPackageUpdatedLocked();
+        }
+    }
+
+    @Override // from AbstractMasterSystemService
+    protected void onServiceNameChanged(@UserIdInt int userId, @NonNull String serviceName,
+            boolean isTemporary) {
+        mGlobalContentCaptureOptions.setServiceInfo(userId, serviceName, isTemporary);
+
+        super.onServiceNameChanged(userId, serviceName, isTemporary);
     }
 
     @Override // from AbstractMasterSystemService
@@ -151,7 +231,8 @@ public final class ContentCaptureManagerService extends
     protected void onSettingsChanged(@UserIdInt int userId, @NonNull String property) {
         switch (property) {
             case Settings.Secure.CONTENT_CAPTURE_ENABLED:
-                setContentCaptureFeatureEnabledFromSettings(userId);
+                setContentCaptureFeatureEnabledBySettingsForUser(userId,
+                        isEnabledBySettings(userId));
                 return;
             default:
                 Slog.w(mTag, "Unexpected property (" + property + "); updating cache instead");
@@ -160,43 +241,136 @@ public final class ContentCaptureManagerService extends
 
     @Override // from AbstractMasterSystemService
     protected boolean isDisabledLocked(@UserIdInt int userId) {
-        return isDisabledBySettingsLocked(userId) || super.isDisabledLocked(userId);
+        return mDisabledByDeviceConfig || isDisabledBySettingsLocked(userId)
+                || super.isDisabledLocked(userId);
     }
 
     private boolean isDisabledBySettingsLocked(@UserIdInt int userId) {
-        return mDisabledUsers != null && mDisabledUsers.get(userId);
+        return mDisabledBySettings != null && mDisabledBySettings.get(userId);
     }
 
-    private void setContentCaptureFeatureEnabledFromSettings(@UserIdInt int userId) {
-        setContentCaptureFeatureEnabledForUser(userId, !isDisabledBySettings(userId));
+    private boolean isEnabledBySettings(@UserIdInt int userId) {
+        final boolean enabled = Settings.Secure.getIntForUser(getContext().getContentResolver(),
+                Settings.Secure.CONTENT_CAPTURE_ENABLED, 1, userId) == 1 ? true : false;
+        return enabled;
     }
 
-    private boolean isDisabledBySettings(@UserIdInt int userId) {
-        final String property = Settings.Secure.CONTENT_CAPTURE_ENABLED;
-        final String value = Settings.Secure.getStringForUser(getContext().getContentResolver(),
-                property, userId);
-        if (value == null) {
-            if (verbose) {
-                Slog.v(mTag, "isDisabledBySettings(): assuming false as '" + property
-                        + "' is not set");
-            }
-            return false;
+    private void onDeviceConfigChange(@NonNull String key, @Nullable String value) {
+        switch (key) {
+            case ContentCaptureManager.DEVICE_CONFIG_PROPERTY_SERVICE_EXPLICITLY_ENABLED:
+                setDisabledByDeviceConfig(value);
+                return;
+            case ContentCaptureManager.DEVICE_CONFIG_PROPERTY_LOGGING_LEVEL:
+                setLoggingLevelFromDeviceConfig();
+                return;
+            case ContentCaptureManager.DEVICE_CONFIG_PROPERTY_MAX_BUFFER_SIZE:
+            case ContentCaptureManager.DEVICE_CONFIG_PROPERTY_IDLE_FLUSH_FREQUENCY:
+            case ContentCaptureManager.DEVICE_CONFIG_PROPERTY_LOG_HISTORY_SIZE:
+            case ContentCaptureManager.DEVICE_CONFIG_PROPERTY_TEXT_CHANGE_FLUSH_FREQUENCY:
+            case ContentCaptureManager.DEVICE_CONFIG_PROPERTY_IDLE_UNBIND_TIMEOUT:
+                setFineTuneParamsFromDeviceConfig();
+                return;
+            default:
+                Slog.i(mTag, "Ignoring change on " + key);
         }
-
-        try {
-            return !Boolean.valueOf(value);
-        } catch (Exception e) {
-            Slog.w(mTag, "Invalid value for property " + property + ": " + value);
-        }
-        return false;
     }
 
-    private void setContentCaptureFeatureEnabledForUser(@UserIdInt int userId, boolean enabled) {
+    private void setFineTuneParamsFromDeviceConfig() {
         synchronized (mLock) {
-            if (mDisabledUsers == null) {
-                mDisabledUsers = new SparseBooleanArray();
+            mDevCfgMaxBufferSize = DeviceConfig.getInt(
+                    DeviceConfig.NAMESPACE_CONTENT_CAPTURE,
+                    ContentCaptureManager.DEVICE_CONFIG_PROPERTY_MAX_BUFFER_SIZE,
+                    ContentCaptureManager.DEFAULT_MAX_BUFFER_SIZE);
+            mDevCfgIdleFlushingFrequencyMs = DeviceConfig.getInt(
+                    DeviceConfig.NAMESPACE_CONTENT_CAPTURE,
+                    ContentCaptureManager.DEVICE_CONFIG_PROPERTY_IDLE_FLUSH_FREQUENCY,
+                    ContentCaptureManager.DEFAULT_IDLE_FLUSHING_FREQUENCY_MS);
+            mDevCfgTextChangeFlushingFrequencyMs = DeviceConfig.getInt(
+                    DeviceConfig.NAMESPACE_CONTENT_CAPTURE,
+                    ContentCaptureManager.DEVICE_CONFIG_PROPERTY_TEXT_CHANGE_FLUSH_FREQUENCY,
+                    ContentCaptureManager.DEFAULT_TEXT_CHANGE_FLUSHING_FREQUENCY_MS);
+            mDevCfgLogHistorySize = DeviceConfig.getInt(
+                    DeviceConfig.NAMESPACE_CONTENT_CAPTURE,
+                    ContentCaptureManager.DEVICE_CONFIG_PROPERTY_LOG_HISTORY_SIZE, 20);
+            mDevCfgIdleUnbindTimeoutMs = DeviceConfig.getInt(
+                    DeviceConfig.NAMESPACE_CONTENT_CAPTURE,
+                    ContentCaptureManager.DEVICE_CONFIG_PROPERTY_IDLE_UNBIND_TIMEOUT,
+                    (int) AbstractRemoteService.PERMANENT_BOUND_TIMEOUT_MS);
+            if (verbose) {
+                Slog.v(mTag, "setFineTuneParamsFromDeviceConfig(): "
+                        + "bufferSize=" + mDevCfgMaxBufferSize
+                        + ", idleFlush=" + mDevCfgIdleFlushingFrequencyMs
+                        + ", textFluxh=" + mDevCfgTextChangeFlushingFrequencyMs
+                        + ", logHistory=" + mDevCfgLogHistorySize
+                        + ", idleUnbindTimeoutMs=" + mDevCfgIdleUnbindTimeoutMs);
             }
-            final boolean alreadyEnabled = !mDisabledUsers.get(userId);
+        }
+    }
+
+    private void setLoggingLevelFromDeviceConfig() {
+        mDevCfgLoggingLevel = DeviceConfig.getInt(
+                DeviceConfig.NAMESPACE_CONTENT_CAPTURE,
+                ContentCaptureManager.DEVICE_CONFIG_PROPERTY_LOGGING_LEVEL,
+                ContentCaptureHelper.getDefaultLoggingLevel());
+        ContentCaptureHelper.setLoggingLevel(mDevCfgLoggingLevel);
+        verbose = ContentCaptureHelper.sVerbose;
+        debug = ContentCaptureHelper.sDebug;
+        if (verbose) {
+            Slog.v(mTag, "setLoggingLevelFromDeviceConfig(): level=" + mDevCfgLoggingLevel
+                    + ", debug=" + debug + ", verbose=" + verbose);
+        }
+    }
+
+    private void setDeviceConfigProperties() {
+        setLoggingLevelFromDeviceConfig();
+        setFineTuneParamsFromDeviceConfig();
+        final String enabled = DeviceConfig.getProperty(DeviceConfig.NAMESPACE_CONTENT_CAPTURE,
+                ContentCaptureManager.DEVICE_CONFIG_PROPERTY_SERVICE_EXPLICITLY_ENABLED);
+        setDisabledByDeviceConfig(enabled);
+    }
+
+    private void setDisabledByDeviceConfig(@Nullable String explicitlyEnabled) {
+        if (verbose) {
+            Slog.v(mTag, "setDisabledByDeviceConfig(): explicitlyEnabled=" + explicitlyEnabled);
+        }
+        final UserManager um = getContext().getSystemService(UserManager.class);
+        final List<UserInfo> users = um.getUsers();
+
+        final boolean newDisabledValue;
+
+        if (explicitlyEnabled != null && explicitlyEnabled.equalsIgnoreCase("false")) {
+            newDisabledValue = true;
+        } else {
+            newDisabledValue = false;
+        }
+
+        synchronized (mLock) {
+            if (mDisabledByDeviceConfig == newDisabledValue) {
+                if (verbose) {
+                    Slog.v(mTag, "setDisabledByDeviceConfig(): already " + newDisabledValue);
+                }
+                return;
+            }
+            mDisabledByDeviceConfig = newDisabledValue;
+
+            Slog.i(mTag, "setDisabledByDeviceConfig(): set to " + mDisabledByDeviceConfig);
+            for (int i = 0; i < users.size(); i++) {
+                final int userId = users.get(i).id;
+                boolean disabled = mDisabledByDeviceConfig || isDisabledBySettingsLocked(userId);
+                Slog.i(mTag, "setDisabledByDeviceConfig(): updating service for user "
+                        + userId + " to " + (disabled ? "'disabled'" : "'enabled'"));
+                updateCachedServiceLocked(userId, disabled);
+            }
+        }
+    }
+
+    private void setContentCaptureFeatureEnabledBySettingsForUser(@UserIdInt int userId,
+            boolean enabled) {
+        synchronized (mLock) {
+            if (mDisabledBySettings == null) {
+                mDisabledBySettings = new SparseBooleanArray();
+            }
+            final boolean alreadyEnabled = !mDisabledBySettings.get(userId);
             if (!(enabled ^ alreadyEnabled)) {
                 if (debug) {
                     Slog.d(mTag, "setContentCaptureFeatureEnabledForUser(): already " + enabled);
@@ -206,13 +380,14 @@ public final class ContentCaptureManagerService extends
             if (enabled) {
                 Slog.i(mTag, "setContentCaptureFeatureEnabled(): enabling service for user "
                         + userId);
-                mDisabledUsers.delete(userId);
+                mDisabledBySettings.delete(userId);
             } else {
                 Slog.i(mTag, "setContentCaptureFeatureEnabled(): disabling service for user "
                         + userId);
-                mDisabledUsers.put(userId, true);
+                mDisabledBySettings.put(userId, true);
             }
-            updateCachedServiceLocked(userId, !enabled);
+            final boolean disabled = !enabled || mDisabledByDeviceConfig;
+            updateCachedServiceLocked(userId, disabled);
         }
     }
 
@@ -266,13 +441,6 @@ public final class ContentCaptureManagerService extends
         }
     }
 
-    /**
-     * Logs a request so it's dumped later...
-     */
-    void logRequestLocked(@NonNull String historyItem) {
-        mRequestsHistory.log(historyItem);
-    }
-
     private ActivityManagerInternal getAmInternal() {
         synchronized (mLock) {
             if (mAm == null) {
@@ -283,24 +451,16 @@ public final class ContentCaptureManagerService extends
     }
 
     @GuardedBy("mLock")
-    private boolean assertCalledByServiceLocked(@NonNull String methodName, @UserIdInt int userId,
-            int callingUid, @NonNull IResultReceiver result) {
-        final boolean isService = isCalledByServiceLocked(methodName, userId, callingUid);
-        if (isService) return true;
-
-        try {
-            result.send(ContentCaptureManager.RESULT_CODE_NOT_SERVICE,
-                    /* resultData= */ null);
-        } catch (RemoteException e) {
-            Slog.w(mTag, "Unable to send isContentCaptureFeatureEnabled(): " + e);
+    private void assertCalledByServiceLocked(@NonNull String methodName) {
+        if (!isCalledByServiceLocked(methodName)) {
+            throw new SecurityException("caller is not user's ContentCapture service");
         }
-        return false;
     }
 
     @GuardedBy("mLock")
-    private boolean isCalledByServiceLocked(@NonNull String methodName, @UserIdInt int userId,
-            int callingUid) {
-
+    private boolean isCalledByServiceLocked(@NonNull String methodName) {
+        final int userId = UserHandle.getCallingUserId();
+        final int callingUid = Binder.getCallingUid();
         final String serviceName = mServiceNameResolver.getServiceName(userId);
         if (serviceName == null) {
             Slog.e(mTag, methodName + ": called by UID " + callingUid
@@ -308,7 +468,7 @@ public final class ContentCaptureManagerService extends
             return false;
         }
 
-        final ComponentName serviceComponent  = ComponentName.unflattenFromString(serviceName);
+        final ComponentName serviceComponent = ComponentName.unflattenFromString(serviceName);
         if (serviceComponent == null) {
             Slog.w(mTag, methodName + ": invalid service name: " + serviceName);
             return false;
@@ -333,18 +493,54 @@ public final class ContentCaptureManagerService extends
         return true;
     }
 
+    /**
+     * Executes the given {@code runnable} and if it throws a {@link SecurityException},
+     * send it back to the receiver.
+     *
+     * @return whether the exception was thrown or not.
+     */
+    private boolean throwsSecurityException(@NonNull IResultReceiver result,
+            @NonNull Runnable runable) {
+        try {
+            runable.run();
+            return false;
+        } catch (SecurityException e) {
+            try {
+                result.send(RESULT_CODE_SECURITY_EXCEPTION, bundleFor(e.getMessage()));
+            } catch (RemoteException e2) {
+                Slog.w(mTag, "Unable to send security exception (" + e + "): ", e2);
+            }
+        }
+        return true;
+    }
+
     @Override // from AbstractMasterSystemService
     protected void dumpLocked(String prefix, PrintWriter pw) {
         super.dumpLocked(prefix, pw);
 
-        pw.print(prefix); pw.print("Disabled users: "); pw.println(mDisabledUsers);
+        final String prefix2 = prefix + "  ";
+
+        pw.print(prefix); pw.print("Users disabled by Settings: "); pw.println(mDisabledBySettings);
+        pw.print(prefix); pw.println("DeviceConfig Settings: ");
+        pw.print(prefix2); pw.print("disabled: "); pw.println(mDisabledByDeviceConfig);
+        pw.print(prefix2); pw.print("loggingLevel: "); pw.println(mDevCfgLoggingLevel);
+        pw.print(prefix2); pw.print("maxBufferSize: "); pw.println(mDevCfgMaxBufferSize);
+        pw.print(prefix2); pw.print("idleFlushingFrequencyMs: ");
+        pw.println(mDevCfgIdleFlushingFrequencyMs);
+        pw.print(prefix2); pw.print("textChangeFlushingFrequencyMs: ");
+        pw.println(mDevCfgTextChangeFlushingFrequencyMs);
+        pw.print(prefix2); pw.print("logHistorySize: "); pw.println(mDevCfgLogHistorySize);
+        pw.print(prefix2); pw.print("idleUnbindTimeoutMs: ");
+        pw.println(mDevCfgIdleUnbindTimeoutMs);
+        pw.print(prefix); pw.println("Global Options:");
+        mGlobalContentCaptureOptions.dump(prefix2, pw);
     }
 
     final class ContentCaptureManagerServiceStub extends IContentCaptureManager.Stub {
 
         @Override
         public void startSession(@NonNull IBinder activityToken,
-                @NonNull ComponentName componentName, @NonNull String sessionId, int flags,
+                @NonNull ComponentName componentName, int sessionId, int flags,
                 @NonNull IResultReceiver result) {
             Preconditions.checkNotNull(activityToken);
             Preconditions.checkNotNull(sessionId);
@@ -361,7 +557,7 @@ public final class ContentCaptureManagerService extends
         }
 
         @Override
-        public void finishSession(@NonNull String sessionId) {
+        public void finishSession(int sessionId) {
             Preconditions.checkNotNull(sessionId);
             final int userId = UserHandle.getCallingUserId();
 
@@ -380,8 +576,7 @@ public final class ContentCaptureManagerService extends
                 connectedServiceComponentName = service.getServiceComponentName();
             }
             try {
-                result.send(/* resultCode= */ 0,
-                        SyncResultReceiver.bundleFor(connectedServiceComponentName));
+                result.send(RESULT_CODE_OK, bundleFor(connectedServiceComponentName));
             } catch (RemoteException e) {
                 Slog.w(mTag, "Unable to send service component name: " + e);
             }
@@ -390,6 +585,8 @@ public final class ContentCaptureManagerService extends
         @Override
         public void removeUserData(@NonNull UserDataRemovalRequest request) {
             Preconditions.checkNotNull(request);
+            assertCalledByPackageOwner(request.getPackageName());
+
             final int userId = UserHandle.getCallingUserId();
             synchronized (mLock) {
                 final ContentCapturePerUserService service = getServiceForUserLocked(userId);
@@ -399,45 +596,61 @@ public final class ContentCaptureManagerService extends
 
         @Override
         public void isContentCaptureFeatureEnabled(@NonNull IResultReceiver result) {
-            final int userId = UserHandle.getCallingUserId();
             boolean enabled;
             synchronized (mLock) {
-                final boolean isService = assertCalledByServiceLocked(
-                        "isContentCaptureFeatureEnabled()", userId, Binder.getCallingUid(), result);
-                if (!isService) return;
+                if (throwsSecurityException(result,
+                        () -> assertCalledByServiceLocked("isContentCaptureFeatureEnabled()"))) {
+                    return;
+                }
 
-                enabled = !isDisabledBySettingsLocked(userId);
+                final int userId = UserHandle.getCallingUserId();
+                enabled = !mDisabledByDeviceConfig && !isDisabledBySettingsLocked(userId);
             }
             try {
-                result.send(enabled ? ContentCaptureManager.RESULT_CODE_TRUE
-                        : ContentCaptureManager.RESULT_CODE_FALSE, /* resultData= */null);
+                result.send(enabled ? RESULT_CODE_TRUE : RESULT_CODE_FALSE, /* resultData= */null);
             } catch (RemoteException e) {
                 Slog.w(mTag, "Unable to send isContentCaptureFeatureEnabled(): " + e);
             }
         }
 
         @Override
-        public void setContentCaptureFeatureEnabled(boolean enabled,
-                @NonNull IResultReceiver result) {
-            final int userId = UserHandle.getCallingUserId();
-            final boolean isService;
-            synchronized (mLock) {
-                isService = assertCalledByServiceLocked("setContentCaptureFeatureEnabled()", userId,
-                        Binder.getCallingUid(), result);
+        public void getServiceSettingsActivity(@NonNull IResultReceiver result) {
+            if (throwsSecurityException(result, () -> enforceCallingPermissionForManagement())) {
+                return;
             }
-            if (!isService) return;
 
-            final long token = Binder.clearCallingIdentity();
-            try {
-                Settings.Secure.putStringForUser(getContext().getContentResolver(),
-                        Settings.Secure.CONTENT_CAPTURE_ENABLED, Boolean.toString(enabled), userId);
-            } finally {
-                Binder.restoreCallingIdentity(token);
+            final int userId = UserHandle.getCallingUserId();
+            final ComponentName componentName;
+            synchronized (mLock) {
+                final ContentCapturePerUserService service = getServiceForUserLocked(userId);
+                if (service == null) return;
+                componentName = service.getServiceSettingsActivityLocked();
             }
             try {
-                result.send(ContentCaptureManager.RESULT_CODE_TRUE, /* resultData= */null);
+                result.send(RESULT_CODE_OK, bundleFor(componentName));
             } catch (RemoteException e) {
-                Slog.w(mTag, "Unable to send setContentCaptureFeatureEnabled(): " + e);
+                Slog.w(mTag, "Unable to send getServiceSettingsIntent(): " + e);
+            }
+        }
+
+        @Override
+        public void getContentCaptureConditions(@NonNull String packageName,
+                @NonNull IResultReceiver result) {
+            if (throwsSecurityException(result, () -> assertCalledByPackageOwner(packageName))) {
+                return;
+            }
+
+            final int userId = UserHandle.getCallingUserId();
+            final ArrayList<ContentCaptureCondition> conditions;
+            synchronized (mLock) {
+                final ContentCapturePerUserService service = getServiceForUserLocked(userId);
+                conditions = service == null ? null
+                        : toList(service.getContentCaptureConditionsLocked(packageName));
+            }
+            try {
+                result.send(RESULT_CODE_OK, bundleFor(conditions));
+            } catch (RemoteException e) {
+                Slog.w(mTag, "Unable to send getServiceComponentName(): " + e);
             }
         }
 
@@ -448,7 +661,7 @@ public final class ContentCaptureManagerService extends
             boolean showHistory = true;
             if (args != null) {
                 for (String arg : args) {
-                    switch(arg) {
+                    switch (arg) {
                         case "--no-history":
                             showHistory = false;
                             break;
@@ -464,9 +677,15 @@ public final class ContentCaptureManagerService extends
             synchronized (mLock) {
                 dumpLocked("", pw);
             }
-            if (showHistory) {
-                pw.println(); pw.println("Requests history:"); pw.println();
+            pw.print("Requests history: ");
+            if (mRequestsHistory == null) {
+                pw.println("disabled by device config");
+            } else if (showHistory) {
+                pw.println();
                 mRequestsHistory.reverseDump(fd, pw, args);
+                pw.println();
+            } else {
+                pw.println();
             }
         }
 
@@ -502,6 +721,110 @@ public final class ContentCaptureManagerService extends
                 }
             }
             return false;
+        }
+
+        @Override
+        public ContentCaptureOptions getOptionsForPackage(int userId, @NonNull String packageName) {
+            return mGlobalContentCaptureOptions.getOptions(userId, packageName);
+        }
+
+        @Override
+        public void notifyActivityEvent(int userId, @NonNull ComponentName activityComponent,
+                @ActivityEventType int eventType) {
+            synchronized (mLock) {
+                final ContentCapturePerUserService service = peekServiceForUserLocked(userId);
+                if (service != null) {
+                    service.onActivityEventLocked(activityComponent, eventType);
+                }
+            }
+        }
+    }
+
+    /**
+     * Content capture options associated with all services.
+     *
+     * <p>This object is defined here instead of on each {@link ContentCapturePerUserService}
+     * because it cannot hold a lock on the main lock when
+     * {@link GlobalContentCaptureOptions#getOptions(int, String)} is called by external services.
+     */
+    final class GlobalContentCaptureOptions extends GlobalWhitelistState {
+
+        @GuardedBy("mGlobalWhitelistStateLock")
+        private final SparseArray<String> mServicePackages = new SparseArray<>();
+        @GuardedBy("mGlobalWhitelistStateLock")
+        private final SparseBooleanArray mTemporaryServices = new SparseBooleanArray();
+
+        private void setServiceInfo(@UserIdInt int userId, @Nullable String serviceName,
+                boolean isTemporary) {
+            synchronized (mGlobalWhitelistStateLock) {
+                if (isTemporary) {
+                    mTemporaryServices.put(userId, true);
+                } else {
+                    mTemporaryServices.delete(userId);
+                }
+                if (serviceName != null) {
+                    final ComponentName componentName =
+                            ComponentName.unflattenFromString(serviceName);
+                    if (componentName == null) {
+                        Slog.w(mTag, "setServiceInfo(): invalid name: " + serviceName);
+                        mServicePackages.remove(userId);
+                    } else {
+                        mServicePackages.put(userId, componentName.getPackageName());
+                    }
+                } else {
+                    mServicePackages.remove(userId);
+                }
+            }
+        }
+
+        @Nullable
+        @GuardedBy("mGlobalWhitelistStateLock")
+        public ContentCaptureOptions getOptions(@UserIdInt int userId,
+                @NonNull String packageName) {
+            synchronized (mGlobalWhitelistStateLock) {
+                if (!isWhitelisted(userId, packageName)) {
+                    if (packageName.equals(mServicePackages.get(userId))) {
+                        if (verbose) Slog.v(mTag, "getOptionsForPackage() lite for " + packageName);
+                        return new ContentCaptureOptions(mDevCfgLoggingLevel);
+                    }
+                    if (verbose) {
+                        Slog.v(mTag, "getOptionsForPackage(" + packageName + "): not whitelisted");
+                    }
+                    return null;
+                }
+
+                final ArraySet<ComponentName> whitelistedComponents =
+                        getWhitelistedComponents(userId, packageName);
+                if (Build.IS_USER && mServiceNameResolver.isTemporary(userId)) {
+                    if (!packageName.equals(mServicePackages.get(userId))) {
+                        Slog.w(mTag, "Ignoring package " + packageName
+                                + " while using temporary service " + mServicePackages.get(userId));
+                        return null;
+                    }
+                }
+                final ContentCaptureOptions options = new ContentCaptureOptions(mDevCfgLoggingLevel,
+                        mDevCfgMaxBufferSize, mDevCfgIdleFlushingFrequencyMs,
+                        mDevCfgTextChangeFlushingFrequencyMs, mDevCfgLogHistorySize,
+                        whitelistedComponents);
+                if (verbose) {
+                    Slog.v(mTag, "getOptionsForPackage(" + packageName + "): " + options);
+                }
+                return options;
+            }
+        }
+
+        @Override
+        public void dump(@NonNull String prefix, @NonNull PrintWriter pw) {
+            super.dump(prefix, pw);
+
+            synchronized (mGlobalWhitelistStateLock) {
+                if (mServicePackages.size() > 0) {
+                    pw.print(prefix); pw.print("Service packages: "); pw.println(mServicePackages);
+                }
+                if (mTemporaryServices.size() > 0) {
+                    pw.print(prefix); pw.print("Temp services: "); pw.println(mTemporaryServices);
+                }
+            }
         }
     }
 }
