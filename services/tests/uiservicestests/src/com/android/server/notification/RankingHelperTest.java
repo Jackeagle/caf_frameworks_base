@@ -469,7 +469,11 @@ public class RankingHelperTest extends UiServiceTestCase {
                 mHelper.getNotificationChannel(PKG, UID, channel3.getId(), false));
 
         List<NotificationChannelGroup> actualGroups =
+<<<<<<< HEAD
                 mHelper.getNotificationChannelGroups(PKG, UID, false, true, false).getList();
+=======
+                mHelper.getNotificationChannelGroups(PKG, UID, false, true,false).getList();
+>>>>>>> DO NOT MERGE Fix behavior of getNotificationChannelGroups
         boolean foundNcg = false;
         for (NotificationChannelGroup actual : actualGroups) {
             if (ncg.getId().equals(actual.getId())) {
@@ -1446,7 +1450,11 @@ public class RankingHelperTest extends UiServiceTestCase {
         mHelper.onPackagesChanged(true, UserHandle.USER_SYSTEM, new String[]{PKG}, new int[]{UID});
 
         assertEquals(0,
+<<<<<<< HEAD
                 mHelper.getNotificationChannelGroups(PKG, UID, true, true, false).getList().size());
+=======
+                mHelper.getNotificationChannelGroups(PKG, UID, true, true,false).getList().size());
+>>>>>>> DO NOT MERGE Fix behavior of getNotificationChannelGroups
     }
 
     @Test
@@ -1535,7 +1543,11 @@ public class RankingHelperTest extends UiServiceTestCase {
         mHelper.createNotificationChannel(PKG, UID, channel3, true, false);
 
         List<NotificationChannelGroup> actual =
+<<<<<<< HEAD
                 mHelper.getNotificationChannelGroups(PKG, UID, true, true, false).getList();
+=======
+                mHelper.getNotificationChannelGroups(PKG, UID, true, true,false).getList();
+>>>>>>> DO NOT MERGE Fix behavior of getNotificationChannelGroups
         assertEquals(3, actual.size());
         for (NotificationChannelGroup group : actual) {
             if (group.getId() == null) {
@@ -1567,13 +1579,21 @@ public class RankingHelperTest extends UiServiceTestCase {
                 new NotificationChannel("id1", "name1", NotificationManager.IMPORTANCE_HIGH);
         channel1.setGroup(ncg.getId());
         mHelper.createNotificationChannel(PKG, UID, channel1, true, false);
+<<<<<<< HEAD
         mHelper.getNotificationChannelGroups(PKG, UID, true, true, false).getList();
+=======
+        mHelper.getNotificationChannelGroups(PKG, UID, true, true,false).getList();
+>>>>>>> DO NOT MERGE Fix behavior of getNotificationChannelGroups
 
         channel1.setImportance(IMPORTANCE_LOW);
         mHelper.updateNotificationChannel(PKG, UID, channel1, true);
 
         List<NotificationChannelGroup> actual =
+<<<<<<< HEAD
                 mHelper.getNotificationChannelGroups(PKG, UID, true, true, false).getList();
+=======
+                mHelper.getNotificationChannelGroups(PKG, UID, true, true,false).getList();
+>>>>>>> DO NOT MERGE Fix behavior of getNotificationChannelGroups
 
         assertEquals(2, actual.size());
         for (NotificationChannelGroup group : actual) {

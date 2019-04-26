@@ -860,6 +860,13 @@ public class RankingHelper implements RankingConfig {
         }
         if (includeNonGrouped && nonGrouped.getChannels().size() > 0) {
             groups.put(null, nonGrouped);
+        } 
+        if (includeEmpty) {
+            for (NotificationChannelGroup group : r.groups.values()) {
+                if (!groups.containsKey(group.getId())) {
+                    groups.put(group.getId(), group);
+                }
+            }
         }
         if (includeEmpty) {
             for (NotificationChannelGroup group : r.groups.values()) {
