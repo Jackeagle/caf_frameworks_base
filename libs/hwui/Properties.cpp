@@ -17,8 +17,8 @@
 #include "Properties.h"
 #include "Debug.h"
 #include "DeviceInfo.h"
-#include "SkTraceEventCommon.h"
 #include "HWUIProperties.sysprop.h"
+#include "SkTraceEventCommon.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -67,7 +67,7 @@ bool Properties::debuggingEnabled = false;
 bool Properties::isolatedProcess = false;
 
 int Properties::contextPriority = 0;
-int Properties::defaultRenderAhead = 0;
+int Properties::defaultRenderAhead = -1;
 
 static int property_get_int(const char* key, int defaultValue) {
     char buf[PROPERTY_VALUE_MAX] = {
@@ -130,12 +130,8 @@ bool Properties::load() {
 
     enableForceDarkSupport = property_get_bool(PROPERTY_ENABLE_FORCE_DARK, true);
 
-    defaultRenderAhead = std::max(0, std::min(2, property_get_int(PROPERTY_RENDERAHEAD,
+    defaultRenderAhead = std::max(-1, std::min(2, property_get_int(PROPERTY_RENDERAHEAD,
             render_ahead().value_or(0))));
-
-    if (defaultRenderAhead && sRenderPipelineType == RenderPipelineType::SkiaVulkan) {
-        ALOGW("hwui.render_ahead of %d ignored because pipeline is skiavk", defaultRenderAhead);
-    }
 
     return (prevDebugLayersUpdates != debugLayersUpdates) || (prevDebugOverdraw != debugOverdraw);
 }

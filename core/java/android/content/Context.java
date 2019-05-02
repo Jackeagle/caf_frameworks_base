@@ -3679,6 +3679,7 @@ public abstract class Context {
      * @hide
      */
     @SystemApi
+    @TestApi
     public static final String STATUS_BAR_SERVICE = "statusbar";
 
     /**
@@ -3820,10 +3821,7 @@ public abstract class Context {
 
     /**
      * Use with {@link #getSystemService(String)} to retrieve a {@link
-     * android.net.wifi.rtt.WifiRttManager} for ranging devices with wifi
-     *
-     * Note: this is a replacement for WIFI_RTT_SERVICE above. It will
-     * be renamed once final implementation in place.
+     * android.net.wifi.rtt.WifiRttManager} for ranging devices with wifi.
      *
      * @see #getSystemService(String)
      * @see android.net.wifi.rtt.WifiRttManager
@@ -4567,8 +4565,7 @@ public abstract class Context {
      * @see android.os.BugreportManager
      * @hide
      */
-    // TODO: Expose API when the implementation is more complete.
-    // @SystemApi
+    @SystemApi @TestApi
     public static final String BUGREPORT_SERVICE = "bugreport";
 
     /**

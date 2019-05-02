@@ -32,7 +32,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageItemInfo;
 import android.content.pm.PackageManager;
-import android.content.pm.PackageManagerInternal;
 import android.content.res.Configuration;
 import android.content.res.Resources.Theme;
 import android.database.sqlite.SQLiteCompatibilityWalFlags;
@@ -158,8 +157,6 @@ import com.android.server.wm.WindowManagerGlobalLock;
 import com.android.server.wm.WindowManagerService;
 
 import dalvik.system.VMRuntime;
-
-import com.google.android.startop.iorap.IorapForwardingService;
 
 import java.io.File;
 import java.io.IOException;
@@ -1073,10 +1070,6 @@ public final class SystemServer {
             mSystemServiceManager.startService(PinnerService.class);
             traceEnd();
 
-            traceBeginAndSlog("IorapForwardingService");
-            mSystemServiceManager.startService(IorapForwardingService.class);
-            traceEnd();
-
             traceBeginAndSlog("SignedConfigService");
             SignedConfigService.registerUpdateReceiver(mSystemContext);
             traceEnd();
@@ -1246,11 +1239,6 @@ public final class SystemServer {
             // Content suggestions manager service
             traceBeginAndSlog("StartContentSuggestionsService");
             mSystemServiceManager.startService(CONTENT_SUGGESTIONS_SERVICE_CLASS);
-            traceEnd();
-
-            // NOTE: ClipboardService indirectly depends on IntelligenceService
-            traceBeginAndSlog("StartClipboardService");
-            mSystemServiceManager.startService(ClipboardService.class);
             traceEnd();
 
             traceBeginAndSlog("InitNetworkStackClient");
@@ -1886,6 +1874,11 @@ public final class SystemServer {
             mSystemServiceManager.startService(AUTO_FILL_MANAGER_SERVICE_CLASS);
             traceEnd();
         }
+
+        // NOTE: ClipboardService depends on ContentCapture and Autofill
+        traceBeginAndSlog("StartClipboardService");
+        mSystemServiceManager.startService(ClipboardService.class);
+        traceEnd();
 
         traceBeginAndSlog("AppServiceManager");
         mSystemServiceManager.startService(AppBindingService.Lifecycle.class);

@@ -35,6 +35,34 @@ public class NetworkStackUtils {
     // TODO: Refer to DeviceConfig definition.
     public static final String NAMESPACE_CONNECTIVITY = "connectivity";
 
+    /**
+     * A list of captive portal detection specifications used in addition to the fallback URLs.
+     * Each spec has the format url@@/@@statusCodeRegex@@/@@contentRegex. Specs are separated
+     * by "@@,@@".
+     */
+    public static final String CAPTIVE_PORTAL_FALLBACK_PROBE_SPECS =
+            "captive_portal_fallback_probe_specs";
+
+    /**
+     * A comma separated list of URLs used for captive portal detection in addition to the
+     * fallback HTTP url associated with the CAPTIVE_PORTAL_FALLBACK_URL settings.
+     */
+    public static final String CAPTIVE_PORTAL_OTHER_FALLBACK_URLS =
+            "captive_portal_other_fallback_urls";
+
+    /**
+     * Which User-Agent string to use in the header of the captive portal detection probes.
+     * The User-Agent field is unset when this setting has no value (HttpUrlConnection default).
+     */
+    public static final String CAPTIVE_PORTAL_USER_AGENT = "captive_portal_user_agent";
+
+    /**
+     * Whether to use HTTPS for network validation. This is enabled by default and the setting
+     * needs to be set to 0 to disable it. This setting is a misnomer because captive portals
+     * don't actually use HTTPS, but it's consistent with the other settings.
+     */
+    public static final String CAPTIVE_PORTAL_USE_HTTPS = "captive_portal_use_https";
+
     static {
         System.loadLibrary("networkstackutilsjni");
     }
@@ -95,8 +123,7 @@ public class NetworkStackUtils {
      * Look up the value of a property for a particular namespace from {@link DeviceConfig}.
      * @param namespace The namespace containing the property to look up.
      * @param name The name of the property to look up.
-     * @param defaultValue The value to return if the property does not exist or has no non-null
-     *                     value.
+     * @param defaultValue The value to return if the property does not exist or has no valid value.
      * @return the corresponding value, or defaultValue if none exists.
      */
     @Nullable

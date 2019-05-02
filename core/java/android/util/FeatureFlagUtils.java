@@ -53,7 +53,6 @@ public class FeatureFlagUtils {
         DEFAULT_FLAGS.put("settings_audio_switcher", "true");
         DEFAULT_FLAGS.put("settings_mobile_network_v2", "true");
         DEFAULT_FLAGS.put("settings_network_and_internet_v2", "true");
-        DEFAULT_FLAGS.put("settings_slice_injection", "true");
         DEFAULT_FLAGS.put("settings_systemui_theme", "true");
         DEFAULT_FLAGS.put(DYNAMIC_SYSTEM, "false");
         DEFAULT_FLAGS.put(SEAMLESS_TRANSFER, "false");
@@ -63,7 +62,6 @@ public class FeatureFlagUtils {
         DEFAULT_FLAGS.put(FORCE_GLOBAL_ACTIONS_GRID_ENABLED, "false");
         DEFAULT_FLAGS.put(GLOBAL_ACTIONS_PANEL_ENABLED, "true");
         DEFAULT_FLAGS.put(PIXEL_WALLPAPER_CATEGORY_SWITCH, "false");
-        DEFAULT_FLAGS.put("settings_wifi_details_saved_screen", "true");
         DEFAULT_FLAGS.put("settings_wifi_details_datausage_header", "false");
     }
 

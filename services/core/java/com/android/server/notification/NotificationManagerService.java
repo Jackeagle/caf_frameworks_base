@@ -308,8 +308,7 @@ public class NotificationManagerService extends SystemService {
     static final String[] DEFAULT_ALLOWED_ADJUSTMENTS = new String[] {
             Adjustment.KEY_IMPORTANCE,
             Adjustment.KEY_CONTEXTUAL_ACTIONS,
-            Adjustment.KEY_TEXT_REPLIES,
-            Adjustment.KEY_USER_SENTIMENT};
+            Adjustment.KEY_TEXT_REPLIES};
 
     static final String[] NON_BLOCKABLE_DEFAULT_ROLES = new String[] {
             RoleManager.ROLE_DIALER,
@@ -455,6 +454,7 @@ public class NotificationManagerService extends SystemService {
     private int mAutoGroupAtCount;
     private boolean mIsTelevision;
     private boolean mIsAutomotive;
+    private boolean mNotificationEffectsEnabledForAutomotive;
 
     private MetricsLogger mMetricsLogger;
     private TriPredicate<String, Integer, String> mAllowedManagedServicePackages;
@@ -1526,6 +1526,11 @@ public class NotificationManagerService extends SystemService {
     }
 
     @VisibleForTesting
+    void setNotificationEffectsEnabledForAutomotive(boolean isEnabled) {
+        mNotificationEffectsEnabledForAutomotive = isEnabled;
+    }
+
+    @VisibleForTesting
     void setIsTelevision(boolean isTelevision) {
         mIsTelevision = isTelevision;
     }
@@ -1686,9 +1691,14 @@ public class NotificationManagerService extends SystemService {
 
         mIsAutomotive =
                 mPackageManagerClient.hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE, 0);
+        mNotificationEffectsEnabledForAutomotive =
+                resources.getBoolean(R.bool.config_enableServerNotificationEffectsForAutomotive);
 
         mPreferencesHelper.lockChannelsForOEM(getContext().getResources().getStringArray(
                 com.android.internal.R.array.config_nonBlockableNotificationPackages));
+
+        mZenModeHelper.setPriorityOnlyDndExemptPackages(getContext().getResources().getStringArray(
+                com.android.internal.R.array.config_priorityOnlyDndExemptPackages));
     }
 
     @Override
@@ -2853,8 +2863,7 @@ public class NotificationManagerService extends SystemService {
 
             // Reset notification preferences
             if (!fromApp) {
-                mPreferencesHelper.onPackagesChanged(
-                        true, UserHandle.getCallingUserId(), packages, uids);
+                mPreferencesHelper.clearData(packageName, uid);
             }
 
             handleSavePolicyFile();
@@ -5560,6 +5569,9 @@ public class NotificationManagerService extends SystemService {
     @VisibleForTesting
     @GuardedBy("mNotificationLock")
     void buzzBeepBlinkLocked(NotificationRecord record) {
+        if (mIsAutomotive && !mNotificationEffectsEnabledForAutomotive) {
+            return;
+        }
         boolean buzz = false;
         boolean beep = false;
         boolean blink = false;
@@ -6332,9 +6344,14 @@ public class NotificationManagerService extends SystemService {
 
         // tell the app
         if (sendDelete) {
-            if (r.getNotification().deleteIntent != null) {
+            final PendingIntent deleteIntent = r.getNotification().deleteIntent;
+            if (deleteIntent != null) {
                 try {
-                    r.getNotification().deleteIntent.send();
+                    // make sure deleteIntent cannot be used to start activities from background
+                    LocalServices.getService(ActivityManagerInternal.class)
+                            .clearPendingIntentAllowBgActivityStarts(deleteIntent.getTarget(),
+                            WHITELIST_TOKEN);
+                    deleteIntent.send();
                 } catch (PendingIntent.CanceledException ex) {
                     // do nothing - there's no relevant way to recover, and
                     //     no reason to let this propagate
@@ -7306,7 +7323,7 @@ public class NotificationManagerService extends SystemService {
 
         private static final String ATT_USER_SET = "user_set";
         // TODO: STOPSHIP (b/127994217) switch to final value when onboarding flow is implemented
-        private static final String TAG_ALLOWED_ADJUSTMENT_TYPES = "allowed_adjustments_tmp";
+        private static final String TAG_ALLOWED_ADJUSTMENT_TYPES = "allowed_adjustments_tmp2";
         private static final String ATT_TYPES = "types";
 
         private final Object mLock = new Object();

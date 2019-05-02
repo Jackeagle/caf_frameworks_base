@@ -198,14 +198,10 @@ public final class AudioDeviceInventory {
                     }
                 }
                 if (a2dpVolume != -1) {
-                    AudioService.VolumeStreamState streamState =
-                            mDeviceBroker.getStreamState(AudioSystem.STREAM_MUSIC);
-                    // Convert index to internal representation in VolumeStreamState
-                    a2dpVolume = a2dpVolume * 10;
-                    streamState.setIndex(a2dpVolume, AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP,
-                            "onSetA2dpSinkConnectionState");
-                    mDeviceBroker.setDeviceVolume(
-                            streamState, AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP);
+                    mDeviceBroker.postSetVolumeIndexOnDevice(AudioSystem.STREAM_MUSIC,
+                            // convert index to internal representation in VolumeStreamState
+                            a2dpVolume * 10,
+                            AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP, "onSetA2dpSinkConnectionState");
                 }
                 makeA2dpDeviceAvailable(address, BtHelper.getName(btDevice),
                         "onSetA2dpSinkConnectionState", a2dpCodec);
@@ -302,14 +298,11 @@ public final class AudioDeviceInventory {
             if (event == BtHelper.EVENT_ACTIVE_DEVICE_CHANGE) {
                 // Device is connected
                 if (a2dpVolume != -1) {
-                    final AudioService.VolumeStreamState streamState =
-                            mDeviceBroker.getStreamState(AudioSystem.STREAM_MUSIC);
-                    // Convert index to internal representation in VolumeStreamState
-                    a2dpVolume = a2dpVolume * 10;
-                    streamState.setIndex(a2dpVolume, AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP,
+                    mDeviceBroker.postSetVolumeIndexOnDevice(AudioSystem.STREAM_MUSIC,
+                            // convert index to internal representation in VolumeStreamState
+                            a2dpVolume * 10,
+                            AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP,
                             "onBluetoothA2dpActiveDeviceChange");
-                    mDeviceBroker.setDeviceVolume(
-                            streamState, AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP);
                 }
             } else if (event == BtHelper.EVENT_DEVICE_CONFIG_CHANGE) {
                 if (di.mDeviceCodecFormat != a2dpCodec) {
@@ -352,7 +345,7 @@ public final class AudioDeviceInventory {
             }
         }
         mRoutesObservers.finishBroadcast();
-        mDeviceBroker.observeDevicesForAllStreams();
+        mDeviceBroker.postObserveDevicesForAllStreams();
     }
 
     private static final int DEVICE_OVERRIDE_A2DP_ROUTE_ON_PLUG =
@@ -655,8 +648,6 @@ public final class AudioDeviceInventory {
             int a2dpCodec) {
         // enable A2DP before notifying A2DP connection to avoid unnecessary processing in
         // audio policy manager
-        AudioService.VolumeStreamState streamState =
-                mDeviceBroker.getStreamState(AudioSystem.STREAM_MUSIC);
         mDeviceBroker.setBluetoothA2dpOnInt(true, eventSource);
         AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP,
                 AudioSystem.DEVICE_STATE_AVAILABLE, address, name, a2dpCodec);
@@ -727,8 +718,8 @@ public final class AudioDeviceInventory {
 
     @GuardedBy("mConnectedDevices")
     private void makeHearingAidDeviceAvailable(String address, String name, String eventSource) {
-        final int hearingAidVolIndex = mDeviceBroker.getStreamState(AudioSystem.STREAM_MUSIC)
-                .getIndex(AudioSystem.DEVICE_OUT_HEARING_AID);
+        final int hearingAidVolIndex = mDeviceBroker.getVssVolumeForDevice(AudioSystem.STREAM_MUSIC,
+                AudioSystem.DEVICE_OUT_HEARING_AID);
         mDeviceBroker.postSetHearingAidVolumeIndex(hearingAidVolIndex, AudioSystem.STREAM_MUSIC);
 
         AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_HEARING_AID,
@@ -739,9 +730,8 @@ public final class AudioDeviceInventory {
                 new DeviceInfo(AudioSystem.DEVICE_OUT_HEARING_AID, name,
                         address, AudioSystem.AUDIO_FORMAT_DEFAULT));
         mDeviceBroker.postAccessoryPlugMediaUnmute(AudioSystem.DEVICE_OUT_HEARING_AID);
-        mDeviceBroker.setDeviceVolume(
-                mDeviceBroker.getStreamState(AudioSystem.STREAM_MUSIC),
-                AudioSystem.DEVICE_OUT_HEARING_AID);
+        mDeviceBroker.postApplyVolumeOnDevice(AudioSystem.STREAM_MUSIC,
+                AudioSystem.DEVICE_OUT_HEARING_AID, "makeHearingAidDeviceAvailable");
         setCurrentAudioRouteNameIfPossible(name);
     }
 
@@ -819,11 +809,12 @@ public final class AudioDeviceInventory {
         if (((device == musicDevice) || mDeviceBroker.isInCommunication())
                 && (device == devices) && !mDeviceBroker.hasMediaDynamicPolicy()
                         && ((musicDevice & AudioSystem.DEVICE_OUT_REMOTE_SUBMIX) == 0)) {
-            if (!AudioSystem.isStreamActive(AudioSystem.STREAM_MUSIC, 0 /*not looking in past*/)) {
+            if (!AudioSystem.isStreamActive(AudioSystem.STREAM_MUSIC, 0 /*not looking in past*/)
+                    && !mDeviceBroker.hasAudioFocusUsers()) {
                 // no media playback, not a "becoming noisy" situation, otherwise it could cause
                 // the pausing of some apps that are playing remotely
                 AudioService.sDeviceLogger.log((new AudioEventLogger.StringEvent(
-                        "dropping ACTION_AUDIO_BECOMING_NOISY, no media playback")).printLog(TAG));
+                        "dropping ACTION_AUDIO_BECOMING_NOISY")).printLog(TAG));
                 return 0;
             }
             mDeviceBroker.postBroadcastBecomingNoisy();

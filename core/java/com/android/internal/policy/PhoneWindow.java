@@ -45,6 +45,7 @@ import android.content.res.Configuration;
 import android.content.res.Resources.Theme;
 import android.content.res.TypedArray;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.media.AudioManager;
 import android.media.session.MediaController;
@@ -115,6 +116,7 @@ import com.android.internal.widget.SwipeDismissLayout;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Android-specific Window.
@@ -2464,9 +2466,9 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
         }
         if (!targetPreQ) {
             mEnsureStatusBarContrastWhenTransparent = a.getBoolean(
-                    R.styleable.Window_ensureStatusBarContrastWhenTransparent, false);
+                    R.styleable.Window_enforceStatusBarContrast, false);
             mEnsureNavigationBarContrastWhenTransparent = a.getBoolean(
-                    R.styleable.Window_ensureNavigationBarContrastWhenTransparent, true);
+                    R.styleable.Window_enforceNavigationBarContrast, true);
         }
 
         WindowManager.LayoutParams params = getAttributes();
@@ -3857,7 +3859,7 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
     }
 
     @Override
-    public void setEnsureStatusBarContrastWhenTransparent(boolean ensureContrast) {
+    public void setStatusBarContrastEnforced(boolean ensureContrast) {
         mEnsureStatusBarContrastWhenTransparent = ensureContrast;
         if (mDecor != null) {
             mDecor.updateColorViews(null, false /* animate */);
@@ -3865,20 +3867,20 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
     }
 
     @Override
-    public boolean isEnsureStatusBarContrastWhenTransparent() {
+    public boolean isStatusBarContrastEnforced() {
         return mEnsureStatusBarContrastWhenTransparent;
     }
 
     @Override
-    public void setEnsureNavigationBarContrastWhenTransparent(boolean ensureContrast) {
-        mEnsureNavigationBarContrastWhenTransparent = ensureContrast;
+    public void setNavigationBarContrastEnforced(boolean enforceContrast) {
+        mEnsureNavigationBarContrastWhenTransparent = enforceContrast;
         if (mDecor != null) {
             mDecor.updateColorViews(null, false /* animate */);
         }
     }
 
     @Override
-    public boolean isEnsureNavigationBarContrastWhenTransparent() {
+    public boolean isNavigationBarContrastEnforced() {
         return mEnsureNavigationBarContrastWhenTransparent;
     }
 
@@ -3925,5 +3927,16 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
     @Override
     public WindowInsetsController getInsetsController() {
         return mDecor.getWindowInsetsController();
+    }
+
+    @Override
+    public void setSystemGestureExclusionRects(@NonNull List<Rect> rects) {
+        getViewRootImpl().setRootSystemGestureExclusionRects(rects);
+    }
+
+    @Override
+    @NonNull
+    public List<Rect> getSystemGestureExclusionRects() {
+        return getViewRootImpl().getRootSystemGestureExclusionRects();
     }
 }

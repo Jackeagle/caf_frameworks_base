@@ -3039,6 +3039,7 @@ public final class Telephony {
              * The {@code content://} style URL for this table. Can be appended with a part ID to
              * address individual parts.
              */
+            @NonNull
             public static final Uri CONTENT_URI = Uri.withAppendedPath(Mms.CONTENT_URI, "part");
 
             /**
@@ -3394,6 +3395,7 @@ public final class Telephony {
          * {@link SubscriptionManager#getDefaultSubscriptionId()}. To specify subId for MSIM,
          * use {@link Uri#withAppendedPath(Uri, String)} to append with subscription id.
          */
+        @NonNull
         public static final Uri CONTENT_URI = Uri.parse("content://telephony/carriers");
 
         /**
@@ -3406,6 +3408,7 @@ public final class Telephony {
          * {@link SubscriptionManager#getDefaultSubscriptionId()}. To specify subId for MSIM,
          * use {@link Uri#withAppendedPath(Uri, String)} to append with subscription id.
          */
+        @NonNull
         public static final Uri SIM_APN_URI = Uri.parse(
                 "content://telephony/carriers/sim_apn_list");
 

@@ -20,6 +20,7 @@ import static android.content.pm.ActivityInfo.DOCUMENT_LAUNCH_ALWAYS;
 import static android.util.StatsLogInternal.BUBBLE_DEVELOPER_ERROR_REPORTED__ERROR__ACTIVITY_INFO_MISSING;
 import static android.util.StatsLogInternal.BUBBLE_DEVELOPER_ERROR_REPORTED__ERROR__ACTIVITY_INFO_NOT_RESIZABLE;
 import static android.util.StatsLogInternal.BUBBLE_DEVELOPER_ERROR_REPORTED__ERROR__DOCUMENT_LAUNCH_NOT_ALWAYS;
+import static android.view.Display.INVALID_DISPLAY;
 
 import android.animation.LayoutTransition;
 import android.animation.ObjectAnimator;
@@ -228,6 +229,9 @@ public class BubbleExpandedView extends LinearLayout implements View.OnClickList
         mActivityView = new ActivityView(mContext, null /* attrs */, 0 /* defStyle */,
                 true /* singleTaskInstance */);
         addView(mActivityView);
+
+        // Make sure pointer is below activity view
+        bringChildToFront(mPointerView);
 
         setOnApplyWindowInsetsListener((View view, WindowInsets insets) -> {
             // Keep track of IME displaying because we should not make any adjustments that might
@@ -595,6 +599,16 @@ public class BubbleExpandedView extends LinearLayout implements View.OnClickList
         return mBubbleIntent != null && mActivityView != null;
     }
 
+    /**
+     * @return the display id of the virtual display.
+     */
+    public int getVirtualDisplayId() {
+        if (usingActivityView()) {
+            return mActivityView.getVirtualDisplayId();
+        }
+        return INVALID_DISPLAY;
+    }
+
     private void applyRowState(ExpandableNotificationRow view) {
         view.reset();
         view.setHeadsUp(false);
@@ -720,7 +734,9 @@ public class BubbleExpandedView extends LinearLayout implements View.OnClickList
                 action,
                 mStackView.getNormalizedXPosition(),
                 mStackView.getNormalizedYPosition(),
-                entry.showInShadeWhenBubble());
+                entry.showInShadeWhenBubble(),
+                entry.isForegroundService(),
+                BubbleController.isForegroundApp(mContext, notification.getPackageName()));
     }
 
     private int getDimenForPackageUser(int resId, String pkg, int userId) {

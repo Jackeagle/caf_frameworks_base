@@ -1305,7 +1305,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     void onDisplayChanged(DisplayContent dc) {
         super.onDisplayChanged(dc);
         // Window was not laid out for this display yet, so make sure mLayoutSeq does not match.
-        if (dc != null) {
+        if (dc != null && mInputWindowHandle.displayId != dc.getDisplayId()) {
             mLayoutSeq = dc.mLayoutSeq - 1;
             mInputWindowHandle.displayId = dc.getDisplayId();
         }
@@ -2861,6 +2861,13 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             }
             mDestroying = false;
             destroyedSomething = true;
+
+            // Since mDestroying will affect AppWindowToken#allDrawn, we need to perform another
+            // traversal in case we are waiting on this window to start the transition.
+            if (getDisplayContent().mAppTransition.isTransitionSet()
+                    && getDisplayContent().mOpeningApps.contains(mAppToken)) {
+                mWmService.mWindowPlacerLocked.requestTraversal();
+            }
         }
 
         return destroyedSomething;
@@ -4446,7 +4453,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         return !mLastSurfaceInsets.equals(mAttrs.surfaceInsets);
     }
 
-    int relayoutVisibleWindow(int result, int attrChanges, int oldVisibility) {
+    int relayoutVisibleWindow(int result, int attrChanges) {
         final boolean wasVisible = isVisibleLw();
 
         result |= (!wasVisible || !isDrawnLw()) ? RELAYOUT_RES_FIRST_TIME : 0;
@@ -4466,7 +4473,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             mDestroying = false;
             mWmService.mDestroySurface.remove(this);
         }
-        if (oldVisibility == View.GONE) {
+        if (!wasVisible) {
             mWinAnimator.mEnterAnimationPending = true;
         }
 

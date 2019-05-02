@@ -367,7 +367,7 @@ final class SystemServiceRegistry {
                             throw new ServiceNotFoundException(Context.TEST_NETWORK_SERVICE);
                         }
                         ITestNetworkManager tnMgr = ITestNetworkManager.Stub.asInterface(tnBinder);
-                        return new TestNetworkManager(context, tnMgr);
+                        return new TestNetworkManager(tnMgr);
                     }
                 });
 
@@ -1143,7 +1143,7 @@ final class SystemServiceRegistry {
                 Context outerContext = ctx.getOuterContext();
                 ContentCaptureOptions options = outerContext.getContentCaptureOptions();
                 // Options is null when the service didn't whitelist the activity or package
-                if (options != null) {
+                if (options != null && (options.lite || options.isWhitelisted(outerContext))) {
                     IBinder b = ServiceManager
                             .getService(Context.CONTENT_CAPTURE_MANAGER_SERVICE);
                     IContentCaptureManager service = IContentCaptureManager.Stub.asInterface(b);

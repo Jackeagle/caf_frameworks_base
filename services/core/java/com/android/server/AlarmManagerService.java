@@ -1764,7 +1764,8 @@ class AlarmManagerService extends SystemService {
                                 + ", callingPackage: " + callingPackage;
                 // STOPSHIP (b/128866264): Just to catch breakages. Remove before final release.
                 Slog.wtf(TAG, errorMsg);
-                throw new UnsupportedOperationException(errorMsg);
+                // TODO b/129995049: Resume throwing once issue is resolved.
+                // throw new UnsupportedOperationException(errorMsg);
             }
             setImplLocked(type, triggerAtTime, triggerElapsed, windowLength, maxElapsed,
                     interval, operation, directReceiver, listenerTag, flags, true, workSource,
@@ -3151,7 +3152,7 @@ class AlarmManagerService extends SystemService {
 
     void removeLocked(final int uid) {
         if (uid == Process.SYSTEM_UID) {
-            Slog.wtf(TAG, "removeLocked: Shouldn't for UID=" + uid);
+            // If a force-stop occurs for a system-uid package, ignore it.
             return;
         }
         boolean didRemove = false;
@@ -3246,7 +3247,7 @@ class AlarmManagerService extends SystemService {
     // Only called for ephemeral apps
     void removeForStoppedLocked(final int uid) {
         if (uid == Process.SYSTEM_UID) {
-            Slog.wtf(TAG, "removeForStoppedLocked: Shouldn't for UID=" + uid);
+            // If a force-stop occurs for a system-uid package, ignore it.
             return;
         }
         boolean didRemove = false;
@@ -3290,7 +3291,7 @@ class AlarmManagerService extends SystemService {
 
     void removeUserLocked(int userHandle) {
         if (userHandle == UserHandle.USER_SYSTEM) {
-            Slog.wtf(TAG, "removeForStoppedLocked: Shouldn't for user=" + userHandle);
+            // If we're told we're removing the system user, ignore it.
             return;
         }
         boolean didRemove = false;

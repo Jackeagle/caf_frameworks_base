@@ -96,22 +96,25 @@ public class Watchdog extends Thread {
         "media.extractor", // system/bin/mediaextractor
         "media.metrics", // system/bin/mediametrics
         "media.codec", // vendor/bin/hw/android.hardware.media.omx@1.0-service
+        "media.swcodec", // /apex/com.android.media.swcodec/bin/mediaswcodec
         "com.android.bluetooth",  // Bluetooth service
         "/system/bin/statsd",  // Stats daemon
     };
 
     public static final List<String> HAL_INTERFACES_OF_INTEREST = Arrays.asList(
-        "android.hardware.audio@2.0::IDevicesFactory",
-        "android.hardware.audio@4.0::IDevicesFactory",
-        "android.hardware.bluetooth@1.0::IBluetoothHci",
-        "android.hardware.camera.provider@2.4::ICameraProvider",
-        "android.hardware.graphics.allocator@2.0::IAllocator",
-        "android.hardware.graphics.composer@2.1::IComposer",
-        "android.hardware.health@2.0::IHealth",
-        "android.hardware.media.omx@1.0::IOmx",
-        "android.hardware.media.omx@1.0::IOmxStore",
-        "android.hardware.sensors@1.0::ISensors",
-        "android.hardware.vr@1.0::IVr"
+            "android.hardware.audio@2.0::IDevicesFactory",
+            "android.hardware.audio@4.0::IDevicesFactory",
+            "android.hardware.bluetooth@1.0::IBluetoothHci",
+            "android.hardware.camera.provider@2.4::ICameraProvider",
+            "android.hardware.graphics.allocator@2.0::IAllocator",
+            "android.hardware.graphics.composer@2.1::IComposer",
+            "android.hardware.health@2.0::IHealth",
+            "android.hardware.media.c2@1.0::IComponentStore",
+            "android.hardware.media.omx@1.0::IOmx",
+            "android.hardware.media.omx@1.0::IOmxStore",
+            "android.hardware.sensors@1.0::ISensors",
+            "android.hardware.vr@1.0::IVr",
+            "android.hardware.biometrics.face@1.0::IBiometricsFace"
     );
 
     static Watchdog sWatchdog;
@@ -396,7 +399,7 @@ public class Watchdog extends Thread {
         return builder.toString();
     }
 
-    private ArrayList<Integer> getInterestingHalPids() {
+    private static ArrayList<Integer> getInterestingHalPids() {
         try {
             IServiceManager serviceManager = IServiceManager.getService();
             ArrayList<IServiceManager.InstanceDebugInfo> dump =
@@ -419,7 +422,7 @@ public class Watchdog extends Thread {
         }
     }
 
-    private ArrayList<Integer> getInterestingNativePids() {
+    static ArrayList<Integer> getInterestingNativePids() {
         ArrayList<Integer> pids = getInterestingHalPids();
 
         int[] nativePids = Process.getPidsForCommands(NATIVE_STACKS_OF_INTEREST);
