@@ -115,6 +115,7 @@ import com.android.server.om.OverlayManagerService;
 import com.android.server.os.BugreportManagerService;
 import com.android.server.os.DeviceIdentifiersPolicyService;
 import com.android.server.os.SchedulingPolicyService;
+import com.android.server.pm.ApexManager;
 import com.android.server.pm.BackgroundDexOptService;
 import com.android.server.pm.CrossProfileAppsService;
 import com.android.server.pm.DynamicCodeLoggingService;
@@ -620,6 +621,19 @@ public final class SystemServer {
      * initialized in one of the other functions.
      */
     private void startBootstrapServices() {
+        // Start the watchdog as early as possible so we can crash the system server
+        // if we deadlock during early boot
+        traceBeginAndSlog("StartWatchdog");
+        final Watchdog watchdog = Watchdog.getInstance();
+        watchdog.start();
+        traceEnd();
+
+        // Start ApexManager as early as we can to give it enough time to call apexd and populate
+        // cache of known apex packages. Note that calling apexd will happen asynchronously.
+        traceBeginAndSlog("StartApexManager");
+        mSystemServiceManager.startService(ApexManager.class);
+        traceEnd();
+
         Slog.i(TAG, "Reading configuration...");
         final String TAG_SYSTEM_CONFIG = "ReadingSystemConfig";
         traceBeginAndSlog(TAG_SYSTEM_CONFIG);
@@ -762,6 +776,12 @@ public final class SystemServer {
         // Set up the Application instance for the system process and get started.
         traceBeginAndSlog("SetSystemProcess");
         mActivityManagerService.setSystemProcess();
+        traceEnd();
+
+        // Complete the watchdog setup with an ActivityManager instance and listen for reboots
+        // Do this only after the ActivityManagerService is properly started as a system process
+        traceBeginAndSlog("InitWatchdog");
+        watchdog.init(mSystemContext, mActivityManagerService);
         traceEnd();
 
         // DisplayManagerService needs to setup android.display scheduling related policies
@@ -983,12 +1003,6 @@ public final class SystemServer {
 
             traceBeginAndSlog("StartAlarmManagerService");
             mSystemServiceManager.startService(new AlarmManagerService(context));
-
-            traceEnd();
-
-            traceBeginAndSlog("InitWatchdog");
-            final Watchdog watchdog = Watchdog.getInstance();
-            watchdog.init(context, mActivityManagerService);
             traceEnd();
 
             traceBeginAndSlog("StartInputManagerService");
@@ -2115,10 +2129,6 @@ public final class SystemServer {
             } catch (Throwable e) {
                 reportWtf("making Network Policy Service ready", e);
             }
-            traceEnd();
-
-            traceBeginAndSlog("StartWatchdog");
-            Watchdog.getInstance().start();
             traceEnd();
 
             // Wait for all packages to be prepared

@@ -38,6 +38,7 @@ import android.service.notification.RankingHelperProto;
 import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
+import android.util.Pair;
 import android.util.Slog;
 import android.util.SparseBooleanArray;
 import android.util.proto.ProtoOutputStream;
@@ -91,13 +92,13 @@ public class PreferencesHelper implements RankingConfig {
     private static final String ATT_APP_USER_LOCKED_FIELDS = "app_user_locked_fields";
     private static final String ATT_ENABLED = "enabled";
     private static final String ATT_USER_ALLOWED = "allowed";
-    private static final String ATT_HIDE_SILENT = "hide_silent";
+    private static final String ATT_HIDE_SILENT = "hide_gentle";
 
     private static final int DEFAULT_PRIORITY = Notification.PRIORITY_DEFAULT;
     private static final int DEFAULT_VISIBILITY = NotificationManager.VISIBILITY_NO_OVERRIDE;
     private static final int DEFAULT_IMPORTANCE = NotificationManager.IMPORTANCE_UNSPECIFIED;
     @VisibleForTesting
-    static final boolean DEFAULT_HIDE_SILENT_STATUS_BAR_ICONS = true;
+    static final boolean DEFAULT_HIDE_SILENT_STATUS_BAR_ICONS = false;
     private static final boolean DEFAULT_SHOW_BADGE = true;
     private static final boolean DEFAULT_ALLOW_BUBBLE = true;
     private static final boolean DEFAULT_OEM_LOCKED_IMPORTANCE  = false;
@@ -236,6 +237,8 @@ public class PreferencesHelper implements RankingConfig {
                                         } else {
                                             channel.populateFromXml(parser);
                                         }
+                                        channel.setImportanceLockedByCriticalDeviceFunction(
+                                                r.defaultAppLockedImportance);
                                         r.channels.put(id, channel);
                                     }
                                 }
@@ -882,7 +885,8 @@ public class PreferencesHelper implements RankingConfig {
         }
     }
 
-    public void updateDefaultApps(int userId, ArraySet<String> toRemove, ArraySet<String> toAdd) {
+    public void updateDefaultApps(int userId, ArraySet<String> toRemove,
+            ArraySet<Pair<String, Integer>> toAdd) {
         synchronized (mPackagePreferences) {
             for (PackagePreferences p : mPackagePreferences.values()) {
                 if (userId == UserHandle.getUserId(p.uid)) {
@@ -891,11 +895,16 @@ public class PreferencesHelper implements RankingConfig {
                         for (NotificationChannel channel : p.channels.values()) {
                             channel.setImportanceLockedByCriticalDeviceFunction(false);
                         }
-                    } else if (toAdd != null && toAdd.contains(p.pkg)) {
-                        p.defaultAppLockedImportance = true;
-                        for (NotificationChannel channel : p.channels.values()) {
-                            channel.setImportanceLockedByCriticalDeviceFunction(true);
-                        }
+                    }
+                }
+            }
+            if (toAdd != null) {
+                for (Pair<String, Integer> approvedApp : toAdd) {
+                    PackagePreferences p = getOrCreatePackagePreferencesLocked(approvedApp.first,
+                            approvedApp.second);
+                    p.defaultAppLockedImportance = true;
+                    for (NotificationChannel channel : p.channels.values()) {
+                        channel.setImportanceLockedByCriticalDeviceFunction(true);
                     }
                 }
             }
@@ -1426,8 +1435,22 @@ public class PreferencesHelper implements RankingConfig {
                     pw.print(" visibility=");
                     pw.print(Notification.visibilityToString(r.visibility));
                 }
-                pw.print(" showBadge=");
-                pw.print(Boolean.toString(r.showBadge));
+                if (r.showBadge != DEFAULT_SHOW_BADGE) {
+                    pw.print(" showBadge=");
+                    pw.print(r.showBadge);
+                }
+                if (r.defaultAppLockedImportance != DEFAULT_APP_LOCKED_IMPORTANCE) {
+                    pw.print(" defaultAppLocked=");
+                    pw.print(r.defaultAppLockedImportance);
+                }
+                if (r.oemLockedImportance != DEFAULT_OEM_LOCKED_IMPORTANCE) {
+                    pw.print(" oemLocked=");
+                    pw.print(r.oemLockedImportance);
+                }
+                if (!r.futureOemLockedChannels.isEmpty()) {
+                    pw.print(" futureLockedChannels=");
+                    pw.print(r.futureOemLockedChannels);
+                }
                 pw.println();
                 for (NotificationChannel channel : r.channels.values()) {
                     pw.print(prefix);

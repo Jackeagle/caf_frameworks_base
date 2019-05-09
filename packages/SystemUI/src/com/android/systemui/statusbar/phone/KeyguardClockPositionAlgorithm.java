@@ -117,8 +117,13 @@ public class KeyguardClockPositionAlgorithm {
     public void loadDimens(Resources res) {
         mClockNotificationsMargin = res.getDimensionPixelSize(
                 R.dimen.keyguard_clock_notifications_margin);
-        mContainerTopPadding = res.getDimensionPixelSize(
-                R.dimen.keyguard_clock_top_margin);
+        // Consider the lock icon when determining the minimum top padding between the status bar
+        // and top of the clock.
+        mContainerTopPadding = Math.max(res.getDimensionPixelSize(
+                R.dimen.keyguard_clock_top_margin),
+                res.getDimensionPixelSize(R.dimen.keyguard_lock_height)
+                        + res.getDimensionPixelSize(R.dimen.keyguard_lock_padding)
+                        + res.getDimensionPixelSize(R.dimen.keyguard_clock_lock_margin));
         mBurnInPreventionOffsetX = res.getDimensionPixelSize(
                 R.dimen.burn_in_prevention_offset_x);
         mBurnInPreventionOffsetY = res.getDimensionPixelSize(
@@ -158,7 +163,12 @@ public class KeyguardClockPositionAlgorithm {
     }
 
     private int getPreferredClockY() {
-        return mClockPreferredY - mKeyguardStatusHeight - mClockNotificationsMargin;
+        return mClockPreferredY;
+    }
+
+    private int getExpandedPreferredClockY() {
+        return (mHasCustomClock && !mHasVisibleNotifs) ? getPreferredClockY()
+                : getExpandedClockPosition();
     }
 
     /**
@@ -187,13 +197,11 @@ public class KeyguardClockPositionAlgorithm {
 
     private int getClockY() {
         // Dark: Align the bottom edge of the clock at about half of the screen:
-        float clockYDark = getPreferredClockY() + burnInPreventionOffsetY();
+        float clockYDark = (mHasCustomClock ? getPreferredClockY() : getMaxClockY())
+                + burnInPreventionOffsetY();
         clockYDark = MathUtils.max(0, clockYDark);
 
-        float clockYRegular = getExpandedClockPosition();
-        if (mHasCustomClock && !mHasVisibleNotifs) {
-            clockYRegular = clockYDark;
-        }
+        float clockYRegular = getExpandedPreferredClockY();
         float clockYBouncer = -mKeyguardStatusHeight;
 
         // Move clock up while collapsing the shade
@@ -213,7 +221,7 @@ public class KeyguardClockPositionAlgorithm {
      * @return Alpha from 0 to 1.
      */
     private float getClockAlpha(int y) {
-        float alphaKeyguard = Math.max(0, y / Math.max(1f, getExpandedClockPosition()));
+        float alphaKeyguard = Math.max(0, y / Math.max(1f, getExpandedPreferredClockY()));
         alphaKeyguard = Interpolators.ACCELERATE.getInterpolation(alphaKeyguard);
         return MathUtils.lerp(alphaKeyguard, 1f, mDarkAmount);
     }

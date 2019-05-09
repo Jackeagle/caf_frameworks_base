@@ -15,6 +15,7 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
+import android.metrics.LogMaker;
 import android.os.AsyncTask;
 import android.os.Binder;
 import android.os.Bundle;
@@ -35,6 +36,8 @@ import android.widget.ImageView;
 import com.android.internal.app.AssistUtils;
 import com.android.internal.app.IVoiceInteractionSessionListener;
 import com.android.internal.app.IVoiceInteractionSessionShowCallback;
+import com.android.internal.logging.MetricsLogger;
+import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
 import com.android.keyguard.KeyguardUpdateMonitor;
 import com.android.settingslib.applications.InterestingConfigChanges;
 import com.android.systemui.ConfigurationChangedReceiver;
@@ -180,7 +183,15 @@ public class AssistManager implements ConfigurationChangedReceiver {
                     ? TIMEOUT_SERVICE
                     : TIMEOUT_ACTIVITY);
         }
+
+        if (args == null) {
+            args = new Bundle();
+        }
         args.putLong(INVOCATION_TIME_MS_KEY, SystemClock.uptimeMillis());
+        // Logs assistant start with invocation type.
+        MetricsLogger.action(
+                new LogMaker(MetricsEvent.ASSISTANT)
+                    .setType(MetricsEvent.TYPE_OPEN).setSubtype(args.getInt(INVOCATION_TYPE_KEY)));
         startAssistInternal(args, assistComponent, isService);
     }
 

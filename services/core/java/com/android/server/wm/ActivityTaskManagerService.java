@@ -134,12 +134,14 @@ import android.app.ActivityTaskManager;
 import android.app.ActivityThread;
 import android.app.AlertDialog;
 import android.app.AppGlobals;
+import android.app.AppOpsManager;
 import android.app.Dialog;
 import android.app.IActivityController;
 import android.app.IActivityTaskManager;
 import android.app.IApplicationThread;
 import android.app.IAssistDataReceiver;
 import android.app.INotificationManager;
+import android.app.IRequestFinishCallback;
 import android.app.ITaskStackListener;
 import android.app.Notification;
 import android.app.NotificationManager;
@@ -870,6 +872,16 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
 
     boolean hasUserRestriction(String restriction, int userId) {
         return getUserManager().hasUserRestriction(restriction, userId);
+    }
+
+    boolean hasSystemAlertWindowPermission(int callingUid, int callingPid, String callingPackage) {
+        final int mode = getAppOpsService().noteOperation(AppOpsManager.OP_SYSTEM_ALERT_WINDOW,
+                callingUid, callingPackage);
+        if (mode == AppOpsManager.MODE_DEFAULT) {
+            return checkPermission(Manifest.permission.SYSTEM_ALERT_WINDOW, callingPid, callingUid)
+                    == PERMISSION_GRANTED;
+        }
+        return mode == AppOpsManager.MODE_ALLOWED;
     }
 
     protected RecentTasks createRecentTasks() {
@@ -2277,6 +2289,32 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         }
     }
 
+    @Override
+    public void onBackPressedOnTaskRoot(IBinder token, IRequestFinishCallback callback) {
+        synchronized (mGlobalLock) {
+            ActivityRecord r = ActivityRecord.isInStackLocked(token);
+            if (r == null) {
+                return;
+            }
+            ActivityStack stack = r.getActivityStack();
+            if (stack != null && stack.isSingleTaskInstance()) {
+                // Single-task stacks are used for activities which are presented in floating
+                // windows above full screen activities. Instead of directly finishing the
+                // task, a task change listener is used to notify SystemUI so the action can be
+                // handled specially.
+                final TaskRecord task = r.getTaskRecord();
+                mTaskChangeNotificationController
+                        .notifyBackPressedOnTaskRoot(task.getTaskInfo());
+            } else {
+                try {
+                    callback.requestFinish();
+                } catch (RemoteException e) {
+                    Slog.e(TAG, "Failed to invoke request finish callback", e);
+                }
+            }
+        }
+    }
+
     /**
      * TODO: Add mController hook
      */
@@ -3000,6 +3038,10 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             if ((sendReceiver = pae.receiver) != null) {
                 // Caller wants result sent back to them.
                 sendBundle = new Bundle();
+                sendBundle.putInt(ActivityTaskManagerInternal.ASSIST_TASK_ID,
+                        pae.activity.getTaskRecord().taskId);
+                sendBundle.putBinder(ActivityTaskManagerInternal.ASSIST_ACTIVITY_ID,
+                        pae.activity.assistToken);
                 sendBundle.putBundle(ASSIST_KEY_DATA, pae.extras);
                 sendBundle.putParcelable(ASSIST_KEY_STRUCTURE, pae.structure);
                 sendBundle.putParcelable(ASSIST_KEY_CONTENT, pae.content);
@@ -3372,6 +3414,11 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
 
                 if (stack.inFreeformWindowingMode()) {
                     stack.setWindowingMode(WINDOWING_MODE_FULLSCREEN);
+                } else if (stack.getParent().inFreeformWindowingMode()) {
+                    // If the window is on a freeform display, set it to undefined. It will be
+                    // resolved to freeform and it can adjust windowing mode when the display mode
+                    // changes in runtime.
+                    stack.setWindowingMode(WINDOWING_MODE_UNDEFINED);
                 } else {
                     stack.setWindowingMode(WINDOWING_MODE_FREEFORM);
                 }
@@ -6538,6 +6585,31 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 if (r != null && r.pendingResults != null) {
                     r.pendingResults.remove(pir);
                 }
+            }
+        }
+
+        @Override
+        public ActivityTokens getTopActivityForTask(int taskId) {
+            synchronized (mGlobalLock) {
+                final TaskRecord taskRecord = mRootActivityContainer.anyTaskForId(taskId);
+                if (taskRecord == null) {
+                    Slog.w(TAG, "getApplicationThreadForTopActivity failed:"
+                            + " Requested task not found");
+                    return null;
+                }
+                final ActivityRecord activity = taskRecord.getTopActivity();
+                if (activity == null) {
+                    Slog.w(TAG, "getApplicationThreadForTopActivity failed:"
+                            + " Requested activity not found");
+                    return null;
+                }
+                if (!activity.attachedToProcess()) {
+                    Slog.w(TAG, "getApplicationThreadForTopActivity failed: No process for "
+                            + activity);
+                    return null;
+                }
+                return new ActivityTokens(activity.appToken, activity.assistToken,
+                        activity.app.getThread());
             }
         }
 

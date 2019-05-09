@@ -543,7 +543,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     private static final int NATIVE_DUMP_TIMEOUT_MS = 2000; // 2 seconds;
 
-    final OomAdjuster mOomAdjuster;
+    OomAdjuster mOomAdjuster;
     final LowMemDetector mLowMemDetector;
 
     /** All system services */
@@ -1483,7 +1483,7 @@ public class ActivityManagerService extends IActivityManager.Stub
     final ServiceThread mProcStartHandlerThread;
     final Handler mProcStartHandler;
 
-    final ActivityManagerConstants mConstants;
+    ActivityManagerConstants mConstants;
 
     // Encapsulates the global setting "hidden_api_blacklist_exemptions"
     final HiddenApiSettings mHiddenApiBlacklist;
@@ -2185,24 +2185,38 @@ public class ActivityManagerService extends IActivityManager.Stub
                 "hidden_api_access_statslog_sampling_rate";
 
         public void onPropertiesChanged(DeviceConfig.Properties properties) {
-            int logSampleRate = properties.getInt(HIDDEN_API_ACCESS_LOG_SAMPLING_RATE, 0x0);
-            if (logSampleRate < 0 || logSampleRate > 0x10000) {
-                logSampleRate = -1;
-            }
-            if (logSampleRate != -1 && logSampleRate != mLogSampleRate) {
+            int logSampleRate = properties.getInt(HIDDEN_API_ACCESS_LOG_SAMPLING_RATE,
+                    mLogSampleRate);
+            int statslogSampleRate = properties.getInt(HIDDEN_API_ACCESS_STATSLOG_SAMPLING_RATE,
+                    mStatslogSampleRate);
+            setSampleRates(logSampleRate, statslogSampleRate);
+        }
+
+        private void setSampleRates(int logSampleRate, int statslogSampleRate) {
+            if (logSampleRate >= 0 && logSampleRate <= 0x10000
+                    && logSampleRate != mLogSampleRate) {
                 mLogSampleRate = logSampleRate;
                 ZYGOTE_PROCESS.setHiddenApiAccessLogSampleRate(mLogSampleRate);
             }
 
-            int statslogSampleRate =
-                    properties.getInt(HIDDEN_API_ACCESS_STATSLOG_SAMPLING_RATE, 0);
-            if (statslogSampleRate < 0 || statslogSampleRate > 0x10000) {
-                statslogSampleRate = -1;
-            }
-            if (statslogSampleRate != -1 && statslogSampleRate != mStatslogSampleRate) {
+            if (statslogSampleRate >= 0 && statslogSampleRate <= 0x10000
+                    && statslogSampleRate != mStatslogSampleRate) {
                 mStatslogSampleRate = statslogSampleRate;
                 ZYGOTE_PROCESS.setHiddenApiAccessStatslogSampleRate(mStatslogSampleRate);
             }
+
+        }
+
+        /**
+         * Set initial sampling rates from DeviceConfig. This is required after each restart,
+         * if they never get updated.
+         */
+        private void initializeSampleRates() {
+            int logSampleRate = DeviceConfig.getInt(DeviceConfig.NAMESPACE_APP_COMPAT,
+                    HIDDEN_API_ACCESS_LOG_SAMPLING_RATE, 0);
+            int statslogSampleRate = DeviceConfig.getInt(DeviceConfig.NAMESPACE_APP_COMPAT,
+                    HIDDEN_API_ACCESS_STATSLOG_SAMPLING_RATE, 0);
+            setSampleRates(logSampleRate, statslogSampleRate);
         }
 
         public HiddenApiSettings(Handler handler, Context context) {
@@ -2219,6 +2233,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     Settings.Global.getUriFor(Settings.Global.HIDDEN_API_POLICY),
                     false,
                     this);
+            initializeSampleRates();
             DeviceConfig.addOnPropertiesChangedListener(DeviceConfig.NAMESPACE_APP_COMPAT,
                     mContext.getMainExecutor(), this);
             update();
@@ -13853,6 +13868,18 @@ public class ActivityManagerService extends IActivityManager.Stub
             throw new IllegalArgumentException("callingPackage cannot be null");
         }
 
+        // Ensure that instanceName, which is caller provided, does not contain
+        // unusual characters.
+        if (instanceName != null) {
+            for (int i = 0; i < instanceName.length(); ++i) {
+                char c = instanceName.charAt(i);
+                if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                            || (c >= '0' && c <= '9') || c == '_' || c == '.')) {
+                    throw new IllegalArgumentException("Illegal instanceName");
+                }
+            }
+        }
+
         synchronized(this) {
             return mServices.bindServiceLocked(caller, token, service,
                     resolvedType, connection, flags, instanceName, callingPackage, userId);
@@ -17832,8 +17859,10 @@ public class ActivityManagerService extends IActivityManager.Stub
             synchronized (ActivityManagerService.this) {
                 final ProcessRecord proc = getProcessRecordLocked(processName, uid,
                         true /* keepIfLarge */);
-                mProcessList.removeProcessLocked(proc, false /* callerWillRestart */,
-                        true /* allowRestart */, reason);
+                if (proc != null) {
+                    mProcessList.removeProcessLocked(proc, false /* callerWillRestart */,
+                            true /* allowRestart */, reason);
+                }
             }
         }
 

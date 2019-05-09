@@ -29,6 +29,14 @@ android_test_helper_app {
 }
 
 android_test_helper_app {
+    name: "RollbackTestAppAv3",
+    manifest: "TestApp/Av3.xml",
+    sdk_version: "current",
+    srcs: ["TestApp/src/**/*.java"],
+    resource_dirs: ["TestApp/res_v3"],
+}
+
+android_test_helper_app {
     name: "RollbackTestAppACrashingV2",
     manifest: "TestApp/ACrashingV2.xml",
     sdk_version: "current",
@@ -88,6 +96,15 @@ apex {
     installable: false,
 }
 
+apex {
+    name: "com.android.tests.rollback.testapex.RollbackTestApexV3",
+    manifest: "TestApex/RollbackTestApexV3.json",
+    file_contexts: "apex.test",
+    prebuilts: ["RollbackTestApex.prebuilt.txt"],
+    key: "RollbackTestApex.key",
+    installable: false,
+}
+
 apex_key {
     name: "RollbackTestApex.key",
     public_key: "TestApex/com.android.tests.rollback.testapex.avbpubkey",
@@ -109,6 +126,7 @@ android_test {
     java_resources: [
         ":RollbackTestAppAv1",
         ":RollbackTestAppAv2",
+        ":RollbackTestAppAv3",
         ":RollbackTestAppACrashingV2",
         ":RollbackTestAppBv1",
         ":RollbackTestAppBv2",
@@ -116,6 +134,7 @@ android_test {
         ":RollbackTestAppASplitV2",
         ":com.android.tests.rollback.testapex.RollbackTestApexV1",
         ":com.android.tests.rollback.testapex.RollbackTestApexV2",
+        ":com.android.tests.rollback.testapex.RollbackTestApexV3",
     ],
     test_config: "RollbackTest.xml",
     sdk_version: "test_current",

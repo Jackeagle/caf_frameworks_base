@@ -15,6 +15,7 @@
 package com.android.systemui.statusbar.phone;
 
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
+import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_3BUTTON;
 
 import android.annotation.Nullable;
 import android.content.Context;
@@ -49,7 +50,8 @@ import java.util.List;
 import java.util.Objects;
 
 public class NavigationBarInflaterView extends FrameLayout
-        implements Tunable, PluginListener<NavBarButtonProvider> {
+        implements Tunable, PluginListener<NavBarButtonProvider>,
+                NavigationModeController.ModeChangedListener {
 
     private static final String TAG = "NavBarInflater";
 
@@ -69,6 +71,7 @@ public class NavigationBarInflaterView extends FrameLayout
     public static final String RIGHT = "right";
     public static final String CONTEXTUAL = "contextual";
     public static final String IME_SWITCHER = "ime_switcher";
+    public static final String START_CONTEXTUAL = "start_contextual";
 
     public static final String GRAVITY_SEPARATOR = ";";
     public static final String BUTTON_SEPARATOR = ",";
@@ -81,6 +84,8 @@ public class NavigationBarInflaterView extends FrameLayout
     public static final String KEY_CODE_END = ")";
     private static final String WEIGHT_SUFFIX = "W";
     private static final String WEIGHT_CENTERED_SUFFIX = "WC";
+    private static final String ABSOLUTE_SUFFIX = "A";
+    private static final String ABSOLUTE_VERTICAL_CENTERED_SUFFIX = "C";
 
     private final List<NavBarButtonProvider> mPlugins = new ArrayList<>();
 
@@ -102,11 +107,13 @@ public class NavigationBarInflaterView extends FrameLayout
     private boolean mUsingCustomLayout;
 
     private OverviewProxyService mOverviewProxyService;
+    private int mNavBarMode = NAV_BAR_MODE_3BUTTON;
 
     public NavigationBarInflaterView(Context context, AttributeSet attrs) {
         super(context, attrs);
         createInflaters();
         mOverviewProxyService = Dependency.get(OverviewProxyService.class);
+        mNavBarMode = Dependency.get(NavigationModeController.class).addListener(this);
     }
 
     @VisibleForTesting
@@ -138,12 +145,18 @@ public class NavigationBarInflaterView extends FrameLayout
     }
 
     protected String getDefaultLayout() {
-        final int defaultResource = QuickStepContract.isGesturalMode(getContext())
+        final int defaultResource = QuickStepContract.isGesturalMode(mNavBarMode)
                 ? R.string.config_navBarLayoutHandle
                 : mOverviewProxyService.shouldShowSwipeUpUI()
                         ? R.string.config_navBarLayoutQuickstep
                         : R.string.config_navBarLayout;
         return getContext().getString(defaultResource);
+    }
+
+    @Override
+    public void onNavigationModeChanged(int mode) {
+        mNavBarMode = mode;
+        onLikelyDefaultLayoutChange();
     }
 
     @Override
@@ -159,6 +172,7 @@ public class NavigationBarInflaterView extends FrameLayout
     protected void onDetachedFromWindow() {
         Dependency.get(TunerService.class).removeTunable(this);
         Dependency.get(PluginManager.class).removePluginListener(this);
+        Dependency.get(NavigationModeController.class).removeListener(this);
         super.onDetachedFromWindow();
     }
 
@@ -341,17 +355,20 @@ public class NavigationBarInflaterView extends FrameLayout
         String sizeStr = extractSize(buttonSpec);
         if (sizeStr == null) return v;
 
-        if (sizeStr.contains(WEIGHT_SUFFIX)) {
+        if (sizeStr.contains(WEIGHT_SUFFIX) || sizeStr.contains(ABSOLUTE_SUFFIX)) {
             // To support gravity, wrap in RelativeLayout and apply gravity to it.
             // Children wanting to use gravity must be smaller then the frame.
-            float weight = Float.parseFloat(sizeStr.substring(0, sizeStr.indexOf(WEIGHT_SUFFIX)));
             ReverseRelativeLayout frame = new ReverseRelativeLayout(mContext);
             LayoutParams childParams = new LayoutParams(v.getLayoutParams());
 
             // Compute gravity to apply
             int gravity = (landscape) ? (start ? Gravity.TOP : Gravity.BOTTOM)
                     : (start ? Gravity.START : Gravity.END);
-            if (sizeStr.endsWith(WEIGHT_CENTERED_SUFFIX)) gravity = Gravity.CENTER;
+            if (sizeStr.endsWith(WEIGHT_CENTERED_SUFFIX)) {
+                gravity = Gravity.CENTER;
+            } else if (sizeStr.endsWith(ABSOLUTE_VERTICAL_CENTERED_SUFFIX)) {
+                gravity = Gravity.CENTER_VERTICAL;
+            }
 
             // Set default gravity, flipped if needed in reversed layouts (270 RTL and 90 LTR)
             frame.setDefaultGravity(gravity);
@@ -359,8 +376,16 @@ public class NavigationBarInflaterView extends FrameLayout
 
             frame.addView(v, childParams);
 
-            // Use weighting to set the width of the frame
-            frame.setLayoutParams(new LinearLayout.LayoutParams(0, MATCH_PARENT, weight));
+            if (sizeStr.contains(WEIGHT_SUFFIX)) {
+                // Use weighting to set the width of the frame
+                float weight = Float.parseFloat(
+                        sizeStr.substring(0, sizeStr.indexOf(WEIGHT_SUFFIX)));
+                frame.setLayoutParams(new LinearLayout.LayoutParams(0, MATCH_PARENT, weight));
+            } else {
+                int width = (int) convertDpToPx(mContext,
+                        Float.parseFloat(sizeStr.substring(0, sizeStr.indexOf(ABSOLUTE_SUFFIX))));
+                frame.setLayoutParams(new LinearLayout.LayoutParams(width, MATCH_PARENT));
+            }
 
             // Ensure ripples can be drawn outside bounds
             frame.setClipChildren(false);
@@ -408,6 +433,8 @@ public class NavigationBarInflaterView extends FrameLayout
             v = inflater.inflate(R.layout.home_handle, parent, false);
         } else if (IME_SWITCHER.equals(button)) {
             v = inflater.inflate(R.layout.ime_switcher, parent, false);
+        } else if (START_CONTEXTUAL.equals(button)) {
+            v = inflater.inflate(R.layout.start_contextual, parent, false);
         } else if (button.startsWith(KEY)) {
             String uri = extractImage(button);
             int code = extractKeycode(button);
@@ -476,8 +503,6 @@ public class NavigationBarInflaterView extends FrameLayout
         }
     }
 
-
-
     private void clearViews() {
         if (mButtonDispatchers != null) {
             for (int i = 0; i < mButtonDispatchers.size(); i++) {
@@ -492,6 +517,10 @@ public class NavigationBarInflaterView extends FrameLayout
         for (int i = 0; i < group.getChildCount(); i++) {
             ((ViewGroup) group.getChildAt(i)).removeAllViews();
         }
+    }
+
+    private static float convertDpToPx(Context context, float dp) {
+        return dp * context.getResources().getDisplayMetrics().density;
     }
 
     @Override

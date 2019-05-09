@@ -22,6 +22,7 @@ import static com.android.systemui.theme.ThemeOverlayManager.OVERLAY_CATEGORY_IC
 import static com.android.systemui.theme.ThemeOverlayManager.OVERLAY_CATEGORY_ICON_LAUNCHER;
 import static com.android.systemui.theme.ThemeOverlayManager.OVERLAY_CATEGORY_ICON_SETTINGS;
 import static com.android.systemui.theme.ThemeOverlayManager.OVERLAY_CATEGORY_ICON_SYSUI;
+import static com.android.systemui.theme.ThemeOverlayManager.OVERLAY_CATEGORY_ICON_THEME_PICKER;
 import static com.android.systemui.theme.ThemeOverlayManager.OVERLAY_CATEGORY_SHAPE;
 import static com.android.systemui.theme.ThemeOverlayManager.SETTINGS_PACKAGE;
 import static com.android.systemui.theme.ThemeOverlayManager.SYSTEM_USER_CATEGORIES;
@@ -47,13 +48,12 @@ import com.android.systemui.SysuiTestCase;
 import com.google.android.collect.Maps;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.MoreExecutors;
 
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.InOrder;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 import java.util.HashMap;
@@ -75,6 +75,7 @@ public class ThemeOverlayManagerTest extends SysuiTestCase {
         }
     }
 
+    private static final String THEMEPICKER_PACKAGE = "com.android.wallpaper";
     private static final String LAUNCHER_PACKAGE = "com.android.launcher3";
     private static final UserHandle TEST_USER = UserHandle.of(5);
     private static final Set<UserHandle> TEST_USER_HANDLES = Sets.newHashSet(TEST_USER);
@@ -87,7 +88,8 @@ public class ThemeOverlayManagerTest extends SysuiTestCase {
     @Before
     public void setup() throws Exception {
         MockitoAnnotations.initMocks(this);
-        mManager = new ThemeOverlayManager(mOverlayManager, LAUNCHER_PACKAGE);
+        mManager = new ThemeOverlayManager(mOverlayManager, MoreExecutors.directExecutor(),
+                LAUNCHER_PACKAGE, THEMEPICKER_PACKAGE);
         when(mOverlayManager.getOverlayInfosForTarget(ANDROID_PACKAGE, UserHandle.SYSTEM))
                 .thenReturn(Lists.newArrayList(
                         createOverlayInfo(TEST_DISABLED_PREFIX + OVERLAY_CATEGORY_COLOR,
@@ -124,6 +126,12 @@ public class ThemeOverlayManagerTest extends SysuiTestCase {
                                 LAUNCHER_PACKAGE, OVERLAY_CATEGORY_ICON_LAUNCHER, false),
                         createOverlayInfo(TEST_ENABLED_PREFIX + OVERLAY_CATEGORY_ICON_LAUNCHER,
                                 LAUNCHER_PACKAGE, OVERLAY_CATEGORY_ICON_LAUNCHER, true)));
+        when(mOverlayManager.getOverlayInfosForTarget(THEMEPICKER_PACKAGE, UserHandle.SYSTEM))
+                .thenReturn(Lists.newArrayList(
+                        createOverlayInfo(TEST_DISABLED_PREFIX + OVERLAY_CATEGORY_ICON_THEME_PICKER,
+                                THEMEPICKER_PACKAGE, OVERLAY_CATEGORY_ICON_THEME_PICKER, false),
+                        createOverlayInfo(TEST_ENABLED_PREFIX + OVERLAY_CATEGORY_ICON_THEME_PICKER,
+                                THEMEPICKER_PACKAGE, OVERLAY_CATEGORY_ICON_THEME_PICKER, true)));
     }
 
     @Test
@@ -132,17 +140,6 @@ public class ThemeOverlayManagerTest extends SysuiTestCase {
 
         for (String overlayPackage : ALL_CATEGORIES_MAP.values()) {
             verify(mOverlayManager).setEnabledExclusiveInCategory(overlayPackage, TEST_USER);
-        }
-    }
-
-    @Test
-    public void allCategoriesSpecified_enabledInOrder() {
-        mManager.applyCurrentUserOverlays(ALL_CATEGORIES_MAP, TEST_USER_HANDLES);
-
-        InOrder inOrder = Mockito.inOrder(mOverlayManager);
-        for (String category : THEME_CATEGORIES) {
-            inOrder.verify(mOverlayManager)
-                    .setEnabledExclusiveInCategory(ALL_CATEGORIES_MAP.get(category), TEST_USER);
         }
     }
 
@@ -232,6 +229,8 @@ public class ThemeOverlayManagerTest extends SysuiTestCase {
                 UserHandle.SYSTEM);
         verify(mOverlayManager, never()).getOverlayInfosForTarget(SYSUI_PACKAGE, UserHandle.SYSTEM);
         verify(mOverlayManager, never()).getOverlayInfosForTarget(LAUNCHER_PACKAGE,
+                UserHandle.SYSTEM);
+        verify(mOverlayManager, never()).getOverlayInfosForTarget(THEMEPICKER_PACKAGE,
                 UserHandle.SYSTEM);
     }
 

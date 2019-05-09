@@ -416,8 +416,9 @@ import com.android.internal.annotations.GuardedBy;
         mAudioService.checkMusicActive(deviceType, caller);
     }
 
-    /*package*/ void checkVolumeCecOnHdmiConnection(int state, String caller) {
-        mAudioService.checkVolumeCecOnHdmiConnection(state, caller);
+    /*package*/ void checkVolumeCecOnHdmiConnection(
+            @AudioService.ConnectionState  int state, String caller) {
+        mAudioService.postCheckVolumeCecOnHdmiConnection(state, caller);
     }
 
     /*package*/ boolean hasAudioFocusUsers() {
@@ -722,7 +723,8 @@ import com.android.internal.annotations.GuardedBy;
                 case MSG_IL_SET_HEARING_AID_CONNECTION_STATE:
                     synchronized (mDeviceStateLock) {
                         mDeviceInventory.onSetHearingAidConnectionState(
-                                (BluetoothDevice) msg.obj, msg.arg1);
+                                (BluetoothDevice) msg.obj, msg.arg1,
+                                mAudioService.getHearingAidStreamType());
                     }
                     break;
                 case MSG_BT_HEADSET_CNCT_FAILED:
@@ -771,7 +773,7 @@ import com.android.internal.annotations.GuardedBy;
                 case MSG_L_SCOCLIENT_DIED:
                     synchronized (mSetModeLock) {
                         synchronized (mDeviceStateLock) {
-                            mBtHelper.scoClientDied(msg.arg1);
+                            mBtHelper.scoClientDied(msg.obj);
                         }
                     }
                     break;

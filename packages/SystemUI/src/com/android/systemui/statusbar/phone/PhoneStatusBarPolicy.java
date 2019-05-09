@@ -44,6 +44,7 @@ import com.android.systemui.SysUiServiceProvider;
 import com.android.systemui.UiOffloadThread;
 import com.android.systemui.privacy.PrivacyItem;
 import com.android.systemui.privacy.PrivacyItemController;
+import com.android.systemui.privacy.PrivacyType;
 import com.android.systemui.qs.tiles.DndTile;
 import com.android.systemui.qs.tiles.RotationLockTile;
 import com.android.systemui.statusbar.CommandQueue;
@@ -85,7 +86,7 @@ public class PhoneStatusBarPolicy
     private static final String TAG = "PhoneStatusBarPolicy";
     private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
 
-    public static final int LOCATION_STATUS_ICON_ID = R.drawable.stat_sys_location;
+    public static final int LOCATION_STATUS_ICON_ID = PrivacyType.TYPE_LOCATION.getIconId();
 
     private final String mSlotCast;
     private final String mSlotHotspot;
@@ -229,16 +230,19 @@ public class PhoneStatusBarPolicy
         mIconController.setIconVisibility(mSlotDataSaver, false);
 
         // privacy items
-        mIconController.setIcon(mSlotMicrophone, R.drawable.stat_sys_mic_none, null);
+        mIconController.setIcon(mSlotMicrophone, PrivacyType.TYPE_MICROPHONE.getIconId(),
+                PrivacyType.TYPE_MICROPHONE.getName(mContext));
         mIconController.setIconVisibility(mSlotMicrophone, false);
-        mIconController.setIcon(mSlotCamera, R.drawable.stat_sys_camera, null);
+        mIconController.setIcon(mSlotCamera, PrivacyType.TYPE_CAMERA.getIconId(),
+                PrivacyType.TYPE_CAMERA.getName(mContext));
         mIconController.setIconVisibility(mSlotCamera, false);
         mIconController.setIcon(mSlotLocation, LOCATION_STATUS_ICON_ID,
                 mContext.getString(R.string.accessibility_location_active));
         mIconController.setIconVisibility(mSlotLocation, false);
 
         // sensors off
-        mIconController.setIcon(mSlotSensorsOff, R.drawable.stat_sys_sensors_off, null);
+        mIconController.setIcon(mSlotSensorsOff, R.drawable.stat_sys_sensors_off,
+                mContext.getString(R.string.accessibility_sensors_off_active));
         mIconController.setIconVisibility(mSlotSensorsOff,
                 mSensorPrivacyController.isSensorPrivacyEnabled());
 

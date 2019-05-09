@@ -414,18 +414,25 @@ public final class MediaController {
     /**
      * Gets the additional session information which was set when the session was created.
      *
-     * @return The additional session information
+     * @return The additional session information, or {@link Bundle#EMPTY} if not set.
      */
-    @Nullable
+    @NonNull
     public Bundle getSessionInfo() {
-        if (mSessionInfo == null) {
-            try {
-                mSessionInfo = mSessionBinder.getSessionInfo();
-            } catch (RemoteException e) {
-                Log.d(TAG, "Dead object in getSessionInfo.", e);
-            }
+        if (mSessionInfo != null) {
+            return new Bundle(mSessionInfo);
         }
-        return mSessionInfo;
+
+        // Get info from the connected session.
+        try {
+            mSessionInfo = mSessionBinder.getSessionInfo();
+        } catch (RemoteException e) {
+            Log.d(TAG, "Dead object in getSessionInfo.", e);
+        }
+
+        if (mSessionInfo == null) {
+            mSessionInfo = Bundle.EMPTY;
+        }
+        return new Bundle(mSessionInfo);
     }
 
     /**
@@ -884,11 +891,16 @@ public final class MediaController {
         }
 
         /**
-         * Set the playback speed.
+         * Sets the playback speed. A value of {@code 1.0f} is the default playback value,
+         * and a negative value indicates reverse playback. {@code 0.0f} is not allowed.
          *
          * @param speed The playback speed
+         * @throws IllegalArgumentException if the {@code speed} is equal to zero.
          */
         public void setPlaybackSpeed(float speed) {
+            if (speed == 0.0f) {
+                throw new IllegalArgumentException("speed must not be zero");
+            }
             try {
                 mSessionBinder.setPlaybackSpeed(mContext.getPackageName(), mCbStub, speed);
             } catch (RemoteException e) {

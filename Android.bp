@@ -73,6 +73,7 @@ java_defaults {
         "core/java/android/app/IInstrumentationWatcher.aidl",
         "core/java/android/app/INotificationManager.aidl",
         "core/java/android/app/IProcessObserver.aidl",
+        "core/java/android/app/IRequestFinishCallback.aidl",
         "core/java/android/app/ISearchManager.aidl",
         "core/java/android/app/ISearchManagerCallback.aidl",
         "core/java/android/app/IServiceConnection.aidl",
@@ -320,7 +321,7 @@ java_defaults {
         "core/java/android/service/vr/IVrManager.aidl",
         "core/java/android/service/vr/IVrStateCallbacks.aidl",
         "core/java/android/service/watchdog/IExplicitHealthCheckService.aidl",
-        "core/java/android/service/watchdog/PackageInfo.aidl",
+        "core/java/android/service/watchdog/PackageConfig.aidl",
         "core/java/android/print/ILayoutResultCallback.aidl",
         "core/java/android/print/IPrinterDiscoveryObserver.aidl",
         "core/java/android/print/IPrintDocumentAdapter.aidl",
@@ -687,6 +688,7 @@ java_defaults {
         "core/java/com/android/server/DropboxLogTags.logtags",
         "core/java/org/chromium/arc/EventLogTags.logtags",
 
+        ":apex-properties",
         ":platform-properties",
 
         ":framework-statslog-gen",

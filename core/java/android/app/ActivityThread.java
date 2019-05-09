@@ -88,6 +88,7 @@ import android.os.AsyncTask;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.CancellationSignal;
 import android.os.Debug;
 import android.os.Environment;
 import android.os.FileUtils;
@@ -95,6 +96,7 @@ import android.os.GraphicsEnvironment;
 import android.os.Handler;
 import android.os.HandlerExecutor;
 import android.os.IBinder;
+import android.os.ICancellationSignal;
 import android.os.LocaleList;
 import android.os.Looper;
 import android.os.Message;
@@ -121,6 +123,7 @@ import android.provider.Settings;
 import android.renderscript.RenderScriptCacheDir;
 import android.security.NetworkSecurityPolicy;
 import android.security.net.config.NetworkSecurityConfigProvider;
+import android.service.voice.VoiceInteractionSession;
 import android.system.ErrnoException;
 import android.system.OsConstants;
 import android.system.StructStat;
@@ -137,6 +140,7 @@ import android.util.Slog;
 import android.util.SparseArray;
 import android.util.SparseIntArray;
 import android.util.SuperNotCalledException;
+import android.util.UtilConfig;
 import android.util.proto.ProtoOutputStream;
 import android.view.Choreographer;
 import android.view.ContextThemeWrapper;
@@ -160,6 +164,7 @@ import com.android.internal.os.RuntimeInit;
 import com.android.internal.os.SomeArgs;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.FastPrintWriter;
+import com.android.internal.util.Preconditions;
 import com.android.internal.util.function.pooled.PooledLambda;
 import com.android.org.conscrypt.OpenSSLSocketImpl;
 import com.android.org.conscrypt.TrustedCertificateStore;
@@ -387,6 +392,10 @@ public final class ActivityThread extends ClientTransactionHandler {
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private final ResourcesManager mResourcesManager;
 
+    // Registry of remote cancellation transports pending a reply with reply handles.
+    @GuardedBy("this")
+    private @Nullable Map<SafeCancellationTransport, CancellationSignal> mRemoteCancellations;
+
     private static final class ProviderKey {
         final String authority;
         final int userId;
@@ -450,6 +459,7 @@ public final class ActivityThread extends ClientTransactionHandler {
     public static final class ActivityClientRecord {
         @UnsupportedAppUsage
         public IBinder token;
+        public IBinder assistToken;
         int ident;
         @UnsupportedAppUsage
         Intent intent;
@@ -526,8 +536,10 @@ public final class ActivityThread extends ClientTransactionHandler {
                 String referrer, IVoiceInteractor voiceInteractor, Bundle state,
                 PersistableBundle persistentState, List<ResultInfo> pendingResults,
                 List<ReferrerIntent> pendingNewIntents, boolean isForward,
-                ProfilerInfo profilerInfo, ClientTransactionHandler client) {
+                ProfilerInfo profilerInfo, ClientTransactionHandler client,
+                IBinder assistToken) {
             this.token = token;
+            this.assistToken = assistToken;
             this.ident = ident;
             this.intent = intent;
             this.referrer = referrer;
@@ -1057,6 +1069,7 @@ public final class ActivityThread extends ClientTransactionHandler {
         }
 
         public void scheduleApplicationInfoChanged(ApplicationInfo ai) {
+            mH.removeMessages(H.APPLICATION_INFO_CHANGED, ai);
             sendMessage(H.APPLICATION_INFO_CHANGED, ai);
         }
 
@@ -1644,6 +1657,86 @@ public final class ActivityThread extends ClientTransactionHandler {
         @Override
         public void scheduleTransaction(ClientTransaction transaction) throws RemoteException {
             ActivityThread.this.scheduleTransaction(transaction);
+        }
+
+        @Override
+        public void requestDirectActions(@NonNull IBinder activityToken,
+                @NonNull IVoiceInteractor interactor, @Nullable RemoteCallback cancellationCallback,
+                @NonNull RemoteCallback callback) {
+            final CancellationSignal cancellationSignal = new CancellationSignal();
+            if (cancellationCallback != null) {
+                final ICancellationSignal transport = createSafeCancellationTransport(
+                        cancellationSignal);
+                final Bundle cancellationResult = new Bundle();
+                cancellationResult.putBinder(VoiceInteractor.KEY_CANCELLATION_SIGNAL,
+                        transport.asBinder());
+                cancellationCallback.sendResult(cancellationResult);
+            }
+            mH.sendMessage(PooledLambda.obtainMessage(ActivityThread::handleRequestDirectActions,
+                    ActivityThread.this, activityToken, interactor, cancellationSignal, callback));
+        }
+
+        @Override
+        public void performDirectAction(@NonNull IBinder activityToken, @NonNull String actionId,
+                @Nullable Bundle arguments, @Nullable RemoteCallback cancellationCallback,
+                @NonNull RemoteCallback resultCallback) {
+            final CancellationSignal cancellationSignal = new CancellationSignal();
+            if (cancellationCallback != null) {
+                final ICancellationSignal transport = createSafeCancellationTransport(
+                        cancellationSignal);
+                final Bundle cancellationResult = new Bundle();
+                cancellationResult.putBinder(VoiceInteractor.KEY_CANCELLATION_SIGNAL,
+                        transport.asBinder());
+                cancellationCallback.sendResult(cancellationResult);
+            }
+            mH.sendMessage(PooledLambda.obtainMessage(ActivityThread::handlePerformDirectAction,
+                    ActivityThread.this, activityToken, actionId, arguments,
+                    cancellationSignal, resultCallback));
+        }
+    }
+
+    private @NonNull SafeCancellationTransport createSafeCancellationTransport(
+            @NonNull CancellationSignal cancellationSignal) {
+        synchronized (ActivityThread.this) {
+            if (mRemoteCancellations == null) {
+                mRemoteCancellations = new ArrayMap<>();
+            }
+            final SafeCancellationTransport transport = new SafeCancellationTransport(
+                    this, cancellationSignal);
+            mRemoteCancellations.put(transport, cancellationSignal);
+            return transport;
+        }
+    }
+
+    private @NonNull CancellationSignal removeSafeCancellationTransport(
+            @NonNull SafeCancellationTransport transport) {
+        synchronized (ActivityThread.this) {
+            final CancellationSignal cancellation = mRemoteCancellations.remove(transport);
+            if (mRemoteCancellations.isEmpty()) {
+                mRemoteCancellations = null;
+            }
+            return cancellation;
+        }
+    }
+
+    private static final class SafeCancellationTransport extends ICancellationSignal.Stub {
+        private final @NonNull WeakReference<ActivityThread> mWeakActivityThread;
+
+        SafeCancellationTransport(@NonNull ActivityThread activityThread,
+                @NonNull CancellationSignal cancellation) {
+            mWeakActivityThread = new WeakReference<>(activityThread);
+        }
+
+        @Override
+        public void cancel() {
+            final ActivityThread activityThread = mWeakActivityThread.get();
+            if (activityThread != null) {
+                final CancellationSignal cancellation = activityThread
+                        .removeSafeCancellationTransport(this);
+                if (cancellation != null) {
+                    cancellation.cancel();
+                }
+            }
         }
     }
 
@@ -2877,9 +2970,10 @@ public final class ActivityThread extends ClientTransactionHandler {
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public final Activity startActivityNow(Activity parent, String id,
         Intent intent, ActivityInfo activityInfo, IBinder token, Bundle state,
-        Activity.NonConfigurationInstances lastNonConfigurationInstances) {
+        Activity.NonConfigurationInstances lastNonConfigurationInstances, IBinder assistToken) {
         ActivityClientRecord r = new ActivityClientRecord();
             r.token = token;
+            r.assistToken = assistToken;
             r.ident = 0;
             r.intent = intent;
             r.state = state;
@@ -3120,7 +3214,8 @@ public final class ActivityThread extends ClientTransactionHandler {
                 activity.attach(appContext, this, getInstrumentation(), r.token,
                         r.ident, app, r.intent, r.activityInfo, title, r.parent,
                         r.embeddedID, r.lastNonConfigurationInstances, config,
-                        r.referrer, r.voiceInteractor, window, r.configCallback);
+                        r.referrer, r.voiceInteractor, window, r.configCallback,
+                        r.assistToken);
 
                 if (customIntent != null) {
                     activity.mIntent = customIntent;
@@ -3352,7 +3447,6 @@ public final class ActivityThread extends ClientTransactionHandler {
         } catch (RemoteException ex) {
             throw ex.rethrowFromSystemServer();
         }
-
     }
 
     private void deliverNewIntents(ActivityClientRecord r, List<ReferrerIntent> intents) {
@@ -3432,6 +3526,7 @@ public final class ActivityThread extends ClientTransactionHandler {
                     r.activity.onProvideAssistContent(content);
                 }
             }
+
         }
         if (structure == null) {
             structure = new AssistStructure();
@@ -3448,6 +3543,68 @@ public final class ActivityThread extends ClientTransactionHandler {
             mgr.reportAssistContextExtras(cmd.requestToken, data, structure, content, referrer);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /** Fetches the user actions for the corresponding activity */
+    private void handleRequestDirectActions(@NonNull IBinder activityToken,
+            @NonNull IVoiceInteractor interactor, @NonNull CancellationSignal cancellationSignal,
+            @NonNull RemoteCallback callback) {
+        final ActivityClientRecord r = mActivities.get(activityToken);
+        if (r == null) {
+            callback.sendResult(null);
+            return;
+        }
+        final int lifecycleState = r.getLifecycleState();
+        if (lifecycleState < ON_START || lifecycleState >= ON_STOP) {
+            callback.sendResult(null);
+            return;
+        }
+        if (r.activity.mVoiceInteractor == null
+                || r.activity.mVoiceInteractor.mInteractor.asBinder()
+                != interactor.asBinder()) {
+            if (r.activity.mVoiceInteractor != null) {
+                r.activity.mVoiceInteractor.destroy();
+            }
+            r.activity.mVoiceInteractor = new VoiceInteractor(interactor, r.activity,
+                    r.activity, Looper.myLooper());
+        }
+        r.activity.onGetDirectActions(cancellationSignal, (actions) -> {
+            Preconditions.checkNotNull(actions);
+            Preconditions.checkCollectionElementsNotNull(actions, "actions");
+            if (!actions.isEmpty()) {
+                final int actionCount = actions.size();
+                for (int i = 0; i < actionCount; i++) {
+                    final DirectAction action = actions.get(i);
+                    action.setSource(r.activity.getTaskId(), r.activity.getAssistToken());
+                }
+                final Bundle result = new Bundle();
+                result.putParcelable(DirectAction.KEY_ACTIONS_LIST,
+                        new ParceledListSlice<>(actions));
+                callback.sendResult(result);
+            } else {
+                callback.sendResult(null);
+            }
+        });
+    }
+
+    /** Performs an actions in the corresponding activity */
+    private void handlePerformDirectAction(@NonNull IBinder activityToken,
+            @NonNull String actionId, @Nullable Bundle arguments,
+            @NonNull CancellationSignal cancellationSignal,
+            @NonNull RemoteCallback resultCallback) {
+        final ActivityClientRecord r = mActivities.get(activityToken);
+        if (r != null) {
+            final int lifecycleState = r.getLifecycleState();
+            if (lifecycleState < ON_START || lifecycleState >= ON_STOP) {
+                resultCallback.sendResult(null);
+                return;
+            }
+            final Bundle nonNullArguments = (arguments != null) ? arguments : Bundle.EMPTY;
+            r.activity.onPerformDirectAction(actionId, nonNullArguments, cancellationSignal,
+                    resultCallback::sendResult);
+        } else {
+            resultCallback.sendResult(null);
         }
     }
 
@@ -5028,6 +5185,7 @@ public final class ActivityThread extends ClientTransactionHandler {
      * handling current transaction item before relaunching the activity.
      */
     void scheduleRelaunchActivity(IBinder token) {
+        mH.removeMessages(H.RELAUNCH_ACTIVITY, token);
         sendMessage(H.RELAUNCH_ACTIVITY, token);
     }
 
@@ -5977,6 +6135,10 @@ public final class ActivityThread extends ClientTransactionHandler {
         if (data.appInfo.targetSdkVersion <= android.os.Build.VERSION_CODES.HONEYCOMB_MR1) {
             AsyncTask.setDefaultExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
         }
+
+        // Let the util.*Array classes maintain "undefined" for apps targeting Pie or earlier.
+        UtilConfig.setThrowExceptionForUpperArrayOutOfBounds(
+                data.appInfo.targetSdkVersion >= Build.VERSION_CODES.Q);
 
         Message.updateCheckRecycle(data.appInfo.targetSdkVersion);
 

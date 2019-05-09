@@ -1202,7 +1202,7 @@ public class CarrierConfigManager {
      * Override the SPN Display Condition 2 integer bits (lsb). B2, B1 is the last two bits of the
      * spn display condition coding.
      *
-     * The default value -1 mean this field is not config.
+     * The default value -1 mean this field is not set.
      *
      * B1 = 0: display of registered PLMN name not required when registered PLMN is either HPLMN
      * or a PLMN in the service provider PLMN list (see EF_SPDI).
@@ -1241,7 +1241,7 @@ public class CarrierConfigManager {
 
     /**
      * Override the PNN - a string array of comma-separated alpha long and short names:
-     * "alpha_long1, alpha_short1".
+     * "alpha_long1,alpha_short1".
      *
      * Reference: 3GPP TS 31.102 v15.2.0 Section 4.2.58 EF_PNN.
      * @hide
@@ -1259,6 +1259,8 @@ public class CarrierConfigManager {
 
     /**
      * Allow ERI rules to select a carrier name display string when using 3gpp2 access technologies.
+     * If this bit is not set, the carrier name display string will be selected from the carrier
+     * display name resolver which doesn't apply the ERI rules.
      *
      * @hide
      */
@@ -2817,6 +2819,59 @@ public class CarrierConfigManager {
         }
     }
 
+    /**
+     * Wi-Fi configs used in Carrier Wi-Fi application.
+     * TODO(b/132059890): Expose it in a future release as systemapi.
+     *
+     * @hide
+     */
+    public static final class Wifi {
+        /** Prefix of all Wifi.KEY_* constants. */
+        public static final String KEY_PREFIX = "wifi.";
+
+        /**
+         * Whenever any information under wifi namespace is changed, the version should be
+         * incremented by 1 so that the device is able to figure out the latest profiles based on
+         * the version.
+         */
+        public static final String KEY_CARRIER_PROFILES_VERSION_INT =
+                KEY_PREFIX + "carrier_profiles_version_int";
+
+        /**
+         * It contains the package name of connection manager that the carrier owns.
+         *
+         * <P>Once it is installed, the profiles installed by Carrier Wi-Fi Application
+         * will be deleted.
+         * Once it is uninstalled, Carrier Wi-Fi Application will re-install the latest profiles.
+         */
+        public static final String KEY_CARRIER_CONNECTION_MANAGER_PACKAGE_STRING =
+                KEY_PREFIX + "carrier_connection_manager_package_string";
+        /**
+         * It is to have the list of wifi networks profiles which contain the information about
+         * the wifi-networks to which carrier wants the device to connect.
+         */
+        public static final String KEY_NETWORK_PROFILES_STRING_ARRAY =
+                KEY_PREFIX + "network_profiles_string_array";
+
+        /**
+         * It is to have the list of Passpoint profiles which contain the information about
+         * the Passpoint networks to which carrier wants the device to connect.
+         */
+        public static final String KEY_PASSPOINT_PROFILES_STRING_ARRAY =
+                KEY_PREFIX + "passpoint_profiles_string_array";
+
+        private static PersistableBundle getDefaults() {
+            PersistableBundle defaults = new PersistableBundle();
+            defaults.putInt(KEY_CARRIER_PROFILES_VERSION_INT, -1);
+            defaults.putString(KEY_CARRIER_CONNECTION_MANAGER_PACKAGE_STRING, null);
+            defaults.putStringArray(KEY_NETWORK_PROFILES_STRING_ARRAY, null);
+            defaults.putStringArray(KEY_PASSPOINT_PROFILES_STRING_ARRAY, null);
+            return defaults;
+        }
+
+        private Wifi() {}
+    }
+
    /**
     * An int array containing CDMA enhanced roaming indicator values for Home (non-roaming) network.
     * The default values come from 3GPP2 C.R1001 table 8.1-1.
@@ -3305,13 +3360,14 @@ public class CarrierConfigManager {
         /* Default value is 10 seconds. */
         sDefaults.putLong(KEY_OPPORTUNISTIC_NETWORK_DATA_SWITCH_HYSTERESIS_TIME_LONG, 10000);
         sDefaults.putAll(Gps.getDefaults());
+        sDefaults.putAll(Wifi.getDefaults());
         sDefaults.putIntArray(KEY_CDMA_ENHANCED_ROAMING_INDICATOR_FOR_HOME_NETWORK_INT_ARRAY,
                 new int[] {
                         1 /* Roaming Indicator Off */
                 });
         sDefaults.putStringArray(KEY_EMERGENCY_NUMBER_PREFIX_STRING_ARRAY, new String[0]);
         sDefaults.putBoolean(KEY_USE_USIM_BOOL, false);
-        sDefaults.putBoolean(KEY_SHOW_WFC_LOCATION_PRIVACY_POLICY_BOOL, true);
+        sDefaults.putBoolean(KEY_SHOW_WFC_LOCATION_PRIVACY_POLICY_BOOL, false);
         sDefaults.putBoolean(KEY_AUTO_CANCEL_CS_REJECT_NOTIFICATION, false);
         sDefaults.putString(KEY_SMART_FORWARDING_CONFIG_COMPONENT_NAME_STRING, "");
         sDefaults.putBoolean(KEY_ALWAYS_SHOW_PRIMARY_SIGNAL_BAR_IN_OPPORTUNISTIC_NETWORK_BOOLEAN,
@@ -3369,8 +3425,7 @@ public class CarrierConfigManager {
      * May throw an {@link IllegalArgumentException} if {@code overrideValues} contains invalid
      * values for the specified config keys.
      *
-     * NOTE: This API is meant for testing purposes only and may only be accessed from the shell UID
-     * during instrumentation testing.
+     * NOTE: This API is meant for testing purposes only.
      *
      * @param subscriptionId The subscription ID for which the override should be done.
      * @param overrideValues Key-value pairs of the values that are to be overridden. If set to

@@ -32,7 +32,6 @@ import static android.content.pm.PackageManager.FLAG_PERMISSION_WHITELIST_INSTAL
 import static android.content.pm.PackageManager.FLAG_PERMISSION_WHITELIST_SYSTEM;
 import static android.content.pm.PackageManager.FLAG_PERMISSION_WHITELIST_UPGRADE;
 import static android.content.pm.PackageManager.MASK_PERMISSION_FLAGS_ALL;
-import static android.content.pm.PackageManager.RESTRICTED_PERMISSIONS_ENABLED;
 import static android.os.Trace.TRACE_TAG_PACKAGE_MANAGER;
 
 import static com.android.server.pm.PackageManagerService.DEBUG_INSTALL;
@@ -922,6 +921,8 @@ public class PermissionManagerService {
         permissionsState.setGlobalGids(mGlobalGids);
 
         synchronized (mLock) {
+            ArraySet<String> newImplicitPermissions = new ArraySet<>();
+
             final int N = pkg.requestedPermissions.size();
             for (int i = 0; i < N; i++) {
                 final String permName = pkg.requestedPermissions.get(i);
@@ -941,6 +942,17 @@ public class PermissionManagerService {
                         }
                     }
                     continue;
+                }
+
+                // Cache newImplicitPermissions before modifing permissionsState as for the shared
+                // uids the original and new state are the same object
+                if (!origPermissions.hasRequestedPermission(permName)
+                        && pkg.implicitPermissions.contains(permName)) {
+                    newImplicitPermissions.add(permName);
+
+                    if (DEBUG_PERMISSIONS) {
+                        Slog.i(TAG, permName + " is newly added for " + pkg.packageName);
+                    }
                 }
 
                 // Limit ephemeral apps to ephemeral allowed permissions.
@@ -1045,8 +1057,8 @@ public class PermissionManagerService {
 
                                 boolean wasChanged = false;
 
-                                boolean restrictionExempt = !RESTRICTED_PERMISSIONS_ENABLED
-                                        || (origPermissions.getPermissionFlags(bp.name, userId)
+                                boolean restrictionExempt =
+                                        (origPermissions.getPermissionFlags(bp.name, userId)
                                                 & FLAGS_PERMISSION_RESTRICTION_ANY_EXEMPT) != 0;
                                 boolean restrictionApplied = (origPermissions.getPermissionFlags(
                                         bp.name, userId) & FLAG_PERMISSION_APPLY_RESTRICTION) != 0;
@@ -1164,8 +1176,8 @@ public class PermissionManagerService {
                             for (int userId : currentUserIds) {
                                 boolean wasChanged = false;
 
-                                boolean restrictionExempt = !RESTRICTED_PERMISSIONS_ENABLED
-                                        || (origPermissions.getPermissionFlags(bp.name, userId)
+                                boolean restrictionExempt =
+                                        (origPermissions.getPermissionFlags(bp.name, userId)
                                                 & FLAGS_PERMISSION_RESTRICTION_ANY_EXEMPT) != 0;
                                 boolean restrictionApplied = (origPermissions.getPermissionFlags(
                                         bp.name, userId) & FLAG_PERMISSION_APPLY_RESTRICTION) != 0;
@@ -1298,7 +1310,7 @@ public class PermissionManagerService {
             updatedUserIds = revokePermissionsNoLongerImplicitLocked(permissionsState, pkg,
                     updatedUserIds);
             updatedUserIds = setInitialGrantForNewImplicitPermissionsLocked(origPermissions,
-                    permissionsState, pkg, updatedUserIds);
+                    permissionsState, pkg, newImplicitPermissions, updatedUserIds);
         }
 
         // Persist the runtime permissions state for users with changes. If permissions
@@ -1437,27 +1449,9 @@ public class PermissionManagerService {
     private @NonNull int[] setInitialGrantForNewImplicitPermissionsLocked(
             @NonNull PermissionsState origPs,
             @NonNull PermissionsState ps, @NonNull PackageParser.Package pkg,
+            @NonNull ArraySet<String> newImplicitPermissions,
             @NonNull int[] updatedUserIds) {
         String pkgName = pkg.packageName;
-        ArraySet<String> newImplicitPermissions = new ArraySet<>();
-
-        int numRequestedPerms = pkg.requestedPermissions.size();
-        for (int i = 0; i < numRequestedPerms; i++) {
-            BasePermission bp = mSettings.getPermissionLocked(pkg.requestedPermissions.get(i));
-            if (bp != null) {
-                String perm = bp.getName();
-
-                if (!origPs.hasRequestedPermission(perm) && pkg.implicitPermissions.contains(
-                        perm)) {
-                    newImplicitPermissions.add(perm);
-
-                    if (DEBUG_PERMISSIONS) {
-                        Slog.i(TAG, perm + " is newly added for " + pkgName);
-                    }
-                }
-            }
-        }
-
         ArrayMap<String, ArraySet<String>> newToSplitPerms = new ArrayMap<>();
 
         int numSplitPerms = PermissionManager.SPLIT_PERMISSIONS.size();
@@ -2059,7 +2053,7 @@ public class PermissionManagerService {
             return;
         }
 
-        if (RESTRICTED_PERMISSIONS_ENABLED && bp.isHardOrSoftRestricted()
+        if (bp.isHardOrSoftRestricted()
                 && (flags & PackageManager.FLAGS_PERMISSION_RESTRICTION_ANY_EXEMPT) == 0) {
             Log.e(TAG, "Cannot grant restricted non-exempt permission "
                     + permName + " for package " + packageName);

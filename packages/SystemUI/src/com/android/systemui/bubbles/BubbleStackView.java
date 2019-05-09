@@ -22,16 +22,21 @@ import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 import android.annotation.NonNull;
 import android.content.Context;
 import android.content.res.Resources;
+import android.content.res.TypedArray;
+import android.graphics.Color;
 import android.graphics.Outline;
 import android.graphics.Point;
 import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.drawable.LayerDrawable;
+import android.graphics.drawable.ShapeDrawable;
 import android.os.Bundle;
 import android.service.notification.StatusBarNotification;
 import android.util.Log;
 import android.util.StatsLog;
 import android.view.Choreographer;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -40,6 +45,7 @@ import android.view.ViewTreeObserver;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.widget.FrameLayout;
 import android.widget.TextView;
@@ -56,10 +62,12 @@ import com.android.systemui.R;
 import com.android.systemui.bubbles.animation.ExpandedAnimationController;
 import com.android.systemui.bubbles.animation.PhysicsAnimationLayout;
 import com.android.systemui.bubbles.animation.StackAnimationController;
+import com.android.systemui.recents.TriangleShape;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -72,6 +80,9 @@ public class BubbleStackView extends FrameLayout {
 
     /** Duration of the flyout alpha animations. */
     private static final int FLYOUT_ALPHA_ANIMATION_DURATION = 100;
+
+    /** Max width of the flyout, in terms of percent of the screen width. */
+    private static final float FLYOUT_MAX_WIDTH_PERCENT = .6f;
 
     /** How long to wait, in milliseconds, before hiding the flyout. */
     @VisibleForTesting
@@ -126,13 +137,17 @@ public class BubbleStackView extends FrameLayout {
 
     private FrameLayout mExpandedViewContainer;
 
-    private View mFlyout;
+    private FrameLayout mFlyoutContainer;
+    private FrameLayout mFlyout;
     private TextView mFlyoutText;
+    private ShapeDrawable mLeftFlyoutTriangle;
+    private ShapeDrawable mRightFlyoutTriangle;
     /** Spring animation for the flyout. */
     private SpringAnimation mFlyoutSpring;
     /** Runnable that fades out the flyout and then sets it to GONE. */
     private Runnable mHideFlyout =
-            () -> mFlyout.animate().alpha(0f).withEndAction(() -> mFlyout.setVisibility(GONE));
+            () -> mFlyoutContainer.animate().alpha(0f).withEndAction(
+                    () -> mFlyoutContainer.setVisibility(GONE));
 
     /** Layout change listener that moves the stack to the nearest valid position on rotation. */
     private OnLayoutChangeListener mMoveStackToValidPositionOnLayoutListener;
@@ -146,6 +161,9 @@ public class BubbleStackView extends FrameLayout {
 
     private int mBubbleSize;
     private int mBubblePadding;
+    private int mFlyoutPadding;
+    private int mFlyoutSpaceFromBubble;
+    private int mPointerSize;
     private int mExpandedAnimateXDistance;
     private int mExpandedAnimateYDistance;
     private int mStatusBarHeight;
@@ -211,13 +229,16 @@ public class BubbleStackView extends FrameLayout {
 
         mBubbleData = data;
         mInflater = LayoutInflater.from(context);
-        mTouchHandler = new BubbleTouchHandler(context, this);
+        mTouchHandler = new BubbleTouchHandler(this, data, context);
         setOnTouchListener(mTouchHandler);
         mInflater = LayoutInflater.from(context);
 
         Resources res = getResources();
         mBubbleSize = res.getDimensionPixelSize(R.dimen.individual_bubble_size);
         mBubblePadding = res.getDimensionPixelSize(R.dimen.bubble_padding);
+        mFlyoutPadding = res.getDimensionPixelSize(R.dimen.bubble_flyout_padding_x);
+        mFlyoutSpaceFromBubble = res.getDimensionPixelSize(R.dimen.bubble_flyout_space_from_bubble);
+        mPointerSize = res.getDimensionPixelSize(R.dimen.bubble_flyout_pointer_size);
         mExpandedAnimateXDistance =
                 res.getDimensionPixelSize(R.dimen.bubble_expanded_animate_x_distance);
         mExpandedAnimateYDistance =
@@ -244,7 +265,6 @@ public class BubbleStackView extends FrameLayout {
                 getResources().getInteger(R.integer.bubbles_max_rendered));
         mBubbleContainer.setController(mStackAnimationController);
         mBubbleContainer.setElevation(elevation);
-        mBubbleContainer.setPadding(padding, 0, padding, 0);
         mBubbleContainer.setClipChildren(false);
         addView(mBubbleContainer, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
@@ -254,16 +274,17 @@ public class BubbleStackView extends FrameLayout {
         mExpandedViewContainer.setClipChildren(false);
         addView(mExpandedViewContainer);
 
-        mFlyout = mInflater.inflate(R.layout.bubble_flyout, this, false);
-        mFlyout.setVisibility(GONE);
-        mFlyout.animate()
+        mFlyoutContainer = (FrameLayout) mInflater.inflate(R.layout.bubble_flyout, this, false);
+        mFlyoutContainer.setVisibility(GONE);
+        mFlyoutContainer.setClipToPadding(false);
+        mFlyoutContainer.setClipChildren(false);
+        mFlyoutContainer.animate()
                 .setDuration(FLYOUT_ALPHA_ANIMATION_DURATION)
                 .setInterpolator(new AccelerateDecelerateInterpolator());
-        addView(mFlyout);
 
-        mFlyoutText = mFlyout.findViewById(R.id.bubble_flyout_text);
-
-        mFlyoutSpring = new SpringAnimation(mFlyout, DynamicAnimation.TRANSLATION_X);
+        mFlyout = mFlyoutContainer.findViewById(R.id.bubble_flyout);
+        addView(mFlyoutContainer);
+        setupFlyout();
 
         mExpandedViewXAnim =
                 new SpringAnimation(mExpandedViewContainer, DynamicAnimation.TRANSLATION_X);
@@ -371,11 +392,34 @@ public class BubbleStackView extends FrameLayout {
     @Override
     public void onInitializeAccessibilityNodeInfoInternal(AccessibilityNodeInfo info) {
         super.onInitializeAccessibilityNodeInfoInternal(info);
-        info.addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_DISMISS);
+
+        // Custom actions.
+        AccessibilityAction moveTopLeft = new AccessibilityAction(R.id.action_move_top_left,
+                getContext().getResources()
+                        .getString(R.string.bubble_accessibility_action_move_top_left));
+        info.addAction(moveTopLeft);
+
+        AccessibilityAction moveTopRight = new AccessibilityAction(R.id.action_move_top_right,
+                getContext().getResources()
+                        .getString(R.string.bubble_accessibility_action_move_top_right));
+        info.addAction(moveTopRight);
+
+        AccessibilityAction moveBottomLeft = new AccessibilityAction(R.id.action_move_bottom_left,
+                getContext().getResources()
+                        .getString(R.string.bubble_accessibility_action_move_bottom_left));
+        info.addAction(moveBottomLeft);
+
+        AccessibilityAction moveBottomRight = new AccessibilityAction(R.id.action_move_bottom_right,
+                getContext().getResources()
+                        .getString(R.string.bubble_accessibility_action_move_bottom_right));
+        info.addAction(moveBottomRight);
+
+        // Default actions.
+        info.addAction(AccessibilityAction.ACTION_DISMISS);
         if (mIsExpanded) {
-            info.addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_COLLAPSE);
+            info.addAction(AccessibilityAction.ACTION_COLLAPSE);
         } else {
-            info.addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_EXPAND);
+            info.addAction(AccessibilityAction.ACTION_EXPAND);
         }
     }
 
@@ -384,16 +428,30 @@ public class BubbleStackView extends FrameLayout {
         if (super.performAccessibilityActionInternal(action, arguments)) {
             return true;
         }
-        switch (action) {
-            case AccessibilityNodeInfo.ACTION_DISMISS:
-                mBubbleData.dismissAll(BubbleController.DISMISS_ACCESSIBILITY_ACTION);
-                return true;
-            case AccessibilityNodeInfo.ACTION_COLLAPSE:
-                mBubbleData.setExpanded(false);
-                return true;
-            case AccessibilityNodeInfo.ACTION_EXPAND:
-                mBubbleData.setExpanded(true);
-                return true;
+        final RectF stackBounds = mStackAnimationController.getAllowableStackPositionRegion();
+
+        // R constants are not final so we cannot use switch-case here.
+        if (action == AccessibilityNodeInfo.ACTION_DISMISS) {
+            mBubbleData.dismissAll(BubbleController.DISMISS_ACCESSIBILITY_ACTION);
+            return true;
+        } else if (action == AccessibilityNodeInfo.ACTION_COLLAPSE) {
+            mBubbleData.setExpanded(false);
+            return true;
+        } else if (action == AccessibilityNodeInfo.ACTION_EXPAND) {
+            mBubbleData.setExpanded(true);
+            return true;
+        } else if (action == R.id.action_move_top_left) {
+            mStackAnimationController.springStack(stackBounds.left, stackBounds.top);
+            return true;
+        } else if (action == R.id.action_move_top_right) {
+            mStackAnimationController.springStack(stackBounds.right, stackBounds.top);
+            return true;
+        } else if (action == R.id.action_move_bottom_left) {
+            mStackAnimationController.springStack(stackBounds.left, stackBounds.bottom);
+            return true;
+        } else if (action == R.id.action_move_bottom_right) {
+            mStackAnimationController.springStack(stackBounds.right, stackBounds.bottom);
+            return true;
         }
         return false;
     }
@@ -484,27 +542,47 @@ public class BubbleStackView extends FrameLayout {
 
     // via BubbleData.Listener
     void addBubble(Bubble bubble) {
+        if (DEBUG) {
+            Log.d(TAG, "addBubble: " + bubble);
+        }
         bubble.inflate(mInflater, this);
         mBubbleContainer.addView(bubble.iconView, 0,
                 new FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
         ViewClippingUtil.setClippingDeactivated(bubble.iconView, true, mClippingParameters);
+        animateInFlyoutForBubble(bubble);
         requestUpdate();
         logBubbleEvent(bubble, StatsLog.BUBBLE_UICHANGED__ACTION__POSTED);
     }
 
     // via BubbleData.Listener
     void removeBubble(Bubble bubble) {
+        if (DEBUG) {
+            Log.d(TAG, "removeBubble: " + bubble);
+        }
         // Remove it from the views
         int removedIndex = mBubbleContainer.indexOfChild(bubble.iconView);
-        mBubbleContainer.removeViewAt(removedIndex);
-        logBubbleEvent(bubble, StatsLog.BUBBLE_UICHANGED__ACTION__DISMISSED);
+        if (removedIndex >= 0) {
+            mBubbleContainer.removeViewAt(removedIndex);
+            logBubbleEvent(bubble, StatsLog.BUBBLE_UICHANGED__ACTION__DISMISSED);
+        } else {
+            Log.d(TAG, "was asked to remove Bubble, but didn't find the view! " + bubble);
+        }
     }
 
     // via BubbleData.Listener
     void updateBubble(Bubble bubble) {
+        animateInFlyoutForBubble(bubble);
         requestUpdate();
         logBubbleEvent(bubble, StatsLog.BUBBLE_UICHANGED__ACTION__UPDATED);
     }
+
+    public void updateBubbleOrder(List<Bubble> bubbles) {
+        for (int i = 0; i < bubbles.size(); i++) {
+            Bubble bubble = bubbles.get(i);
+            mBubbleContainer.moveViewTo(bubble.iconView, i);
+        }
+    }
+
 
     /**
      * Changes the currently selected bubble. If the stack is already expanded, the newly selected
@@ -512,7 +590,10 @@ public class BubbleStackView extends FrameLayout {
      * position of any bubble.
      */
     // via BubbleData.Listener
-    public void setSelectedBubble(Bubble bubbleToSelect) {
+    public void setSelectedBubble(@Nullable Bubble bubbleToSelect) {
+        if (DEBUG) {
+            Log.d(TAG, "setSelectedBubble: " + bubbleToSelect);
+        }
         if (mExpandedBubble != null && mExpandedBubble.equals(bubbleToSelect)) {
             return;
         }
@@ -543,6 +624,9 @@ public class BubbleStackView extends FrameLayout {
      */
     // via BubbleData.Listener
     public void setExpanded(boolean shouldExpand) {
+        if (DEBUG) {
+            Log.d(TAG, "setExpanded: " + shouldExpand);
+        }
         boolean wasExpanded = mIsExpanded;
         if (shouldExpand == wasExpanded) {
             return;
@@ -567,6 +651,9 @@ public class BubbleStackView extends FrameLayout {
      */
     @Deprecated
     void stackDismissed(int reason) {
+        if (DEBUG) {
+            Log.d(TAG, "stackDismissed: reason=" + reason);
+        }
         mBubbleData.dismissAll(reason);
         logBubbleEvent(null /* no bubble associated with bubble stack dismiss */,
                 StatsLog.BUBBLE_UICHANGED__ACTION__STACK_DISMISSED);
@@ -592,7 +679,7 @@ public class BubbleStackView extends FrameLayout {
             }
             // Outside parts of view we care about.
             return null;
-        } else if (isIntersecting(mFlyout, x, y)) {
+        } else if (mFlyoutContainer.getVisibility() == VISIBLE && isIntersecting(mFlyout, x, y)) {
             return mFlyout;
         }
 
@@ -614,6 +701,9 @@ public class BubbleStackView extends FrameLayout {
     @Deprecated
     @MainThread
     void collapseStack() {
+        if (DEBUG) {
+            Log.d(TAG, "collapseStack()");
+        }
         mBubbleData.setExpanded(false);
     }
 
@@ -623,6 +713,9 @@ public class BubbleStackView extends FrameLayout {
     @Deprecated
     @MainThread
     void collapseStack(Runnable endRunnable) {
+        if (DEBUG) {
+            Log.d(TAG, "collapseStack(endRunnable)");
+        }
         collapseStack();
         // TODO - use the runnable at end of animation
         endRunnable.run();
@@ -638,6 +731,9 @@ public class BubbleStackView extends FrameLayout {
     @Deprecated
     @MainThread
     void expandStack() {
+        if (DEBUG) {
+            Log.d(TAG, "expandStack()");
+        }
         mBubbleData.setExpanded(true);
     }
 
@@ -645,6 +741,9 @@ public class BubbleStackView extends FrameLayout {
      * Tell the stack to animate to collapsed or expanded state.
      */
     private void animateExpansion(boolean shouldExpand) {
+        if (DEBUG) {
+            Log.d(TAG, "animateExpansion: shouldExpand=" + shouldExpand);
+        }
         if (mIsExpanded != shouldExpand) {
             hideFlyoutImmediate();
 
@@ -717,17 +816,18 @@ public class BubbleStackView extends FrameLayout {
 
     /** Moves the bubbles out of the way if they're going to be over the keyboard. */
     public void onImeVisibilityChanged(boolean visible, int height) {
+        mStackAnimationController.setImeHeight(height + mImeOffset);
+
         if (!mIsExpanded) {
-            if (visible) {
-                mStackAnimationController.updateBoundsForVisibleImeAndAnimate(height + mImeOffset);
-            } else {
-                mStackAnimationController.updateBoundsForInvisibleImeAndAnimate();
-            }
+            mStackAnimationController.animateForImeVisibility(visible);
         }
     }
 
     /** Called when a drag operation on an individual bubble has started. */
     public void onBubbleDragStart(View bubble) {
+        if (DEBUG) {
+            Log.d(TAG, "onBubbleDragStart: bubble=" + bubble);
+        }
         mExpandedAnimationController.prepareForBubbleDrag(bubble);
     }
 
@@ -743,6 +843,9 @@ public class BubbleStackView extends FrameLayout {
     /** Called when a drag operation on an individual bubble has finished. */
     public void onBubbleDragFinish(
             View bubble, float x, float y, float velX, float velY, boolean dismissed) {
+        if (DEBUG) {
+            Log.d(TAG, "onBubbleDragFinish: bubble=" + bubble + ", dismissed=" + dismissed);
+        }
         if (!mIsExpanded || mIsExpansionAnimating) {
             return;
         }
@@ -755,6 +858,9 @@ public class BubbleStackView extends FrameLayout {
     }
 
     void onDragStart() {
+        if (DEBUG) {
+            Log.d(TAG, "onDragStart()");
+        }
         if (mIsExpanded || mIsExpansionAnimating) {
             return;
         }
@@ -775,6 +881,9 @@ public class BubbleStackView extends FrameLayout {
     }
 
     void onDragFinish(float x, float y, float velX, float velY) {
+        if (DEBUG) {
+            Log.d(TAG, "onDragFinish");
+        }
         // TODO: Add fling to bottom to dismiss.
         mIsDragging = false;
 
@@ -785,6 +894,10 @@ public class BubbleStackView extends FrameLayout {
         mStackAnimationController.flingStackThenSpringToEdge(x, velX, velY);
         logBubbleEvent(null /* no bubble associated with bubble stack move */,
                 StatsLog.BUBBLE_UICHANGED__ACTION__STACK_MOVED);
+    }
+
+    void onDragFinishAsDismiss() {
+        mIsDragging = false;
     }
 
     /**
@@ -826,27 +939,52 @@ public class BubbleStackView extends FrameLayout {
         if (updateMessage != null && !isExpanded() && !mIsExpansionAnimating && !mIsDragging) {
             final PointF stackPos = mStackAnimationController.getStackPosition();
 
+            // Set the flyout TextView's max width in terms of percent, and then subtract out the
+            // padding so that the entire flyout view will be the desired width (rather than the
+            // TextView being the desired width + extra padding).
+            mFlyoutText.setMaxWidth(
+                    (int) (getWidth() * FLYOUT_MAX_WIDTH_PERCENT) - mFlyoutPadding * 2);
+
+            mFlyoutContainer.setAlpha(0f);
+            mFlyoutContainer.setVisibility(VISIBLE);
+
             mFlyoutText.setText(updateMessage);
-            mFlyout.measure(WRAP_CONTENT, WRAP_CONTENT);
-            mFlyout.post(() -> {
-                final boolean onLeft = mStackAnimationController.isStackOnLeftSide();
+
+            final boolean onLeft = mStackAnimationController.isStackOnLeftSide();
+
+            if (onLeft) {
+                mLeftFlyoutTriangle.setAlpha(255);
+                mRightFlyoutTriangle.setAlpha(0);
+            } else {
+                mLeftFlyoutTriangle.setAlpha(0);
+                mRightFlyoutTriangle.setAlpha(255);
+            }
+
+            mFlyoutContainer.post(() -> {
+                // Multi line flyouts get top-aligned to the bubble.
+                if (mFlyoutText.getLineCount() > 1) {
+                    mFlyoutContainer.setTranslationY(stackPos.y);
+                } else {
+                    // Single line flyouts are vertically centered with respect to the bubble.
+                    mFlyoutContainer.setTranslationY(
+                            stackPos.y + (mBubbleSize - mFlyout.getHeight()) / 2f);
+                }
+
                 final float destinationX = onLeft
-                        ? stackPos.x + mBubbleSize + mBubblePadding
-                        : stackPos.x - mFlyout.getMeasuredWidth();
+                        ? stackPos.x + mBubbleSize + mFlyoutSpaceFromBubble
+                        : stackPos.x - mFlyoutContainer.getWidth() - mFlyoutSpaceFromBubble;
 
                 // Translate towards the stack slightly, then spring out from the stack.
-                mFlyout.setTranslationX(destinationX + (onLeft ? -mBubblePadding : mBubblePadding));
-                mFlyout.setTranslationY(stackPos.y);
-                mFlyout.setAlpha(0f);
+                mFlyoutContainer.setTranslationX(
+                        destinationX + (onLeft ? -mBubblePadding : mBubblePadding));
 
-                mFlyout.setVisibility(VISIBLE);
-
-                mFlyout.animate().alpha(1f);
+                mFlyoutContainer.animate().alpha(1f);
                 mFlyoutSpring.animateToFinalPosition(destinationX);
 
                 mFlyout.removeCallbacks(mHideFlyout);
                 mFlyout.postDelayed(mHideFlyout, FLYOUT_HIDE_AFTER);
             });
+
             logBubbleEvent(bubble, StatsLog.BUBBLE_UICHANGED__ACTION__FLYOUT);
         }
     }
@@ -867,7 +1005,7 @@ public class BubbleStackView extends FrameLayout {
             mBubbleContainer.getBoundsOnScreen(outRect);
         }
 
-        if (mFlyout.getVisibility() == View.VISIBLE) {
+        if (mFlyoutContainer.getVisibility() == View.VISIBLE) {
             final Rect flyoutBounds = new Rect();
             mFlyout.getBoundsOnScreen(flyoutBounds);
             outRect.union(flyoutBounds);
@@ -912,6 +1050,9 @@ public class BubbleStackView extends FrameLayout {
     }
 
     private void updateExpandedBubble() {
+        if (DEBUG) {
+            Log.d(TAG, "updateExpandedBubble()");
+        }
         mExpandedViewContainer.removeAllViews();
         if (mExpandedBubble != null && mIsExpanded) {
             mExpandedViewContainer.addView(mExpandedBubble.expandedView);
@@ -921,8 +1062,78 @@ public class BubbleStackView extends FrameLayout {
         }
     }
 
+    /** Sets up the flyout views and drawables. */
+    private void setupFlyout() {
+        // Retrieve the styled floating background color.
+        TypedArray ta = mContext.obtainStyledAttributes(
+                new int[] {android.R.attr.colorBackgroundFloating});
+        final int floatingBackgroundColor = ta.getColor(0, Color.WHITE);
+        ta.recycle();
+
+        // Retrieve the flyout background, which is currently a rounded white rectangle with a
+        // shadow but no triangular arrow pointing anywhere.
+        final LayerDrawable flyoutBackground = (LayerDrawable) mFlyout.getBackground();
+
+        // Create the triangle drawables and set their color.
+        mLeftFlyoutTriangle =
+                new ShapeDrawable(TriangleShape.createHorizontal(
+                        mPointerSize, mPointerSize, true /* isPointingLeft */));
+        mRightFlyoutTriangle =
+                new ShapeDrawable(TriangleShape.createHorizontal(
+                        mPointerSize, mPointerSize, false /* isPointingLeft */));
+        mLeftFlyoutTriangle.getPaint().setColor(floatingBackgroundColor);
+        mRightFlyoutTriangle.getPaint().setColor(floatingBackgroundColor);
+
+        // Add both triangles to the drawable. We'll show and hide the appropriate ones when we show
+        // the flyout.
+        final int leftTriangleIndex = flyoutBackground.addLayer(mLeftFlyoutTriangle);
+        flyoutBackground.setLayerSize(leftTriangleIndex, mPointerSize, mPointerSize);
+        flyoutBackground.setLayerGravity(leftTriangleIndex, Gravity.LEFT | Gravity.CENTER_VERTICAL);
+        flyoutBackground.setLayerInsetLeft(leftTriangleIndex, -mPointerSize);
+
+        final int rightTriangleIndex = flyoutBackground.addLayer(mRightFlyoutTriangle);
+        flyoutBackground.setLayerSize(rightTriangleIndex, mPointerSize, mPointerSize);
+        flyoutBackground.setLayerGravity(
+                rightTriangleIndex, Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        flyoutBackground.setLayerInsetRight(rightTriangleIndex, -mPointerSize);
+
+        // Append the appropriate triangle's outline to the view's outline so that the shadows look
+        // correct.
+        mFlyout.setOutlineProvider(new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, Outline outline) {
+                final boolean leftPointing = mStackAnimationController.isStackOnLeftSide();
+
+                // Get the outline from the appropriate triangle.
+                final Outline triangleOutline = new Outline();
+                if (leftPointing) {
+                    mLeftFlyoutTriangle.getOutline(triangleOutline);
+                } else {
+                    mRightFlyoutTriangle.getOutline(triangleOutline);
+                }
+
+                // Offset it to the correct position, since it has no intrinsic position since
+                // that is maintained by the parent LayerDrawable.
+                triangleOutline.offset(
+                        leftPointing ? -mPointerSize : mFlyout.getWidth(),
+                        mFlyout.getHeight() / 2 - mPointerSize / 2);
+
+                // Merge the outlines.
+                final Outline compoundOutline = new Outline();
+                flyoutBackground.getOutline(compoundOutline);
+                compoundOutline.mPath.addPath(triangleOutline.mPath);
+                outline.set(compoundOutline);
+            }
+        });
+
+        mFlyoutText = mFlyout.findViewById(R.id.bubble_flyout_text);
+        mFlyoutSpring = new SpringAnimation(mFlyoutContainer, DynamicAnimation.TRANSLATION_X);
+    }
+
     private void applyCurrentState() {
-        Log.d(TAG, "applyCurrentState: mIsExpanded=" + mIsExpanded);
+        if (DEBUG) {
+            Log.d(TAG, "applyCurrentState: mIsExpanded=" + mIsExpanded);
+        }
         mExpandedViewContainer.setVisibility(mIsExpanded ? VISIBLE : GONE);
         if (mIsExpanded) {
             // First update the view so that it calculates a new height (ensuring the y position
@@ -961,10 +1172,14 @@ public class BubbleStackView extends FrameLayout {
     }
 
     private void updatePointerPosition() {
-        if (mExpandedBubble != null) {
-            float pointerPosition = mExpandedBubble.iconView.getTranslationX()
-                    + (mExpandedBubble.iconView.getWidth() / 2f);
-            mExpandedBubble.expandedView.setPointerPosition((int) pointerPosition);
+        if (DEBUG) {
+            Log.d(TAG, "updatePointerPosition()");
+        }
+        Bubble expandedBubble = getExpandedBubble();
+        if (expandedBubble != null) {
+            BubbleView iconView = expandedBubble.iconView;
+            float pointerPosition = iconView.getTranslationX() + (iconView.getWidth() / 2f);
+            expandedBubble.expandedView.setPointerPosition((int) pointerPosition);
         }
     }
 
@@ -1059,5 +1274,19 @@ public class BubbleStackView extends FrameLayout {
             return false;
         }
         return mExpandedBubble.expandedView.performBackPressIfNeeded();
+    }
+
+    /** For debugging only */
+    List<Bubble> getBubblesOnScreen() {
+        List<Bubble> bubbles = new ArrayList<>();
+        for (int i = 0; i < mBubbleContainer.getChildCount(); i++) {
+            View child = mBubbleContainer.getChildAt(i);
+            if (child instanceof BubbleView) {
+                String key = ((BubbleView) child).getKey();
+                Bubble bubble = mBubbleData.getBubbleWithKey(key);
+                bubbles.add(bubble);
+            }
+        }
+        return bubbles;
     }
 }

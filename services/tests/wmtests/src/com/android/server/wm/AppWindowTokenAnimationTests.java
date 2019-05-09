@@ -25,10 +25,12 @@ import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.intThat;
 
 import android.platform.test.annotations.Presubmit;
 import android.view.SurfaceControl;
 
+import androidx.test.filters.FlakyTest;
 import androidx.test.filters.SmallTest;
 
 import com.android.server.wm.WindowTestUtils.TestAppWindowToken;
@@ -64,6 +66,7 @@ public class AppWindowTokenAnimationTests extends WindowTestsBase {
     }
 
     @Test
+    @FlakyTest(bugId = 131005232)
     public void clipAfterAnim_boundsLayerIsCreated() {
         mToken.mNeedsAnimationBoundsLayer = true;
 
@@ -75,6 +78,17 @@ public class AppWindowTokenAnimationTests extends WindowTestsBase {
     }
 
     @Test
+    public void clipAfterAnim_boundsLayerZBoosted() {
+        mToken.mNeedsAnimationBoundsLayer = true;
+        mToken.mNeedsZBoost = true;
+
+        mToken.mSurfaceAnimator.startAnimation(mTransaction, mSpec, true /* hidden */);
+        verify(mTransaction).setLayer(eq(mToken.mAnimationBoundsLayer),
+                intThat(layer -> layer >= AppWindowToken.Z_BOOST_BASE));
+    }
+
+    @Test
+    @FlakyTest(bugId = 131005232)
     public void clipAfterAnim_boundsLayerIsDestroyed() {
         mToken.mNeedsAnimationBoundsLayer = true;
         mToken.mSurfaceAnimator.startAnimation(mTransaction, mSpec, true /* hidden */);
@@ -105,6 +119,7 @@ public class AppWindowTokenAnimationTests extends WindowTestsBase {
     }
 
     @Test
+    @FlakyTest(bugId = 131005232)
     public void clipNoneAnim_boundsLayerIsNotCreated() {
         mToken.mNeedsAnimationBoundsLayer = false;
 

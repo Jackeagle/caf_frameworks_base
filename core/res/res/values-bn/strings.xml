@@ -553,6 +553,9 @@
     <string name="permdesc_manageFace" msgid="8919637120670185330">"ব্যবহার করার জন্য ফেস টেম্পলেট যোগ করা এবং মোছার পদ্ধতি গ্রহণ করতে অ্যাপটিকে অনুমতি দেয়৷"</string>
     <string name="permlab_useFaceAuthentication" msgid="8996134460546804535">"ফেস যাচাইকরণ হার্ডওয়্যার ব্যবহার করুন"</string>
     <string name="permdesc_useFaceAuthentication" msgid="5011118722951833089">"প্রমাণীকরণের জন্য ফেস যাচাইকরণ হার্ডওয়্যার ব্যবহার করার অনুমতি অ্যাপটিকে দেয়"</string>
+    <string name="face_recalibrate_notification_name" msgid="3976629945250435054">"ফেস যাচাইকরণ"</string>
+    <string name="face_recalibrate_notification_title" msgid="4087620069451499365">"আপনার ফেস আবার এনরোল করুন"</string>
+    <string name="face_recalibrate_notification_content" msgid="5530308842361499835">"শনাক্তকরণের উন্নতি করতে আপনার ফেস আবার এনরোল করুন"</string>
     <string name="face_acquired_insufficient" msgid="2767330364802375742">"মুখের সঠিক ডেটা পাওয়া যায়নি। আবার চেষ্টা করুন।"</string>
     <string name="face_acquired_too_bright" msgid="5005650874582450967">"খুব উজ্জ্বল। আলো কমিয়ে চেষ্টা করে দেখুন।"</string>
     <string name="face_acquired_too_dark" msgid="1966194696381394616">"খুব অন্ধকার। আরও উজ্জ্বল আলো ব্যবহার করে দেখুন।"</string>
@@ -568,8 +571,10 @@
     <string name="face_acquired_recalibrate" msgid="8077949502893707539">"আপনার মুখের ছবি আবার নথিভুক্ত করুন।"</string>
     <string name="face_acquired_too_different" msgid="7663983770123789694">"আর মুখ চিনতে পারবেন না। আবার চেষ্টা করুন।"</string>
     <string name="face_acquired_too_similar" msgid="1508776858407646460">"একই ধরনের দেখতে, একটু অন্যদিকে ঘুরে দাঁড়ান।"</string>
-    <string name="face_acquired_pan_too_extreme" msgid="1852495480382773759">"সরাসরি স্ক্রিনের দিকে তাকান।"</string>
-    <string name="face_acquired_tilt_too_extreme" msgid="1290820400317982049">"সরাসরি স্ক্রিনের দিকে তাকান।"</string>
+    <!-- no translation found for face_acquired_pan_too_extreme (4581629343077288178) -->
+    <skip />
+    <!-- no translation found for face_acquired_tilt_too_extreme (4019954263012496468) -->
+    <skip />
     <string name="face_acquired_roll_too_extreme" msgid="1444829237745898619">"মাথা সোজা করে রাখুন।"</string>
     <string name="face_acquired_obscured" msgid="5747521031647744553">"আপনার মুখের উপর কোনও আবরণ থাকলে সেটি সরিয়ে দিন।"</string>
     <string name="face_acquired_sensor_dirty" msgid="364493868630891300">"ক্যামেরাটি পরিষ্কার করুন।"</string>
@@ -2025,4 +2030,5 @@
       <item quantity="other"><xliff:g id="FILE_NAME_2">%s</xliff:g> এবং আরও <xliff:g id="COUNT_3">%d</xliff:g>টি ফাইল</item>
     </plurals>
     <string name="chooser_no_direct_share_targets" msgid="997970693708458895">"সরাসরি শেয়ার করার সুবিধা নেই"</string>
+    <string name="chooser_all_apps_button_label" msgid="3631524352936289457">"অ্যাপের তালিকা"</string>
 </resources>

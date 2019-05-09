@@ -301,7 +301,7 @@
     <string name="permgrouprequest_activityRecognition" msgid="7626438016904799383">"Payagan ang &lt;b&gt;<xliff:g id="APP_NAME">%1$s</xliff:g>&lt;/b&gt; na i-access ang iyong pisikal na aktibidad?"</string>
     <string name="permgrouplab_camera" msgid="4820372495894586615">"Camera"</string>
     <string name="permgroupdesc_camera" msgid="3250611594678347720">"kumuha ng mga larawan at mag-record ng video"</string>
-    <string name="permgrouprequest_camera" msgid="1299833592069671756">"Payagan ang &lt;b&gt;<xliff:g id="APP_NAME">%1$s</xliff:g>&lt;/b&gt; na kumuha ng mga larawan at mag-record ng video?"</string>
+    <string name="permgrouprequest_camera" msgid="1299833592069671756">"Payagan ang &lt;b&gt;<xliff:g id="APP_NAME">%1$s</xliff:g>&lt;/b&gt; na kumuha ng larawan at mag-record ng video?"</string>
     <string name="permgrouplab_calllog" msgid="8798646184930388160">"Mga log ng tawag"</string>
     <string name="permgroupdesc_calllog" msgid="3006237336748283775">"binabasa at sinusulat ang log ng tawag sa telepono"</string>
     <string name="permgrouprequest_calllog" msgid="8487355309583773267">"Payagan ang &lt;b&gt;<xliff:g id="APP_NAME">%1$s</xliff:g>&lt;/b&gt; na i-access ang iyong mga log ng tawag sa telepono?"</string>
@@ -553,6 +553,9 @@
     <string name="permdesc_manageFace" msgid="8919637120670185330">"Pumapayag na mag-invoke ang app ng paraang magdagdag at mag-delete ng template ng mukha."</string>
     <string name="permlab_useFaceAuthentication" msgid="8996134460546804535">"gumamit ng hardware sa pag-authenticate ng mukha"</string>
     <string name="permdesc_useFaceAuthentication" msgid="5011118722951833089">"Pumapayag na gumamit ng face authentication hardware ang app para sa pag-authenticate"</string>
+    <string name="face_recalibrate_notification_name" msgid="3976629945250435054">"Pag-authenticate ng Mukha"</string>
+    <string name="face_recalibrate_notification_title" msgid="4087620069451499365">"I-enroll ulit ang iyong mukha"</string>
+    <string name="face_recalibrate_notification_content" msgid="5530308842361499835">"Para mapahusay ang pagkilala, paki-enroll ulit ang iyong mukha"</string>
     <string name="face_acquired_insufficient" msgid="2767330364802375742">"Hindi makakuha ng tamang face data. Subukang muli."</string>
     <string name="face_acquired_too_bright" msgid="5005650874582450967">"Masyadong maliwanag. Subukang bawasan ang liwanag."</string>
     <string name="face_acquired_too_dark" msgid="1966194696381394616">"Masyadong madilim. Subukan sa mas maliwanag."</string>
@@ -568,8 +571,10 @@
     <string name="face_acquired_recalibrate" msgid="8077949502893707539">"Paki-enroll muli ang iyong mukha."</string>
     <string name="face_acquired_too_different" msgid="7663983770123789694">"Hindi na makilala ang mukha. Subukang muli."</string>
     <string name="face_acquired_too_similar" msgid="1508776858407646460">"Masyadong magkatulad, pakibago ang pose mo."</string>
-    <string name="face_acquired_pan_too_extreme" msgid="1852495480382773759">"Tumingin nang mas direkta sa screen."</string>
-    <string name="face_acquired_tilt_too_extreme" msgid="1290820400317982049">"Tumingin nang mas direkta sa screen."</string>
+    <!-- no translation found for face_acquired_pan_too_extreme (4581629343077288178) -->
+    <skip />
+    <!-- no translation found for face_acquired_tilt_too_extreme (4019954263012496468) -->
+    <skip />
     <string name="face_acquired_roll_too_extreme" msgid="1444829237745898619">"Pakituwid ang iyong mukha."</string>
     <string name="face_acquired_obscured" msgid="5747521031647744553">"Alisin ang nasa pagitan ng ulo mo at ng telepono."</string>
     <string name="face_acquired_sensor_dirty" msgid="364493868630891300">"Pakilinis ang camera."</string>
@@ -2024,4 +2029,5 @@
       <item quantity="other"><xliff:g id="FILE_NAME_2">%s</xliff:g> + <xliff:g id="COUNT_3">%d</xliff:g> na file</item>
     </plurals>
     <string name="chooser_no_direct_share_targets" msgid="997970693708458895">"Hindi available ang direktang pagbabahagi"</string>
+    <string name="chooser_all_apps_button_label" msgid="3631524352936289457">"Listahan ng mga app"</string>
 </resources>

@@ -553,6 +553,9 @@
     <string name="permdesc_manageFace" msgid="8919637120670185330">"允許應用程式調用方法，以加入和刪除可用的臉孔範本。"</string>
     <string name="permlab_useFaceAuthentication" msgid="8996134460546804535">"使用臉孔驗證硬件"</string>
     <string name="permdesc_useFaceAuthentication" msgid="5011118722951833089">"允許應用程式使用臉孔驗證硬件來驗證"</string>
+    <string name="face_recalibrate_notification_name" msgid="3976629945250435054">"臉孔驗證"</string>
+    <string name="face_recalibrate_notification_title" msgid="4087620069451499365">"重新註冊臉孔"</string>
+    <string name="face_recalibrate_notification_content" msgid="5530308842361499835">"如要提高識別能力，請重新註冊您的臉孔"</string>
     <string name="face_acquired_insufficient" msgid="2767330364802375742">"無法擷取準確的臉容資料。請再試一次。"</string>
     <string name="face_acquired_too_bright" msgid="5005650874582450967">"影像太亮。請嘗試在更暗的環境下使用。"</string>
     <string name="face_acquired_too_dark" msgid="1966194696381394616">"影像太暗。請嘗試在更明亮的環境下使用。"</string>
@@ -568,8 +571,10 @@
     <string name="face_acquired_recalibrate" msgid="8077949502893707539">"請重新註冊臉孔。"</string>
     <string name="face_acquired_too_different" msgid="7663983770123789694">"無法再識別臉孔。請再試一次。"</string>
     <string name="face_acquired_too_similar" msgid="1508776858407646460">"臉孔位置太相近，請改變您的姿勢。"</string>
-    <string name="face_acquired_pan_too_extreme" msgid="1852495480382773759">"請以更直視的角度看著螢幕。"</string>
-    <string name="face_acquired_tilt_too_extreme" msgid="1290820400317982049">"請以更直視的角度看著螢幕。"</string>
+    <!-- no translation found for face_acquired_pan_too_extreme (4581629343077288178) -->
+    <skip />
+    <!-- no translation found for face_acquired_tilt_too_extreme (4019954263012496468) -->
+    <skip />
     <string name="face_acquired_roll_too_extreme" msgid="1444829237745898619">"請保持頭部垂直。"</string>
     <string name="face_acquired_obscured" msgid="5747521031647744553">"請移除頭部與手機之間的障礙物。"</string>
     <string name="face_acquired_sensor_dirty" msgid="364493868630891300">"請清潔相機。"</string>
@@ -1458,7 +1463,7 @@
     <string name="vpn_text_long" msgid="4907843483284977618">"已連線至 <xliff:g id="SESSION">%s</xliff:g>，輕按一下即可管理網絡。"</string>
     <string name="vpn_lockdown_connecting" msgid="6443438964440960745">"正在連線至永久連線的 VPN…"</string>
     <string name="vpn_lockdown_connected" msgid="8202679674819213931">"已連線至永久連線的 VPN"</string>
-    <string name="vpn_lockdown_disconnected" msgid="735805531187559719">"永遠開啟的 VPN 已中斷連線"</string>
+    <string name="vpn_lockdown_disconnected" msgid="735805531187559719">"保持開啟的 VPN 已中斷連線"</string>
     <string name="vpn_lockdown_error" msgid="3133844445659711681">"無法連接永久連線的 VPN"</string>
     <string name="vpn_lockdown_config" msgid="8151951501116759194">"變更網絡或 VPN 設定"</string>
     <string name="upload_file" msgid="2897957172366730416">"選擇檔案"</string>
@@ -2024,4 +2029,5 @@
       <item quantity="one"><xliff:g id="FILE_NAME_0">%s</xliff:g> + <xliff:g id="COUNT_1">%d</xliff:g> 個檔案</item>
     </plurals>
     <string name="chooser_no_direct_share_targets" msgid="997970693708458895">"無法直接分享"</string>
+    <string name="chooser_all_apps_button_label" msgid="3631524352936289457">"應用程式清單"</string>
 </resources>

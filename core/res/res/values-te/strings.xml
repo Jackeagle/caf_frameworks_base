@@ -553,6 +553,9 @@
     <string name="permdesc_manageFace" msgid="8919637120670185330">"వినియోగం కోసం ముఖ టెంప్లేట్‌లను జోడించే మరియు తొలగించే పద్ధతులను అమలు చేయడానికి యాప్‌ను అనుమతిస్తుంది."</string>
     <string name="permlab_useFaceAuthentication" msgid="8996134460546804535">"ముఖ ప్రమాణీకరణ హార్డ్‌వేర్‌ను వాడండి"</string>
     <string name="permdesc_useFaceAuthentication" msgid="5011118722951833089">"ప్రమాణీకరణ కోసం ముఖ ప్రామాణీకరణ హార్డ్‌వేర్‌ను ఉపయోగించడానికి యాప్‌ని అనుమతిస్తుంది"</string>
+    <string name="face_recalibrate_notification_name" msgid="3976629945250435054">"ముఖ ప్రామాణీకరణ"</string>
+    <string name="face_recalibrate_notification_title" msgid="4087620069451499365">"మీ ముఖాన్ని తిరిగి నమోదు చేయండి"</string>
+    <string name="face_recalibrate_notification_content" msgid="5530308842361499835">"గుర్తింపును మెరుగుపరచడానికి, దయచేసి మీ ముఖంను తిరిగి నమోదు చేసుకోండి"</string>
     <string name="face_acquired_insufficient" msgid="2767330364802375742">"ముఖం డేటా సరిగ్గా రాలేదు. మళ్లీ ప్రయత్నించండి."</string>
     <string name="face_acquired_too_bright" msgid="5005650874582450967">"వెలుతురు అధికంగా ఉంది. తక్కువ ఉండేలా చూడండి."</string>
     <string name="face_acquired_too_dark" msgid="1966194696381394616">"చాలా చీకటిగా ఉంది. బాగా వెలుతురులో ప్రయత్నించండి."</string>
@@ -568,8 +571,10 @@
     <string name="face_acquired_recalibrate" msgid="8077949502893707539">"దయచేసి మీ ముఖాన్ని మళ్లీ నమోదు చేయండి."</string>
     <string name="face_acquired_too_different" msgid="7663983770123789694">"ఇక ముఖం గుర్తించలేదు. మళ్లీ ప్రయత్నించండి."</string>
     <string name="face_acquired_too_similar" msgid="1508776858407646460">"ఒకే మాదిరిగా ఉంది, దయచేసి భంగిమను మార్చండి."</string>
-    <string name="face_acquired_pan_too_extreme" msgid="1852495480382773759">"దయచేసి స్క్రీన్ వైపు మరింత సూటిగా చూడండి."</string>
-    <string name="face_acquired_tilt_too_extreme" msgid="1290820400317982049">"దయచేసి స్క్రీన్ వైపు మరింత సూటిగా చూడండి."</string>
+    <!-- no translation found for face_acquired_pan_too_extreme (4581629343077288178) -->
+    <skip />
+    <!-- no translation found for face_acquired_tilt_too_extreme (4019954263012496468) -->
+    <skip />
     <string name="face_acquired_roll_too_extreme" msgid="1444829237745898619">"దయచేసి మీ తలను నిలువుగా, నిటారుగా ఉంచండి."</string>
     <string name="face_acquired_obscured" msgid="5747521031647744553">"మీ తలకు, ఫోన్‌కు మధ్యన ఏదీ లేదని నిర్దారించుకోండి."</string>
     <string name="face_acquired_sensor_dirty" msgid="364493868630891300">"దయచేసి కెమెరాను శుభ్రం చేయండి."</string>
@@ -2025,4 +2030,5 @@
       <item quantity="one"><xliff:g id="FILE_NAME_0">%s</xliff:g> + <xliff:g id="COUNT_1">%d</xliff:g> ఫైల్</item>
     </plurals>
     <string name="chooser_no_direct_share_targets" msgid="997970693708458895">"డైరెక్ట్ షేర్ అందుబాటులో లేదు"</string>
+    <string name="chooser_all_apps_button_label" msgid="3631524352936289457">"యాప్‌ల జాబితా"</string>
 </resources>

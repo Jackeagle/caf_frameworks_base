@@ -659,6 +659,9 @@
     <!-- Accessibility text describing the presence of active location requests by one or more apps -->
     <string name="accessibility_location_active">Location requests active</string>
 
+    <!-- Accessibility text describing sensors off active. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_sensors_off_active">Sensors off active</string>
+
     <!-- Content description of the clear button in the notification panel for accessibility (not shown on the screen). [CHAR LIMIT=NONE] -->
     <string name="accessibility_clear_all">Clear all notifications.</string>
 
@@ -1099,6 +1102,12 @@
     <!-- The text for the manage notifications link. [CHAR LIMIT=40] -->
     <string name="manage_notifications_text">Manage</string>
 
+    <!-- Section title for notifications that do not vibrate or make noise. [CHAR LIMIT=40] -->
+    <string name="notification_section_header_gentle">Gentle notifications</string>
+
+    <!-- Content description for accessibility: Tapping this button will dismiss all gentle notifications [CHAR LIMIT=NONE] -->
+    <string name="accessibility_notification_section_header_gentle_clear_all">Clear all gentle notifications</string>
+
     <!-- The text to show in the notifications shade when dnd is suppressing notifications. [CHAR LIMIT=100] -->
     <string name="dnd_suppressing_shade_text">Notifications paused by Do Not Disturb</string>
 
@@ -1342,6 +1351,7 @@
     <!-- Screen pinning dialog description. -->
     <string name="screen_pinning_description">This keeps it in view until you unpin. Touch &amp; hold Back and Overview to unpin.</string>
     <string name="screen_pinning_description_recents_invisible">This keeps it in view until you unpin. Touch &amp; hold Back and Home to unpin.</string>
+    <string name="screen_pinning_description_gestural">This keeps it in view until you unpin. Swipe up &amp; hold to unpin.</string>
     <!-- Screen pinning dialog description. -->
     <string name="screen_pinning_description_accessible">This keeps it in view until you unpin. Touch &amp; hold Overview to unpin.</string>
     <string name="screen_pinning_description_recents_invisible_accessible">This keeps it in view until you unpin. Touch &amp; hold Home to unpin.</string>
@@ -1648,23 +1658,35 @@
     <!-- Notification Inline controls: continue receiving notifications prompt, app level -->
     <string name="inline_keep_showing_app">Keep showing notifications from this app?</string>
 
-    <!-- Hint text for block button in the interruptiveness settings [CHAR_LIMIT=NONE]-->
-    <string name="hint_text_block">Blocked notifications do not appear anywhere or play a sound. You can unblock notifications in settings.</string>
+    <!-- [CHAR LIMIT=100] Notification Importance title -->
+    <string name="notification_silence_title">Gentle</string>
 
-    <!-- Hint text for silent button in the interruptiveness settings [CHAR_LIMIT=NONE]-->
-    <string name="hint_text_silent">Silent notifications appear in the shade, but do not appear on the lock screen, present a banner, or play a sound.</string>
+    <!-- [CHAR LIMIT=100] Notification Importance title -->
+    <string name="notification_alert_title">Prioritized</string>
 
-    <!-- Hint text for alert button in the interruptiveness settings [CHAR_LIMIT=NONE]-->
-    <string name="hint_text_alert">These notifications will make a sound and show in the notification drawer, status bar, and lock screen</string>
+    <!-- [CHAR LIMIT=150] Notification Importance title: low importance level summary -->
+    <string name="notification_channel_summary_low">Helps you focus with notifications only in the pull-down shade. Always silent.</string>
+
+    <!-- [CHAR LIMIT=150] Notification Importance title: low importance level summary -->
+    <string name="notification_channel_summary_low_status">Displays below priority notifications. Always silent.</string>
+
+    <!-- [CHAR LIMIT=150] Notification Importance title: low importance level summary -->
+    <string name="notification_channel_summary_low_lock">Displays below priority notifications. Always silent.</string>
+
+    <!-- [CHAR LIMIT=150] Notification Importance title: low importance level summary -->
+    <string name="notification_channel_summary_low_status_lock">Displays below priority notifications. Always silent.</string>
+
+    <!-- [CHAR LIMIT=150] Notification Importance title: normal importance level summary -->
+    <string name="notification_channel_summary_default">Gets your attention with sound &amp; a status bar icon. Shows on lock screen.</string>
 
     <!-- Notification: Control panel: Label that displays when the app's notifications cannot be blocked. -->
-    <string name="notification_unblockable_desc">These notifications can\'t be turned off</string>
+    <string name="notification_unblockable_desc">These notifications can\'t be modified.</string>
 
     <!-- Notification: Control panel: label that displays when viewing settings for a group of notifications posted to multiple channels. -->
     <string name="notification_multichannel_desc">This group of notifications cannot be configured here</string>
 
     <!-- Notification: Control panel: Label for the app that posted this notification, if it's not the package that the notification was posted for -->
-    <string name="notification_delegate_header">via <xliff:g id="app_name" example="YouTube">%1$s</xliff:g></string>
+    <string name="notification_delegate_header">Proxied notification</string>
 
     <!-- Notification Inline controls: describes what the app is doing in the background [CHAR_LIMIT=NONE] -->
     <string name="appops_camera">This app is using the camera.</string>
@@ -2398,6 +2420,8 @@
     <!-- Text for asking the user whether bubbles (floating app content) should be enabled for an
          app. [CHAR LIMIT=NONE] -->
     <string name="bubbles_prompt">Allow bubbles from <xliff:g id="app_name" example="YouTube">%1$s</xliff:g>?</string>
+    <!-- The text for the manage bubbles link. [CHAR LIMIT=NONE] -->
+    <string name="manage_bubbles_text">Manage</string>
     <!-- Text used for button allowing user to opt out of bubbles [CHAR LIMIT=20] -->
     <string name="no_bubbles">Deny</string>
     <!-- Text used for button allowing user to approve / enable bubbles [CHAR LIMIT=20] -->

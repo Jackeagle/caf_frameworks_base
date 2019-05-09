@@ -553,6 +553,9 @@
     <string name="permdesc_manageFace" msgid="8919637120670185330">"Колдонмого пайдалануу үчүн жүздүн үлгүлөрүн кошуу жана жок кылуу мүмкүндүгүн берет."</string>
     <string name="permlab_useFaceAuthentication" msgid="8996134460546804535">"жүздүн аныктыгын текшерүүчү аппараттык камсыздоону колдонуу"</string>
     <string name="permdesc_useFaceAuthentication" msgid="5011118722951833089">"Колдонмого аныктыгын текшерүү үчүн жүздүн аныктыгын текшерүүчү аппараттык камсыздоону пайдалануу мүмкүндүгүн берет"</string>
+    <string name="face_recalibrate_notification_name" msgid="3976629945250435054">"Жүздүн аныктыгын текшерүү"</string>
+    <string name="face_recalibrate_notification_title" msgid="4087620069451499365">"Жүзүңүздү кайра таанытыңыз."</string>
+    <string name="face_recalibrate_notification_content" msgid="5530308842361499835">"Мыкты таануу үчүн, жүзүңүздү кайра таанытыңыз"</string>
     <string name="face_acquired_insufficient" msgid="2767330364802375742">"Жүзүңүз жакшы тартылган жок. Кайра аракет кылыңыз."</string>
     <string name="face_acquired_too_bright" msgid="5005650874582450967">"Өтө жарык. Жарыктыкты азайтып көрүңүз."</string>
     <string name="face_acquired_too_dark" msgid="1966194696381394616">"Өтө караңгы. Жарыгыраак жерден тартып көрүңүз."</string>
@@ -568,8 +571,10 @@
     <string name="face_acquired_recalibrate" msgid="8077949502893707539">"Жүзүңүздү кайра таанытыңыз."</string>
     <string name="face_acquired_too_different" msgid="7663983770123789694">"Жүз таанылган жок. Кайра аракет кылыңыз."</string>
     <string name="face_acquired_too_similar" msgid="1508776858407646460">"Мурункуга окшош болуп калды, башкача туруңуз."</string>
-    <string name="face_acquired_pan_too_extreme" msgid="1852495480382773759">"Дисплейге түз караңыз."</string>
-    <string name="face_acquired_tilt_too_extreme" msgid="1290820400317982049">"Дисплейге түз караңыз."</string>
+    <!-- no translation found for face_acquired_pan_too_extreme (4581629343077288178) -->
+    <skip />
+    <!-- no translation found for face_acquired_tilt_too_extreme (4019954263012496468) -->
+    <skip />
     <string name="face_acquired_roll_too_extreme" msgid="1444829237745898619">"Башыңызды түз кармаңыз."</string>
     <string name="face_acquired_obscured" msgid="5747521031647744553">"Башыңыз менен телефондун ортосу бош болушу керек."</string>
     <string name="face_acquired_sensor_dirty" msgid="364493868630891300">"Камераны тазалаңыз."</string>
@@ -2026,4 +2031,5 @@
       <item quantity="one"><xliff:g id="FILE_NAME_0">%s</xliff:g> + <xliff:g id="COUNT_1">%d</xliff:g> файл</item>
     </plurals>
     <string name="chooser_no_direct_share_targets" msgid="997970693708458895">"Түздөн-түз бөлүшүүгө болбойт"</string>
+    <string name="chooser_all_apps_button_label" msgid="3631524352936289457">"Колдонмолордун тизмеси"</string>
 </resources>

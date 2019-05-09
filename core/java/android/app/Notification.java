@@ -618,11 +618,13 @@ public class Notification implements Parcelable
     public static final int FLAG_CAN_COLORIZE = 0x00000800;
 
     /**
-     * Bit to be bitswised-ored into the {@link #flags} field that should be set if this
-     * notification is showing as a bubble. This will be set by the system if it is determined
-     * that your notification is allowed to be a bubble.
+     * Bit to be bitswised-ored into the {@link #flags} field that should be
+     * set by the system if this notification is showing as a bubble.
      *
-     * @see {@link Notification.Builder#setBubbleMetadata(BubbleMetadata)}
+     * Applications cannot set this flag directly; they should instead call
+     * {@link Notification.Builder#setBubbleMetadata(BubbleMetadata)} to
+     * request that a notification be displayed as a bubble, and then check
+     * this flag to see whether that request was honored by the system.
      */
     public static final int FLAG_BUBBLE = 0x00001000;
 
@@ -6253,7 +6255,7 @@ public class Notification implements Parcelable
     }
 
     /**
-     * @return true if this is a notification that can show as a bubble.
+     * @return true if this notification is showing as a bubble
      *
      * @hide
      */
@@ -8642,27 +8644,6 @@ public class Notification implements Parcelable
         }
 
         /**
-         * @return whether this bubble should suppress the initial notification when it is posted.
-         *
-         * @see BubbleMetadata.Builder#setSuppressInitialNotification(boolean)
-         * @deprecated TO BE REMOVED, use {@link #isNotificationSuppressed()} instead.
-         */
-        @Deprecated
-        public boolean getSuppressInitialNotification() {
-            return isNotificationSuppressed();
-        }
-
-        /**
-         * @return whether this bubble should suppress the notification when it is posted.
-         *
-         * @see BubbleMetadata.Builder#setSuppressNotification(boolean)
-         * @deprecated TO BE REMOVED, use {@link #isNotificationSuppressed()} instead.
-         */
-        public boolean getSuppressNotification() {
-            return isNotificationSuppressed();
-        }
-
-        /**
          * @return whether this bubble should suppress the notification when it is posted.
          *
          * @see BubbleMetadata.Builder#setSuppressNotification(boolean)
@@ -8814,27 +8795,6 @@ public class Notification implements Parcelable
             @NonNull
             public BubbleMetadata.Builder setAutoExpandBubble(boolean shouldExpand) {
                 setFlag(FLAG_AUTO_EXPAND_BUBBLE, shouldExpand);
-                return this;
-            }
-
-            /**
-             * If set and the app creating the bubble is in the foreground, the bubble will be
-             * posted <b>without</b> the associated notification in the notification shade.
-             * Subsequent update notifications to this bubble will post a notification in the shade.
-             *
-             * <p>If the app creating the bubble is not in the foreground this flag has no effect.
-             * </p>
-             *
-             * <p>Generally this flag should only be set if the user has performed an action to
-             * request or create a bubble.</p>
-             *
-             * @deprecated TO BE REMOVED, use {@link #setSuppressNotification(boolean)} instead.
-             */
-            @Deprecated
-            @NonNull
-            public BubbleMetadata.Builder setSuppressInitialNotification(
-                    boolean shouldSupressNotif) {
-                setFlag(FLAG_SUPPRESS_NOTIFICATION, shouldSupressNotif);
                 return this;
             }
 

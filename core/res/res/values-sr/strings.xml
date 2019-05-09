@@ -556,6 +556,9 @@
     <string name="permdesc_manageFace" msgid="8919637120670185330">"Дозвољава да апликација активира методе за додавање и брисање шаблона лица ради коришћења."</string>
     <string name="permlab_useFaceAuthentication" msgid="8996134460546804535">"коришћење хардв. за потврду идентитета помоћу лица"</string>
     <string name="permdesc_useFaceAuthentication" msgid="5011118722951833089">"Дозвољава да апликација користи хардвер за потврду идентитета помоћу лица"</string>
+    <string name="face_recalibrate_notification_name" msgid="3976629945250435054">"Потврда идентитета лицем"</string>
+    <string name="face_recalibrate_notification_title" msgid="4087620069451499365">"Поново региструјте лице"</string>
+    <string name="face_recalibrate_notification_content" msgid="5530308842361499835">"Да бисте побољшали препознавање, поново региструјте лице"</string>
     <string name="face_acquired_insufficient" msgid="2767330364802375742">"Снимање лица није успело. Пробајте поново."</string>
     <string name="face_acquired_too_bright" msgid="5005650874582450967">"Превише је светло. Пробајте са слабијим осветљењем."</string>
     <string name="face_acquired_too_dark" msgid="1966194696381394616">"Претамно је. Пробајте са јачим осветљењем."</string>
@@ -571,8 +574,10 @@
     <string name="face_acquired_recalibrate" msgid="8077949502893707539">"Поново региструјте лице."</string>
     <string name="face_acquired_too_different" msgid="7663983770123789694">"Више не може да се препозна лице. Пробајте поново."</string>
     <string name="face_acquired_too_similar" msgid="1508776858407646460">"Превише је слично, промените позу."</string>
-    <string name="face_acquired_pan_too_extreme" msgid="1852495480382773759">"Гледајте право у екран."</string>
-    <string name="face_acquired_tilt_too_extreme" msgid="1290820400317982049">"Гледајте право у екран."</string>
+    <!-- no translation found for face_acquired_pan_too_extreme (4581629343077288178) -->
+    <skip />
+    <!-- no translation found for face_acquired_tilt_too_extreme (4019954263012496468) -->
+    <skip />
     <string name="face_acquired_roll_too_extreme" msgid="1444829237745898619">"Исправите главу."</string>
     <string name="face_acquired_obscured" msgid="5747521031647744553">"Ослободите простор између главе и телефона."</string>
     <string name="face_acquired_sensor_dirty" msgid="364493868630891300">"Очистите камеру."</string>
@@ -896,7 +901,7 @@
     <string name="password_keyboard_label_alt_key" msgid="1284820942620288678">"ALT"</string>
     <string name="granularity_label_character" msgid="7336470535385009523">"знак"</string>
     <string name="granularity_label_word" msgid="7075570328374918660">"реч"</string>
-    <string name="granularity_label_link" msgid="5815508880782488267">"веза"</string>
+    <string name="granularity_label_link" msgid="5815508880782488267">"линк"</string>
     <string name="granularity_label_line" msgid="5764267235026120888">"ред"</string>
     <string name="factorytest_failed" msgid="5410270329114212041">"Фабричко тестирање није успело"</string>
     <string name="factorytest_not_system" msgid="4435201656767276723">"Радња FACTORY_TEST је подржана само за пакете инсталиране у директоријуму /system/app."</string>
@@ -2060,4 +2065,5 @@
       <item quantity="other"><xliff:g id="FILE_NAME_2">%s</xliff:g> и још <xliff:g id="COUNT_3">%d</xliff:g> датотека</item>
     </plurals>
     <string name="chooser_no_direct_share_targets" msgid="997970693708458895">"Директно дељење није доступно"</string>
+    <string name="chooser_all_apps_button_label" msgid="3631524352936289457">"Листа апликација"</string>
 </resources>

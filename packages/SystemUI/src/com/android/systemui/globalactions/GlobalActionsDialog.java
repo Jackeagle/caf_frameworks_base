@@ -80,6 +80,7 @@ import com.android.internal.telephony.TelephonyProperties;
 import com.android.internal.util.EmergencyAffordanceManager;
 import com.android.internal.util.ScreenRecordHelper;
 import com.android.internal.util.ScreenshotHelper;
+import com.android.internal.view.RotationPolicy;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.systemui.Dependency;
 import com.android.systemui.Interpolators;
@@ -410,8 +411,10 @@ public class GlobalActionsDialog implements DialogInterface.OnDismissListener,
                                         mActivityStarter
                                                 .startPendingIntentDismissingKeyguard(intent);
                                     }
-                                })
+                                },
+                                mKeyguardManager.isDeviceLocked())
                         : null;
+
         ActionsDialog dialog = new ActionsDialog(mContext, mAdapter, panelViewController);
         dialog.setCanceledOnTouchOutside(false); // Handled by the custom class.
         dialog.setKeyguardShowing(mKeyguardShowing);
@@ -919,56 +922,46 @@ public class GlobalActionsDialog implements DialogInterface.OnDismissListener,
      * via {@link com.android.systemui.globalactions.GlobalActionsDialog#mDeviceProvisioned}.
      */
     public class MyAdapter extends MultiListAdapter {
-        @Override
-        public int getCount() {
+        private int countItems(boolean separated) {
             int count = 0;
             for (int i = 0; i < mItems.size(); i++) {
                 final Action action = mItems.get(i);
 
-                if (mKeyguardShowing && !action.showDuringKeyguard()) {
-                    continue;
+                if (shouldBeShown(action) && action.shouldBeSeparated() == separated) {
+                    count++;
                 }
-                if (!mDeviceProvisioned && !action.showBeforeProvisioning()) {
-                    continue;
-                }
-                count++;
             }
             return count;
+        }
+
+        private boolean shouldBeShown(Action action) {
+            if (mKeyguardShowing && !action.showDuringKeyguard()) {
+                return false;
+            }
+            if (!mDeviceProvisioned && !action.showBeforeProvisioning()) {
+                return false;
+            }
+            return true;
+        }
+
+        @Override
+        public int countSeparatedItems() {
+            return countItems(true);
+        }
+
+        @Override
+        public int countListItems() {
+            return countItems(false);
+        }
+
+        @Override
+        public int getCount() {
+            return countSeparatedItems() + countListItems();
         }
 
         @Override
         public boolean isEnabled(int position) {
             return getItem(position).isEnabled();
-        }
-
-        @Override
-        public ArrayList<Action> getSeparatedItems() {
-            ArrayList<Action> separatedActions = new ArrayList<Action>();
-            if (!shouldUseSeparatedView()) {
-                return separatedActions;
-            }
-            for (int i = 0; i < mItems.size(); i++) {
-                final Action action = mItems.get(i);
-                if (action.shouldBeSeparated()) {
-                    separatedActions.add(action);
-                }
-            }
-            return separatedActions;
-        }
-
-        @Override
-        public ArrayList<Action> getListItems() {
-            if (!shouldUseSeparatedView()) {
-                return new ArrayList<Action>(mItems);
-            }
-            ArrayList<Action> listActions = new ArrayList<Action>();
-            for (int i = 0; i < mItems.size(); i++) {
-                final Action action = mItems.get(i);
-                if (!action.shouldBeSeparated()) {
-                    listActions.add(action);
-                }
-            }
-            return listActions;
         }
 
         @Override
@@ -978,14 +971,10 @@ public class GlobalActionsDialog implements DialogInterface.OnDismissListener,
 
         @Override
         public Action getItem(int position) {
-
             int filteredPos = 0;
             for (int i = 0; i < mItems.size(); i++) {
                 final Action action = mItems.get(i);
-                if (mKeyguardShowing && !action.showDuringKeyguard()) {
-                    continue;
-                }
-                if (!mDeviceProvisioned && !action.showBeforeProvisioning()) {
+                if (!shouldBeShown(action)) {
                     continue;
                 }
                 if (filteredPos == position) {
@@ -1010,10 +999,8 @@ public class GlobalActionsDialog implements DialogInterface.OnDismissListener,
         public View getView(int position, View convertView, ViewGroup parent) {
             Action action = getItem(position);
             View view = action.create(mContext, convertView, parent, LayoutInflater.from(mContext));
-            // Everything but screenshot, the last item, gets white background.
-            if (position == getCount() - 1) {
-                MultiListLayout.get(parent).setDivisionView(view);
-            }
+            view.setOnClickListener(v -> onClickItem(position));
+            view.setOnLongClickListener(v -> onLongClickItem(position));
             return view;
         }
 
@@ -1034,6 +1021,11 @@ public class GlobalActionsDialog implements DialogInterface.OnDismissListener,
                 mDialog.dismiss();
             }
             item.onPress();
+        }
+
+        @Override
+        public boolean shouldBeSeparated(int position) {
+            return getItem(position).shouldBeSeparated();
         }
     }
 
@@ -1507,6 +1499,7 @@ public class GlobalActionsDialog implements DialogInterface.OnDismissListener,
         private boolean mKeyguardShowing;
         private boolean mShowing;
         private float mScrimAlpha;
+        private ResetOrientationData mResetOrientationData;
 
         ActionsDialog(Context context, MyAdapter adapter,
                 GlobalActionsPanelPlugin.PanelViewController plugin) {
@@ -1540,27 +1533,50 @@ public class GlobalActionsDialog implements DialogInterface.OnDismissListener,
         }
 
         private boolean shouldUsePanel() {
-            if (!isPanelEnabled(mContext) || mPanelController == null) {
-                return false;
-            }
-            if (mPanelController.getPanelContent() == null) {
-                return false;
-            }
-            return true;
+            return isPanelEnabled(mContext)
+                    && mPanelController != null
+                    && mPanelController.getPanelContent() != null;
         }
 
         private void initializePanel() {
-            FrameLayout panelContainer = new FrameLayout(mContext);
-            FrameLayout.LayoutParams panelParams =
-                    new FrameLayout.LayoutParams(
-                            FrameLayout.LayoutParams.MATCH_PARENT,
-                            FrameLayout.LayoutParams.WRAP_CONTENT);
-            panelContainer.addView(mPanelController.getPanelContent(), panelParams);
-            addContentView(
-                    panelContainer,
-                    new ViewGroup.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT));
+            int rotation = RotationUtils.getRotation(mContext);
+            boolean rotationLocked = RotationPolicy.isRotationLocked(mContext);
+            if (rotation != RotationUtils.ROTATION_NONE) {
+                if (rotationLocked) {
+                    if (mResetOrientationData == null) {
+                        mResetOrientationData = new ResetOrientationData();
+                        mResetOrientationData.locked = true;
+                        mResetOrientationData.rotation = rotation;
+                    }
+
+                    // Unlock rotation, so user can choose to rotate to portrait to see the panel.
+                    RotationPolicy.setRotationLockAtAngle(
+                            mContext, false, RotationUtils.ROTATION_NONE);
+                }
+            } else {
+                if (!rotationLocked) {
+                    if (mResetOrientationData == null) {
+                        mResetOrientationData = new ResetOrientationData();
+                        mResetOrientationData.locked = false;
+                    }
+
+                    // Lock to portrait, so the user doesn't accidentally hide the panel.
+                    RotationPolicy.setRotationLockAtAngle(
+                            mContext, true, RotationUtils.ROTATION_NONE);
+                }
+
+                FrameLayout panelContainer = new FrameLayout(mContext);
+                FrameLayout.LayoutParams panelParams =
+                        new FrameLayout.LayoutParams(
+                                FrameLayout.LayoutParams.MATCH_PARENT,
+                                FrameLayout.LayoutParams.WRAP_CONTENT);
+                panelContainer.addView(mPanelController.getPanelContent(), panelParams);
+                addContentView(
+                        panelContainer,
+                        new ViewGroup.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT));
+            }
         }
 
         private void initializeLayout() {
@@ -1588,19 +1604,26 @@ public class GlobalActionsDialog implements DialogInterface.OnDismissListener,
                 mBackgroundDrawable = mContext.getDrawable(
                         com.android.systemui.R.drawable.global_action_panel_scrim);
                 mScrimAlpha = 1f;
+                initializePanel();
             }
-            mGlobalActionsLayout.setSnapToEdge(true);
             getWindow().setBackgroundDrawable(mBackgroundDrawable);
         }
 
         private int getGlobalActionsLayoutId(Context context) {
-            if (isForceGridEnabled(context) || shouldUsePanel()) {
-                if (RotationUtils.getRotation(context) == RotationUtils.ROTATION_SEASCAPE) {
+            boolean useGridLayout = isForceGridEnabled(context) || shouldUsePanel();
+            if (RotationUtils.getRotation(context) == RotationUtils.ROTATION_SEASCAPE) {
+                if (useGridLayout) {
                     return com.android.systemui.R.layout.global_actions_grid_seascape;
+                } else {
+                    return com.android.systemui.R.layout.global_actions_column_seascape;
                 }
-                return com.android.systemui.R.layout.global_actions_grid;
+            } else {
+                if (useGridLayout) {
+                    return com.android.systemui.R.layout.global_actions_grid;
+                } else {
+                    return com.android.systemui.R.layout.global_actions_column;
+                }
             }
-            return com.android.systemui.R.layout.global_actions_wrapped;
         }
 
         @Override
@@ -1685,16 +1708,27 @@ public class GlobalActionsDialog implements DialogInterface.OnDismissListener,
                         mBackgroundDrawable.setAlpha(alpha);
                     })
                     .start();
-            if (mPanelController != null) {
-                mPanelController.onDismissed();
-            }
+            dismissPanel();
+            resetOrientation();
         }
 
         void dismissImmediately() {
             super.dismiss();
             mShowing = false;
+            dismissPanel();
+            resetOrientation();
+        }
+
+        private void dismissPanel() {
             if (mPanelController != null) {
                 mPanelController.onDismissed();
+            }
+        }
+
+        private void resetOrientation() {
+            if (mResetOrientationData != null) {
+                RotationPolicy.setRotationLockAtAngle(mContext, mResetOrientationData.locked,
+                        mResetOrientationData.rotation);
             }
         }
 
@@ -1723,9 +1757,14 @@ public class GlobalActionsDialog implements DialogInterface.OnDismissListener,
         }
 
         public void onRotate(int from, int to) {
-            if (mShowing && (shouldUsePanel() || isForceGridEnabled(mContext))) {
+            if (mShowing) {
                 refreshDialog();
             }
+        }
+
+        private static class ResetOrientationData {
+            public boolean locked;
+            public int rotation;
         }
     }
 

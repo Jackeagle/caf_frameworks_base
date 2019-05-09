@@ -553,6 +553,9 @@
     <string name="permdesc_manageFace" msgid="8919637120670185330">"Permite à aplicação invocar métodos para adicionar e eliminar modelos faciais para uso."</string>
     <string name="permlab_useFaceAuthentication" msgid="8996134460546804535">"utilizar hardware de autenticação facial"</string>
     <string name="permdesc_useFaceAuthentication" msgid="5011118722951833089">"Permite que a aplicação utilize hardware de autenticação facial para autenticação."</string>
+    <string name="face_recalibrate_notification_name" msgid="3976629945250435054">"Autenticação facial"</string>
+    <string name="face_recalibrate_notification_title" msgid="4087620069451499365">"Volte a inscrever o seu rosto"</string>
+    <string name="face_recalibrate_notification_content" msgid="5530308842361499835">"Para melhorar o reconhecimento, volte a inscrever o seu rosto."</string>
     <string name="face_acquired_insufficient" msgid="2767330364802375742">"Imp. capt. dados rosto precisos. Tente novamente."</string>
     <string name="face_acquired_too_bright" msgid="5005650874582450967">"Demasiado clara. Experimente uma luz mais suave."</string>
     <string name="face_acquired_too_dark" msgid="1966194696381394616">"Demasiado escura. Experimente local com mais luz."</string>
@@ -568,8 +571,10 @@
     <string name="face_acquired_recalibrate" msgid="8077949502893707539">"Volte a inscrever o rosto."</string>
     <string name="face_acquired_too_different" msgid="7663983770123789694">"Impossível reconhecer o rosto. Tente novamente."</string>
     <string name="face_acquired_too_similar" msgid="1508776858407646460">"Muito parecida, mude de pose."</string>
-    <string name="face_acquired_pan_too_extreme" msgid="1852495480382773759">"Olhe mais diretamente para o ecrã."</string>
-    <string name="face_acquired_tilt_too_extreme" msgid="1290820400317982049">"Olhe mais diretamente para o ecrã."</string>
+    <!-- no translation found for face_acquired_pan_too_extreme (4581629343077288178) -->
+    <skip />
+    <!-- no translation found for face_acquired_tilt_too_extreme (4019954263012496468) -->
+    <skip />
     <string name="face_acquired_roll_too_extreme" msgid="1444829237745898619">"Endireite a cabeça na vertical."</string>
     <string name="face_acquired_obscured" msgid="5747521031647744553">"Desimpeça o espaço entre a cabeça e o telemóvel."</string>
     <string name="face_acquired_sensor_dirty" msgid="364493868630891300">"Limpe a câmara."</string>
@@ -2024,4 +2029,5 @@
       <item quantity="one"><xliff:g id="FILE_NAME_0">%s</xliff:g> + <xliff:g id="COUNT_1">%d</xliff:g> ficheiro</item>
     </plurals>
     <string name="chooser_no_direct_share_targets" msgid="997970693708458895">"A partilha direta não está disponível."</string>
+    <string name="chooser_all_apps_button_label" msgid="3631524352936289457">"Lista de aplicações"</string>
 </resources>

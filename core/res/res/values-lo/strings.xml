@@ -553,6 +553,9 @@
     <string name="permdesc_manageFace" msgid="8919637120670185330">"ອະນຸຍາດໃຫ້ແອັບເປີດວິທີການຕ່າງໆເພື່ອເພີ່ມ ແລະ ລຶບແມ່ແບບໃບໜ້າສຳລັບການນຳໃຊ້."</string>
     <string name="permlab_useFaceAuthentication" msgid="8996134460546804535">"ໃຊ້ຮາດແວການກວດສອບຄວາມຖືກຕ້ອງດ້ວຍໃບໜ້າ"</string>
     <string name="permdesc_useFaceAuthentication" msgid="5011118722951833089">"ອະນຸຍາດໃຫ້ແອັບໃຊ້ຮາດແວການກວດສອບຄວາມຖືກຕ້ອງດ້ວຍໃບໜ້າສຳລັບການກວດສອບຄວາມຖືກຕ້ອງ"</string>
+    <string name="face_recalibrate_notification_name" msgid="3976629945250435054">"ການພິສູດຢືນຢັນດ້ວຍໃບໜ້າ"</string>
+    <string name="face_recalibrate_notification_title" msgid="4087620069451499365">"ລົງທະບຽນໃບໜ້າຂອງທ່ານຄືນໃໝ່"</string>
+    <string name="face_recalibrate_notification_content" msgid="5530308842361499835">"ເພື່ອປັບປຸງການຈຳແນກ, ກະລຸນາລົງທະບຽນໃບໜ້າຂອງທ່ານຄືນໃໝ່."</string>
     <string name="face_acquired_insufficient" msgid="2767330364802375742">"ບໍ່ສາມາດບັນທຶກຂໍ້ມູນໃບໜ້າທີ່ຖືກຕ້ອງໄດ້. ກະລຸນາລອງໃໝ່."</string>
     <string name="face_acquired_too_bright" msgid="5005650874582450967">"ແຈ້ງເກີນໄປ. ລອງຄ່ອຍແສງໄຟລົງ."</string>
     <string name="face_acquired_too_dark" msgid="1966194696381394616">"ມືດເກີນ. ກະລຸນາລອງໃຊ້ສະພາບແສງທີ່ແຈ້ງຂຶ້ນ."</string>
@@ -568,8 +571,10 @@
     <string name="face_acquired_recalibrate" msgid="8077949502893707539">"ກະລຸນາລົງທະບຽນອຸປະກອນຂອງທ່ານອີກເທື່ອໜຶ່ງ."</string>
     <string name="face_acquired_too_different" msgid="7663983770123789694">"ບໍ່ສາມາດຈຳແນກໃບໜ້າໄດ້ອີກຕໍ່ໄປ. ກະລຸນາລອງໃໝ່."</string>
     <string name="face_acquired_too_similar" msgid="1508776858407646460">"ຄ້າຍກັນເກີນໄປ, ກະລຸນາປ່ຽນທ່າຂອງທ່ານ."</string>
-    <string name="face_acquired_pan_too_extreme" msgid="1852495480382773759">"ກະລຸນາເບິ່ງຊື່ໆໄປທາງໜ້າຈໍຫຼາຍຂຶ້ນ."</string>
-    <string name="face_acquired_tilt_too_extreme" msgid="1290820400317982049">"ກະລຸນາເບິ່ງຊື່ໆໄປທາງໜ້າຈໍຫຼາຍຂຶ້ນ."</string>
+    <!-- no translation found for face_acquired_pan_too_extreme (4581629343077288178) -->
+    <skip />
+    <!-- no translation found for face_acquired_tilt_too_extreme (4019954263012496468) -->
+    <skip />
     <string name="face_acquired_roll_too_extreme" msgid="1444829237745898619">"ກະລຸນາຍັບຫົວຂອງທ່ານໃຫ້ຊື່ຕາມລວງຕັ້ງ."</string>
     <string name="face_acquired_obscured" msgid="5747521031647744553">"ເຄລຍພື້ນທີ່ລະຫວ່າງຫົວ ແລະ ໂທລະສັບຂອງທ່ານ."</string>
     <string name="face_acquired_sensor_dirty" msgid="364493868630891300">"ກະລຸນາທຳຄວາມສະອາດກ້ອງ."</string>
@@ -2024,4 +2029,5 @@
       <item quantity="one"><xliff:g id="FILE_NAME_0">%s</xliff:g> + <xliff:g id="COUNT_1">%d</xliff:g> ໄຟລ໌</item>
     </plurals>
     <string name="chooser_no_direct_share_targets" msgid="997970693708458895">"ບໍ່ສາມາດແບ່ງປັນໂດຍກົງໄດ້"</string>
+    <string name="chooser_all_apps_button_label" msgid="3631524352936289457">"ລາຍຊື່ແອັບ"</string>
 </resources>
