@@ -288,8 +288,18 @@
 
     <!-- Message shown when a biometric is authenticated, asking the user to confirm authentication [CHAR LIMIT=30] -->
     <string name="biometric_dialog_confirm">Confirm</string>
-    <!-- Button name on BiometricPrompt shown when a biometric is detected but not authenticated. Tapping the button resumes authentication [CHAR_LIMIT=30] -->
+    <!-- Button name on BiometricPrompt shown when a biometric is detected but not authenticated. Tapping the button resumes authentication [CHAR LIMIT=30] -->
     <string name="biometric_dialog_try_again">Try again</string>
+    <!-- Content description for empty spaces that are not taken by the biometric dialog. Clicking on these areas will cancel authentication and dismiss the biometric dialog [CHAR LIMIT=NONE] -->
+    <string name="biometric_dialog_empty_space_description">Empty region, tap to cancel authentication</string>
+    <!-- Content description for the face icon when the device is not authenticating anymore [CHAR LIMIT=NONE] -->
+    <string name="biometric_dialog_face_icon_description_idle">Please try again</string>
+    <!-- Content description for the face icon when the device is authenticating [CHAR LIMIT=NONE] -->
+    <string name="biometric_dialog_face_icon_description_authenticating">Looking for your face</string>
+    <!-- Content description for the face icon when the user has been authenticated [CHAR LIMIT=NONE] -->
+    <string name="biometric_dialog_face_icon_description_authenticated">Face authenticated</string>
+    <!-- Content description for the face icon when the user has been authenticated and the confirm button has been pressed [CHAR LIMIT=NONE] -->
+    <string name="biometric_dialog_face_icon_description_confirmed">Confirmed</string>
 
     <!-- Message shown when the system-provided fingerprint dialog is shown, asking for authentication -->
     <string name="fingerprint_dialog_touch_sensor">Touch the fingerprint sensor</string>
@@ -871,6 +881,8 @@
     <string name="quick_settings_secondary_label_until">Until <xliff:g id="time" example="7 am">%s</xliff:g></string>
     <!-- QuickSettings: Label for the toggle to activate Dark theme (A.K.A Dark Mode). [CHAR LIMIT=20] -->
     <string name="quick_settings_ui_mode_night_label">Dark Theme</string>
+    <!-- QuickSettings: Label for the Dark theme tile when enabled by battery saver. [CHAR LIMIT=40] -->
+    <string name="quick_settings_ui_mode_night_label_battery_saver">Dark Theme\nBattery saver</string>
 
     <!-- QuickSettings: NFC tile [CHAR LIMIT=NONE] -->
     <string name="quick_settings_nfc_label">NFC</string>
@@ -1688,6 +1700,12 @@
     <!-- Notification: Control panel: Label for the app that posted this notification, if it's not the package that the notification was posted for -->
     <string name="notification_delegate_header">Proxied notification</string>
 
+    <!-- [CHAR LIMIT=40 Notification: Label for the inline channel blocking view -->
+    <string name="notification_channel_dialog_title">All <xliff:g id="app_name" example="YouTube">%1$s</xliff:g> notifications</string>
+
+    <!-- [CHAR LIMIT=20 Notification: "See more" button -->
+    <string name="see_more_title">See more</string>
+
     <!-- Notification Inline controls: describes what the app is doing in the background [CHAR_LIMIT=NONE] -->
     <string name="appops_camera">This app is using the camera.</string>
     <!-- Notification Inline controls: describes what the app is doing in the background [CHAR_LIMIT=NONE] -->
@@ -2442,4 +2460,6 @@
     <string name="bubble_accessibility_action_move_bottom_left">Move bottom left</string>
     <!-- Action in accessibility menu to move the stack of bubbles to the bottom right of the screen. [CHAR LIMIT=30]-->
     <string name="bubble_accessibility_action_move_bottom_right">Move bottom right</string>
+    <!-- Text used for the bubble dismiss area. Bubbles dragged to, or flung towards, this area will go away. [CHAR LIMIT=20] -->
+    <string name="bubble_dismiss_text">Dismiss</string>
 </resources>

@@ -23,6 +23,7 @@ import static android.app.Notification.FLAG_BUBBLE;
 import static android.app.Notification.FLAG_FOREGROUND_SERVICE;
 import static android.app.Notification.FLAG_NO_CLEAR;
 import static android.app.Notification.FLAG_ONGOING_EVENT;
+import static android.app.Notification.FLAG_ONLY_ALERT_ONCE;
 import static android.app.NotificationManager.ACTION_APP_BLOCK_STATE_CHANGED;
 import static android.app.NotificationManager.ACTION_NOTIFICATION_CHANNEL_BLOCK_STATE_CHANGED;
 import static android.app.NotificationManager.ACTION_NOTIFICATION_CHANNEL_GROUP_BLOCK_STATE_CHANGED;
@@ -121,8 +122,6 @@ import android.app.backup.BackupManager;
 import android.app.role.OnRoleHoldersChangedListener;
 import android.app.role.RoleManager;
 import android.app.usage.UsageEvents;
-import android.app.usage.UsageStats;
-import android.app.usage.UsageStatsManager;
 import android.app.usage.UsageStatsManagerInternal;
 import android.companion.ICompanionDeviceManager;
 import android.content.BroadcastReceiver;
@@ -183,7 +182,6 @@ import android.service.notification.NotificationRankingUpdate;
 import android.service.notification.NotificationRecordProto;
 import android.service.notification.NotificationServiceDumpProto;
 import android.service.notification.NotificationStats;
-import android.service.notification.NotifyingApp;
 import android.service.notification.SnoozeCriterion;
 import android.service.notification.StatusBarNotification;
 import android.service.notification.ZenModeConfig;
@@ -260,8 +258,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Calendar;
-import java.util.GregorianCalendar;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
@@ -1036,11 +1032,18 @@ public class NotificationManagerService extends SystemService {
                     final StatusBarNotification n = r.sbn;
                     final int callingUid = n.getUid();
                     final String pkg = n.getPackageName();
+                    final boolean wasBubble = r.getNotification().isBubbleNotification();
                     if (isBubble && isNotificationAppropriateToBubble(r, pkg, callingUid,
                             null /* oldEntry */)) {
                         r.getNotification().flags |= FLAG_BUBBLE;
                     } else {
                         r.getNotification().flags &= ~FLAG_BUBBLE;
+                    }
+                    if (wasBubble != r.getNotification().isBubbleNotification()) {
+                        // Add the "alert only once" flag so that the notification won't HUN
+                        // unnecessarily just because the bubble flag was changed.
+                        r.getNotification().flags |= FLAG_ONLY_ALERT_ONCE;
+                        mListeners.notifyPostedLocked(r, r);
                     }
                 }
             }
@@ -2467,7 +2470,8 @@ public class NotificationManagerService extends SystemService {
          */
         @Override
         public boolean areNotificationsEnabledForPackage(String pkg, int uid) {
-            checkCallerIsSystemOrSameApp(pkg);
+            enforceSystemOrSystemUIOrSamePackage(pkg,
+                    "Caller not system or systemui or same package");
             if (UserHandle.getCallingUserId() != UserHandle.getUserId(uid)) {
                 getContext().enforceCallingPermission(
                         android.Manifest.permission.INTERACT_ACROSS_USERS,
@@ -2793,7 +2797,7 @@ public class NotificationManagerService extends SystemService {
         @Override
         public ParceledListSlice<NotificationChannelGroup> getNotificationChannelGroupsForPackage(
                 String pkg, int uid, boolean includeDeleted) {
-            checkCallerIsSystem();
+            enforceSystemOrSystemUI("getNotificationChannelGroupsForPackage");
             return mPreferencesHelper.getNotificationChannelGroups(
                     pkg, uid, includeDeleted, true, false);
         }
@@ -5736,7 +5740,7 @@ public class NotificationManagerService extends SystemService {
         }
         // Suppressed because it's a silent update
         final Notification notification = record.getNotification();
-        if (record.isUpdate && (notification.flags & Notification.FLAG_ONLY_ALERT_ONCE) != 0) {
+        if (record.isUpdate && (notification.flags & FLAG_ONLY_ALERT_ONCE) != 0) {
             return false;
         }
         // Suppressed because another notification in its group handles alerting
@@ -5755,7 +5759,7 @@ public class NotificationManagerService extends SystemService {
     boolean shouldMuteNotificationLocked(final NotificationRecord record) {
         // Suppressed because it's a silent update
         final Notification notification = record.getNotification();
-        if (record.isUpdate && (notification.flags & Notification.FLAG_ONLY_ALERT_ONCE) != 0) {
+        if (record.isUpdate && (notification.flags & FLAG_ONLY_ALERT_ONCE) != 0) {
             return true;
         }
 

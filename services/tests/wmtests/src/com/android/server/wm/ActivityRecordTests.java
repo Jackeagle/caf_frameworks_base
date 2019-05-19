@@ -16,6 +16,8 @@
 
 package com.android.server.wm;
 
+import static android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD;
+import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Surface.ROTATION_0;
 import static android.view.Surface.ROTATION_90;
@@ -38,6 +40,7 @@ import static com.android.server.wm.ActivityStack.REMOVE_TASK_MODE_MOVING;
 import static com.android.server.wm.ActivityStack.STACK_VISIBILITY_INVISIBLE;
 import static com.android.server.wm.ActivityStack.STACK_VISIBILITY_VISIBLE;
 import static com.android.server.wm.ActivityStack.STACK_VISIBILITY_VISIBLE_BEHIND_TRANSLUCENT;
+import static com.android.server.wm.WindowContainer.POSITION_TOP;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -59,6 +62,11 @@ import android.graphics.Rect;
 import android.platform.test.annotations.Presubmit;
 import android.util.MergedConfiguration;
 import android.util.MutableBoolean;
+import android.view.DisplayInfo;
+import android.view.IRemoteAnimationFinishedCallback;
+import android.view.IRemoteAnimationRunner.Stub;
+import android.view.RemoteAnimationAdapter;
+import android.view.RemoteAnimationTarget;
 
 import androidx.test.filters.MediumTest;
 
@@ -566,6 +574,92 @@ public class ActivityRecordTests extends ActivityTestsBase {
         mService.mH.runWithScissors(() -> { }, TimeUnit.SECONDS.toMillis(3));
         verify(mService.mAmInternal).killProcess(
                 eq(mActivity.app.mName), eq(mActivity.app.mUid), anyString());
+    }
+
+    @Test
+    public void testTakeOptions() {
+        ActivityOptions opts = ActivityOptions.makeRemoteAnimation(
+                new RemoteAnimationAdapter(new Stub() {
+
+                    @Override
+                    public void onAnimationStart(RemoteAnimationTarget[] apps,
+                            IRemoteAnimationFinishedCallback finishedCallback) {
+
+                    }
+
+                    @Override
+                    public void onAnimationCancelled() {
+
+                    }
+                }, 0, 0));
+        mActivity.updateOptionsLocked(opts);
+        assertNotNull(mActivity.takeOptionsLocked(true /* fromClient */));
+        assertNotNull(mActivity.pendingOptions);
+
+        mActivity.updateOptionsLocked(ActivityOptions.makeBasic());
+        assertNotNull(mActivity.takeOptionsLocked(false /* fromClient */));
+        assertNull(mActivity.pendingOptions);
+    }
+
+    @Test
+    public void testSetProcessOverridesConfig() {
+        final ActivityRecord defaultDisplayActivity =
+                createActivityOnDisplay(true /* defaultDisplay */, null /* process */);
+        assertFalse(defaultDisplayActivity.app.registeredForDisplayConfigChanges());
+
+        final ActivityRecord secondaryDisplayActivity =
+                createActivityOnDisplay(false /* defaultDisplay */, null /* process */);
+        assertTrue(secondaryDisplayActivity.app.registeredForDisplayConfigChanges());
+        assertEquals(secondaryDisplayActivity.getDisplay().getResolvedOverrideConfiguration(),
+                secondaryDisplayActivity.app.getRequestedOverrideConfiguration());
+
+        assertNotEquals(defaultDisplayActivity.getConfiguration(),
+                secondaryDisplayActivity.getConfiguration());
+    }
+
+    @Test
+    public void testSetProcessDoesntOverrideConfigIfAnotherActivityPresent() {
+        final ActivityRecord defaultDisplayActivity =
+                createActivityOnDisplay(true /* defaultDisplay */, null /* process */);
+        assertFalse(defaultDisplayActivity.app.registeredForDisplayConfigChanges());
+
+        final ActivityRecord secondaryDisplayActivity =
+                createActivityOnDisplay(false /* defaultDisplay */, defaultDisplayActivity.app);
+        assertFalse(secondaryDisplayActivity.app.registeredForDisplayConfigChanges());
+    }
+
+    @Test
+    public void testActivityOnDefaultDisplayClearsProcessOverride() {
+        final ActivityRecord secondaryDisplayActivity =
+                createActivityOnDisplay(false /* defaultDisplay */, null /* process */);
+        assertTrue(secondaryDisplayActivity.app.registeredForDisplayConfigChanges());
+
+        final ActivityRecord defaultDisplayActivity =
+                createActivityOnDisplay(true /* defaultDisplay */,
+                        secondaryDisplayActivity.app);
+        assertFalse(defaultDisplayActivity.app.registeredForDisplayConfigChanges());
+        assertFalse(secondaryDisplayActivity.app.registeredForDisplayConfigChanges());
+    }
+
+    /**
+     * Creates an activity on display. For non-default display request it will also create a new
+     * display with custom DisplayInfo.
+     */
+    private ActivityRecord createActivityOnDisplay(boolean defaultDisplay,
+            WindowProcessController process) {
+        final ActivityDisplay display;
+        if (defaultDisplay) {
+            display = mRootActivityContainer.getDefaultDisplay();
+        } else {
+            final DisplayInfo info = new DisplayInfo();
+            info.logicalWidth = 100;
+            info.logicalHeight = 100;
+            display = addNewActivityDisplayAt(info, POSITION_TOP);
+        }
+        final TestActivityStack stack = display.createStack(WINDOWING_MODE_UNDEFINED,
+                ACTIVITY_TYPE_STANDARD, true /* onTop */);
+        final TaskRecord task = new TaskBuilder(mSupervisor).setStack(stack).build();
+        return new ActivityBuilder(mService).setTask(task).setUseProcess(process).build();
     }
 
     /** Setup {@link #mActivity} as a size-compat-mode-able activity without fixed orientation. */

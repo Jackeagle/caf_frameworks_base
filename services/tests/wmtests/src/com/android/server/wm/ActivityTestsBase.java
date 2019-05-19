@@ -72,6 +72,7 @@ import com.android.server.am.ActivityManagerService;
 import com.android.server.am.PendingIntentController;
 import com.android.server.appop.AppOpsService;
 import com.android.server.firewall.IntentFirewall;
+import com.android.server.policy.PermissionPolicyInternal;
 import com.android.server.uri.UriGrantsManagerInternal;
 import com.android.server.wm.TaskRecord.TaskRecordFactory;
 import com.android.server.wm.utils.MockTracker;
@@ -194,6 +195,7 @@ class ActivityTestsBase {
         private ActivityStack mStack;
         private int mActivityFlags;
         private int mLaunchMode;
+        private WindowProcessController mWpc;
 
         ActivityBuilder(ActivityTaskManagerService service) {
             mService = service;
@@ -244,6 +246,11 @@ class ActivityTestsBase {
             return this;
         }
 
+        ActivityBuilder setUseProcess(WindowProcessController wpc) {
+            mWpc = wpc;
+            return this;
+        }
+
         ActivityRecord build() {
             if (mComponent == null) {
                 final int id = sCurrentActivityId++;
@@ -289,12 +296,18 @@ class ActivityTestsBase {
                 mTaskRecord.addActivityToTop(activity);
             }
 
-            final WindowProcessController wpc = new WindowProcessController(mService,
-                    mService.mContext.getApplicationInfo(), "name", 12345,
-                    UserHandle.getUserId(12345), mock(Object.class),
-                    mock(WindowProcessListener.class));
-            wpc.setThread(mock(IApplicationThread.class));
+            final WindowProcessController wpc;
+            if (mWpc != null) {
+                wpc = mWpc;
+            } else {
+                wpc = new WindowProcessController(mService,
+                        mService.mContext.getApplicationInfo(), "name", 12345,
+                        UserHandle.getUserId(12345), mock(Object.class),
+                        mock(WindowProcessListener.class));
+                wpc.setThread(mock(IApplicationThread.class));
+            }
             activity.setProcess(wpc);
+            wpc.addActivityIfNeeded(activity);
             return activity;
         }
     }
@@ -426,6 +439,7 @@ class ActivityTestsBase {
 
     protected class TestActivityTaskManagerService extends ActivityTaskManagerService {
         private PackageManagerInternal mPmInternal;
+        private PermissionPolicyInternal mPermissionPolicyInternal;
 
         // ActivityStackSupervisor may be created more than once while setting up AMS and ATMS.
         // We keep the reference in order to prevent creating it twice.
@@ -540,6 +554,16 @@ class ActivityTestsBase {
                         .isPermissionsReviewRequired(anyString(), anyInt());
             }
             return mPmInternal;
+        }
+
+        @Override
+        PermissionPolicyInternal getPermissionPolicyInternal() {
+            if (mPermissionPolicyInternal == null) {
+                mPermissionPolicyInternal = mock(PermissionPolicyInternal.class);
+                doReturn(true).when(mPermissionPolicyInternal).checkStartActivity(any(), anyInt(),
+                        any());
+            }
+            return mPermissionPolicyInternal;
         }
     }
 

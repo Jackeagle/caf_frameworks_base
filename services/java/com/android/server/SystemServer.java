@@ -115,7 +115,6 @@ import com.android.server.om.OverlayManagerService;
 import com.android.server.os.BugreportManagerService;
 import com.android.server.os.DeviceIdentifiersPolicyService;
 import com.android.server.os.SchedulingPolicyService;
-import com.android.server.pm.ApexManager;
 import com.android.server.pm.BackgroundDexOptService;
 import com.android.server.pm.CrossProfileAppsService;
 import com.android.server.pm.DynamicCodeLoggingService;
@@ -628,12 +627,6 @@ public final class SystemServer {
         watchdog.start();
         traceEnd();
 
-        // Start ApexManager as early as we can to give it enough time to call apexd and populate
-        // cache of known apex packages. Note that calling apexd will happen asynchronously.
-        traceBeginAndSlog("StartApexManager");
-        mSystemServiceManager.startService(ApexManager.class);
-        traceEnd();
-
         Slog.i(TAG, "Reading configuration...");
         final String TAG_SYSTEM_CONFIG = "ReadingSystemConfig";
         traceBeginAndSlog(TAG_SYSTEM_CONFIG);
@@ -1056,12 +1049,7 @@ public final class SystemServer {
             mDisplayManagerService.windowManagerAndInputReady();
             traceEnd();
 
-            // Skip Bluetooth if we have an emulator kernel
-            // TODO: Use a more reliable check to see if this product should
-            // support Bluetooth - see bug 988521
-            if (isEmulator) {
-                Slog.i(TAG, "No Bluetooth Service (emulator)");
-            } else if (mFactoryTestMode == FactoryTest.FACTORY_TEST_LOW_LEVEL) {
+            if (mFactoryTestMode == FactoryTest.FACTORY_TEST_LOW_LEVEL) {
                 Slog.i(TAG, "No Bluetooth Service (factory test)");
             } else if (!context.getPackageManager().hasSystemFeature
                     (PackageManager.FEATURE_BLUETOOTH)) {
@@ -1174,9 +1162,12 @@ public final class SystemServer {
         if (!mOnlyCore) {
             traceBeginAndSlog("UpdatePackagesIfNeeded");
             try {
+                Watchdog.getInstance().pauseWatchingCurrentThread("dexopt");
                 mPackageManagerService.updatePackagesIfNeeded();
             } catch (Throwable e) {
                 reportWtf("update packages", e);
+            } finally {
+                Watchdog.getInstance().resumeWatchingCurrentThread("dexopt");
             }
             traceEnd();
         }
@@ -1206,11 +1197,11 @@ public final class SystemServer {
                 traceBeginAndSlog("StartPersistentDataBlock");
                 mSystemServiceManager.startService(PersistentDataBlockService.class);
                 traceEnd();
-
-                traceBeginAndSlog("StartTestHarnessMode");
-                mSystemServiceManager.startService(TestHarnessModeService.class);
-                traceEnd();
             }
+
+            traceBeginAndSlog("StartTestHarnessMode");
+            mSystemServiceManager.startService(TestHarnessModeService.class);
+            traceEnd();
 
             if (hasPdb || OemLockService.isHalPresent()) {
                 // Implementation depends on pdb or the OemLock HAL
@@ -1407,6 +1398,7 @@ public final class SystemServer {
 
             traceBeginAndSlog("StartNotificationManager");
             mSystemServiceManager.startService(NotificationManagerService.class);
+            SystemNotificationChannels.removeDeprecated(context);
             SystemNotificationChannels.createAll(context);
             notification = INotificationManager.Stub.asInterface(
                     ServiceManager.getService(Context.NOTIFICATION_SERVICE));

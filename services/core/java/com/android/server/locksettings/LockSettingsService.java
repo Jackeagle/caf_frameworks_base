@@ -421,8 +421,9 @@ public class LockSettingsService extends ILockSettings.Stub {
                     new PasswordSlotManager());
         }
 
-        public boolean hasBiometrics() {
-            return BiometricManager.hasBiometrics(mContext);
+        public boolean hasEnrolledBiometrics() {
+            BiometricManager bm = mContext.getSystemService(BiometricManager.class);
+            return bm.canAuthenticate() == BiometricManager.BIOMETRIC_SUCCESS;
         }
 
         public int binderGetCallingUid() {
@@ -483,6 +484,12 @@ public class LockSettingsService extends ILockSettings.Stub {
             return;
         }
 
+        if (isUserKeyUnlocked(userId)) {
+            // If storage is not locked, the user will be automatically unlocked so there is
+            // no need to show the notification.
+            return;
+        }
+
         final UserHandle userHandle = user.getUserHandle();
         final boolean isSecure = isUserSecure(userId);
         if (isSecure && !mUserManager.isUserUnlockingOrUnlocked(userHandle)) {
@@ -500,7 +507,7 @@ public class LockSettingsService extends ILockSettings.Stub {
     private void showEncryptionNotificationForProfile(UserHandle user) {
         Resources r = mContext.getResources();
         CharSequence title = r.getText(
-                com.android.internal.R.string.user_encrypted_title);
+                com.android.internal.R.string.profile_encrypted_title);
         CharSequence message = r.getText(
                 com.android.internal.R.string.profile_encrypted_message);
         CharSequence detail = r.getText(
@@ -528,7 +535,7 @@ public class LockSettingsService extends ILockSettings.Stub {
         if (!StorageManager.isFileEncryptedNativeOrEmulated()) return;
 
         Notification notification =
-                new Notification.Builder(mContext, SystemNotificationChannels.SECURITY)
+                new Notification.Builder(mContext, SystemNotificationChannels.DEVICE_ADMIN)
                         .setSmallIcon(com.android.internal.R.drawable.ic_user_secure)
                         .setWhen(0)
                         .setOngoing(true)
@@ -2496,7 +2503,8 @@ public class LockSettingsService extends ILockSettings.Stub {
         // TODO: When lockout is handled under the HAL for all biometrics (fingerprint),
         // we need to generate challenge for each one, have it signed by GK and reset lockout
         // for each modality.
-        if (!hasChallenge && pm.hasSystemFeature(PackageManager.FEATURE_FACE)) {
+        if (!hasChallenge && pm.hasSystemFeature(PackageManager.FEATURE_FACE)
+                && mInjector.hasEnrolledBiometrics()) {
             challenge = mContext.getSystemService(FaceManager.class).generateChallenge();
         }
 
@@ -2538,8 +2546,8 @@ public class LockSettingsService extends ILockSettings.Stub {
         if (response.getResponseCode() == VerifyCredentialResponse.RESPONSE_OK) {
             notifyActivePasswordMetricsAvailable(credentialType, userCredential, userId);
             unlockKeystore(authResult.authToken.deriveKeyStorePassword(), userId);
-            // Reset lockout
-            if (mInjector.hasBiometrics()) {
+            // Reset lockout only if user has enrolled templates
+            if (mInjector.hasEnrolledBiometrics()) {
                 BiometricManager bm = mContext.getSystemService(BiometricManager.class);
                 Slog.i(TAG, "Resetting lockout, length: "
                         + authResult.gkResponse.getPayload().length);

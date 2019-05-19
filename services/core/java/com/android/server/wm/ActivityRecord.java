@@ -120,6 +120,7 @@ import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_FOCUS;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_SAVED_STATE;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_STATES;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_SWITCH;
+import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_TRANSITION;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_VISIBILITY;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.POSTFIX_CONFIGURATION;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.POSTFIX_FOCUS;
@@ -1084,6 +1085,22 @@ final class ActivityRecord extends ConfigurationContainer {
         if (root == this) {
             task.setRootProcess(proc);
         }
+        // Override the process configuration to match the display where the first activity in
+        // the process was launched. This can help with compat issues on secondary displays when
+        // apps use Application to obtain configuration or metrics instead of Activity.
+        final ActivityDisplay display = getDisplay();
+        if (display == null || display.mDisplayId == INVALID_DISPLAY) {
+            return;
+        }
+        if (!proc.hasActivities() && display.mDisplayId != DEFAULT_DISPLAY) {
+            proc.registerDisplayConfigurationListenerLocked(display);
+        } else if (display.mDisplayId == DEFAULT_DISPLAY) {
+            // Once an activity is launched on default display - stop listening for other displays
+            // configurations to maintain compatibility with previous platform releases. E.g. when
+            // an activity is launched in a Bubble and then moved to default screen, we should match
+            // the global device config.
+            proc.unregisterDisplayConfigurationListenerLocked();
+        }
     }
 
     boolean hasProcess() {
@@ -1631,6 +1648,7 @@ final class ActivityRecord extends ConfigurationContainer {
 
     void updateOptionsLocked(ActivityOptions options) {
         if (options != null) {
+            if (DEBUG_TRANSITION) Slog.i(TAG, "Update options for " + this);
             if (pendingOptions != null) {
                 pendingOptions.abort();
             }
@@ -1641,6 +1659,7 @@ final class ActivityRecord extends ConfigurationContainer {
     void applyOptionsLocked() {
         if (pendingOptions != null
                 && pendingOptions.getAnimationType() != ANIM_SCENE_TRANSITION) {
+            if (DEBUG_TRANSITION) Slog.i(TAG, "Applying options for " + this);
             applyOptionsLocked(pendingOptions, intent);
             if (task == null) {
                 clearOptionsLocked(false /* withAbort */);
@@ -1762,9 +1781,19 @@ final class ActivityRecord extends ConfigurationContainer {
         pendingOptions = null;
     }
 
-    ActivityOptions takeOptionsLocked() {
+    ActivityOptions takeOptionsLocked(boolean fromClient) {
+        if (DEBUG_TRANSITION) Slog.i(TAG, "Taking options for " + this + " callers="
+                + Debug.getCallers(6));
         ActivityOptions opts = pendingOptions;
-        pendingOptions = null;
+
+        // If we are trying to take activity options from the client, do not null it out if it's a
+        // remote animation as the client doesn't need it ever. This is a workaround when client is
+        // faster to take the options than we are to resume the next activity.
+        // TODO (b/132432864): Fix the root cause of these transition preparing/applying options
+        // timing somehow
+        if (!fromClient || opts == null || opts.getRemoteAnimationAdapter() == null) {
+            pendingOptions = null;
+        }
         return opts;
     }
 
@@ -3220,7 +3249,7 @@ final class ActivityRecord extends ConfigurationContainer {
         // Update last reported values.
         final Configuration newMergedOverrideConfig = getMergedOverrideConfiguration();
 
-        setLastReportedConfiguration(mAtmService.getGlobalConfiguration(), newMergedOverrideConfig);
+        setLastReportedConfiguration(getProcessGlobalConfiguration(), newMergedOverrideConfig);
 
         if (mState == INITIALIZING) {
             // No need to relaunch or schedule new config for activity that hasn't been launched
@@ -3327,6 +3356,14 @@ final class ActivityRecord extends ConfigurationContainer {
         stopFreezingScreenLocked(false);
 
         return true;
+    }
+
+    /** Get process configuration, or global config if the process is not set. */
+    private Configuration getProcessGlobalConfiguration() {
+        if (app != null) {
+            return app.getConfiguration();
+        }
+        return mAtmService.getGlobalConfiguration();
     }
 
     /**
@@ -3436,7 +3473,7 @@ final class ActivityRecord extends ConfigurationContainer {
             mStackSupervisor.activityRelaunchingLocked(this);
             final ClientTransactionItem callbackItem = ActivityRelaunchItem.obtain(pendingResults,
                     pendingNewIntents, configChangeFlags,
-                    new MergedConfiguration(mAtmService.getGlobalConfiguration(),
+                    new MergedConfiguration(getProcessGlobalConfiguration(),
                             getMergedOverrideConfiguration()),
                     preserveWindow);
             final ActivityLifecycleItem lifecycleItem;

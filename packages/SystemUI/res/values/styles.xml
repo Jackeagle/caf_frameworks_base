@@ -349,7 +349,7 @@
     <style name="AutoSizingList">
         <item name="enableAutoSizing">true</item>
     </style>
-    <style name="Theme.MediaProjectionAlertDialog" parent="android:Theme.DeviceDefault">
+    <style name="Theme.SystemUI.MediaProjectionAlertDialog">
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowContentOverlay">@null</item>
@@ -448,6 +448,12 @@
     <style name="TextAppearance.NotificationInfo.Secondary">
         <item name="android:textSize">14sp</item>
         <item name="android:alpha">0.54</item>
+    </style>
+
+    <style name="TextAppearance.NotificationInfo.Title">
+        <item name="android:fontFamily">@*android:string/config_bodyFontFamily</item>
+        <item name="android:textColor">@color/notification_primary_text_color</item>
+        <item name="android:textStyle">bold</item>
     </style>
 
     <style name="TextAppearance.NotificationInfo.Button">

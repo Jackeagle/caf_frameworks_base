@@ -836,13 +836,6 @@ public class CarrierConfigManager {
             "carrier_metered_roaming_apn_types_strings";
 
     /**
-     * Default APN types that are metered on IWLAN by the carrier
-     * @hide
-     */
-    public static final String KEY_CARRIER_METERED_IWLAN_APN_TYPES_STRINGS =
-            "carrier_metered_iwlan_apn_types_strings";
-
-    /**
      * CDMA carrier ERI (Enhanced Roaming Indicator) file name
      * @hide
      */
@@ -2791,7 +2784,7 @@ public class CarrierConfigManager {
         /**
          * Control Plane / SUPL NI emergency extension time in seconds. Default to "0".
          */
-        public static final String KEY_ES_EXTENSION_SEC = KEY_PREFIX + "es_extension_sec";
+        public static final String KEY_ES_EXTENSION_SEC_STRING = KEY_PREFIX + "es_extension_sec";
 
         /**
          * Space separated list of Android package names of proxy applications representing
@@ -2799,7 +2792,15 @@ public class CarrierConfigManager {
          * the framework, as managed by IGnssVisibilityControl.hal. For example,
          * "com.example.mdt com.example.ims".
          */
-        public static final String KEY_NFW_PROXY_APPS = KEY_PREFIX + "nfw_proxy_apps";
+        public static final String KEY_NFW_PROXY_APPS_STRING = KEY_PREFIX + "nfw_proxy_apps";
+
+        /**
+         * Specify whether to post a notification on the status bar whenever device location is
+         * provided for non-framework location requests in user-initiated emergency use cases.
+         * 0 - Do not post notification. This is default.
+         * 1 - Post notification for all request types.
+         */
+        public static final String KEY_ES_NOTIFY_INT = KEY_PREFIX + "es_notify_int";
 
         private static PersistableBundle getDefaults() {
             PersistableBundle defaults = new PersistableBundle();
@@ -2813,8 +2814,9 @@ public class CarrierConfigManager {
             defaults.putString(KEY_USE_EMERGENCY_PDN_FOR_EMERGENCY_SUPL_STRING, "1");
             defaults.putString(KEY_A_GLONASS_POS_PROTOCOL_SELECT_STRING, "0");
             defaults.putString(KEY_GPS_LOCK_STRING, "3");
-            defaults.putString(KEY_ES_EXTENSION_SEC, "0");
-            defaults.putString(KEY_NFW_PROXY_APPS, "");
+            defaults.putString(KEY_ES_EXTENSION_SEC_STRING, "0");
+            defaults.putString(KEY_NFW_PROXY_APPS_STRING, "");
+            defaults.putInt(KEY_ES_NOTIFY_INT, 0);
             return defaults;
         }
     }
@@ -2964,6 +2966,15 @@ public class CarrierConfigManager {
     public static final String KEY_GSM_RSSI_THRESHOLDS_INT_ARRAY =
             "gsm_rssi_thresholds_int_array";
 
+    /**
+     * Determines whether Wireless Priority Service call is supported over IMS.
+     *
+     * See Wireless Priority Service from https://www.fcc.gov/general/wireless-priority-service-wps
+     * @hide
+     */
+    public static final String KEY_SUPPORT_WPS_OVER_IMS_BOOL =
+            "support_wps_over_ims_bool";
+
     /** The default value for every variable. */
     private final static PersistableBundle sDefaults;
 
@@ -3098,15 +3109,6 @@ public class CarrierConfigManager {
                 new String[]{"default", "mms", "dun", "supl"});
         sDefaults.putStringArray(KEY_CARRIER_METERED_ROAMING_APN_TYPES_STRINGS,
                 new String[]{"default", "mms", "dun", "supl"});
-        // By default all APNs should be unmetered if the device is on IWLAN. However, we add
-        // default APN as metered here as a workaround for P because in some cases, a data
-        // connection was brought up on cellular, but later on the device camped on IWLAN. That
-        // data connection was incorrectly treated as unmetered due to the current RAT IWLAN.
-        // Marking it as metered for now can workaround the issue.
-        // Todo: This will be fixed in Q when IWLAN full refactoring is completed.
-        sDefaults.putStringArray(KEY_CARRIER_METERED_IWLAN_APN_TYPES_STRINGS,
-                new String[]{"default"});
-
         sDefaults.putIntArray(KEY_ONLY_SINGLE_DC_ALLOWED_INT_ARRAY,
                 new int[]{
                     4, /* IS95A */
@@ -3381,6 +3383,7 @@ public class CarrierConfigManager {
                         -97, /* SIGNAL_STRENGTH_GOOD */
                         -89,  /* SIGNAL_STRENGTH_GREAT */
                 });
+        sDefaults.putBoolean(KEY_SUPPORT_WPS_OVER_IMS_BOOL, true);
     }
 
     /**

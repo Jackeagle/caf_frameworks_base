@@ -25,6 +25,7 @@ import android.app.ActivityTaskManager;
 import android.car.Car;
 import android.car.drivingstate.CarDrivingStateEvent;
 import android.car.drivingstate.CarUxRestrictionsManager;
+import android.car.hardware.power.CarPowerManager.CarPowerStateListener;
 import android.content.Context;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
@@ -121,12 +122,17 @@ public class CarStatusBar extends StatusBar implements
     private boolean mDeviceIsProvisioned = true;
     private HvacController mHvacController;
     private DrivingStateHelper mDrivingStateHelper;
-    private static FlingAnimationUtils sFlingAnimationUtils;
+    private PowerManagerHelper mPowerManagerHelper;
+    private FlingAnimationUtils mFlingAnimationUtils;
     private SwitchToGuestTimer mSwitchToGuestTimer;
+    private NotificationDataManager mNotificationDataManager;
+    private NotificationClickHandlerFactory mNotificationClickHandlerFactory;
 
     // The container for the notifications.
     private CarNotificationView mNotificationView;
     private RecyclerView mNotificationList;
+    // The controller for the notification view.
+    private NotificationViewController mNotificationViewController;
     // The state of if the notification list is currently showing the bottom.
     private boolean mNotificationListAtBottom;
     // Was the notification list at the bottom when the user first touched the screen
@@ -156,6 +162,20 @@ public class CarStatusBar extends StatusBar implements
     // If notification shade is being swiped vertically to close.
     private boolean mIsSwipingVerticallyToClose;
 
+    private final CarPowerStateListener mCarPowerStateListener =
+            (int state) -> {
+                // When the car powers on, clear all notifications and mute/unread states.
+                Log.d(TAG, "New car power state: " + state);
+                if (state == CarPowerStateListener.ON) {
+                    if (mNotificationClickHandlerFactory != null) {
+                        mNotificationClickHandlerFactory.clearAllNotifications();
+                    }
+                    if (mNotificationDataManager != null) {
+                        mNotificationDataManager.clearAll();
+                    }
+                }
+            };
+
     @Override
     public void start() {
         // get the provisioned state before calling the parent class since it's that flow that
@@ -172,7 +192,7 @@ public class CarStatusBar extends StatusBar implements
                 R.integer.notification_settle_open_percentage);
         mSettleClosePercentage = mContext.getResources().getInteger(
                 R.integer.notification_settle_close_percentage);
-        sFlingAnimationUtils = new FlingAnimationUtils(mContext,
+        mFlingAnimationUtils = new FlingAnimationUtils(mContext,
                 FLING_ANIMATION_MAX_TIME, FLING_SPEED_UP_FACTOR);
 
         createBatteryController();
@@ -203,6 +223,9 @@ public class CarStatusBar extends StatusBar implements
         // Register a listener for driving state changes.
         mDrivingStateHelper = new DrivingStateHelper(mContext, this::onDrivingStateChanged);
         mDrivingStateHelper.connectToCarService();
+
+        mPowerManagerHelper = new PowerManagerHelper(mContext, mCarPowerStateListener);
+        mPowerManagerHelper.connectToCarService();
 
         mSwitchToGuestTimer = new SwitchToGuestTimer(mContext);
     }
@@ -291,6 +314,7 @@ public class CarStatusBar extends StatusBar implements
     public void showKeyguard() {
         super.showKeyguard();
         updateNavBarForKeyguardContent();
+        dismissKeyguardWhenUserSwitcherNotDisplayed();
     }
 
     /**
@@ -307,7 +331,6 @@ public class CarStatusBar extends StatusBar implements
             mRightNavigationBarView.showKeyguardButtons();
         }
     }
-
 
     @Override
     protected void makeStatusBarView(@Nullable RegisterStatusBarResult result) {
@@ -407,7 +430,7 @@ public class CarStatusBar extends StatusBar implements
                 }
         );
 
-        NotificationClickHandlerFactory clickHandlerFactory = new NotificationClickHandlerFactory(
+        mNotificationClickHandlerFactory = new NotificationClickHandlerFactory(
                 mBarService,
                 launchResult -> {
                     if (launchResult == ActivityManager.START_TASK_TO_FRONT
@@ -422,17 +445,27 @@ public class CarStatusBar extends StatusBar implements
         CarUxRestrictionManagerWrapper carUxRestrictionManagerWrapper =
                 new CarUxRestrictionManagerWrapper();
         carUxRestrictionManagerWrapper.setCarUxRestrictionsManager(carUxRestrictionsManager);
-        NotificationDataManager notificationDataManager = new NotificationDataManager();
+
+        mNotificationDataManager = new NotificationDataManager();
+        mNotificationDataManager.setOnUnseenCountUpdateListener(
+                () -> {
+                    // TODO: Update Notification Icon based on unseen count
+                    Log.d(TAG, "unseen count: " +
+                            mNotificationDataManager.getUnseenNotificationCount());
+                });
+
         CarHeadsUpNotificationManager carHeadsUpNotificationManager =
-                new CarSystemUIHeadsUpNotificationManager(mContext, clickHandlerFactory,
-                        notificationDataManager);
+                new CarSystemUIHeadsUpNotificationManager(mContext,
+                        mNotificationClickHandlerFactory, mNotificationDataManager);
+        mNotificationClickHandlerFactory.setNotificationDataManager(mNotificationDataManager);
 
         carNotificationListener.registerAsSystemService(mContext, carUxRestrictionManagerWrapper,
-                carHeadsUpNotificationManager, notificationDataManager);
+                carHeadsUpNotificationManager, mNotificationDataManager);
 
         mNotificationView = mStatusBarWindow.findViewById(R.id.notification_view);
         View glassPane = mStatusBarWindow.findViewById(R.id.glass_pane);
-        mNotificationView.setClickHandlerFactory(clickHandlerFactory);
+        mNotificationView.setClickHandlerFactory(mNotificationClickHandlerFactory);
+        mNotificationView.setNotificationDataManager(mNotificationDataManager);
 
         // The glass pane is used to view touch events before passed to the notification list.
         // This allows us to initialize gesture listeners and detect when to close the notifications
@@ -514,11 +547,12 @@ public class CarStatusBar extends StatusBar implements
             }
         });
 
-        NotificationViewController mNotificationViewController = new NotificationViewController(
+        mNotificationViewController = new NotificationViewController(
                 mNotificationView,
                 PreprocessingManager.getInstance(mContext),
                 carNotificationListener,
-                carUxRestrictionManagerWrapper);
+                carUxRestrictionManagerWrapper,
+                mNotificationDataManager);
         mNotificationViewController.enable();
     }
 
@@ -538,7 +572,6 @@ public class CarStatusBar extends StatusBar implements
         mNotificationList.scrollToPosition(0);
         mStatusBarWindowController.setPanelVisible(true);
         mNotificationView.setVisibility(View.VISIBLE);
-
         animateNotificationPanel(mOpeningVelocity, false);
 
         setPanelExpanded(true);
@@ -621,15 +654,18 @@ public class CarStatusBar extends StatusBar implements
                     mStatusBarWindowController.setPanelVisible(false);
                     mNotificationView.setVisibility(View.INVISIBLE);
                     mNotificationList.setClipBounds(null);
+                    mNotificationViewController.setIsInForeground(false);
                     // let the status bar know that the panel is closed
                     setPanelExpanded(false);
                 } else {
+                    mNotificationViewController.setIsInForeground(true);
                     // let the status bar know that the panel is open
+                    mNotificationView.setVisibleNotificationsAsSeen();
                     setPanelExpanded(true);
                 }
             }
         });
-        sFlingAnimationUtils.apply(animator, from, to, Math.abs(velocity));
+        mFlingAnimationUtils.apply(animator, from, to, Math.abs(velocity));
         animator.start();
     }
 
@@ -824,7 +860,6 @@ public class CarStatusBar extends StatusBar implements
             pw.println(entry.getValue());
         }
     }
-
 
     @Override
     public void showBatteryView() {
