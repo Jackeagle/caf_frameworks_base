@@ -45,7 +45,6 @@ import android.os.Process;
 import android.os.RemoteException;
 import android.os.ResultReceiver;
 import android.os.ServiceManager;
-import android.os.StrictMode;
 import android.os.SystemProperties;
 import android.provider.Settings.SettingNotFoundException;
 import android.service.carrier.CarrierIdentifier;
@@ -1686,7 +1685,6 @@ public class TelephonyManager {
     {
         String cmdline = "";
         FileInputStream is = null;
-        StrictMode.ThreadPolicy oldThreadPolicy = StrictMode.allowThreadDiskReads();
         try {
             is = new FileInputStream("/proc/cmdline");
             byte [] buffer = new byte[2048];
@@ -1697,7 +1695,6 @@ public class TelephonyManager {
         } catch (IOException e) {
             Rlog.d(TAG, "No /proc/cmdline exception=" + e);
         } finally {
-            StrictMode.setThreadPolicy(oldThreadPolicy);
             if (is != null) {
                 try {
                     is.close();
