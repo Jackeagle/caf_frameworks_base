@@ -19,6 +19,7 @@
 
 #include <shared_mutex>
 
+#include <frameworks/base/cmds/statsd/src/active_config_list.pb.h>
 #include "HashableDimensionKey.h"
 #include "anomaly/AnomalyTracker.h"
 #include "condition/ConditionWizard.h"
@@ -33,6 +34,18 @@
 namespace android {
 namespace os {
 namespace statsd {
+
+// Keep this in sync with DumpReportReason enum in stats_log.proto
+enum DumpReportReason {
+    DEVICE_SHUTDOWN = 1,
+    CONFIG_UPDATED = 2,
+    CONFIG_REMOVED = 3,
+    GET_DATA_CALLED = 4,
+    ADB_DUMP = 5,
+    CONFIG_RESET = 6,
+    STATSCOMPANION_DIED = 7,
+    TERMINATION_SIGNAL_RECEIVED = 8
+};
 
 // If the metric has no activation requirement, it will be active once the metric producer is
 // created.
@@ -119,23 +132,17 @@ public:
     // Consume the parsed stats log entry that already matched the "what" of the metric.
     void onMatchedLogEvent(const size_t matcherIndex, const LogEvent& event) {
         std::lock_guard<std::mutex> lock(mMutex);
-        if (mIsActive) {
-            onMatchedLogEventLocked(matcherIndex, event);
-        }
+        onMatchedLogEventLocked(matcherIndex, event);
     }
 
     void onConditionChanged(const bool condition, const int64_t eventTime) {
         std::lock_guard<std::mutex> lock(mMutex);
-        if (mIsActive) {
-            onConditionChangedLocked(condition, eventTime);
-        }
+        onConditionChangedLocked(condition, eventTime);
     }
 
     void onSlicedConditionMayChange(bool overallCondition, const int64_t eventTime) {
         std::lock_guard<std::mutex> lock(mMutex);
-        if (mIsActive) {
-            onSlicedConditionMayChangeLocked(overallCondition, eventTime);
-        }
+        onSlicedConditionMayChangeLocked(overallCondition, eventTime);
     }
 
     bool isConditionSliced() const {
@@ -198,15 +205,9 @@ public:
         return mMetricId;
     }
 
-    int64_t getRemainingTtlNs(int64_t currentTimeNs) const {
+    void loadActiveMetric(const ActiveMetric& activeMetric, int64_t currentTimeNs) {
         std::lock_guard<std::mutex> lock(mMutex);
-        return getRemainingTtlNsLocked(currentTimeNs);
-    }
-
-    // Set metric to active for ttlNs.
-    void setActive(int64_t currentTimeNs, int64_t remainingTtlNs) {
-        std::lock_guard<std::mutex> lock(mMutex);
-        setActiveLocked(currentTimeNs, remainingTtlNs);
+        loadActiveMetricLocked(activeMetric, currentTimeNs);
     }
 
     // Let MetricProducer drop in-memory data to save memory.
@@ -238,20 +239,18 @@ public:
         return isActiveLocked();
     }
 
-    void prepActiveForBootIfNecessary(int64_t currentTimeNs) {
+    void addActivation(int activationTrackerIndex, const ActivationType& activationType,
+            int64_t ttl_seconds, int deactivationTrackerIndex = -1);
+
+    void prepareFirstBucket() {
         std::lock_guard<std::mutex> lock(mMutex);
-        prepActiveForBootIfNecessaryLocked(currentTimeNs);
-    }
-
-    void addActivation(int activationTrackerIndex, int64_t ttl_seconds,
-                       int deactivationTrackerIndex = -1);
-
-    inline void setActivationType(const MetricActivation::ActivationType& activationType) {
-        mActivationType = activationType;
+        prepareFirstBucketLocked();
     }
 
     void flushIfExpire(int64_t elapsedTimestampNs);
 
+    void writeActiveMetricToProtoOutputStream(
+            int64_t currentTimeNs, const DumpReportReason reason, ProtoOutputStream* proto);
 protected:
     virtual void onConditionChangedLocked(const bool condition, const int64_t eventTime) = 0;
     virtual void onSlicedConditionMayChangeLocked(bool overallCondition,
@@ -275,12 +274,9 @@ protected:
         return mIsActive;
     }
 
-    void prepActiveForBootIfNecessaryLocked(int64_t currentTimeNs);
+    void loadActiveMetricLocked(const ActiveMetric& activeMetric, int64_t currentTimeNs);
 
-    int64_t getRemainingTtlNsLocked(int64_t currentTimeNs) const;
-
-    void setActiveLocked(int64_t currentTimeNs, int64_t remainingTtlNs);
-
+    virtual void prepareFirstBucketLocked() {};
     /**
      * Flushes the current bucket if the eventTime is after the current bucket's end time. This will
        also flush the current partial bucket in memory.
@@ -302,11 +298,17 @@ protected:
      * bucket's end timestamp, than we flush up to the end of the latest full bucket; otherwise,
      * we assume that we want to flush a partial bucket. The bucket start timestamp and bucket
      * number are not changed by this function. This method should only be called by
-     * flushIfNeededLocked or the app upgrade handler; the caller MUST update the bucket timestamp
-     * and bucket number as needed.
+     * flushIfNeededLocked or flushLocked or the app upgrade handler; the caller MUST update the
+     * bucket timestamp and bucket number as needed.
      */
     virtual void flushCurrentBucketLocked(const int64_t& eventTimeNs,
                                           const int64_t& nextBucketStartTimeNs) {};
+
+    virtual void onActiveStateChangedLocked(const int64_t& eventTimeNs) {
+        if (!mIsActive) {
+            flushLocked(eventTimeNs);
+        }
+    }
 
     // Convenience to compute the current bucket's end time, which is always aligned with the
     // start time of the metric.
@@ -390,11 +392,16 @@ protected:
     mutable std::mutex mMutex;
 
     struct Activation {
-        Activation() : ttl_ns(0), activation_ns(0), state(ActivationState::kNotActive)  {}
+        Activation(const ActivationType& activationType, const int64_t ttlNs)
+            : ttl_ns(ttlNs),
+              start_ns(0),
+              state(ActivationState::kNotActive),
+              activationType(activationType) {}
 
-        int64_t ttl_ns;
-        int64_t activation_ns;
+        const int64_t ttl_ns;
+        int64_t start_ns;
         ActivationState state;
+        const ActivationType activationType;
     };
     // When the metric producer has multiple activations, these activations are ORed to determine
     // whether the metric producer is ready to generate metrics.
@@ -405,7 +412,12 @@ protected:
 
     bool mIsActive;
 
-    MetricActivation::ActivationType mActivationType;
+    FRIEND_TEST(DurationMetricE2eTest, TestOneBucket);
+    FRIEND_TEST(DurationMetricE2eTest, TestTwoBuckets);
+    FRIEND_TEST(DurationMetricE2eTest, TestWithActivation);
+    FRIEND_TEST(DurationMetricE2eTest, TestWithCondition);
+    FRIEND_TEST(DurationMetricE2eTest, TestWithSlicedCondition);
+    FRIEND_TEST(DurationMetricE2eTest, TestWithActivationAndSlicedCondition);
 
     FRIEND_TEST(MetricActivationE2eTest, TestCountMetric);
     FRIEND_TEST(MetricActivationE2eTest, TestCountMetricWithOneDeactivation);
@@ -414,6 +426,10 @@ protected:
 
     FRIEND_TEST(StatsLogProcessorTest, TestActiveConfigMetricDiskWriteRead);
     FRIEND_TEST(StatsLogProcessorTest, TestActivationOnBoot);
+    FRIEND_TEST(StatsLogProcessorTest, TestActivationOnBootMultipleActivations);
+    FRIEND_TEST(StatsLogProcessorTest,
+            TestActivationOnBootMultipleActivationsDifferentActivationTypes);
+    FRIEND_TEST(StatsLogProcessorTest, TestActivationsPersistAcrossSystemServerRestart);
 };
 
 }  // namespace statsd

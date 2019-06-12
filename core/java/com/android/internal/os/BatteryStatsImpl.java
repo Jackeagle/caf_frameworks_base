@@ -188,6 +188,7 @@ public class BatteryStatsImpl extends BatteryStats {
     static final long DELAY_UPDATE_WAKELOCKS = 5*1000;
 
     private static final double MILLISECONDS_IN_HOUR = 3600 * 1000;
+    private static final long MILLISECONDS_IN_YEAR = 365 * 24 * 3600 * 1000L;
 
     private final KernelWakelockReader mKernelWakelockReader = new KernelWakelockReader();
     private final KernelWakelockStats mTmpWakelockStats = new KernelWakelockStats();
@@ -609,9 +610,7 @@ public class BatteryStatsImpl extends BatteryStats {
         int UPDATE_RADIO = 0x04;
         int UPDATE_BT = 0x08;
         int UPDATE_RPM = 0x10; // 16
-        int UPDATE_RAIL = 0x20; // 32
-        int UPDATE_ALL = UPDATE_CPU | UPDATE_WIFI | UPDATE_RADIO | UPDATE_BT | UPDATE_RPM
-                | UPDATE_RAIL;
+        int UPDATE_ALL = UPDATE_CPU | UPDATE_WIFI | UPDATE_RADIO | UPDATE_BT | UPDATE_RPM;
 
         Future<?> scheduleSync(String reason, int flags);
         Future<?> scheduleCpuSyncDueToRemovedUid(int uid);
@@ -3687,7 +3686,7 @@ public class BatteryStatsImpl extends BatteryStats {
                 Slog.d(TAG, "addHistoryBufferLocked writeHistoryLocked takes ms:"
                         + (SystemClock.uptimeMillis() - start));
             }
-            mBatteryStatsHistory.createNextFile();
+            mBatteryStatsHistory.startNextFile();
             mHistoryBuffer.setDataSize(0);
             mHistoryBuffer.setDataPosition(0);
             mHistoryBuffer.setDataCapacity(mConstants.MAX_HISTORY_BUFFER / 2);
@@ -3957,25 +3956,11 @@ public class BatteryStatsImpl extends BatteryStats {
         addHistoryEventLocked(elapsedRealtime, uptime, code, name, uid);
     }
 
-    boolean ensureStartClockTime(final long currentTime) {
-        final long ABOUT_ONE_YEAR = 365*24*60*60*1000L;
-        if ((currentTime > ABOUT_ONE_YEAR && mStartClockTime < (currentTime-ABOUT_ONE_YEAR))
-                || (mStartClockTime > currentTime)) {
-            // If the start clock time has changed by more than a year, then presumably
-            // the previous time was completely bogus.  So we are going to figure out a
-            // new time based on how much time has elapsed since we started counting.
-            mStartClockTime = currentTime - (mClocks.elapsedRealtime()-(mRealtimeStart/1000));
-            return true;
-        }
-        return false;
-    }
-
     public void noteCurrentTimeChangedLocked() {
         final long currentTime = System.currentTimeMillis();
         final long elapsedRealtime = mClocks.elapsedRealtime();
         final long uptime = mClocks.uptimeMillis();
         recordCurrentTimeChangeLocked(currentTime, elapsedRealtime, uptime);
-        ensureStartClockTime(currentTime);
     }
 
     public void noteProcessStartLocked(String name, int uid) {
@@ -6454,9 +6439,15 @@ public class BatteryStatsImpl extends BatteryStats {
 
     @Override public long getStartClockTime() {
         final long currentTime = System.currentTimeMillis();
-        if (ensureStartClockTime(currentTime)) {
+        if ((currentTime > MILLISECONDS_IN_YEAR
+                && mStartClockTime < (currentTime - MILLISECONDS_IN_YEAR))
+                || (mStartClockTime > currentTime)) {
+            // If the start clock time has changed by more than a year, then presumably
+            // the previous time was completely bogus.  So we are going to figure out a
+            // new time based on how much time has elapsed since we started counting.
             recordCurrentTimeChangeLocked(currentTime, mClocks.elapsedRealtime(),
                     mClocks.uptimeMillis());
+            return currentTime - (mClocks.elapsedRealtime() - (mRealtimeStart / 1000));
         }
         return mStartClockTime;
     }
@@ -12030,7 +12021,7 @@ public class BatteryStatsImpl extends BatteryStats {
         // if the device is now charging, it means that this is either called
         // 1. directly when level >= 90
         // 2. or from within the runnable that we deferred
-        // For 1. if we have an existing callback, remove it, since we will immediatelly send a
+        // For 1. if we have an existing callback, remove it, since we will immediately send a
         // ACTION_CHARGING
         // For 2. we remove existing callback so we don't send multiple ACTION_CHARGING
         mHandler.removeCallbacks(mDeferSetCharging);
@@ -12371,7 +12362,6 @@ public class BatteryStatsImpl extends BatteryStats {
                     // If the battery level is at least 90%, always consider the device to be
                     // charging even if it happens to go down a level.
                     changed |= setChargingLocked(true);
-                    mLastChargeStepLevel = level;
                 } else if (!mCharging) {
                     if (mLastChargeStepLevel < level) {
                         // We have not reported that we are charging, but the level has gone up,
@@ -12397,17 +12387,16 @@ public class BatteryStatsImpl extends BatteryStats {
                         changed |= setChargingLocked(false);
                     }
                 }
-                mLastChargeStepLevel = level;
                 if (mLastChargeStepLevel != level && mMaxChargeStepLevel < level) {
                     mChargeStepTracker.addLevelSteps(level - mLastChargeStepLevel,
                             modeBits, elapsedRealtime);
                     mDailyChargeStepTracker.addLevelSteps(level - mLastChargeStepLevel,
                             modeBits, elapsedRealtime);
-                    mLastChargeStepLevel = level;
                     mMaxChargeStepLevel = level;
                     mInitStepMode = mCurStepMode;
                     mModStepMode = 0;
                 }
+                mLastChargeStepLevel = level;
             }
             if (changed) {
                 addHistoryRecordLocked(elapsedRealtime, uptime);
@@ -14026,7 +14015,7 @@ public class BatteryStatsImpl extends BatteryStats {
 
         // Pull the clock time.  This may update the time and make a new history entry
         // if we had originally pulled a time before the RTC was set.
-        long startClockTime = getStartClockTime();
+        getStartClockTime();
 
         final long NOW_SYS = mClocks.uptimeMillis() * 1000;
         final long NOWREAL_SYS = mClocks.elapsedRealtime() * 1000;
@@ -14050,7 +14039,7 @@ public class BatteryStatsImpl extends BatteryStats {
         out.writeInt(mStartCount);
         out.writeLong(computeUptime(NOW_SYS, STATS_SINCE_CHARGED));
         out.writeLong(computeRealtime(NOWREAL_SYS, STATS_SINCE_CHARGED));
-        out.writeLong(startClockTime);
+        out.writeLong(mStartClockTime);
         out.writeString(mStartPlatformVersion);
         out.writeString(mEndPlatformVersion);
         mOnBatteryTimeBase.writeSummaryToParcel(out, NOW_SYS, NOWREAL_SYS);
@@ -14763,7 +14752,7 @@ public class BatteryStatsImpl extends BatteryStats {
 
         // Pull the clock time.  This may update the time and make a new history entry
         // if we had originally pulled a time before the RTC was set.
-        long startClockTime = getStartClockTime();
+        getStartClockTime();
 
         final long uSecUptime = mClocks.uptimeMillis() * 1000;
         final long uSecRealtime = mClocks.elapsedRealtime() * 1000;
@@ -14776,7 +14765,7 @@ public class BatteryStatsImpl extends BatteryStats {
         mBatteryStatsHistory.writeToParcel(out);
 
         out.writeInt(mStartCount);
-        out.writeLong(startClockTime);
+        out.writeLong(mStartClockTime);
         out.writeString(mStartPlatformVersion);
         out.writeString(mEndPlatformVersion);
         out.writeLong(mUptime);

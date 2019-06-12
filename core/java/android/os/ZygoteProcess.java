@@ -306,7 +306,6 @@ public class ZygoteProcess {
      * @param appDataDir null-ok the data directory of the app.
      * @param invokeWith null-ok the command to invoke with.
      * @param packageName null-ok the name of the package this process belongs to.
-     * @param packagesForUid null-ok all the packages with the same uid as this process.
      * @param zygoteArgs Additional arguments to supply to the zygote process.
      * @param useSystemGraphicsDriver whether the process uses system graphics driver.
      *
@@ -324,11 +323,9 @@ public class ZygoteProcess {
                                                   @Nullable String appDataDir,
                                                   @Nullable String invokeWith,
                                                   @Nullable String packageName,
-                                                  @Nullable String[] packagesForUid,
-                                                  @Nullable String sandboxId,
                                                   boolean useUsapPool,
-                                                  @Nullable String[] zygoteArgs,
-                                                  boolean useSystemGraphicsDriver) {
+                                                  boolean useSystemGraphicsDriver,
+                                                  @Nullable String[] zygoteArgs) {
         // TODO (chriswailes): Is there a better place to check this value?
         if (fetchUsapPoolEnabledPropWithMinInterval()) {
             informZygotesOfUsapPoolStatus();
@@ -338,8 +335,7 @@ public class ZygoteProcess {
             return startViaZygote(processClass, niceName, uid, gid, gids,
                     runtimeFlags, mountExternal, targetSdkVersion, seInfo,
                     abi, instructionSet, appDataDir, invokeWith, /*startChildZygote=*/ false,
-                    packageName, packagesForUid, sandboxId,
-                    useUsapPool, zygoteArgs);
+                    packageName, useUsapPool, useSystemGraphicsDriver, zygoteArgs);
         } catch (ZygoteStartFailedEx ex) {
             Log.e(LOG_TAG,
                     "Starting VM process through Zygote failed");
@@ -385,13 +381,17 @@ public class ZygoteProcess {
      */
     @GuardedBy("mLock")
     private Process.ProcessStartResult zygoteSendArgsAndGetResult(
-            ZygoteState zygoteState, boolean useUsapPool, ArrayList<String> args)
+            ZygoteState zygoteState, boolean useUsapPool, @NonNull ArrayList<String> args)
             throws ZygoteStartFailedEx {
         // Throw early if any of the arguments are malformed. This means we can
         // avoid writing a partial response to the zygote.
         for (String arg : args) {
+            // Making two indexOf calls here is faster than running a manually fused loop due
+            // to the fact that indexOf is a optimized intrinsic.
             if (arg.indexOf('\n') >= 0) {
-                throw new ZygoteStartFailedEx("embedded newlines not allowed");
+                throw new ZygoteStartFailedEx("Embedded newlines not allowed");
+            } else if (arg.indexOf('\r') >= 0) {
+                throw new ZygoteStartFailedEx("Embedded carriage returns not allowed");
             }
         }
 
@@ -407,7 +407,7 @@ public class ZygoteProcess {
          */
         String msgStr = args.size() + "\n" + String.join("\n", args) + "\n";
 
-        if (useUsapPool && mUsapPoolEnabled && isValidUsapCommand(args)) {
+        if (useUsapPool && mUsapPoolEnabled && canAttemptUsap(args)) {
             try {
                 return attemptUsapSendArgsAndGetResult(zygoteState, msgStr);
             } catch (IOException ex) {
@@ -498,10 +498,18 @@ public class ZygoteProcess {
      * @param args  Zygote/USAP command arguments
      * @return  True if the command can be passed to a USAP; false otherwise
      */
-    private static boolean isValidUsapCommand(ArrayList<String> args) {
+    private static boolean canAttemptUsap(ArrayList<String> args) {
         for (String flag : args) {
             for (String badFlag : INVALID_USAP_FLAGS) {
                 if (flag.startsWith(badFlag)) {
+                    return false;
+                }
+            }
+            if (flag.startsWith("--nice-name=")) {
+                // Check if the wrap property is set, usap would ignore it.
+                String niceName = flag.substring(12);
+                String property_value = SystemProperties.get("wrap." + niceName);
+                if (property_value != null && property_value.length() != 0) {
                     return false;
                 }
             }
@@ -528,7 +536,6 @@ public class ZygoteProcess {
      * @param startChildZygote Start a sub-zygote. This creates a new zygote process
      * that has its state cloned from this zygote process.
      * @param packageName null-ok the name of the package this process belongs to.
-     * @param packagesForUid null-ok all the packages with the same uid as this process.
      * @param extraArgs Additional arguments to supply to the zygote process.
      * @return An object that describes the result of the attempt to start the process.
      * @throws ZygoteStartFailedEx if process start failed for any reason
@@ -546,9 +553,8 @@ public class ZygoteProcess {
                                                       @Nullable String invokeWith,
                                                       boolean startChildZygote,
                                                       @Nullable String packageName,
-                                                      @Nullable String[] packagesForUid,
-                                                      @Nullable String sandboxId,
-                                                      boolean useUnspecializedAppProcessPool,
+                                                      boolean useUsapPool,
+                                                      boolean useSystemGraphicsDriver,
                                                       @Nullable String[] extraArgs)
                                                       throws ZygoteStartFailedEx {
         ArrayList<String> argsForZygote = new ArrayList<>();
@@ -620,14 +626,6 @@ public class ZygoteProcess {
             argsForZygote.add("--package-name=" + packageName);
         }
 
-        if (packagesForUid != null && packagesForUid.length > 0) {
-            argsForZygote.add("--packages-for-uid=" + String.join(",", packagesForUid));
-        }
-
-        if (sandboxId != null) {
-            argsForZygote.add("--sandbox-id=" + sandboxId);
-        }
-
         argsForZygote.add(processClass);
 
         if (extraArgs != null) {
@@ -635,8 +633,10 @@ public class ZygoteProcess {
         }
 
         synchronized(mLock) {
+            // The USAP pool can not be used if the application will not use the systems graphics
+            // driver.  If that driver is requested use the Zygote application start path.
             return zygoteSendArgsAndGetResult(openZygoteSocketIfNeeded(abi),
-                                              useUnspecializedAppProcessPool,
+                                              useUsapPool && useSystemGraphicsDriver,
                                               argsForZygote);
         }
     }
@@ -648,14 +648,9 @@ public class ZygoteProcess {
                 ZygoteConfig.USAP_POOL_ENABLED, USAP_POOL_ENABLED_DEFAULT);
 
         if (!propertyString.isEmpty()) {
-            if (SystemProperties.get("dalvik.vm.boot-image", "").endsWith("apex.art")) {
-                // TODO(b/119800099): Tweak usap configuration in jitzygote mode.
-                mUsapPoolEnabled = false;
-            } else {
-                mUsapPoolEnabled = Zygote.getConfigurationPropertyBoolean(
-                    ZygoteConfig.USAP_POOL_ENABLED,
-                    Boolean.parseBoolean(USAP_POOL_ENABLED_DEFAULT));
-            }
+            mUsapPoolEnabled = Zygote.getConfigurationPropertyBoolean(
+                  ZygoteConfig.USAP_POOL_ENABLED,
+                  Boolean.parseBoolean(USAP_POOL_ENABLED_DEFAULT));
         }
 
         boolean valueChanged = origVal != mUsapPoolEnabled;
@@ -672,6 +667,16 @@ public class ZygoteProcess {
 
     private boolean fetchUsapPoolEnabledPropWithMinInterval() {
         final long currentTimestamp = SystemClock.elapsedRealtime();
+
+        if (SystemProperties.get("dalvik.vm.boot-image", "").endsWith("apex.art")) {
+            // TODO(b/119800099): In jitzygote mode, we want to start using USAP processes
+            // only once the boot classpath has been compiled. There is currently no callback
+            // from the runtime to notify the zygote about end of compilation, so for now just
+            // arbitrarily start USAP processes 15 seconds after boot.
+            if (currentTimestamp <= 15000) {
+                return false;
+            }
+        }
 
         if (mIsFirstPropCheck
                 || (currentTimestamp - mLastPropCheckTimestamp >= Zygote.PROPERTY_CHECK_INTERVAL)) {
@@ -874,6 +879,7 @@ public class ZygoteProcess {
 
             maybeSetApiBlacklistExemptions(primaryZygoteState, false);
             maybeSetHiddenApiAccessLogSampleRate(primaryZygoteState);
+            maybeSetHiddenApiAccessStatslogSampleRate(primaryZygoteState);
         }
     }
 
@@ -889,6 +895,7 @@ public class ZygoteProcess {
 
             maybeSetApiBlacklistExemptions(secondaryZygoteState, false);
             maybeSetHiddenApiAccessLogSampleRate(secondaryZygoteState);
+            maybeSetHiddenApiAccessStatslogSampleRate(secondaryZygoteState);
         }
     }
 
@@ -1140,8 +1147,8 @@ public class ZygoteProcess {
                     gids, runtimeFlags, 0 /* mountExternal */, 0 /* targetSdkVersion */, seInfo,
                     abi, instructionSet, null /* appDataDir */, null /* invokeWith */,
                     true /* startChildZygote */, null /* packageName */,
-                    null /* packagesForUid */, null /* sandboxId */,
-                    false /* useUsapPool */, extraArgs);
+                    false /* useUsapPool */, false /*useSystemGraphicsDriver*/,
+                    extraArgs);
         } catch (ZygoteStartFailedEx ex) {
             throw new RuntimeException("Starting child-zygote through Zygote failed", ex);
         }

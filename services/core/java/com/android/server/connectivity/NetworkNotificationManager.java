@@ -19,7 +19,6 @@ package com.android.server.connectivity;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET;
 import static android.net.NetworkCapabilities.TRANSPORT_CELLULAR;
 import static android.net.NetworkCapabilities.TRANSPORT_WIFI;
-import static android.telephony.SubscriptionManager.DEFAULT_SUBSCRIPTION_ID;
 
 import android.app.Notification;
 import android.app.NotificationManager;
@@ -107,10 +106,14 @@ public class NetworkNotificationManager {
         }
     }
 
-    private static int getIcon(int transportType) {
-        return (transportType == TRANSPORT_WIFI) ?
-                R.drawable.stat_notify_wifi_in_range :  // TODO: Distinguish ! from ?.
-                R.drawable.stat_notify_rssi_in_range;
+    private static int getIcon(int transportType, NotificationType notifyType) {
+        if (transportType != TRANSPORT_WIFI) {
+            return R.drawable.stat_notify_rssi_in_range;
+        }
+
+        return notifyType == NotificationType.LOGGED_IN
+            ? R.drawable.ic_wifi_signal_4
+            : R.drawable.stat_notify_wifi_in_range;  // TODO: Distinguish ! from ?.
     }
 
     /**
@@ -127,6 +130,7 @@ public class NetworkNotificationManager {
      * @param id an identifier that uniquely identifies this notification.  This must match
      *         between show and hide calls.  We use the NetID value but for legacy callers
      *         we concatenate the range of types with the range of NetIDs.
+     * @param notifyType the type of the notification.
      * @param nai the network with which the notification is associated. For a SIGN_IN, NO_INTERNET,
      *         or LOST_INTERNET notification, this is the network we're connecting to. For a
      *         NETWORK_SWITCH notification it's the network that we switched from. When this network
@@ -173,7 +177,7 @@ public class NetworkNotificationManager {
         Resources r = Resources.getSystem();
         CharSequence title;
         CharSequence details;
-        int icon = getIcon(transportType);
+        int icon = getIcon(transportType, notifyType);
         if (notifyType == NotificationType.NO_INTERNET && transportType == TRANSPORT_WIFI) {
             title = r.getString(R.string.wifi_no_internet,
                     WifiInfo.removeDoubleQuotes(nai.networkCapabilities.getSSID()));
@@ -233,9 +237,15 @@ public class NetworkNotificationManager {
                     + getTransportName(transportType));
             return;
         }
-
-        final String channelId = highPriority ? SystemNotificationChannels.NETWORK_ALERTS :
-                SystemNotificationChannels.NETWORK_STATUS;
+        // When replacing an existing notification for a given network, don't alert, just silently
+        // update the existing notification. Note that setOnlyAlertOnce() will only work for the
+        // same id, and the id used here is the NotificationType which is different in every type of
+        // notification. This is required because the notification metrics only track the ID but not
+        // the tag.
+        final boolean hasPreviousNotification = previousNotifyType != null;
+        final String channelId = (highPriority && !hasPreviousNotification)
+                ? SystemNotificationChannels.NETWORK_ALERTS
+                : SystemNotificationChannels.NETWORK_STATUS;
         Notification.Builder builder = new Notification.Builder(mContext, channelId)
                 .setWhen(System.currentTimeMillis())
                 .setShowWhen(notifyType == NotificationType.NETWORK_SWITCH)

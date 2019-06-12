@@ -71,6 +71,7 @@ public class NotificationShelf extends ActivatableNotificationView implements
     private int mIconAppearTopPadding;
     private int mShelfAppearTranslation;
     private float mDarkShelfPadding;
+    private float mDarkShelfIconSize;
     private int mStatusBarHeight;
     private int mStatusBarPaddingStart;
     private AmbientState mAmbientState;
@@ -151,6 +152,7 @@ public class NotificationShelf extends ActivatableNotificationView implements
         mScrollFastThreshold = res.getDimensionPixelOffset(R.dimen.scroll_fast_threshold);
         mShowNotificationShelf = res.getBoolean(R.bool.config_showNotificationShelf);
         mIconSize = res.getDimensionPixelSize(com.android.internal.R.dimen.status_bar_icon_size);
+        mDarkShelfIconSize = res.getDimensionPixelOffset(R.dimen.dark_shelf_icon_size);
         mGapHeight = res.getDimensionPixelSize(R.dimen.qs_notification_padding);
 
         if (!mShowNotificationShelf) {
@@ -292,17 +294,17 @@ public class NotificationShelf extends ActivatableNotificationView implements
         int backgroundTop = 0;
         int clipTopAmount = 0;
         float firstElementRoundness = 0.0f;
-        ExpandableNotificationRow previousRow = null;
+        ActivatableNotificationView previousRow = null;
 
         for (int i = 0; i < mHostLayout.getChildCount(); i++) {
             ExpandableView child = (ExpandableView) mHostLayout.getChildAt(i);
 
-            if (!(child instanceof ExpandableNotificationRow)
-                    || child.getVisibility() == GONE) {
+            if (!(child instanceof ActivatableNotificationView)
+                    || child.getVisibility() == GONE || child == this) {
                 continue;
             }
 
-            ExpandableNotificationRow row = (ExpandableNotificationRow) child;
+            ActivatableNotificationView row = (ActivatableNotificationView) child;
             float notificationClipEnd;
             boolean aboveShelf = ViewState.getFinalTranslationZ(row) > baseZHeight
                     || row.isPinned();
@@ -322,43 +324,55 @@ public class NotificationShelf extends ActivatableNotificationView implements
             }
             int clipTop = updateNotificationClipHeight(row, notificationClipEnd, notGoneIndex);
             clipTopAmount = Math.max(clipTop, clipTopAmount);
-            float inShelfAmount = updateIconAppearance(row, expandAmount, scrolling, scrollingFast,
-                    expandingAnimated, isLastChild);
-            numViewsInShelf += inShelfAmount;
-            int ownColorUntinted = row.getBackgroundColorWithoutTint();
-            if (rowTranslationY >= shelfStart && mNotGoneIndex == -1) {
-                mNotGoneIndex = notGoneIndex;
-                setTintColor(previousColor);
-                setOverrideTintColor(colorTwoBefore, transitionAmount);
 
-            } else if (mNotGoneIndex == -1) {
-                colorTwoBefore = previousColor;
-                transitionAmount = inShelfAmount;
-            }
-            if (isLastChild) {
-                if (colorOfViewBeforeLast == NO_COLOR) {
+            // If the current row is an ExpandableNotificationRow, update its color, roundedness,
+            // and icon state.
+            if (row instanceof ExpandableNotificationRow) {
+                ExpandableNotificationRow expandableRow = (ExpandableNotificationRow) row;
+
+                float inShelfAmount = updateIconAppearance(expandableRow, expandAmount, scrolling,
+                        scrollingFast,
+                        expandingAnimated, isLastChild);
+                numViewsInShelf += inShelfAmount;
+                int ownColorUntinted = row.getBackgroundColorWithoutTint();
+                if (rowTranslationY >= shelfStart && mNotGoneIndex == -1) {
+                    mNotGoneIndex = notGoneIndex;
+                    setTintColor(previousColor);
+                    setOverrideTintColor(colorTwoBefore, transitionAmount);
+
+                } else if (mNotGoneIndex == -1) {
+                    colorTwoBefore = previousColor;
+                    transitionAmount = inShelfAmount;
+                }
+                if (isLastChild) {
+                    if (colorOfViewBeforeLast == NO_COLOR) {
+                        colorOfViewBeforeLast = ownColorUntinted;
+                    }
+                    row.setOverrideTintColor(colorOfViewBeforeLast, inShelfAmount);
+                } else {
                     colorOfViewBeforeLast = ownColorUntinted;
+                    row.setOverrideTintColor(NO_COLOR, 0 /* overrideAmount */);
                 }
-                row.setOverrideTintColor(colorOfViewBeforeLast, inShelfAmount);
-            } else {
-                colorOfViewBeforeLast = ownColorUntinted;
-                row.setOverrideTintColor(NO_COLOR, 0 /* overrideAmount */);
-            }
-            if (notGoneIndex != 0 || !aboveShelf) {
-                row.setAboveShelf(false);
-            }
-            if (notGoneIndex == 0) {
-                StatusBarIconView icon = row.getEntry().expandedIcon;
-                NotificationIconContainer.IconState iconState = getIconState(icon);
-                // The icon state might be null in rare cases where the notification is actually
-                // added to the layout, but not to the shelf. An example are replied messages, since
-                // they don't show up on AOD
-                if (iconState != null && iconState.clampedAppearAmount == 1.0f) {
-                    // only if the first icon is fully in the shelf we want to clip to it!
-                    backgroundTop = (int) (row.getTranslationY() - getTranslationY());
-                    firstElementRoundness = row.getCurrentTopRoundness();
+                if (notGoneIndex != 0 || !aboveShelf) {
+                    expandableRow.setAboveShelf(false);
                 }
+                if (notGoneIndex == 0) {
+                    StatusBarIconView icon = expandableRow.getEntry().expandedIcon;
+                    NotificationIconContainer.IconState iconState = getIconState(icon);
+                    // The icon state might be null in rare cases where the notification is actually
+                    // added to the layout, but not to the shelf. An example are replied messages,
+                    // since they don't show up on AOD
+                    if (iconState != null && iconState.clampedAppearAmount == 1.0f) {
+                        // only if the first icon is fully in the shelf we want to clip to it!
+                        backgroundTop = (int) (row.getTranslationY() - getTranslationY());
+                        firstElementRoundness = row.getCurrentTopRoundness();
+                    }
+                }
+
+                previousColor = ownColorUntinted;
+                notGoneIndex++;
             }
+
             if (row.isFirstInSection() && previousRow != null && previousRow.isLastInSection()) {
                 // If the top of the shelf is between the view before a gap and the view after a gap
                 // then we need to adjust the shelf's top roundness.
@@ -377,8 +391,6 @@ public class NotificationShelf extends ActivatableNotificationView implements
                     backgroundTop = (int) distanceToGapBottom;
                 }
             }
-            notGoneIndex++;
-            previousColor = ownColorUntinted;
             previousRow = row;
         }
         clipTransientViews();
@@ -495,7 +507,7 @@ public class NotificationShelf extends ActivatableNotificationView implements
      * Update the clipping of this view.
      * @return the amount that our own top should be clipped
      */
-    private int updateNotificationClipHeight(ExpandableNotificationRow row,
+    private int updateNotificationClipHeight(ActivatableNotificationView row,
             float notificationClipEnd, int childIndex) {
         float viewEnd = row.getTranslationY() + row.getActualHeight();
         boolean isPinned = (row.isPinned() || row.isHeadsUpAnimatingAway())
@@ -705,12 +717,13 @@ public class NotificationShelf extends ActivatableNotificationView implements
         }
         notificationIconPosition += iconTopPadding;
         float shelfIconPosition = getTranslationY() + icon.getTop();
-        shelfIconPosition += (icon.getHeight() - icon.getIconScale() * mIconSize) / 2.0f;
+        float iconSize = mDark ? mDarkShelfIconSize : mIconSize;
+        shelfIconPosition += (icon.getHeight() - icon.getIconScale() * iconSize) / 2.0f;
         float iconYTranslation = NotificationUtils.interpolate(
                 notificationIconPosition - shelfIconPosition,
                 0,
                 transitionAmount);
-        float shelfIconSize = mIconSize * icon.getIconScale();
+        float shelfIconSize = iconSize * icon.getIconScale();
         float alpha = 1.0f;
         boolean noIcon = !row.isShowingIcon();
         if (noIcon) {

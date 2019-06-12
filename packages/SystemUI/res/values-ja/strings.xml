@@ -62,12 +62,13 @@
     <string name="usb_debugging_secondary_user_title" msgid="6353808721761220421">"USBデバッグは許可されていません"</string>
     <string name="usb_debugging_secondary_user_message" msgid="6067122453571699801">"このデバイスに現在ログインしているユーザーでは、USB デバッグを ON にすることはできません。この機能を使用するには、メインユーザーに切り替えてください。"</string>
     <string name="usb_contaminant_title" msgid="206854874263058490">"USB ポート無効"</string>
-    <string name="usb_contaminant_message" msgid="2205845572186473860">"液体やゴミからデバイスを保護するため、USB ポートは無効になっています。アクセサリの検出は行われません。\n\nUSB ポートを再び安全に使用できるようになりましたらお知らせします。"</string>
+    <string name="usb_contaminant_message" msgid="7379089091591609111">"液体やゴミからデバイスを保護するため、USB ポートは無効になっています。アクセサリの検出は行われません。\n\nUSB ポートを再び安全に使用できるようになりましたらお知らせします。"</string>
     <string name="usb_port_enabled" msgid="7906141351687694867">"USB ポートが有効になり、充電器やアクセサリを検出できるようになりました"</string>
     <string name="usb_disable_contaminant_detection" msgid="2103905315747120033">"USB を有効にする"</string>
+    <string name="learn_more" msgid="5000517160980853569">"詳細"</string>
     <string name="compat_mode_on" msgid="6623839244840638213">"画面サイズに合わせて拡大"</string>
     <string name="compat_mode_off" msgid="4434467572461327898">"画面サイズに合わせて拡大"</string>
-    <string name="global_action_screenshot" msgid="8329831278085426283">"スクリーンショット"</string>
+    <string name="global_action_screenshot" msgid="8329831278085426283">"画面の保存"</string>
     <string name="screenshot_saving_ticker" msgid="7403652894056693515">"スクリーンショットを保存中..."</string>
     <string name="screenshot_saving_title" msgid="8242282144535555697">"スクリーンショットを保存しています..."</string>
     <string name="screenshot_saved_title" msgid="5637073968117370753">"スクリーンショットを保存しました"</string>
@@ -118,6 +119,11 @@
     <string name="cancel" msgid="6442560571259935130">"キャンセル"</string>
     <string name="biometric_dialog_confirm" msgid="6468457350041712674">"確認"</string>
     <string name="biometric_dialog_try_again" msgid="1900185172633183201">"再試行"</string>
+    <string name="biometric_dialog_empty_space_description" msgid="7997936968009073717">"空白の領域をタップすると、認証をキャンセルできます"</string>
+    <string name="biometric_dialog_face_icon_description_idle" msgid="4497694707475970790">"もう一度お試しください"</string>
+    <string name="biometric_dialog_face_icon_description_authenticating" msgid="4512727754496228488">"顔を認証中です"</string>
+    <string name="biometric_dialog_face_icon_description_authenticated" msgid="595380451325425259">"顔を認証しました"</string>
+    <string name="biometric_dialog_face_icon_description_confirmed" msgid="2003141400387093967">"確認しました"</string>
     <string name="fingerprint_dialog_touch_sensor" msgid="8511557690663181761">"指紋認証センサーをタップしてください"</string>
     <string name="accessibility_fingerprint_dialog_fingerprint_icon" msgid="3125122495414253226">"指紋アイコン"</string>
     <string name="face_dialog_looking_for_face" msgid="7049276266074494689">"顔を認証しています…"</string>
@@ -271,6 +277,7 @@
     <string name="gps_notification_searching_text" msgid="8574247005642736060">"GPSで検索中"</string>
     <string name="gps_notification_found_text" msgid="4619274244146446464">"GPSにより現在地が設定されました"</string>
     <string name="accessibility_location_active" msgid="2427290146138169014">"現在地リクエストがアクティブ"</string>
+    <string name="accessibility_sensors_off_active" msgid="157126524598525432">"センサー OFF: 有効"</string>
     <string name="accessibility_clear_all" msgid="5235938559247164925">"通知をすべて消去。"</string>
     <string name="notification_group_overflow_indicator" msgid="1863231301642314183">"他 <xliff:g id="NUMBER">%s</xliff:g> 件"</string>
     <plurals name="notification_group_overflow_description" formatted="false" msgid="4579313201268495404">
@@ -368,6 +375,7 @@
     <string name="quick_settings_night_secondary_label_on_at" msgid="6256314040368487637">"<xliff:g id="TIME">%s</xliff:g> に ON"</string>
     <string name="quick_settings_secondary_label_until" msgid="2749196569462600150">"<xliff:g id="TIME">%s</xliff:g> まで"</string>
     <string name="quick_settings_ui_mode_night_label" msgid="512534812963862137">"ダークテーマ"</string>
+    <string name="quick_settings_ui_mode_night_label_battery_saver" msgid="3496696903886673256">"ダークテーマ\nバッテリー セーバー"</string>
     <string name="quick_settings_nfc_label" msgid="9012153754816969325">"NFC"</string>
     <string name="quick_settings_nfc_off" msgid="6883274004315134333">"NFC は無効です"</string>
     <string name="quick_settings_nfc_on" msgid="6680317193676884311">"NFC は有効です"</string>
@@ -403,8 +411,7 @@
     <string name="interruption_level_none_twoline" msgid="3957581548190765889">"サイレント\n"</string>
     <string name="interruption_level_priority_twoline" msgid="1564715335217164124">"重要な\n通知のみ"</string>
     <string name="interruption_level_alarms_twoline" msgid="3266909566410106146">"アラーム\nのみ"</string>
-    <!-- no translation found for keyguard_indication_charging_time_wireless (6959284458466962592) -->
-    <skip />
+    <string name="keyguard_indication_charging_time_wireless" msgid="6959284458466962592">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • ワイヤレス充電中（完了まで <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g>）"</string>
     <string name="keyguard_indication_charging_time" msgid="2056340799276374421">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • 充電中（完了まで <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g>）"</string>
     <string name="keyguard_indication_charging_time_fast" msgid="7767562163577492332">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • 急速充電中（完了まで <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g>）"</string>
     <string name="keyguard_indication_charging_time_slowly" msgid="3769655133567307069">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • 低速充電中（完了まで <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g>）"</string>
@@ -443,11 +450,14 @@
     <string name="battery_saver_notification_title" msgid="8614079794522291840">"バッテリー セーバー ON"</string>
     <string name="battery_saver_notification_text" msgid="820318788126672692">"パフォーマンスとバックグラウンドデータを制限します"</string>
     <string name="battery_saver_notification_action_text" msgid="132118784269455533">"バッテリー セーバーを OFF"</string>
-    <string name="media_projection_dialog_text" msgid="5751657130671431216">"記録中やキャスト中に、<xliff:g id="APP_SEEKING_PERMISSION">%s</xliff:g>は、ユーザーが再生している音声、パスワード、お支払い情報、写真、メッセージなど、プライベート情報を取得する可能性があります。"</string>
+    <string name="media_projection_dialog_text" msgid="8585357687598538511">"記録中やキャスト中に、<xliff:g id="APP_SEEKING_PERMISSION">%s</xliff:g>は、画面上に表示またはデバイスから再生されている個人的な情報（音声、パスワード、お支払い情報、写真、メッセージなど）を取得する可能性があります。"</string>
+    <string name="media_projection_dialog_service_text" msgid="3075544489835858258">"記録中やキャスト中に、この機能を提供するサービスは、画面上に表示またはデバイスから再生されている個人的な情報（音声、パスワード、お支払い情報、写真、メッセージなど）を取得する可能性があります。"</string>
     <string name="media_projection_dialog_title" msgid="8124184308671641248">"キャスト中や記録中にプライベート情報が公開されます"</string>
     <string name="media_projection_remember_text" msgid="3103510882172746752">"次回から表示しない"</string>
     <string name="clear_all_notifications_text" msgid="814192889771462828">"すべて消去"</string>
     <string name="manage_notifications_text" msgid="2386728145475108753">"管理"</string>
+    <string name="notification_section_header_gentle" msgid="4372438504154095677">"サイレント通知"</string>
+    <string name="accessibility_notification_section_header_gentle_clear_all" msgid="4286716295850400959">"サイレント通知がすべて消去されます"</string>
     <string name="dnd_suppressing_shade_text" msgid="1904574852846769301">"サイレント モードにより通知は一時停止中です"</string>
     <string name="media_projection_action_text" msgid="8470872969457985954">"今すぐ開始"</string>
     <string name="empty_shade_text" msgid="708135716272867002">"通知はありません"</string>
@@ -507,8 +517,7 @@
     <string name="branded_monitoring_description_app_personal" msgid="2669518213949202599">"「<xliff:g id="APPLICATION">%1$s</xliff:g>」に接続しています。このアプリはあなたの個人のネットワーク アクティビティ（メール、アプリ、ウェブサイトなど）を監視できます。"</string>
     <string name="monitoring_description_app_work" msgid="4612997849787922906">"この仕事用プロファイルは<xliff:g id="ORGANIZATION">%1$s</xliff:g>によって管理され、<xliff:g id="APPLICATION">%2$s</xliff:g> に接続しています。このアプリはあなたの仕事のネットワーク アクティビティ（メール、アプリ、ウェブサイトなど）を監視できます。\n\n詳しくは管理者にお問い合わせください。"</string>
     <string name="monitoring_description_app_personal_work" msgid="5664165460056859391">"この仕事用プロファイルは<xliff:g id="ORGANIZATION">%1$s</xliff:g>によって管理され、<xliff:g id="APPLICATION_WORK">%2$s</xliff:g> に接続しています。このアプリはあなたの仕事のネットワーク アクティビティ（メール、アプリ、ウェブサイトなど）を管理できます。\n\nまた、<xliff:g id="APPLICATION_PERSONAL">%3$s</xliff:g> にも接続しているため、あなたの個人のネットワーク アクティビティも監視できます。"</string>
-    <!-- no translation found for keyguard_indication_trust_unlocked (2712865815371519117) -->
-    <skip />
+    <string name="keyguard_indication_trust_unlocked" msgid="2712865815371519117">"信頼エージェントがロック解除を管理"</string>
     <string name="keyguard_indication_trust_disabled" msgid="7412534203633528135">"手動でロックを解除するまでロックされたままとなります"</string>
     <string name="hidden_notifications_title" msgid="7139628534207443290">"通知をすばやく確認できます"</string>
     <string name="hidden_notifications_text" msgid="2326409389088668981">"ロックを解除する前にご確認ください"</string>
@@ -521,16 +530,14 @@
     <string name="accessibility_volume_collapse" msgid="3609549593031810875">"折りたたむ"</string>
     <string name="volume_odi_captions_tip" msgid="1193653197906918269">"自動字幕起こしメディア"</string>
     <string name="accessibility_volume_close_odi_captions_tip" msgid="1163987066404128967">"字幕のヒントを閉じる"</string>
-    <!-- no translation found for volume_odi_captions_content_description (2950736796270214785) -->
-    <skip />
-    <!-- no translation found for volume_odi_captions_hint_enable (49750248924730302) -->
-    <skip />
-    <!-- no translation found for volume_odi_captions_hint_disable (8980842810619956593) -->
-    <skip />
+    <string name="volume_odi_captions_content_description" msgid="2950736796270214785">"字幕のオーバーレイ"</string>
+    <string name="volume_odi_captions_hint_enable" msgid="49750248924730302">"有効にする"</string>
+    <string name="volume_odi_captions_hint_disable" msgid="8980842810619956593">"無効にする"</string>
     <string name="accessibility_output_chooser" msgid="8185317493017988680">"出力デバイスを選択"</string>
     <string name="screen_pinning_title" msgid="3273740381976175811">"画面が固定されました"</string>
     <string name="screen_pinning_description" msgid="8909878447196419623">"固定を解除するまで画面が常に表示されるようになります。[戻る] と [最近] を同時に押し続けると固定が解除されます。"</string>
     <string name="screen_pinning_description_recents_invisible" msgid="8281145542163727971">"固定を解除するまで画面が常に表示されるようになります。[戻る] と [ホーム] を同時に押し続けると固定が解除されます。"</string>
+    <string name="screen_pinning_description_gestural" msgid="1191513974909607884">"固定を解除するまで常に表示されます。上にスワイプして長押しすると固定が解除されます。"</string>
     <string name="screen_pinning_description_accessible" msgid="426190689254018656">"固定を解除するまで画面が常に表示されるようになります。[最近] を押し続けると固定が解除されます。"</string>
     <string name="screen_pinning_description_recents_invisible_accessible" msgid="6134833683151189507">"固定を解除するまで画面が常に表示されるようになります。[ホーム] を押し続けると固定が解除されます。"</string>
     <string name="screen_pinning_toast" msgid="2266705122951934150">"この画面の固定を解除するには [戻る] ボタンと [最近] ボタンを押し続けます"</string>
@@ -634,18 +641,21 @@
     <string name="inline_block_button" msgid="8735843688021655065">"ブロック"</string>
     <string name="inline_keep_button" msgid="6665940297019018232">"今後も表示する"</string>
     <string name="inline_minimize_button" msgid="966233327974702195">"最小化"</string>
-    <string name="inline_silent_button_silent" msgid="6904727667411781466">"通知音なし"</string>
+    <string name="inline_silent_button_silent" msgid="5315879183296940969">"サイレント"</string>
     <string name="inline_silent_button_stay_silent" msgid="6308371431217601009">"音なしで通知"</string>
-    <string name="inline_silent_button_alert" msgid="2449191160203602471">"通知音あり"</string>
+    <string name="inline_silent_button_alert" msgid="6008435419895088034">"アラートを受け取る"</string>
     <string name="inline_silent_button_keep_alerting" msgid="327696842264359693">"今後もアラートを受け取る"</string>
     <string name="inline_turn_off_notifications" msgid="8635596135532202355">"通知を OFF にする"</string>
     <string name="inline_keep_showing_app" msgid="1723113469580031041">"このアプリからの通知を今後も表示しますか？"</string>
-    <string name="hint_text_block" msgid="3554459167504485284">"ブロック中の通知はどこにも表示されず、通知音も鳴りません。設定で通知のブロックを解除できます。"</string>
-    <string name="hint_text_silent" msgid="859468056340177016">"サイレント通知はシェードには表示されますが、ロック画面には表示されません。バナーも表示されず、通知音も鳴りません。"</string>
-    <string name="hint_text_alert" msgid="2721169810318722524">"この通知は、届いたときに音が鳴り、通知ドロワー、ステータスバー、ロック画面に表示されます"</string>
-    <string name="notification_unblockable_desc" msgid="1037434112919403708">"この通知を OFF にすることはできません"</string>
+    <string name="notification_silence_title" msgid="5763240612242137433">"サイレント"</string>
+    <string name="notification_alert_title" msgid="8031196611815490340">"アラートを受け取る"</string>
+    <string name="notification_channel_summary_low" msgid="3387466082089715555">"音やバイブレーションが作動しないため、通知に煩わされずに済みます。"</string>
+    <string name="notification_channel_summary_default" msgid="5994062840431965586">"音やバイブレーションで通知をお知らせします。"</string>
+    <string name="notification_unblockable_desc" msgid="4556908766584964102">"これらの通知は変更できません。"</string>
     <string name="notification_multichannel_desc" msgid="4695920306092240550">"このグループの通知はここでは設定できません"</string>
-    <string name="notification_delegate_header" msgid="9167022191405284627">"<xliff:g id="APP_NAME">%1$s</xliff:g> 経由"</string>
+    <string name="notification_delegate_header" msgid="2857691673814814270">"代理通知"</string>
+    <string name="notification_channel_dialog_title" msgid="5745335243729167866">"<xliff:g id="APP_NAME">%1$s</xliff:g> のすべての通知"</string>
+    <string name="see_more_title" msgid="5358726697042112726">"詳細"</string>
     <string name="appops_camera" msgid="8100147441602585776">"このアプリはカメラを使用しています。"</string>
     <string name="appops_microphone" msgid="741508267659494555">"このアプリはマイクを使用しています。"</string>
     <string name="appops_overlay" msgid="6165912637560323464">"このアプリは画面上で他のアプリの上に重ねて表示されます。"</string>
@@ -764,8 +774,8 @@
     <string name="right_keycode" msgid="708447961000848163">"右キーコード"</string>
     <string name="left_icon" msgid="3096287125959387541">"左アイコン"</string>
     <string name="right_icon" msgid="3952104823293824311">"右アイコン"</string>
-    <string name="drag_to_add_tiles" msgid="230586591689084925">"タイルを追加するには押し続けながらドラッグ"</string>
-    <string name="drag_to_rearrange_tiles" msgid="4566074720193667473">"タイルを並べ替えるには押し続けながらドラッグ"</string>
+    <string name="drag_to_add_tiles" msgid="230586591689084925">"タイルを追加するには長押ししてドラッグ"</string>
+    <string name="drag_to_rearrange_tiles" msgid="4566074720193667473">"タイルを並べ替えるには長押ししてドラッグ"</string>
     <string name="drag_to_remove_tiles" msgid="3361212377437088062">"削除するにはここにドラッグ"</string>
     <string name="drag_to_remove_disabled" msgid="2390968976638993382">"タイルは 6 個以上必要"</string>
     <string name="qs_edit" msgid="2232596095725105230">"編集"</string>
@@ -889,7 +899,7 @@
     <string name="slice_permission_allow" msgid="2340244901366722709">"許可"</string>
     <string name="slice_permission_deny" msgid="7683681514008048807">"拒否"</string>
     <string name="auto_saver_title" msgid="1217959994732964228">"タップしてバッテリー セーバーのスケジュールを設定"</string>
-    <string name="auto_saver_text" msgid="6324376061044218113">"電池が <xliff:g id="PERCENTAGE">%d</xliff:g>%% になったら自動的に ON にする"</string>
+    <string name="auto_saver_text" msgid="2563289953551438248">"電池切れになる可能性が高くなると有効になります"</string>
     <string name="no_auto_saver_action" msgid="8086002101711328500">"いいえ"</string>
     <string name="auto_saver_enabled_title" msgid="6726474226058316862">"バッテリー セーバーのスケジュール設定 ON"</string>
     <string name="auto_saver_enabled_text" msgid="874711029884777579">"電池が <xliff:g id="PERCENTAGE">%d</xliff:g>%% を下回ると、バッテリー セーバーが自動的に ON になります。"</string>
@@ -910,6 +920,7 @@
     <string name="bubbles_deep_link_button_description" msgid="8895837143057564517">"<xliff:g id="APP_NAME">%1$s</xliff:g> を開く"</string>
     <string name="bubbles_settings_button_description" msgid="2970630476657287189">"<xliff:g id="APP_NAME">%1$s</xliff:g> のふきだしの設定"</string>
     <string name="bubbles_prompt" msgid="8807968030159469710">"<xliff:g id="APP_NAME">%1$s</xliff:g> のふきだしを許可しますか？"</string>
+    <string name="manage_bubbles_text" msgid="7027739766859191408">"管理"</string>
     <string name="no_bubbles" msgid="337101288173078247">"拒否"</string>
     <string name="yes_bubbles" msgid="668809525728633841">"許可"</string>
     <string name="ask_me_later_bubbles" msgid="2147688438402939029">"後で確認"</string>
@@ -920,4 +931,9 @@
     <string name="bubble_accessibility_action_move_top_right" msgid="1671844272347036806">"右上に移動"</string>
     <string name="bubble_accessibility_action_move_bottom_left" msgid="206369104473183217">"左下に移動"</string>
     <string name="bubble_accessibility_action_move_bottom_right" msgid="8705660152384312329">"右下に移動"</string>
+    <string name="bubble_dismiss_text" msgid="8028337712674081668">"閉じる"</string>
+    <!-- no translation found for notification_content_system_nav_changed (7218093915747788444) -->
+    <skip />
+    <!-- no translation found for notification_content_gesture_nav_available (8111130443656460792) -->
+    <skip />
 </resources>

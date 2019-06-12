@@ -62,9 +62,10 @@
     <string name="usb_debugging_secondary_user_title" msgid="6353808721761220421">"USB-Debugging nicht zulässig"</string>
     <string name="usb_debugging_secondary_user_message" msgid="6067122453571699801">"Der momentan auf diesem Gerät angemeldete Nutzer kann das USB-Debugging nicht aktivieren. Um diese Funktion verwenden zu können, wechsle zum primären Nutzer."</string>
     <string name="usb_contaminant_title" msgid="206854874263058490">"USB-Port deaktiviert"</string>
-    <string name="usb_contaminant_message" msgid="2205845572186473860">"Zum Schutz deines Geräts vor Flüssigkeiten oder Fremdkörpern ist der USB-Port deaktiviert und erkennt kein Zubehör.\n\nDu wirst benachrichtigt, wenn der USB-Port wieder sicher verwendet werden kann."</string>
+    <string name="usb_contaminant_message" msgid="7379089091591609111">"Zum Schutz deines Geräts vor Flüssigkeiten oder Fremdkörpern ist der USB-Port zurzeit deaktiviert und erkennt kein Zubehör.\n\nDu wirst benachrichtigt, wenn der USB-Port wieder verwendet werden kann."</string>
     <string name="usb_port_enabled" msgid="7906141351687694867">"Erkennung von Ladegeräten und Zubehör am USB-Port aktiviert"</string>
     <string name="usb_disable_contaminant_detection" msgid="2103905315747120033">"USB aktivieren"</string>
+    <string name="learn_more" msgid="5000517160980853569">"Weitere Informationen"</string>
     <string name="compat_mode_on" msgid="6623839244840638213">"Zoom auf Bildschirmgröße"</string>
     <string name="compat_mode_off" msgid="4434467572461327898">"Auf Bildschirmgröße anpassen"</string>
     <string name="global_action_screenshot" msgid="8329831278085426283">"Screenshot"</string>
@@ -118,6 +119,11 @@
     <string name="cancel" msgid="6442560571259935130">"Abbrechen"</string>
     <string name="biometric_dialog_confirm" msgid="6468457350041712674">"Bestätigen"</string>
     <string name="biometric_dialog_try_again" msgid="1900185172633183201">"Noch einmal versuchen"</string>
+    <string name="biometric_dialog_empty_space_description" msgid="7997936968009073717">"Feld \"Region\" ist leer, zum Abbrechen der Authentifizierung tippen"</string>
+    <string name="biometric_dialog_face_icon_description_idle" msgid="4497694707475970790">"Noch einmal versuchen"</string>
+    <string name="biometric_dialog_face_icon_description_authenticating" msgid="4512727754496228488">"Nach deinem Gesicht wird gesucht"</string>
+    <string name="biometric_dialog_face_icon_description_authenticated" msgid="595380451325425259">"Gesicht authentifiziert"</string>
+    <string name="biometric_dialog_face_icon_description_confirmed" msgid="2003141400387093967">"Bestätigt"</string>
     <string name="fingerprint_dialog_touch_sensor" msgid="8511557690663181761">"Berühre den Fingerabdrucksensor"</string>
     <string name="accessibility_fingerprint_dialog_fingerprint_icon" msgid="3125122495414253226">"Fingerabdruck-Symbol"</string>
     <string name="face_dialog_looking_for_face" msgid="7049276266074494689">"Wir suchen nach dir…"</string>
@@ -275,6 +281,7 @@
     <string name="gps_notification_searching_text" msgid="8574247005642736060">"GPS wird gesucht..."</string>
     <string name="gps_notification_found_text" msgid="4619274244146446464">"Standort durch GPS festgelegt"</string>
     <string name="accessibility_location_active" msgid="2427290146138169014">"Standortanfragen aktiv"</string>
+    <string name="accessibility_sensors_off_active" msgid="157126524598525432">"\"Sensoren aus\" ist aktiv"</string>
     <string name="accessibility_clear_all" msgid="5235938559247164925">"Alle Benachrichtigungen löschen"</string>
     <string name="notification_group_overflow_indicator" msgid="1863231301642314183">"+ <xliff:g id="NUMBER">%s</xliff:g>"</string>
     <plurals name="notification_group_overflow_description" formatted="false" msgid="4579313201268495404">
@@ -372,6 +379,7 @@
     <string name="quick_settings_night_secondary_label_on_at" msgid="6256314040368487637">"An um <xliff:g id="TIME">%s</xliff:g>"</string>
     <string name="quick_settings_secondary_label_until" msgid="2749196569462600150">"Bis <xliff:g id="TIME">%s</xliff:g>"</string>
     <string name="quick_settings_ui_mode_night_label" msgid="512534812963862137">"Dunkles Design"</string>
+    <string name="quick_settings_ui_mode_night_label_battery_saver" msgid="3496696903886673256">"Dunkles Design\nEnergiesparmodus"</string>
     <string name="quick_settings_nfc_label" msgid="9012153754816969325">"NFC"</string>
     <string name="quick_settings_nfc_off" msgid="6883274004315134333">"NFC ist deaktiviert"</string>
     <string name="quick_settings_nfc_on" msgid="6680317193676884311">"NFC ist aktiviert"</string>
@@ -407,8 +415,7 @@
     <string name="interruption_level_none_twoline" msgid="3957581548190765889">"Laut-\nlos"</string>
     <string name="interruption_level_priority_twoline" msgid="1564715335217164124">"Nur\nwichtige"</string>
     <string name="interruption_level_alarms_twoline" msgid="3266909566410106146">"Nur\nWecker"</string>
-    <!-- no translation found for keyguard_indication_charging_time_wireless (6959284458466962592) -->
-    <skip />
+    <string name="keyguard_indication_charging_time_wireless" msgid="6959284458466962592">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Kabelloses Laden (voll in <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g>)"</string>
     <string name="keyguard_indication_charging_time" msgid="2056340799276374421">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Wird geladen (voll in <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g>)"</string>
     <string name="keyguard_indication_charging_time_fast" msgid="7767562163577492332">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Wird schnell geladen (voll in <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g>)"</string>
     <string name="keyguard_indication_charging_time_slowly" msgid="3769655133567307069">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Wird langsam geladen (voll in <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g>)"</string>
@@ -447,11 +454,14 @@
     <string name="battery_saver_notification_title" msgid="8614079794522291840">"Energiesparmodus ist aktiviert"</string>
     <string name="battery_saver_notification_text" msgid="820318788126672692">"Reduzierung der Leistung und Hintergrunddaten"</string>
     <string name="battery_saver_notification_action_text" msgid="132118784269455533">"Energiesparmodus deaktivieren"</string>
-    <string name="media_projection_dialog_text" msgid="5751657130671431216">"Beim Aufnehmen oder Streamen kann <xliff:g id="APP_SEEKING_PERMISSION">%s</xliff:g> sensible Informationen wie beispielsweise wiedergegebenes Audio oder auch deine Passwörter, Zahlungsinformationen, Fotos und Nachrichten erfassen."</string>
-    <string name="media_projection_dialog_title" msgid="8124184308671641248">"Beim Streamen/Aufzeichnen werden sensible Daten zugänglich gemacht"</string>
+    <string name="media_projection_dialog_text" msgid="8585357687598538511">"Beim Aufnehmen oder Streamen kann <xliff:g id="APP_SEEKING_PERMISSION">%s</xliff:g> vertrauliche Informationen erfassen, die auf deinem Bildschirm angezeigt oder von deinem Gerät wiedergegeben werden. Das können beispielsweise Audioinhalte, deine Passwörter, deine Zahlungsinformationen sowie Fotos und Nachrichten sein."</string>
+    <string name="media_projection_dialog_service_text" msgid="3075544489835858258">"Beim Aufnehmen oder Streamen kann der Dienst, der diese Funktion zur Verfügung stellt, vertrauliche Informationen erfassen, die auf deinem Bildschirm angezeigt oder von deinem Gerät wiedergegeben werden. Das können beispielsweise Audioinhalte, deine Passwörter, deine Zahlungsinformationen sowie Fotos und Nachrichten sein."</string>
+    <string name="media_projection_dialog_title" msgid="8124184308671641248">"Beim Streamen/Aufzeichnen werden vertrauliche Informationen zugänglich gemacht"</string>
     <string name="media_projection_remember_text" msgid="3103510882172746752">"Nicht mehr anzeigen"</string>
     <string name="clear_all_notifications_text" msgid="814192889771462828">"Alle löschen"</string>
     <string name="manage_notifications_text" msgid="2386728145475108753">"Verwalten"</string>
+    <string name="notification_section_header_gentle" msgid="4372438504154095677">"Lautlose Benachrichtigungen"</string>
+    <string name="accessibility_notification_section_header_gentle_clear_all" msgid="4286716295850400959">"Alle lautlosen Benachrichtigungen löschen"</string>
     <string name="dnd_suppressing_shade_text" msgid="1904574852846769301">"Benachrichtigungen durch \"Bitte nicht stören\" pausiert"</string>
     <string name="media_projection_action_text" msgid="8470872969457985954">"Jetzt starten"</string>
     <string name="empty_shade_text" msgid="708135716272867002">"Keine Benachrichtigungen"</string>
@@ -511,8 +521,7 @@
     <string name="branded_monitoring_description_app_personal" msgid="2669518213949202599">"Du bist mit der App \"<xliff:g id="APPLICATION">%1$s</xliff:g>\" verbunden. Diese kann deine persönlichen Netzwerkaktivitäten erfassen, einschließlich E-Mails, Apps und Websites."</string>
     <string name="monitoring_description_app_work" msgid="4612997849787922906">"Dein Arbeitsprofil wird von <xliff:g id="ORGANIZATION">%1$s</xliff:g> verwaltet. Das Profil ist mit <xliff:g id="APPLICATION">%2$s</xliff:g> verknüpft. Diese App kann deine Netzwerkaktivitäten überwachen, einschließlich E-Mails, Apps und Websites.\n\nWeitere Informationen erhältst du von deinem Administrator."</string>
     <string name="monitoring_description_app_personal_work" msgid="5664165460056859391">"Dein Arbeitsprofil wird von <xliff:g id="ORGANIZATION">%1$s</xliff:g> verwaltet. Das Profil ist mit <xliff:g id="APPLICATION_WORK">%2$s</xliff:g> verknüpft. Diese App kann deine Netzwerkaktivitäten überwachen, einschließlich E-Mails, Apps und Websites.\n\nDu bist auch mit <xliff:g id="APPLICATION_PERSONAL">%3$s</xliff:g> verbunden, die deine persönlichen Netzwerkaktivitäten überwachen kann."</string>
-    <!-- no translation found for keyguard_indication_trust_unlocked (2712865815371519117) -->
-    <skip />
+    <string name="keyguard_indication_trust_unlocked" msgid="2712865815371519117">"Durch TrustAgent entsperrt"</string>
     <string name="keyguard_indication_trust_disabled" msgid="7412534203633528135">"Das Gerät bleibt gesperrt, bis du es manuell entsperrst."</string>
     <string name="hidden_notifications_title" msgid="7139628534207443290">"Benachrichtigungen schneller erhalten"</string>
     <string name="hidden_notifications_text" msgid="2326409389088668981">"Vor dem Entsperren anzeigen"</string>
@@ -525,23 +534,21 @@
     <string name="accessibility_volume_collapse" msgid="3609549593031810875">"Minimieren"</string>
     <string name="volume_odi_captions_tip" msgid="1193653197906918269">"Medien autom. untertiteln"</string>
     <string name="accessibility_volume_close_odi_captions_tip" msgid="1163987066404128967">"Untertitelinfo schließen"</string>
-    <!-- no translation found for volume_odi_captions_content_description (2950736796270214785) -->
-    <skip />
-    <!-- no translation found for volume_odi_captions_hint_enable (49750248924730302) -->
-    <skip />
-    <!-- no translation found for volume_odi_captions_hint_disable (8980842810619956593) -->
-    <skip />
+    <string name="volume_odi_captions_content_description" msgid="2950736796270214785">"Untertitel-Overlay"</string>
+    <string name="volume_odi_captions_hint_enable" msgid="49750248924730302">"aktivieren"</string>
+    <string name="volume_odi_captions_hint_disable" msgid="8980842810619956593">"deaktivieren"</string>
     <string name="accessibility_output_chooser" msgid="8185317493017988680">"Ausgabegerät wechseln"</string>
-    <string name="screen_pinning_title" msgid="3273740381976175811">"Bildschirm ist fixiert"</string>
+    <string name="screen_pinning_title" msgid="3273740381976175811">"Der Bildschirm ist angpinnt"</string>
     <string name="screen_pinning_description" msgid="8909878447196419623">"Der Bildschirm bleibt so lange eingeblendet, bis du die Fixierung aufhebst. Berühre und halte dazu \"Zurück\" und \"Übersicht\"."</string>
     <string name="screen_pinning_description_recents_invisible" msgid="8281145542163727971">"Der Bildschirm wird so lange angezeigt, bis du die Fixierung aufhebst. Berühre und halte dazu \"Zurück\" und \"Startbildschirm\"."</string>
+    <string name="screen_pinning_description_gestural" msgid="1191513974909607884">"Der Bildschirm wird so lange angezeigt, bis du die Fixierung aufhebst. Dazu wischst du nach oben und hältst den Bildschirm gedrückt"</string>
     <string name="screen_pinning_description_accessible" msgid="426190689254018656">"Der Bildschirm bleibt so lange eingeblendet, bis du die Fixierung aufhebst. Berühre und halte dazu \"Übersicht\"."</string>
     <string name="screen_pinning_description_recents_invisible_accessible" msgid="6134833683151189507">"Der Bildschirm wird so lange angezeigt, bis du die Fixierung aufhebst. Berühre und halte dazu \"Startbildschirm\"."</string>
     <string name="screen_pinning_toast" msgid="2266705122951934150">"Um die Fixierung für diesen Bildschirm aufzuheben, berühre und halte \"Zurück\" und \"Übersicht\""</string>
     <string name="screen_pinning_toast_recents_invisible" msgid="8252402309499161281">"Um die Fixierung für diesen Bildschirm aufzuheben, berühre und halte \"Zurück\" und \"Startbildschirm\""</string>
     <string name="screen_pinning_positive" msgid="3783985798366751226">"Ok"</string>
     <string name="screen_pinning_negative" msgid="3741602308343880268">"Nein danke"</string>
-    <string name="screen_pinning_start" msgid="1022122128489278317">"Bildschirm fixiert"</string>
+    <string name="screen_pinning_start" msgid="1022122128489278317">"Der Bildschirm ist angepinnt"</string>
     <string name="screen_pinning_exit" msgid="5187339744262325372">"Fixierung für Bildschirm aufgehoben"</string>
     <string name="quick_settings_reset_confirmation_title" msgid="748792586749897883">"<xliff:g id="TILE_LABEL">%1$s</xliff:g> ausblenden?"</string>
     <string name="quick_settings_reset_confirmation_message" msgid="2235970126803317374">"Sie wird wieder eingeblendet, wenn du sie in den Einstellungen erneut aktivierst."</string>
@@ -638,18 +645,21 @@
     <string name="inline_block_button" msgid="8735843688021655065">"Blockieren"</string>
     <string name="inline_keep_button" msgid="6665940297019018232">"Weiterhin anzeigen"</string>
     <string name="inline_minimize_button" msgid="966233327974702195">"Minimieren"</string>
-    <string name="inline_silent_button_silent" msgid="6904727667411781466">"Stumm"</string>
+    <string name="inline_silent_button_silent" msgid="5315879183296940969">"Lautlos"</string>
     <string name="inline_silent_button_stay_silent" msgid="6308371431217601009">"Weiter lautlos bleiben"</string>
-    <string name="inline_silent_button_alert" msgid="2449191160203602471">"Pop-up"</string>
+    <string name="inline_silent_button_alert" msgid="6008435419895088034">"Benachrichtigen"</string>
     <string name="inline_silent_button_keep_alerting" msgid="327696842264359693">"Weiterhin Benachrichtigungen senden"</string>
     <string name="inline_turn_off_notifications" msgid="8635596135532202355">"Benachrichtigungen deaktivieren"</string>
     <string name="inline_keep_showing_app" msgid="1723113469580031041">"Benachrichtigungen dieser App weiterhin anzeigen?"</string>
-    <string name="hint_text_block" msgid="3554459167504485284">"Blockierte Benachrichtigungen erscheinen nirgendwo und spielen auch kein Tonsignal ab. Du kannst das Blockieren von Benachrichtigungen jedoch in den Einstellungen deaktivieren."</string>
-    <string name="hint_text_silent" msgid="859468056340177016">"Lautlose Benachrichtigungen erscheinen unterlegt, jedoch nicht auf dem Sperrbildschirm, zeigen kein Banner an und geben kein Tonsignal wieder."</string>
-    <string name="hint_text_alert" msgid="2721169810318722524">"Diese Benachrichtigungen werden mit einem Ton angekündigt. Außerdem werden sie in der Benachrichtigungsleiste, Statusleiste und auf dem Sperrbildschirm angezeigt."</string>
-    <string name="notification_unblockable_desc" msgid="1037434112919403708">"Diese Benachrichtigungen können nicht deaktiviert werden"</string>
+    <string name="notification_silence_title" msgid="5763240612242137433">"Lautlos"</string>
+    <string name="notification_alert_title" msgid="8031196611815490340">"Benachrichtigen"</string>
+    <string name="notification_channel_summary_low" msgid="3387466082089715555">"Benachrichtigungen werden ohne Ton oder Vibration angekündigt, um deine Konzentration nicht zu stören."</string>
+    <string name="notification_channel_summary_default" msgid="5994062840431965586">"Benachrichtigungen werden mit einem Ton oder einer Vibration angekündigt, um dich auf sie aufmerksam zu machen."</string>
+    <string name="notification_unblockable_desc" msgid="4556908766584964102">"Diese Benachrichtigungen können nicht geändert werden."</string>
     <string name="notification_multichannel_desc" msgid="4695920306092240550">"Die Benachrichtigungsgruppe kann hier nicht konfiguriert werden"</string>
-    <string name="notification_delegate_header" msgid="9167022191405284627">"über <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
+    <string name="notification_delegate_header" msgid="2857691673814814270">"Weitergeleitete Benachrichtigung"</string>
+    <string name="notification_channel_dialog_title" msgid="5745335243729167866">"Alle <xliff:g id="APP_NAME">%1$s</xliff:g>-Benachrichtigungen"</string>
+    <string name="see_more_title" msgid="5358726697042112726">"Mehr"</string>
     <string name="appops_camera" msgid="8100147441602585776">"Diese App verwendet die Kamera."</string>
     <string name="appops_microphone" msgid="741508267659494555">"Diese App verwendet das Mikrofon."</string>
     <string name="appops_overlay" msgid="6165912637560323464">"Diese App wird über anderen Apps auf dem Bildschirm angezeigt."</string>
@@ -893,7 +903,7 @@
     <string name="slice_permission_allow" msgid="2340244901366722709">"Zulassen"</string>
     <string name="slice_permission_deny" msgid="7683681514008048807">"Ablehnen"</string>
     <string name="auto_saver_title" msgid="1217959994732964228">"Tippen zum Planen des Energiesparmodus"</string>
-    <string name="auto_saver_text" msgid="6324376061044218113">"Automatisch aktivieren bei einem Akkustand von <xliff:g id="PERCENTAGE">%d</xliff:g> %%"</string>
+    <string name="auto_saver_text" msgid="2563289953551438248">"Aktivieren, wenn der Akku wahrscheinlich nicht mehr lange hält"</string>
     <string name="no_auto_saver_action" msgid="8086002101711328500">"Nein danke"</string>
     <string name="auto_saver_enabled_title" msgid="6726474226058316862">"Geplanter Energiesparmodus aktiviert"</string>
     <string name="auto_saver_enabled_text" msgid="874711029884777579">"Der Energiesparmodus wird bei einem Akkustand von <xliff:g id="PERCENTAGE">%d</xliff:g> %% automatisch aktiviert."</string>
@@ -914,6 +924,7 @@
     <string name="bubbles_deep_link_button_description" msgid="8895837143057564517">"<xliff:g id="APP_NAME">%1$s</xliff:g> öffnen"</string>
     <string name="bubbles_settings_button_description" msgid="2970630476657287189">"Einstellungen für <xliff:g id="APP_NAME">%1$s</xliff:g>-Bubbles"</string>
     <string name="bubbles_prompt" msgid="8807968030159469710">"<xliff:g id="APP_NAME">%1$s</xliff:g>-Bubbles zulassen?"</string>
+    <string name="manage_bubbles_text" msgid="7027739766859191408">"Verwalten"</string>
     <string name="no_bubbles" msgid="337101288173078247">"Ablehnen"</string>
     <string name="yes_bubbles" msgid="668809525728633841">"Zulassen"</string>
     <string name="ask_me_later_bubbles" msgid="2147688438402939029">"Später fragen"</string>
@@ -924,4 +935,9 @@
     <string name="bubble_accessibility_action_move_top_right" msgid="1671844272347036806">"Nach rechts oben verschieben"</string>
     <string name="bubble_accessibility_action_move_bottom_left" msgid="206369104473183217">"Nach unten links verschieben"</string>
     <string name="bubble_accessibility_action_move_bottom_right" msgid="8705660152384312329">"Nach unten rechts verschieben"</string>
+    <string name="bubble_dismiss_text" msgid="8028337712674081668">"Schließen"</string>
+    <!-- no translation found for notification_content_system_nav_changed (7218093915747788444) -->
+    <skip />
+    <!-- no translation found for notification_content_gesture_nav_available (8111130443656460792) -->
+    <skip />
 </resources>

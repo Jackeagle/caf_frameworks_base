@@ -637,7 +637,7 @@ public class GradientDrawable extends Drawable {
      * @see #setOrientation(Orientation)
      */
     public Orientation getOrientation() {
-        return mGradientState.mOrientation;
+        return mGradientState.getOrientation();
     }
 
     /**
@@ -653,7 +653,7 @@ public class GradientDrawable extends Drawable {
      * @see #getOrientation()
      */
     public void setOrientation(Orientation orientation) {
-        mGradientState.mOrientation = orientation;
+        mGradientState.setOrientation(orientation);
         mGradientIsDirty = true;
         invalidateSelf();
     }
@@ -1270,7 +1270,7 @@ public class GradientDrawable extends Drawable {
 
                 if (st.mGradient == LINEAR_GRADIENT) {
                     final float level = st.mUseLevel ? getLevel() / 10000.0f : 1.0f;
-                    switch (st.mOrientation) {
+                    switch (st.getOrientation()) {
                     case TOP_BOTTOM:
                         x0 = r.left;            y0 = r.top;
                         x1 = x0;                y1 = level * r.bottom;
@@ -1312,10 +1312,6 @@ public class GradientDrawable extends Drawable {
                     y0 = r.top + (r.bottom - r.top) * st.mCenterY;
 
                     float radius = st.mGradientRadius;
-                    if (Float.compare(radius, 0.0f) == -1 || Float.isNaN(radius)) {
-                        throw new IllegalArgumentException("Gradient radius must be a valid "
-                                + "number greater than or equal to 0");
-                    }
                     if (st.mGradientRadiusType == RADIUS_TYPE_FRACTION) {
                         // Fall back to parent width or height if intrinsic
                         // size is not specified.
@@ -1511,8 +1507,6 @@ public class GradientDrawable extends Drawable {
                     st.mAttrGradient, R.styleable.GradientDrawableGradient);
             try {
                 updateGradientDrawableGradient(t.getResources(), a);
-            } catch (XmlPullParserException e) {
-                rethrowAsRuntimeException(e);
             } finally {
                 a.recycle();
             }
@@ -1700,8 +1694,7 @@ public class GradientDrawable extends Drawable {
         }
     }
 
-    private void updateGradientDrawableGradient(Resources r, TypedArray a)
-            throws XmlPullParserException {
+    private void updateGradientDrawableGradient(Resources r, TypedArray a) {
         final GradientState st = mGradientState;
 
         // Account for any configuration changes.
@@ -1764,42 +1757,7 @@ public class GradientDrawable extends Drawable {
         }
 
         int angle = (int) a.getFloat(R.styleable.GradientDrawableGradient_angle, st.mAngle);
-        angle %= 360;
-
-        if (angle % 45 != 0) {
-            throw new XmlPullParserException(a.getPositionDescription()
-                    + "<gradient> tag requires 'angle' attribute to "
-                    + "be a multiple of 45");
-        }
-
-        st.mAngle = angle;
-
-        switch (angle) {
-            case 0:
-                st.mOrientation = Orientation.LEFT_RIGHT;
-                break;
-            case 45:
-                st.mOrientation = Orientation.BL_TR;
-                break;
-            case 90:
-                st.mOrientation = Orientation.BOTTOM_TOP;
-                break;
-            case 135:
-                st.mOrientation = Orientation.BR_TL;
-                break;
-            case 180:
-                st.mOrientation = Orientation.RIGHT_LEFT;
-                break;
-            case 225:
-                st.mOrientation = Orientation.TR_BL;
-                break;
-            case 270:
-                st.mOrientation = Orientation.TOP_BOTTOM;
-                break;
-            case 315:
-                st.mOrientation = Orientation.TL_BR;
-                break;
-        }
+        st.mAngle = angle % 360;
 
         final TypedValue tv = a.peekValue(R.styleable.GradientDrawableGradient_gradientRadius);
         if (tv != null) {
@@ -1972,11 +1930,11 @@ public class GradientDrawable extends Drawable {
         public float[] mTempPositions; // no need to copy
         @UnsupportedAppUsage
         public float[] mPositions;
-        @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 124050917)
+        @UnsupportedAppUsage(trackingBug = 124050917)
         public int mStrokeWidth = -1; // if >= 0 use stroking.
-        @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 124050917)
+        @UnsupportedAppUsage(trackingBug = 124050917)
         public float mStrokeDashWidth = 0.0f;
-        @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 124050917)
+        @UnsupportedAppUsage(trackingBug = 124050917)
         public float mStrokeDashGap = 0.0f;
         @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 124050917)
         public float mRadius = 0.0f; // use this if mRadiusArray is null
@@ -2023,7 +1981,7 @@ public class GradientDrawable extends Drawable {
         int[] mAttrPadding;
 
         public GradientState(Orientation orientation, int[] gradientColors) {
-            mOrientation = orientation;
+            setOrientation(orientation);
             setGradientColors(gradientColors);
         }
 
@@ -2224,6 +2182,93 @@ public class GradientDrawable extends Drawable {
         public void setGradientCenter(float x, float y) {
             mCenterX = x;
             mCenterY = y;
+        }
+
+        public void setOrientation(Orientation orientation) {
+            // Update the angle here so that subsequent attempts to obtain the orientation
+            // from the angle overwrite previously configured values during inflation
+            mAngle = getAngleFromOrientation(orientation);
+            mOrientation = orientation;
+        }
+
+        @NonNull
+        public Orientation getOrientation() {
+            updateGradientStateOrientation();
+            return mOrientation;
+        }
+
+        /**
+         * Update the orientation of the gradient based on the given angle only if the type is
+         * {@link #LINEAR_GRADIENT}
+         */
+        private void updateGradientStateOrientation() {
+            if (mGradient == LINEAR_GRADIENT) {
+                int angle = mAngle;
+                if (angle % 45 != 0) {
+                    throw new IllegalArgumentException("Linear gradient requires 'angle' attribute "
+                            + "to be a multiple of 45");
+                }
+
+                Orientation orientation;
+                switch (angle) {
+                    case 0:
+                        orientation = Orientation.LEFT_RIGHT;
+                        break;
+                    case 45:
+                        orientation = Orientation.BL_TR;
+                        break;
+                    case 90:
+                        orientation = Orientation.BOTTOM_TOP;
+                        break;
+                    case 135:
+                        orientation = Orientation.BR_TL;
+                        break;
+                    case 180:
+                        orientation = Orientation.RIGHT_LEFT;
+                        break;
+                    case 225:
+                        orientation = Orientation.TR_BL;
+                        break;
+                    case 270:
+                        orientation = Orientation.TOP_BOTTOM;
+                        break;
+                    case 315:
+                        orientation = Orientation.TL_BR;
+                        break;
+                    default:
+                        // Should not get here as exception is thrown above if angle is not multiple
+                        // of 45 degrees
+                        orientation = Orientation.LEFT_RIGHT;
+                        break;
+                }
+                mOrientation = orientation;
+            }
+        }
+
+        private int getAngleFromOrientation(@Nullable Orientation orientation) {
+            if (orientation != null) {
+                switch (orientation) {
+                    default:
+                    case LEFT_RIGHT:
+                        return 0;
+                    case BL_TR:
+                        return 45;
+                    case BOTTOM_TOP:
+                        return 90;
+                    case BR_TL:
+                        return 135;
+                    case RIGHT_LEFT:
+                        return 180;
+                    case TR_BL:
+                        return 225;
+                    case TOP_BOTTOM:
+                        return 270;
+                    case TL_BR:
+                        return 315;
+                }
+            } else {
+                return 0;
+            }
         }
 
         public void setGradientColors(@Nullable int[] colors) {

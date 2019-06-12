@@ -621,18 +621,6 @@ interface IWindowManager
      */
     void setShouldShowIme(int displayId, boolean shouldShow);
 
-     /**
-     * Reparent the top layers for a display to the requested surfaceControl. The display that
-     * is going to be re-parented (the displayId passed in) needs to have been created by the same
-     * process that is requesting the re-parent. This is to ensure clients can't just re-parent
-     * display content info to any SurfaceControl, as this would be a security issue.
-     *
-     * @param displayId The id of the display.
-     * @param surfaceControlHandle The SurfaceControl that the top level layers for the
-     *        display should be re-parented to.
-     */
-    void reparentDisplayContent(int displayId, in SurfaceControl sc);
-
     /**
      * Waits for transactions to get applied before injecting input.
      * This includes waiting for the input windows to get sent to InputManager.
@@ -640,5 +628,14 @@ interface IWindowManager
      * This is needed for testing since the system add windows and injects input
      * quick enough that the windows don't have time to get sent to InputManager.
      */
-     boolean injectInputAfterTransactionsApplied(in InputEvent ev, int mode);
+    boolean injectInputAfterTransactionsApplied(in InputEvent ev, int mode);
+
+    /**
+     * Waits until all animations have completed and input information has been sent from
+     * WindowManager to native InputManager.
+     *
+     * This is needed for testing since we need to ensure input information has been propagated to
+     * native InputManager before proceeding with tests.
+     */
+    void syncInputTransactions();
 }

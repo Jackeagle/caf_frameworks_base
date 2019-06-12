@@ -662,8 +662,9 @@ public class NetworkControllerImpl extends BroadcastReceiver
                 cachedControllers.remove(subId);
             } else {
                 MobileSignalController controller = new MobileSignalController(mContext, mConfig,
-                        mHasMobileDataFeature, mPhone, mCallbackHandler,
-                        this, subscriptions.get(i), mSubDefaults, mReceiverHandler.getLooper());
+                        mHasMobileDataFeature, mPhone.createForSubscriptionId(subId),
+                        mCallbackHandler, this, subscriptions.get(i),
+                        mSubDefaults, mReceiverHandler.getLooper());
                 controller.setUserSetupComplete(mUserSetup);
                 mMobileSignalControllers.put(subId, controller);
                 if (subscriptions.get(i).getSimSlotIndex() == 0) {
@@ -1011,6 +1012,12 @@ public class NetworkControllerImpl extends BroadcastReceiver
                                     SignalStrength.NUM_SIGNAL_STRENGTH_BINS);
                     controller.getState().connected = controller.getState().level >= 0;
                 }
+                if (args.containsKey("inflate")) {
+                    for (int i = 0; i < mMobileSignalControllers.size(); i++) {
+                        mMobileSignalControllers.valueAt(i).mInflateSignalStrengths =
+                                "true".equals(args.getString("inflate"));
+                    }
+                }
                 String activity = args.getString("activity");
                 if (activity != null) {
                     controller.getState().dataConnected = true;
@@ -1049,7 +1056,8 @@ public class NetworkControllerImpl extends BroadcastReceiver
         SubscriptionInfo info = new SubscriptionInfo(id, "", simSlotIndex, "", "", 0, 0, "", 0,
                 null, null, null, "", false, null, null);
         MobileSignalController controller = new MobileSignalController(mContext,
-                mConfig, mHasMobileDataFeature, mPhone, mCallbackHandler, this, info,
+                mConfig, mHasMobileDataFeature,
+                mPhone.createForSubscriptionId(info.getSubscriptionId()), mCallbackHandler, this, info,
                 mSubDefaults, mReceiverHandler.getLooper());
         mMobileSignalControllers.put(id, controller);
         controller.getState().userSetup = true;
@@ -1132,7 +1140,8 @@ public class NetworkControllerImpl extends BroadcastReceiver
                     res.getBoolean(com.android.internal.R.bool.config_alwaysUseCdmaRssi);
             config.hspaDataDistinguishable =
                     res.getBoolean(R.bool.config_hspa_data_distinguishable);
-            config.inflateSignalStrengths = res.getBoolean(R.bool.config_inflateSignalStrength);
+            config.inflateSignalStrengths = res.getBoolean(
+                    com.android.internal.R.bool.config_inflateSignalStrength);
 
             CarrierConfigManager configMgr = (CarrierConfigManager)
                     context.getSystemService(Context.CARRIER_CONFIG_SERVICE);

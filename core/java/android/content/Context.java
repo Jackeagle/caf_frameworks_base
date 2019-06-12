@@ -329,21 +329,24 @@ public abstract class Context {
     public static final int BIND_ADJUST_WITH_ACTIVITY = 0x0080;
 
     /**
-     * Flag for {@link #bindService}: If binding from something better than perceptible,
-     * still set the adjust below perceptible. This would be used for bound services that can
-     * afford to be evicted when under extreme memory pressure, but should be restarted as soon
-     * as possible.
-     * @hide
-     */
-    public static final int BIND_ADJUST_BELOW_PERCEPTIBLE = 0x0100;
-
-    /**
      * Flag for {@link #bindService}: If binding from an app that has specific capabilities
      * due to its foreground state such as an activity or foreground service, then this flag will
      * allow the bound app to get the same capabilities, as long as it has the required permissions
      * as well.
      */
     public static final int BIND_INCLUDE_CAPABILITIES = 0x00001000;
+
+    /***********    Public flags above this line ***********/
+    /***********    Hidden flags below this line ***********/
+
+    /**
+     * Flag for {@link #bindService}: If binding from something better than perceptible,
+     * still set the adjust below perceptible. This would be used for bound services that can
+     * afford to be evicted when under extreme memory pressure, but should be restarted as soon
+     * as possible.
+     * @hide
+     */
+    public static final int BIND_ADJUST_BELOW_PERCEPTIBLE = 0x00040000;
 
     /**
      * Flag for {@link #bindService}: This flag is intended to be used only by the system to adjust
@@ -3009,13 +3012,21 @@ public abstract class Context {
     /**
      * Variation of {@link #bindService} that, in the specific case of isolated
      * services, allows the caller to generate multiple instances of a service
-     * from a single component declaration.
+     * from a single component declaration.  In other words, you can use this to bind
+     * to a service that has specified {@link android.R.attr#isolatedProcess} and, in
+     * addition to the existing behavior of running in an isolated process, you can
+     * also through the arguments here have the system bring up multiple concurrent
+     * processes hosting their own instances of that service.  The <var>instanceName</var>
+     * you provide here identifies the different instances, and you can use
+     * {@link #updateServiceGroup(ServiceConnection, int, int)} to tell the system how it
+     * should manage each of these instances.
      *
      * @param service Identifies the service to connect to.  The Intent must
      *      specify an explicit component name.
      * @param flags Operation options for the binding as per {@link #bindService}.
      * @param instanceName Unique identifier for the service instance.  Each unique
-     *      name here will result in a different service instance being created.
+     *      name here will result in a different service instance being created.  Identifiers
+     *      must only contain ASCII letters, digits, underscores, and periods.
      * @return Returns success of binding as per {@link #bindService}.
      * @param executor Callbacks on ServiceConnection will be called on executor.
      *      Must use same instance for the same instance of ServiceConnection.
@@ -3023,8 +3034,11 @@ public abstract class Context {
      *      This must be a valid ServiceConnection object; it must not be null.
      *
      * @throws SecurityException If the caller does not have permission to access the service
+     * @throws IllegalArgumentException If the instanceName is invalid.
      *
      * @see #bindService
+     * @see #updateServiceGroup
+     * @see android.R.attr#isolatedProcess
      */
     public boolean bindIsolatedService(@RequiresPermission @NonNull Intent service,
             @BindServiceFlags int flags, @NonNull String instanceName,
@@ -3080,10 +3094,16 @@ public abstract class Context {
      *              are considered to be related.  Supplying 0 reverts to the default behavior
      *              of not grouping.
      * @param importance Additional importance of the processes within a group.  Upon calling
-     *                   here, this will override any previous group that was set for that
-     *                   process.  This fine-tunes process killing of all processes within
-     *                   a related groups -- higher importance values will be killed before
-     *                   lower ones.
+     *                   here, this will override any previous importance that was set for that
+     *                   process.  The most important process is 0, and higher values are
+     *                   successively less important.  You can view this as describing how
+     *                   to order the processes in an array, with the processes at the end of
+     *                   the array being the least important.  This value has no meaning besides
+     *                   indicating how processes should be ordered in that array one after the
+     *                   other.  This provides a way to fine-tune the system's process killing,
+     *                   guiding it to kill processes at the end of the array first.
+     *
+     * @see #bindIsolatedService
      */
     public void updateServiceGroup(@NonNull ServiceConnection conn, int group,
             int importance) {
@@ -4070,6 +4090,7 @@ public abstract class Context {
      * @hide
      * @see #getSystemService(String)
      */
+    @TestApi
     public static final String CONTENT_CAPTURE_MANAGER_SERVICE = "content_capture";
 
     /**

@@ -43,8 +43,8 @@ import com.android.keyguard.KeyguardUpdateMonitorCallback;
 import com.android.keyguard.R;
 import com.android.keyguard.ViewMediatorCallback;
 import com.android.systemui.DejankUtils;
-import com.android.systemui.classifier.FalsingManager;
 import com.android.systemui.keyguard.DismissCallbackRegistry;
+import com.android.systemui.plugins.FalsingManager;
 
 import java.io.PrintWriter;
 
@@ -54,6 +54,7 @@ import java.io.PrintWriter;
 public class KeyguardBouncer {
 
     private static final String TAG = "KeyguardBouncer";
+    static final long BOUNCER_FACE_DELAY = 800;
     static final float ALPHA_EXPANSION_THRESHOLD = 0.95f;
     static final float EXPANSION_HIDDEN = 1f;
     static final float EXPANSION_VISIBLE = 0f;
@@ -66,6 +67,7 @@ public class KeyguardBouncer {
     private final DismissCallbackRegistry mDismissCallbackRegistry;
     private final Handler mHandler;
     private final BouncerExpansionCallback mExpansionCallback;
+    private final KeyguardUpdateMonitor mKeyguardUpdateMonitor;
     private final KeyguardUpdateMonitorCallback mUpdateMonitorCallback =
             new KeyguardUpdateMonitorCallback() {
                 @Override
@@ -93,16 +95,18 @@ public class KeyguardBouncer {
     public KeyguardBouncer(Context context, ViewMediatorCallback callback,
             LockPatternUtils lockPatternUtils, ViewGroup container,
             DismissCallbackRegistry dismissCallbackRegistry, FalsingManager falsingManager,
-            BouncerExpansionCallback expansionCallback) {
+            BouncerExpansionCallback expansionCallback,
+            KeyguardUpdateMonitor keyguardUpdateMonitor, Handler handler) {
         mContext = context;
         mCallback = callback;
         mLockPatternUtils = lockPatternUtils;
         mContainer = container;
-        KeyguardUpdateMonitor.getInstance(mContext).registerCallback(mUpdateMonitorCallback);
+        mKeyguardUpdateMonitor = keyguardUpdateMonitor;
         mFalsingManager = falsingManager;
         mDismissCallbackRegistry = dismissCallbackRegistry;
         mExpansionCallback = expansionCallback;
-        mHandler = new Handler();
+        mHandler = handler;
+        mKeyguardUpdateMonitor.registerCallback(mUpdateMonitorCallback);
     }
 
     public void show(boolean resetSecuritySelection) {
@@ -164,7 +168,11 @@ public class KeyguardBouncer {
 
         // Split up the work over multiple frames.
         DejankUtils.removeCallbacks(mResetRunnable);
-        DejankUtils.postAfterTraversal(mShowRunnable);
+        if (mKeyguardUpdateMonitor.isFaceDetectionRunning()) {
+            mHandler.postDelayed(mShowRunnable, BOUNCER_FACE_DELAY);
+        } else {
+            DejankUtils.postAfterTraversal(mShowRunnable);
+        }
 
         mCallback.onBouncerVisiblityChanged(true /* shown */);
         mExpansionCallback.onStartingToShow();
@@ -266,6 +274,7 @@ public class KeyguardBouncer {
 
     private void cancelShowRunnable() {
         DejankUtils.removeCallbacks(mShowRunnable);
+        mHandler.removeCallbacks(mShowRunnable);
         mShowingSoon = false;
     }
 
@@ -276,8 +285,6 @@ public class KeyguardBouncer {
     }
 
     public void hide(boolean destroyView) {
-        // TODO(b/113914868): investigation log for disappearing home button
-        Log.i(TAG, "KeyguardBouncer.hide (b/113914868): destroyView=" + destroyView);
         if (isShowing()) {
             StatsLog.write(StatsLog.KEYGUARD_BOUNCER_STATE_CHANGED,
                 StatsLog.KEYGUARD_BOUNCER_STATE_CHANGED__STATE__HIDDEN);

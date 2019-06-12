@@ -22,6 +22,8 @@ import static android.app.ActivityManager.START_VOICE_HIDDEN_SESSION;
 import static android.app.ActivityManager.START_VOICE_NOT_ACTIVE_SESSION;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_ASSISTANT;
 
+import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.app.ActivityManager;
 import android.app.ActivityOptions;
 import android.app.ActivityTaskManager;
@@ -37,6 +39,7 @@ import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.RemoteCallback;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.UserHandle;
@@ -53,6 +56,7 @@ import com.android.internal.app.IVoiceInteractionSessionShowCallback;
 import com.android.internal.app.IVoiceInteractor;
 import com.android.server.LocalServices;
 import com.android.server.wm.ActivityTaskManagerInternal;
+import com.android.server.wm.ActivityTaskManagerInternal.ActivityTokens;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -253,6 +257,56 @@ class VoiceInteractionManagerServiceImpl implements VoiceInteractionSessionConne
                     intent, resolvedType, options.toBundle(), mUser);
         } catch (RemoteException e) {
             throw new IllegalStateException("Unexpected remote error", e);
+        }
+    }
+
+    public void requestDirectActionsLocked(@NonNull IBinder token, int taskId,
+            @NonNull IBinder assistToken,  @Nullable RemoteCallback cancellationCallback,
+            @NonNull RemoteCallback callback) {
+        if (mActiveSession == null || token != mActiveSession.mToken) {
+            Slog.w(TAG, "requestDirectActionsLocked does not match active session");
+            callback.sendResult(null);
+            return;
+        }
+        final ActivityTokens tokens = LocalServices.getService(
+                ActivityTaskManagerInternal.class).getTopActivityForTask(taskId);
+        if (tokens == null || tokens.getAssistToken() != assistToken) {
+            Slog.w(TAG, "Unknown activity to query for direct actions");
+            callback.sendResult(null);
+        } else {
+            try {
+                tokens.getApplicationThread().requestDirectActions(tokens.getActivityToken(),
+                        mActiveSession.mInteractor, cancellationCallback, callback);
+            } catch (RemoteException e) {
+                Slog.w("Unexpected remote error", e);
+                callback.sendResult(null);
+            }
+        }
+    }
+
+    void performDirectActionLocked(@NonNull IBinder token, @NonNull String actionId,
+            @Nullable Bundle arguments, int taskId, IBinder assistToken,
+            @Nullable RemoteCallback cancellationCallback,
+            @NonNull RemoteCallback resultCallback) {
+        if (mActiveSession == null || token != mActiveSession.mToken) {
+            Slog.w(TAG, "performDirectActionLocked does not match active session");
+            resultCallback.sendResult(null);
+            return;
+        }
+        final ActivityTokens tokens = LocalServices.getService(
+                ActivityTaskManagerInternal.class).getTopActivityForTask(taskId);
+        if (tokens == null || tokens.getAssistToken() != assistToken) {
+            Slog.w(TAG, "Unknown activity to perform a direct action");
+            resultCallback.sendResult(null);
+        } else {
+            try {
+                tokens.getApplicationThread().performDirectAction(tokens.getActivityToken(),
+                        actionId, arguments, cancellationCallback,
+                        resultCallback);
+            } catch (RemoteException e) {
+                Slog.w("Unexpected remote error", e);
+                resultCallback.sendResult(null);
+            }
         }
     }
 

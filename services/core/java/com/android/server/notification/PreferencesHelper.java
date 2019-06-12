@@ -38,6 +38,7 @@ import android.service.notification.RankingHelperProto;
 import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
+import android.util.Pair;
 import android.util.Slog;
 import android.util.SparseBooleanArray;
 import android.util.proto.ProtoOutputStream;
@@ -77,7 +78,7 @@ public class PreferencesHelper implements RankingConfig {
     private static final String TAG_CHANNEL = "channel";
     private static final String TAG_GROUP = "channelGroup";
     private static final String TAG_DELEGATE = "delegate";
-    private static final String TAG_STATUS_ICONS = "status_icons";
+    private static final String TAG_STATUS_ICONS = "silent_status_icons";
 
     private static final String ATT_VERSION = "version";
     private static final String ATT_NAME = "name";
@@ -91,13 +92,13 @@ public class PreferencesHelper implements RankingConfig {
     private static final String ATT_APP_USER_LOCKED_FIELDS = "app_user_locked_fields";
     private static final String ATT_ENABLED = "enabled";
     private static final String ATT_USER_ALLOWED = "allowed";
-    private static final String ATT_HIDE_SILENT = "hide_silent";
+    private static final String ATT_HIDE_SILENT = "hide_gentle";
 
     private static final int DEFAULT_PRIORITY = Notification.PRIORITY_DEFAULT;
     private static final int DEFAULT_VISIBILITY = NotificationManager.VISIBILITY_NO_OVERRIDE;
     private static final int DEFAULT_IMPORTANCE = NotificationManager.IMPORTANCE_UNSPECIFIED;
     @VisibleForTesting
-    static final boolean DEFAULT_HIDE_SILENT_STATUS_BAR_ICONS = true;
+    static final boolean DEFAULT_HIDE_SILENT_STATUS_BAR_ICONS = false;
     private static final boolean DEFAULT_SHOW_BADGE = true;
     private static final boolean DEFAULT_ALLOW_BUBBLE = true;
     private static final boolean DEFAULT_OEM_LOCKED_IMPORTANCE  = false;
@@ -236,6 +237,8 @@ public class PreferencesHelper implements RankingConfig {
                                         } else {
                                             channel.populateFromXml(parser);
                                         }
+                                        channel.setImportanceLockedByCriticalDeviceFunction(
+                                                r.defaultAppLockedImportance);
                                         r.channels.put(id, channel);
                                     }
                                 }
@@ -331,33 +334,35 @@ public class PreferencesHelper implements RankingConfig {
         return true;
     }
 
-    private void deleteDefaultChannelIfNeededLocked(PackagePreferences r) throws
+    private boolean deleteDefaultChannelIfNeededLocked(PackagePreferences r) throws
             PackageManager.NameNotFoundException {
         if (!r.channels.containsKey(NotificationChannel.DEFAULT_CHANNEL_ID)) {
             // Not present
-            return;
+            return false;
         }
 
         if (shouldHaveDefaultChannel(r)) {
             // Keep the default channel until upgraded.
-            return;
+            return false;
         }
 
         // Remove Default Channel.
         r.channels.remove(NotificationChannel.DEFAULT_CHANNEL_ID);
+
+        return true;
     }
 
-    private void createDefaultChannelIfNeededLocked(PackagePreferences r) throws
+    private boolean createDefaultChannelIfNeededLocked(PackagePreferences r) throws
             PackageManager.NameNotFoundException {
         if (r.channels.containsKey(NotificationChannel.DEFAULT_CHANNEL_ID)) {
             r.channels.get(NotificationChannel.DEFAULT_CHANNEL_ID).setName(mContext.getString(
                     com.android.internal.R.string.default_notification_channel_label));
-            return;
+            return false;
         }
 
         if (!shouldHaveDefaultChannel(r)) {
             // Keep the default channel until upgraded.
-            return;
+            return false;
         }
 
         // Create Default Channel
@@ -378,6 +383,8 @@ public class PreferencesHelper implements RankingConfig {
             channel.lockFields(NotificationChannel.USER_LOCKED_VISIBILITY);
         }
         r.channels.put(channel.getId(), channel);
+
+        return true;
     }
 
     public void writeXml(XmlSerializer out, boolean forBackup, int userId) throws IOException {
@@ -474,10 +481,15 @@ public class PreferencesHelper implements RankingConfig {
      * @param allowed whether bubbles are allowed.
      */
     public void setBubblesAllowed(String pkg, int uid, boolean allowed) {
+        boolean changed = false;
         synchronized (mPackagePreferences) {
             PackagePreferences p = getOrCreatePackagePreferencesLocked(pkg, uid);
+            changed = p.allowBubble != allowed;
             p.allowBubble = allowed;
             p.lockedAppFields = p.lockedAppFields | LockableAppFields.USER_LOCKED_BUBBLE;
+        }
+        if (changed) {
+            updateConfig();
         }
     }
 
@@ -603,12 +615,13 @@ public class PreferencesHelper implements RankingConfig {
     }
 
     @Override
-    public void createNotificationChannel(String pkg, int uid, NotificationChannel channel,
+    public boolean createNotificationChannel(String pkg, int uid, NotificationChannel channel,
             boolean fromTargetApp, boolean hasDndAccess) {
         Preconditions.checkNotNull(pkg);
         Preconditions.checkNotNull(channel);
         Preconditions.checkNotNull(channel.getId());
         Preconditions.checkArgument(!TextUtils.isEmpty(channel.getName()));
+        boolean needsPolicyFileChange = false;
         synchronized (mPackagePreferences) {
             PackagePreferences r = getOrCreatePackagePreferencesLocked(pkg, uid);
             if (r == null) {
@@ -625,17 +638,28 @@ public class PreferencesHelper implements RankingConfig {
             if (existing != null && fromTargetApp) {
                 if (existing.isDeleted()) {
                     existing.setDeleted(false);
+                    needsPolicyFileChange = true;
 
                     // log a resurrected channel as if it's new again
                     MetricsLogger.action(getChannelLog(channel, pkg).setType(
                             com.android.internal.logging.nano.MetricsProto.MetricsEvent.TYPE_OPEN));
                 }
 
-                existing.setName(channel.getName().toString());
-                existing.setDescription(channel.getDescription());
-                existing.setBlockableSystem(channel.isBlockableSystem());
-                if (existing.getGroup() == null) {
+                if (!Objects.equals(channel.getName().toString(), existing.getName().toString())) {
+                    existing.setName(channel.getName().toString());
+                    needsPolicyFileChange = true;
+                }
+                if (!Objects.equals(channel.getDescription(), existing.getDescription())) {
+                    existing.setDescription(channel.getDescription());
+                    needsPolicyFileChange = true;
+                }
+                if (channel.isBlockableSystem() != existing.isBlockableSystem()) {
+                    existing.setBlockableSystem(channel.isBlockableSystem());
+                    needsPolicyFileChange = true;
+                }
+                if (channel.getGroup() != null && existing.getGroup() == null) {
                     existing.setGroup(channel.getGroup());
+                    needsPolicyFileChange = true;
                 }
 
                 // Apps are allowed to downgrade channel importance if the user has not changed any
@@ -644,23 +668,30 @@ public class PreferencesHelper implements RankingConfig {
                 if (existing.getUserLockedFields() == 0 &&
                         channel.getImportance() < existing.getImportance()) {
                     existing.setImportance(channel.getImportance());
+                    needsPolicyFileChange = true;
                 }
 
                 // system apps and dnd access apps can bypass dnd if the user hasn't changed any
                 // fields on the channel yet
                 if (existing.getUserLockedFields() == 0 && hasDndAccess) {
                     boolean bypassDnd = channel.canBypassDnd();
-                    existing.setBypassDnd(bypassDnd);
+                    if (bypassDnd != existing.canBypassDnd()) {
+                        existing.setBypassDnd(bypassDnd);
+                        needsPolicyFileChange = true;
 
-                    if (bypassDnd != mAreChannelsBypassingDnd
-                            || previousExistingImportance != existing.getImportance()) {
-                        updateChannelsBypassingDnd(mContext.getUserId());
+                        if (bypassDnd != mAreChannelsBypassingDnd
+                                || previousExistingImportance != existing.getImportance()) {
+                            updateChannelsBypassingDnd(mContext.getUserId());
+                        }
                     }
                 }
 
                 updateConfig();
-                return;
+                return needsPolicyFileChange;
             }
+
+            needsPolicyFileChange = true;
+
             if (channel.getImportance() < IMPORTANCE_NONE
                     || channel.getImportance() > NotificationManager.IMPORTANCE_MAX) {
                 throw new IllegalArgumentException("Invalid importance level");
@@ -696,6 +727,8 @@ public class PreferencesHelper implements RankingConfig {
             MetricsLogger.action(getChannelLog(channel, pkg).setType(
                     com.android.internal.logging.nano.MetricsProto.MetricsEvent.TYPE_OPEN));
         }
+
+        return needsPolicyFileChange;
     }
 
     void clearLockedFieldsLocked(NotificationChannel channel) {
@@ -733,7 +766,8 @@ public class PreferencesHelper implements RankingConfig {
             }
             updatedChannel.setImportanceLockedByCriticalDeviceFunction(
                     r.defaultAppLockedImportance);
-            if (updatedChannel.isImportanceLockedByCriticalDeviceFunction()) {
+            if (updatedChannel.isImportanceLockedByCriticalDeviceFunction()
+                    && updatedChannel.getImportance() == IMPORTANCE_NONE) {
                 updatedChannel.setImportance(channel.getImportance());
             }
 
@@ -882,7 +916,8 @@ public class PreferencesHelper implements RankingConfig {
         }
     }
 
-    public void updateDefaultApps(int userId, ArraySet<String> toRemove, ArraySet<String> toAdd) {
+    public void updateDefaultApps(int userId, ArraySet<String> toRemove,
+            ArraySet<Pair<String, Integer>> toAdd) {
         synchronized (mPackagePreferences) {
             for (PackagePreferences p : mPackagePreferences.values()) {
                 if (userId == UserHandle.getUserId(p.uid)) {
@@ -891,11 +926,16 @@ public class PreferencesHelper implements RankingConfig {
                         for (NotificationChannel channel : p.channels.values()) {
                             channel.setImportanceLockedByCriticalDeviceFunction(false);
                         }
-                    } else if (toAdd != null && toAdd.contains(p.pkg)) {
-                        p.defaultAppLockedImportance = true;
-                        for (NotificationChannel channel : p.channels.values()) {
-                            channel.setImportanceLockedByCriticalDeviceFunction(true);
-                        }
+                    }
+                }
+            }
+            if (toAdd != null) {
+                for (Pair<String, Integer> approvedApp : toAdd) {
+                    PackagePreferences p = getOrCreatePackagePreferencesLocked(approvedApp.first,
+                            approvedApp.second);
+                    p.defaultAppLockedImportance = true;
+                    for (NotificationChannel channel : p.channels.values()) {
+                        channel.setImportanceLockedByCriticalDeviceFunction(true);
                     }
                 }
             }
@@ -1426,8 +1466,22 @@ public class PreferencesHelper implements RankingConfig {
                     pw.print(" visibility=");
                     pw.print(Notification.visibilityToString(r.visibility));
                 }
-                pw.print(" showBadge=");
-                pw.print(Boolean.toString(r.showBadge));
+                if (r.showBadge != DEFAULT_SHOW_BADGE) {
+                    pw.print(" showBadge=");
+                    pw.print(r.showBadge);
+                }
+                if (r.defaultAppLockedImportance != DEFAULT_APP_LOCKED_IMPORTANCE) {
+                    pw.print(" defaultAppLocked=");
+                    pw.print(r.defaultAppLockedImportance);
+                }
+                if (r.oemLockedImportance != DEFAULT_OEM_LOCKED_IMPORTANCE) {
+                    pw.print(" oemLocked=");
+                    pw.print(r.oemLockedImportance);
+                }
+                if (!r.futureOemLockedChannels.isEmpty()) {
+                    pw.print(" futureLockedChannels=");
+                    pw.print(r.futureOemLockedChannels);
+                }
                 pw.println();
                 for (NotificationChannel channel : r.channels.values()) {
                     pw.print(prefix);
@@ -1663,10 +1717,10 @@ public class PreferencesHelper implements RankingConfig {
         }
     }
 
-    public void onPackagesChanged(boolean removingPackage, int changeUserId, String[] pkgList,
+    public boolean onPackagesChanged(boolean removingPackage, int changeUserId, String[] pkgList,
             int[] uidList) {
         if (pkgList == null || pkgList.length == 0) {
-            return; // nothing to do
+            return false; // nothing to do
         }
         boolean updated = false;
         if (removingPackage) {
@@ -1703,8 +1757,8 @@ public class PreferencesHelper implements RankingConfig {
                         PackagePreferences fullPackagePreferences = getPackagePreferencesLocked(pkg,
                                 mPm.getPackageUidAsUser(pkg, changeUserId));
                         if (fullPackagePreferences != null) {
-                            createDefaultChannelIfNeededLocked(fullPackagePreferences);
-                            deleteDefaultChannelIfNeededLocked(fullPackagePreferences);
+                            updated |= createDefaultChannelIfNeededLocked(fullPackagePreferences);
+                            updated |= deleteDefaultChannelIfNeededLocked(fullPackagePreferences);
                         }
                     }
                 } catch (PackageManager.NameNotFoundException e) {
@@ -1715,6 +1769,7 @@ public class PreferencesHelper implements RankingConfig {
         if (updated) {
             updateConfig();
         }
+        return updated;
     }
 
     public void clearData(String pkg, int uid) {

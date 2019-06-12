@@ -25,12 +25,12 @@ import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkInfo;
 import android.net.NetworkMisc;
+import android.net.NetworkMonitorManager;
 import android.net.NetworkRequest;
 import android.net.NetworkState;
 import android.os.Handler;
 import android.os.INetworkManagementService;
 import android.os.Messenger;
-import android.os.RemoteException;
 import android.os.SystemClock;
 import android.util.Log;
 import android.util.SparseArray;
@@ -247,7 +247,7 @@ public class NetworkAgentInfo implements Comparable<NetworkAgentInfo> {
     public final Nat464Xlat clatd;
 
     // Set after asynchronous creation of the NetworkMonitor.
-    private volatile INetworkMonitor mNetworkMonitor;
+    private volatile NetworkMonitorManager mNetworkMonitor;
 
     private static final String TAG = ConnectivityService.class.getSimpleName();
     private static final boolean VDBG = false;
@@ -278,7 +278,7 @@ public class NetworkAgentInfo implements Comparable<NetworkAgentInfo> {
      * Inform NetworkAgentInfo that a new NetworkMonitor was created.
      */
     public void onNetworkMonitorCreated(INetworkMonitor networkMonitor) {
-        mNetworkMonitor = networkMonitor;
+        mNetworkMonitor = new NetworkMonitorManager(networkMonitor);
     }
 
     /**
@@ -290,13 +290,9 @@ public class NetworkAgentInfo implements Comparable<NetworkAgentInfo> {
      */
     public void setNetworkCapabilities(NetworkCapabilities nc) {
         networkCapabilities = nc;
-        final INetworkMonitor nm = mNetworkMonitor;
+        final NetworkMonitorManager nm = mNetworkMonitor;
         if (nm != null) {
-            try {
-                nm.notifyNetworkCapabilitiesChanged(nc);
-            } catch (RemoteException e) {
-                Log.e(TAG, "Error notifying NetworkMonitor of updated NetworkCapabilities", e);
-            }
+            nm.notifyNetworkCapabilitiesChanged(nc);
         }
     }
 
@@ -317,11 +313,11 @@ public class NetworkAgentInfo implements Comparable<NetworkAgentInfo> {
     }
 
     /**
-     * Get the INetworkMonitor in this NetworkAgentInfo.
+     * Get the NetworkMonitorManager in this NetworkAgentInfo.
      *
      * <p>This will be null before {@link #onNetworkMonitorCreated(INetworkMonitor)} is called.
      */
-    public INetworkMonitor networkMonitor() {
+    public NetworkMonitorManager networkMonitor() {
         return mNetworkMonitor;
     }
 
@@ -483,11 +479,11 @@ public class NetworkAgentInfo implements Comparable<NetworkAgentInfo> {
         // down an explicitly selected network before the user gets a chance to prefer it when
         // a higher-scoring network (e.g., Ethernet) is available.
         if (networkMisc.explicitlySelected && (networkMisc.acceptUnvalidated || pretendValidated)) {
-            return ConnectivityConstants.MAXIMUM_NETWORK_SCORE;
+            return ConnectivityConstants.EXPLICITLY_SELECTED_NETWORK_SCORE;
         }
 
         int score = currentScore;
-        if (!lastValidated && !pretendValidated && !ignoreWifiUnvalidationPenalty()) {
+        if (!lastValidated && !pretendValidated && !ignoreWifiUnvalidationPenalty() && !isVPN()) {
             score -= ConnectivityConstants.UNVALIDATED_SCORE_PENALTY;
         }
         if (score < 0) score = 0;

@@ -65,6 +65,7 @@ import android.net.Uri;
 import android.os.BadParcelableException;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.CancellationSignal;
 import android.os.GraphicsEnvironment;
 import android.os.Handler;
 import android.os.IBinder;
@@ -125,7 +126,6 @@ import android.view.autofill.AutofillManager;
 import android.view.autofill.AutofillManager.AutofillClient;
 import android.view.autofill.AutofillPopupWindow;
 import android.view.autofill.IAutofillWindowPresenter;
-import android.view.contentcapture.ContentCaptureContext;
 import android.view.contentcapture.ContentCaptureManager;
 import android.view.contentcapture.ContentCaptureManager.ContentCaptureClient;
 import android.widget.AdapterView;
@@ -148,8 +148,11 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.Executor;
+import java.util.function.Consumer;
 
 
 /**
@@ -788,6 +791,7 @@ public class Activity extends ContextThemeWrapper
     private Instrumentation mInstrumentation;
     @UnsupportedAppUsage
     private IBinder mToken;
+    private IBinder mAssistToken;
     @UnsupportedAppUsage
     private int mIdent;
     @UnsupportedAppUsage
@@ -835,7 +839,7 @@ public class Activity extends ContextThemeWrapper
     /** The autofill manager. Always access via {@link #getAutofillManager()}. */
     @Nullable private AutofillManager mAutofillManager;
 
-    /** The content capture manager. Always access via {@link #getContentCaptureManager()}. */
+    /** The content capture manager. Access via {@link #getContentCaptureManager()}. */
     @Nullable private ContentCaptureManager mContentCaptureManager;
 
     private final ArrayList<Application.ActivityLifecycleCallbacks> mActivityLifecycleCallbacks =
@@ -866,7 +870,7 @@ public class Activity extends ContextThemeWrapper
     private boolean mEnableDefaultActionBarUp;
 
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
-    private VoiceInteractor mVoiceInteractor;
+    VoiceInteractor mVoiceInteractor;
 
     @UnsupportedAppUsage
     private CharSequence mTitle;
@@ -1087,12 +1091,11 @@ public class Activity extends ContextThemeWrapper
                 case CONTENT_CAPTURE_START:
                     //TODO(b/111276913): decide whether the InteractionSessionId should be
                     // saved / restored in the activity bundle - probably not
-                    int flags = 0;
-                    if ((getWindow().getAttributes().flags
-                            & WindowManager.LayoutParams.FLAG_SECURE) != 0) {
-                        flags |= ContentCaptureContext.FLAG_DISABLED_BY_FLAG_SECURE;
+                    final Window window = getWindow();
+                    if (window != null) {
+                        cm.updateWindowAttributes(window.getAttributes());
                     }
-                    cm.onActivityCreated(mToken, getComponentName(), flags);
+                    cm.onActivityCreated(mToken, getComponentName());
                     break;
                 case CONTENT_CAPTURE_RESUME:
                     cm.onActivityResumed();
@@ -1858,9 +1861,12 @@ public class Activity extends ContextThemeWrapper
 
     void setVoiceInteractor(IVoiceInteractor voiceInteractor) {
         if (mVoiceInteractor != null) {
-            for (Request activeRequest: mVoiceInteractor.getActiveRequests()) {
-                activeRequest.cancel();
-                activeRequest.clear();
+            final Request[] requests = mVoiceInteractor.getActiveRequests();
+            if (requests != null) {
+                for (Request activeRequest : mVoiceInteractor.getActiveRequests()) {
+                    activeRequest.cancel();
+                    activeRequest.clear();
+                }
             }
         }
         if (voiceInteractor == null) {
@@ -2314,6 +2320,57 @@ public class Activity extends ContextThemeWrapper
      */
     public void onProvideAssistContent(AssistContent outContent) {
     }
+
+    /**
+     * Returns the list of direct actions supported by the app.
+     *
+     * <p>You should return the list of actions that could be executed in the
+     * current context, which is in the current state of the app. If the actions
+     * that could be executed by the app changes you should report that via
+     * calling {@link VoiceInteractor#notifyDirectActionsChanged()}.
+     *
+     * <p>To get the voice interactor you need to call {@link #getVoiceInteractor()}
+     * which would return non <code>null<c/ode> only if there is an ongoing voice
+     * interaction session. You an also detect when the voice interactor is no
+     * longer valid because the voice interaction session that is backing is finished
+     * by calling {@link VoiceInteractor#registerOnDestroyedCallback(Executor, Runnable)}.
+     *
+     * <p>This method will be called only after {@link #onStart()} is being called and
+     * before {@link #onStop()} is being called.
+     *
+     * <p>You should pass to the callback the currently supported direct actions which
+     * cannot be <code>null</code> or contain <code>null</null> elements.
+     *
+     * <p>You should return the action list as soon as possible to ensure the consumer,
+     * for example the assistant, is as responsive as possible which would improve user
+     * experience of your app.
+     *
+     * @param cancellationSignal A signal to cancel the operation in progress.
+     * @param callback The callback to send the action list. The actions list cannot
+     *     contain <code>null</code> elements. You can call this on any thread.
+     */
+    public void onGetDirectActions(@NonNull CancellationSignal cancellationSignal,
+            @NonNull Consumer<List<DirectAction>> callback) {
+        callback.accept(Collections.emptyList());
+    }
+
+    /**
+     * This is called to perform an action previously defined by the app.
+     * Apps also have access to {@link #getVoiceInteractor()} to follow up on the action.
+     *
+     * @param actionId The ID for the action you previously reported via
+     *     {@link #onGetDirectActions(CancellationSignal, Consumer)}.
+     * @param arguments Any additional arguments provided by the caller that are
+     *     specific to the given action.
+     * @param cancellationSignal A signal to cancel the operation in progress.
+     * @param resultListener The callback to provide the result back to the caller.
+     *     You can call this on any thread. The result bundle is action specific.
+     *
+     * @see #onGetDirectActions(CancellationSignal, Consumer)
+     */
+    public void onPerformDirectAction(@NonNull String actionId,
+            @NonNull Bundle arguments, @NonNull CancellationSignal cancellationSignal,
+            @NonNull Consumer<Bundle> resultListener) { }
 
     /**
      * Request the Keyboard Shortcuts screen to show up. This will trigger
@@ -3609,7 +3666,25 @@ public class Activity extends ContextThemeWrapper
 
         FragmentManager fragmentManager = mFragments.getFragmentManager();
 
-        if (fragmentManager.isStateSaved() || !fragmentManager.popBackStackImmediate()) {
+        if (!fragmentManager.isStateSaved() && fragmentManager.popBackStackImmediate()) {
+            return;
+        }
+        if (!isTaskRoot()) {
+            // If the activity is not the root of the task, allow finish to proceed normally.
+            finishAfterTransition();
+            return;
+        }
+        try {
+            // Inform activity task manager that the activity received a back press
+            // while at the root of the task. This call allows ActivityTaskManager
+            // to intercept or defer finishing.
+            ActivityTaskManager.getService().onBackPressedOnTaskRoot(mToken,
+                    new IRequestFinishCallback.Stub() {
+                        public void requestFinish() {
+                            mHandler.post(() -> finishAfterTransition());
+                        }
+                    });
+        } catch (RemoteException e) {
             finishAfterTransition();
         }
     }
@@ -3726,6 +3801,9 @@ public class Activity extends ContextThemeWrapper
             View decor = mDecor;
             if (decor != null && decor.getParent() != null) {
                 getWindowManager().updateViewLayout(decor, params);
+                if (mContentCaptureManager != null) {
+                    mContentCaptureManager.updateWindowAttributes(params);
+                }
             }
         }
     }
@@ -7626,7 +7704,7 @@ public class Activity extends ContextThemeWrapper
             CharSequence title, Activity parent, String id,
             NonConfigurationInstances lastNonConfigurationInstances,
             Configuration config, String referrer, IVoiceInteractor voiceInteractor,
-            Window window, ActivityConfigCallback activityConfigCallback) {
+            Window window, ActivityConfigCallback activityConfigCallback, IBinder assistToken) {
         attachBaseContext(context);
 
         mFragments.attachHost(null /*parent*/);
@@ -7647,6 +7725,7 @@ public class Activity extends ContextThemeWrapper
         mMainThread = aThread;
         mInstrumentation = instr;
         mToken = token;
+        mAssistToken = assistToken;
         mIdent = ident;
         mApplication = application;
         mIntent = intent;
@@ -7695,6 +7774,11 @@ public class Activity extends ContextThemeWrapper
     @UnsupportedAppUsage
     public final IBinder getActivityToken() {
         return mParent != null ? mParent.getActivityToken() : mToken;
+    }
+
+    /** @hide */
+    public final IBinder getAssistToken() {
+        return mParent != null ? mParent.getAssistToken() : mAssistToken;
     }
 
     /** @hide */

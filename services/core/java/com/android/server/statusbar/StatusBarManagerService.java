@@ -262,9 +262,10 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         @Override
         public void setSystemUiVisibility(int displayId, int vis, int fullscreenStackVis,
                 int dockedStackVis, int mask, Rect fullscreenBounds, Rect dockedBounds,
-                String cause) {
+                boolean isNavbarColorManagedByIme, String cause) {
             StatusBarManagerService.this.setSystemUiVisibility(displayId, vis, fullscreenStackVis,
-                    dockedStackVis, mask, fullscreenBounds, dockedBounds, cause);
+                    dockedStackVis, mask, fullscreenBounds, dockedBounds, isNavbarColorManagedByIme,
+                    cause);
         }
 
         @Override
@@ -452,8 +453,18 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
             if (mBar != null) {
                 try {
                     mBar.onDisplayReady(displayId);
-                } catch (RemoteException ex) { }
+                } catch (RemoteException ex) {}
             }
+        }
+
+        @Override
+        public void onRecentsAnimationStateChanged(boolean running) {
+            if (mBar != null) {
+                try {
+                    mBar.onRecentsAnimationStateChanged(running);
+                } catch (RemoteException ex) {}
+            }
+
         }
     };
 
@@ -610,11 +621,11 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
     }
 
     @Override
-    public void onBiometricAuthenticated(boolean authenticated) {
+    public void onBiometricAuthenticated(boolean authenticated, String failureReason) {
         enforceBiometricDialog();
         if (mBar != null) {
             try {
-                mBar.onBiometricAuthenticated(authenticated);
+                mBar.onBiometricAuthenticated(authenticated, failureReason);
             } catch (RemoteException ex) {
             }
         }
@@ -708,21 +719,6 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         // Ensure state for the current user is applied, even if passed a non-current user.
         final int net1 = gatherDisableActionsLocked(mCurrentUserId, 1);
         final int net2 = gatherDisableActionsLocked(mCurrentUserId, 2);
-
-        // TODO(b/113914868): investigation log for disappearing home button
-        if (whichFlag == 1 && pkg != null && pkg.contains("systemui")) {
-            String disabledData = "{ ";
-            for (int i = 0; i < mDisableRecords.size(); i++) {
-                DisableRecord tok = mDisableRecords.get(i);
-                disabledData += "    ([" + i + "] " + tok + "), ";
-            }
-            disabledData += " }";
-            final UiState state = getUiState(displayId);
-
-            Log.d(TAG, "disabledlocked (b/113914868): displayId=" + displayId + ", net1=" + net1
-                    + ", mDisabled1=" + state.mDisabled1 + ", token=" + token
-                    + ", mDisableRecords=" + mDisableRecords.size() + " => " + disabledData);
-        }
         final UiState state = getUiState(displayId);
         if (!state.disableEquals(net1, net2)) {
             state.setDisabled(net1, net2);
@@ -872,11 +868,13 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
     public void setSystemUiVisibility(int displayId, int vis, int mask, String cause) {
         final UiState state = getUiState(displayId);
         setSystemUiVisibility(displayId, vis, 0, 0, mask,
-                state.mFullscreenStackBounds, state.mDockedStackBounds, cause);
+                state.mFullscreenStackBounds, state.mDockedStackBounds,
+                state.mNavbarColorManagedByIme, cause);
     }
 
     private void setSystemUiVisibility(int displayId, int vis, int fullscreenStackVis,
-            int dockedStackVis, int mask, Rect fullscreenBounds, Rect dockedBounds, String cause) {
+            int dockedStackVis, int mask, Rect fullscreenBounds, Rect dockedBounds,
+            boolean isNavbarColorManagedByIme, String cause) {
         // also allows calls from window manager which is in this process.
         enforceStatusBarService();
 
@@ -884,7 +882,7 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
 
         synchronized (mLock) {
             updateUiVisibilityLocked(displayId, vis, fullscreenStackVis, dockedStackVis, mask,
-                    fullscreenBounds, dockedBounds);
+                    fullscreenBounds, dockedBounds, isNavbarColorManagedByIme);
             disableLocked(
                     displayId,
                     mCurrentUserId,
@@ -896,17 +894,19 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
 
     private void updateUiVisibilityLocked(final int displayId, final int vis,
             final int fullscreenStackVis, final int dockedStackVis, final int mask,
-            final Rect fullscreenBounds, final Rect dockedBounds) {
+            final Rect fullscreenBounds, final Rect dockedBounds,
+            final boolean isNavbarColorManagedByIme) {
         final UiState state = getUiState(displayId);
         if (!state.systemUiStateEquals(vis, fullscreenStackVis, dockedStackVis,
-                fullscreenBounds, dockedBounds)) {
+                fullscreenBounds, dockedBounds, isNavbarColorManagedByIme)) {
             state.setSystemUiState(vis, fullscreenStackVis, dockedStackVis, fullscreenBounds,
-                    dockedBounds);
+                    dockedBounds, isNavbarColorManagedByIme);
             mHandler.post(() -> {
                 if (mBar != null) {
                     try {
                         mBar.setSystemUiVisibility(displayId, vis, fullscreenStackVis,
-                                dockedStackVis, mask, fullscreenBounds, dockedBounds);
+                                dockedStackVis, mask, fullscreenBounds, dockedBounds,
+                                isNavbarColorManagedByIme);
                     } catch (RemoteException ex) {
                         Log.w(TAG, "Can not get StatusBar!");
                     }
@@ -945,6 +945,7 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         private int mImeBackDisposition = 0;
         private boolean mShowImeSwitcher = false;
         private IBinder mImeToken = null;
+        private boolean mNavbarColorManagedByIme = false;
 
         private int getDisabled1() {
             return mDisabled1;
@@ -972,21 +973,25 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         }
 
         private void setSystemUiState(final int vis, final int fullscreenStackVis,
-                final int dockedStackVis, final Rect fullscreenBounds, final Rect dockedBounds) {
+                final int dockedStackVis, final Rect fullscreenBounds, final Rect dockedBounds,
+                final boolean navbarColorManagedByIme) {
             mSystemUiVisibility = vis;
             mFullscreenStackSysUiVisibility = fullscreenStackVis;
             mDockedStackSysUiVisibility = dockedStackVis;
             mFullscreenStackBounds.set(fullscreenBounds);
             mDockedStackBounds.set(dockedBounds);
+            mNavbarColorManagedByIme = navbarColorManagedByIme;
         }
 
         private boolean systemUiStateEquals(final int vis, final int fullscreenStackVis,
-                final int dockedStackVis, final Rect fullscreenBounds, final Rect dockedBounds) {
+                final int dockedStackVis, final Rect fullscreenBounds, final Rect dockedBounds,
+                final boolean navbarColorManagedByIme) {
             return mSystemUiVisibility == vis
                 && mFullscreenStackSysUiVisibility == fullscreenStackVis
                 && mDockedStackSysUiVisibility == dockedStackVis
                 && mFullscreenStackBounds.equals(fullscreenBounds)
-                && mDockedStackBounds.equals(dockedBounds);
+                && mDockedStackBounds.equals(dockedBounds)
+                && mNavbarColorManagedByIme == navbarColorManagedByIme;
         }
 
         private void setImeWindowState(final int vis, final int backDisposition,
@@ -1051,7 +1056,8 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
                     state.mImeBackDisposition, state.mShowImeSwitcher,
                     gatherDisableActionsLocked(mCurrentUserId, 2),
                     state.mFullscreenStackSysUiVisibility, state.mDockedStackSysUiVisibility,
-                    state.mImeToken, state.mFullscreenStackBounds, state.mDockedStackBounds);
+                    state.mImeToken, state.mFullscreenStackBounds, state.mDockedStackBounds,
+                    state.mNavbarColorManagedByIme);
         }
     }
 
@@ -1308,6 +1314,17 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         long identity = Binder.clearCallingIdentity();
         try {
             mNotificationDelegate.onClearAll(callingUid, callingPid, userId);
+        } finally {
+            Binder.restoreCallingIdentity(identity);
+        }
+    }
+
+    @Override
+    public void onNotificationBubbleChanged(String key, boolean isBubble) {
+        enforceStatusBarService();
+        long identity = Binder.clearCallingIdentity();
+        try {
+            mNotificationDelegate.onNotificationBubbleChanged(key, isBubble);
         } finally {
             Binder.restoreCallingIdentity(identity);
         }

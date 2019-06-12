@@ -133,6 +133,8 @@
     <!-- no translation found for wfcSpnFormat_spn (4998685024207291232) -->
     <skip />
     <string name="wfcSpnFormat_spn_wifi_calling" msgid="136001023263502280">"‏שיחות Wi-Fi <xliff:g id="SPN">%s</xliff:g>"</string>
+    <!-- no translation found for wfcSpnFormat_spn_wifi_calling_vo_hyphen (1730997175789582756) -->
+    <skip />
     <string name="wfcSpnFormat_wlan_call" msgid="2533371081782489793">"שיחה ברשת אלחוטית"</string>
     <string name="wfcSpnFormat_spn_wlan_call" msgid="2315240198303197168">"‏שיחת WLAN <xliff:g id="SPN">%s</xliff:g>"</string>
     <string name="wfcSpnFormat_spn_wifi" msgid="6546481665561961938">"Wi-Fi <xliff:g id="SPN">%s</xliff:g>"</string>
@@ -267,7 +269,7 @@
     <string name="notification_channel_network_alerts" msgid="2895141221414156525">"התראות רשת"</string>
     <string name="notification_channel_network_available" msgid="4531717914138179517">"יש רשת זמינה"</string>
     <string name="notification_channel_vpn" msgid="8330103431055860618">"‏סטטוס ה-VPN"</string>
-    <string name="notification_channel_device_admin" msgid="1568154104368069249">"ניהול מכשירים"</string>
+    <string name="notification_channel_device_admin" msgid="8353118887482520565">"‏התראות ממנהל ה-IT"</string>
     <string name="notification_channel_alerts" msgid="4496839309318519037">"התראות"</string>
     <string name="notification_channel_retail_mode" msgid="6088920674914038779">"הדגמה לקמעונאים"</string>
     <string name="notification_channel_usb" msgid="9006850475328924681">"‏חיבור USB"</string>
@@ -297,7 +299,7 @@
     <string name="permgroupdesc_sms" msgid="4656988620100940350">"‏שליחה והצגה של הודעות SMS"</string>
     <string name="permgrouprequest_sms" msgid="7168124215838204719">"‏לתת לאפליקציה &lt;b&gt;<xliff:g id="APP_NAME">%1$s</xliff:g>&lt;/b&gt; הרשאה לשלוח הודעות SMS ולהציג אותן?"</string>
     <string name="permgrouplab_storage" msgid="1971118770546336966">"אחסון"</string>
-    <string name="permgroupdesc_storage" msgid="637758554581589203">"גישה אל תמונות, מדיה וקבצים במכשיר שלך"</string>
+    <string name="permgroupdesc_storage" msgid="637758554581589203">"גישה לתמונות, למדיה ולקבצים במכשיר שלך"</string>
     <string name="permgrouprequest_storage" msgid="7885942926944299560">"‏לתת לאפליקציה &lt;b&gt;<xliff:g id="APP_NAME">%1$s</xliff:g>&lt;/b&gt; הרשאת גישה לתמונות, למדיה ולקבצים במכשיר?"</string>
     <string name="permgrouplab_microphone" msgid="171539900250043464">"מיקרופון"</string>
     <string name="permgroupdesc_microphone" msgid="4988812113943554584">"הקלטת אודיו"</string>
@@ -559,6 +561,9 @@
     <string name="permdesc_manageFace" msgid="8919637120670185330">"מאפשרת לאפליקציה להפעיל שיטות להוספה ומחיקה של תבניות פנים שבהן ייעשה שימוש."</string>
     <string name="permlab_useFaceAuthentication" msgid="8996134460546804535">"שימוש בחומרה של זיהוי פנים לצורך אימות"</string>
     <string name="permdesc_useFaceAuthentication" msgid="5011118722951833089">"מאפשרת לאפליקציה להשתמש בחומרה של זיהוי פנים לצורך אימות"</string>
+    <string name="face_recalibrate_notification_name" msgid="3976629945250435054">"אימות פנים"</string>
+    <string name="face_recalibrate_notification_title" msgid="4087620069451499365">"יש לבצע רישום מחדש של הפנים שלך"</string>
+    <string name="face_recalibrate_notification_content" msgid="5530308842361499835">"לשיפור הזיהוי יש לבצע רישום מחדש של הפנים שלך"</string>
     <string name="face_acquired_insufficient" msgid="2767330364802375742">"לא ניתן היה לקלוט את הפנים במדויק. יש לנסות שוב."</string>
     <string name="face_acquired_too_bright" msgid="5005650874582450967">"בהיר מדי. צריך תאורה עדינה יותר."</string>
     <string name="face_acquired_too_dark" msgid="1966194696381394616">"התמונה חשוכה מדי. צריך תאורה חזקה יותר."</string>
@@ -568,21 +573,21 @@
     <string name="face_acquired_too_low" msgid="488983581737550912">"צריך להוריד את הטלפון."</string>
     <string name="face_acquired_too_right" msgid="3667075962661863218">"צריך להזיז את הטלפון שמאלה."</string>
     <string name="face_acquired_too_left" msgid="3148242963894703424">"צריך להזיז את הטלפון ימינה."</string>
-    <string name="face_acquired_poor_gaze" msgid="8471716624377228327">"צריך להביט במסך בעיניים פקוחות."</string>
+    <string name="face_acquired_poor_gaze" msgid="5606479370806754905">"יש להביט ישירות אל המכשיר."</string>
     <string name="face_acquired_not_detected" msgid="4885504661626728809">"אי אפשר לראות את הפנים שלך. צריך להביט אל הטלפון."</string>
     <string name="face_acquired_too_much_motion" msgid="3149332171102108851">"יותר מדי תנועה. יש להחזיק את הטלפון בצורה יציבה."</string>
     <string name="face_acquired_recalibrate" msgid="8077949502893707539">"יש לרשום מחדש את הפנים."</string>
     <string name="face_acquired_too_different" msgid="7663983770123789694">"כבר לא ניתן לזהות פנים. יש לנסות שוב."</string>
     <string name="face_acquired_too_similar" msgid="1508776858407646460">"דומה מדי, יש לשנות תנוחה."</string>
-    <string name="face_acquired_pan_too_extreme" msgid="1852495480382773759">"יש להביט ישירות אל המצלמה."</string>
-    <string name="face_acquired_tilt_too_extreme" msgid="1290820400317982049">"יש להביט ישירות אל המצלמה."</string>
-    <string name="face_acquired_roll_too_extreme" msgid="1444829237745898619">"יש ליישר את הראש במאונך."</string>
-    <string name="face_acquired_obscured" msgid="5747521031647744553">"הפנים שלך צריכים להיות גלויים לגמרי."</string>
-    <string name="face_acquired_sensor_dirty" msgid="364493868630891300">"צריך לנקות את המצלמה."</string>
+    <string name="face_acquired_pan_too_extreme" msgid="4581629343077288178">"עליך ליישר קצת את הראש."</string>
+    <string name="face_acquired_tilt_too_extreme" msgid="4019954263012496468">"עליך ליישר קצת את הראש."</string>
+    <string name="face_acquired_roll_too_extreme" msgid="6312973147689664409">"עליך ליישר קצת את הראש."</string>
+    <string name="face_acquired_obscured" msgid="5357207702967893283">"יש להסיר כל דבר שמסתיר את הפנים."</string>
+    <string name="face_acquired_sensor_dirty" msgid="2535761002815565222">"יש לנקות את החיישן שבקצה העליון של המסך."</string>
   <string-array name="face_acquired_vendor">
   </string-array>
     <string name="face_error_hw_not_available" msgid="396883585636963908">"לא ניתן לאמת את הפנים. החומרה לא זמינה."</string>
-    <string name="face_error_timeout" msgid="2605673935810019129">"חלף הזמן הקצוב לזיהוי הפנים. יש לנסות שוב."</string>
+    <string name="face_error_timeout" msgid="3202585609451248103">"יש לנסות שוב את זיהוי הפנים לצורך אימות."</string>
     <string name="face_error_no_space" msgid="2712120617457553825">"לא ניתן לאחסן נתוני פנים. תחילה יש למחוק פנים ישנים."</string>
     <string name="face_error_canceled" msgid="2768146728600802422">"פעולת הפנים בוטלה"</string>
     <string name="face_error_user_canceled" msgid="9003022830076496163">"זיהוי הפנים בוטל על ידי המשתמש"</string>
@@ -651,6 +656,8 @@
     <string name="permdesc_bindCarrierServices" msgid="1391552602551084192">"מאפשר לבעלים לאגד לשירות ספק. לעולם לא אמור להיות נחוץ לאפליקציות רגילות."</string>
     <string name="permlab_access_notification_policy" msgid="4247510821662059671">"גישה אל \'נא לא להפריע\'"</string>
     <string name="permdesc_access_notification_policy" msgid="3296832375218749580">"מאפשר לאפליקציה לקרוא ולכתוב את התצורה של \'נא לא להפריע\'."</string>
+    <string name="permlab_startViewPermissionUsage" msgid="5484728591597709944">"התחלת צפייה בהרשאות השימוש"</string>
+    <string name="permdesc_startViewPermissionUsage" msgid="4808345878203594428">"מאפשרת לבעלים להפעיל את השימוש בהרשאות עבור אפליקציה מסוימת. הרשאה זו אף פעם לא נדרשת עבור אפליקציות רגילות."</string>
     <string name="policylab_limitPassword" msgid="4497420728857585791">"הגדר כללי סיסמה"</string>
     <string name="policydesc_limitPassword" msgid="2502021457917874968">"קביעת האורך הנדרש והתווים המותרים בסיסמאות ובקודי הגישה של מסך הנעילה."</string>
     <string name="policylab_watchLogin" msgid="5091404125971980158">"מעקב אחר ניסיונות לביטול של נעילת המסך"</string>
@@ -812,7 +819,7 @@
     <string name="lockscreen_instructions_when_pattern_disabled" msgid="686260028797158364">"לחץ על \'תפריט\' כדי לבטל את הנעילה."</string>
     <string name="lockscreen_pattern_instructions" msgid="7478703254964810302">"שרטט קו לביטול נעילת המסך"</string>
     <string name="lockscreen_emergency_call" msgid="5298642613417801888">"חירום"</string>
-    <string name="lockscreen_return_to_call" msgid="5244259785500040021">"חזור לשיחה"</string>
+    <string name="lockscreen_return_to_call" msgid="5244259785500040021">"חזרה לשיחה"</string>
     <string name="lockscreen_pattern_correct" msgid="9039008650362261237">"נכון!"</string>
     <string name="lockscreen_pattern_wrong" msgid="4317955014948108794">"נסה שוב"</string>
     <string name="lockscreen_password_wrong" msgid="5737815393253165301">"נסה שוב"</string>
@@ -1347,7 +1354,7 @@
     <string name="sms_control_title" msgid="7296612781128917719">"‏שולח הודעות SMS"</string>
     <string name="sms_control_message" msgid="3867899169651496433">"‏&lt;b&gt; <xliff:g id="APP_NAME">%1$s</xliff:g> &lt;/ b&gt; שולח מספר רב של הודעות SMS. האם ברצונך לאפשר לאפליקציה זו להמשיך לשלוח הודעות?"</string>
     <string name="sms_control_yes" msgid="3663725993855816807">"כן, זה בסדר"</string>
-    <string name="sms_control_no" msgid="625438561395534982">"לא, אין מצב"</string>
+    <string name="sms_control_no" msgid="625438561395534982">"עדיף שלא"</string>
     <string name="sms_short_code_confirm_message" msgid="1645436466285310855">"‏&lt;b&gt;<xliff:g id="APP_NAME">%1$s</xliff:g>&lt;/b&gt; רוצה לשלוח הודעה אל &lt;b&gt;<xliff:g id="DEST_ADDRESS">%2$s</xliff:g>&lt;/b&gt;."</string>
     <string name="sms_short_code_details" msgid="5873295990846059400">"הדבר "<b>"עלול לגרום לחיובים"</b>" בחשבון המכשיר הנייד שלך."</string>
     <string name="sms_premium_short_code_details" msgid="7869234868023975"><b>"הדבר יגרום לחיובים בחשבון המכשיר הנייד שלך."</b></string>
@@ -1396,14 +1403,14 @@
     <string name="test_harness_mode_notification_message" msgid="1343197173054407119">"כדי להשבית את מצב מסגרת בדיקה צריך לאפס להגדרות היצרן."</string>
     <string name="usb_contaminant_detected_title" msgid="7136400633704058349">"‏יש נוזלים או חלקיקים ביציאת ה-USB"</string>
     <string name="usb_contaminant_detected_message" msgid="832337061059487250">"‏יציאת ה-USB הושבתה באופן אוטומטי. יש להקיש לקבלת מידע נוסף."</string>
-    <string name="usb_contaminant_not_detected_title" msgid="4202417484434906086">"‏יציאת ה-USB בטוחה לשימוש"</string>
+    <string name="usb_contaminant_not_detected_title" msgid="7708281124088684821">"‏ניתן להשתמש ביציאת ה-USB"</string>
     <string name="usb_contaminant_not_detected_message" msgid="2415791798244545292">"הטלפון לא מזהה יותר נוזלים וחלקיקים."</string>
     <string name="taking_remote_bugreport_notification_title" msgid="6742483073875060934">"עיבוד דוח על באג..."</string>
     <string name="share_remote_bugreport_notification_title" msgid="4987095013583691873">"האם לשתף דוח על באג?"</string>
     <string name="sharing_remote_bugreport_notification_title" msgid="7572089031496651372">"שיתוף דוח על באג…"</string>
     <string name="share_remote_bugreport_notification_message_finished" msgid="6029609949340992866">"מנהל המערכת ביקש דוח על באג כדי לסייע בפתרון בעיות במכשיר זה. ייתכן שאפליקציות ונתונים ישותפו."</string>
     <string name="share_remote_bugreport_action" msgid="6249476773913384948">"שתף"</string>
-    <string name="decline_remote_bugreport_action" msgid="6230987241608770062">"לא, אין מצב"</string>
+    <string name="decline_remote_bugreport_action" msgid="6230987241608770062">"עדיף שלא"</string>
     <string name="select_input_method" msgid="4653387336791222978">"בחר שיטת הזנה"</string>
     <string name="show_ime" msgid="2506087537466597099">"להשאיר במסך בזמן שהמקלדת הפיזית פעילה"</string>
     <string name="hardware" msgid="194658061510127999">"הצג מקלדת וירטואלית"</string>
@@ -1482,7 +1489,7 @@
     <string name="grant_credentials_permission_message_footer" msgid="3125211343379376561">"האם ברצונך לאפשר בקשה זו?"</string>
     <string name="grant_permissions_header_text" msgid="6874497408201826708">"בקשת גישה"</string>
     <string name="allow" msgid="7225948811296386551">"כן, זה בסדר"</string>
-    <string name="deny" msgid="2081879885755434506">"לא, אין מצב"</string>
+    <string name="deny" msgid="2081879885755434506">"עדיף שלא"</string>
     <string name="permission_request_notification_title" msgid="6486759795926237907">"בקשת הרשאה"</string>
     <string name="permission_request_notification_with_subtitle" msgid="8530393139639560189">"נדרשת הרשאה\nלחשבון <xliff:g id="ACCOUNT">%s</xliff:g>."</string>
     <string name="forward_intent_to_owner" msgid="1207197447013960896">"אתה משתמש באפליקציה זו מחוץ לפרופיל העבודה שלך"</string>
@@ -1709,8 +1716,18 @@
     <string name="accessibility_shortcut_enabling_service" msgid="7771852911861522636">"<xliff:g id="SERVICE_NAME">%1$s</xliff:g> הופעל על-ידי קיצור הדרך לנגישות"</string>
     <string name="accessibility_shortcut_disabling_service" msgid="2747243438223109821">"<xliff:g id="SERVICE_NAME">%1$s</xliff:g> הושבת על-ידי קיצור הדרך לנגישות"</string>
     <string name="accessibility_shortcut_spoken_feedback" msgid="8376923232350078434">"יש ללחוץ לחיצה ארוכה על שני לחצני עוצמת הקול למשך שלוש שניות כדי להשתמש בשירות <xliff:g id="SERVICE_NAME">%1$s</xliff:g>"</string>
-    <string name="accessibility_button_prompt_text" msgid="4234556536456854251">"בחר תכונה שתופעל כשתלחץ על הלחצן \'נגישות\':"</string>
-    <string name="accessibility_button_instructional_text" msgid="6942300463612999993">"כדי להחליף תכונה, יש ללחוץ לחיצה ארוכה על הלחצן \'נגישות\'."</string>
+    <!-- no translation found for accessibility_button_prompt_text (1176658502969738564) -->
+    <skip />
+    <!-- no translation found for accessibility_gesture_prompt_text (8259145549733019401) -->
+    <skip />
+    <!-- no translation found for accessibility_gesture_3finger_prompt_text (1041435574275047665) -->
+    <skip />
+    <!-- no translation found for accessibility_button_instructional_text (7003212763213614833) -->
+    <skip />
+    <!-- no translation found for accessibility_gesture_instructional_text (5261788874937410950) -->
+    <skip />
+    <!-- no translation found for accessibility_gesture_3finger_instructional_text (4969448938984394550) -->
+    <skip />
     <string name="accessibility_magnification_chooser_text" msgid="1227146738764986237">"הגדלה"</string>
     <string name="user_switched" msgid="3768006783166984410">"המשתמש הנוכחי <xliff:g id="NAME">%1$s</xliff:g>."</string>
     <string name="user_switching_message" msgid="2871009331809089783">"עובר אל <xliff:g id="NAME">%1$s</xliff:g>…"</string>
@@ -1963,9 +1980,7 @@
     <string name="deprecated_target_sdk_app_store" msgid="5032340500368495077">"האם יש עדכון חדש?"</string>
     <string name="new_sms_notification_title" msgid="8442817549127555977">"יש לך הודעות חדשות"</string>
     <string name="new_sms_notification_content" msgid="7002938807812083463">"‏פתח את אפליקציית ה-SMS כדי להציג"</string>
-    <string name="user_encrypted_title" msgid="9054897468831672082">"ייתכן שחלק מהפונקציונליות תהיה מוגבלת"</string>
-    <string name="user_encrypted_message" msgid="4923292604515744267">"הקש כדי לבטל את הנעילה"</string>
-    <string name="user_encrypted_detail" msgid="5708447464349420392">"נתוני משתמש נעולים"</string>
+    <string name="profile_encrypted_title" msgid="4260432497586829134">"ייתכן שחלק מהפונקציונליות תהיה מוגבלת"</string>
     <string name="profile_encrypted_detail" msgid="3700965619978314974">"פרופיל העבודה נעול"</string>
     <string name="profile_encrypted_message" msgid="6964994232310195874">"הקש לביטול נעילת פרופיל העבודה"</string>
     <string name="usb_mtp_launch_notification_title" msgid="8359219638312208932">"מחובר אל <xliff:g id="PRODUCT_NAME">%1$s</xliff:g>"</string>
@@ -2096,4 +2111,5 @@
       <item quantity="one"><xliff:g id="FILE_NAME_0">%s</xliff:g> + קובץ  אחד (<xliff:g id="COUNT_1">%d</xliff:g>)</item>
     </plurals>
     <string name="chooser_no_direct_share_targets" msgid="997970693708458895">"שיתוף ישיר אינו זמין"</string>
+    <string name="chooser_all_apps_button_label" msgid="3631524352936289457">"רשימת האפליקציות"</string>
 </resources>

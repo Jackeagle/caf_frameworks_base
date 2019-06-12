@@ -27,6 +27,7 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.AttributeSet;
+import android.util.TypedValue;
 import android.view.View;
 import android.widget.TextView;
 
@@ -58,14 +59,22 @@ public class KeyguardMessageArea extends TextView implements SecurityMessageDisp
     private ColorStateList mDefaultColorState;
     private CharSequence mMessage;
     private ColorStateList mNextMessageColorState = ColorStateList.valueOf(DEFAULT_COLOR);
+    private boolean mBouncerVisible;
 
     private KeyguardUpdateMonitorCallback mInfoCallback = new KeyguardUpdateMonitorCallback() {
         public void onFinishedGoingToSleep(int why) {
             setSelected(false);
-        };
+        }
+
         public void onStartedWakingUp() {
             setSelected(true);
-        };
+        }
+
+        @Override
+        public void onKeyguardBouncerChanged(boolean bouncer) {
+            mBouncerVisible = bouncer;
+            update();
+        }
     };
 
     public KeyguardMessageArea(Context context) {
@@ -117,6 +126,15 @@ public class KeyguardMessageArea extends TextView implements SecurityMessageDisp
         array.recycle();
         mDefaultColorState = newTextColors;
         update();
+    }
+
+    @Override
+    public void onDensityOrFontScaleChanged() {
+        TypedArray array = mContext.obtainStyledAttributes(R.style.Keyguard_TextView, new int[] {
+                android.R.attr.textSize
+        });
+        setTextSize(TypedValue.COMPLEX_UNIT_PX, array.getDimensionPixelSize(0, 0));
+        array.recycle();
     }
 
     @Override
@@ -178,7 +196,7 @@ public class KeyguardMessageArea extends TextView implements SecurityMessageDisp
 
     private void update() {
         CharSequence status = mMessage;
-        setVisibility(TextUtils.isEmpty(status) ? INVISIBLE : VISIBLE);
+        setVisibility(TextUtils.isEmpty(status) || !mBouncerVisible ? INVISIBLE : VISIBLE);
         setText(status);
         ColorStateList colorState = mDefaultColorState;
         if (mNextMessageColorState.getDefaultColor() != DEFAULT_COLOR) {

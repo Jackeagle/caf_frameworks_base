@@ -846,12 +846,18 @@ public final class Downloads {
     }
 
     /** @hide */
-    public static final String MEDIASTORE_DOWNLOADS_DELETED_CALL = "mediastore_downloads_deleted";
+    public static final String CALL_MEDIASTORE_DOWNLOADS_DELETED = "mediastore_downloads_deleted";
+    /** @hide */
+    public static final String CALL_CREATE_EXTERNAL_PUBLIC_DIR = "create_external_public_dir";
+    /** @hide */
+    public static final String CALL_REVOKE_MEDIASTORE_URI_PERMS = "revoke_mediastore_uri_perms";
 
     /** @hide */
     public static final String EXTRA_IDS = "ids";
     /** @hide */
     public static final String EXTRA_MIME_TYPES = "mime_types";
+    /** @hide */
+    public static final String DIR_TYPE = "dir_type";
 
     /**
      * Query where clause for general querying.

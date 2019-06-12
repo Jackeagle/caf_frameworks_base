@@ -384,6 +384,9 @@ void ASurfaceTransaction_setGeometry(ASurfaceTransaction* aSurfaceTransaction,
     transaction->setCrop(surfaceControl, static_cast<const Rect&>(source));
     transaction->setFrame(surfaceControl, static_cast<const Rect&>(destination));
     transaction->setTransform(surfaceControl, transform);
+    bool transformToInverseDisplay = (NATIVE_WINDOW_TRANSFORM_INVERSE_DISPLAY & transform) ==
+            NATIVE_WINDOW_TRANSFORM_INVERSE_DISPLAY;
+    transaction->setTransformToDisplayInverse(surfaceControl, transformToInverseDisplay);
 }
 
 void ASurfaceTransaction_setBufferTransparency(ASurfaceTransaction* aSurfaceTransaction,
@@ -411,7 +414,15 @@ void ASurfaceTransaction_setDamageRegion(ASurfaceTransaction* aSurfaceTransactio
 
     Region region;
     for (uint32_t i = 0; i < count; ++i) {
-        region.merge(static_cast<const Rect&>(rects[i]));
+        region.orSelf(static_cast<const Rect&>(rects[i]));
+    }
+
+    // Hardware composer interprets a DamageRegion with a single Rect of {0,0,0,0} to be an
+    // undamaged region and {0,0,-1,-1} to be a fully damaged buffer. This is a confusing
+    // distinction for a public api. Instead, default both cases to be a fully damaged buffer.
+    if (count == 1 && region.getBounds().isEmpty()) {
+        transaction->setSurfaceDamageRegion(surfaceControl, Region::INVALID_REGION);
+        return;
     }
 
     transaction->setSurfaceDamageRegion(surfaceControl, region);

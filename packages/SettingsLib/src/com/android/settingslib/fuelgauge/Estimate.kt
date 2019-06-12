@@ -45,7 +45,7 @@ class Estimate(
                     Settings.Global.getLong(
                             resolver, Settings.Global.BATTERY_ESTIMATES_LAST_UPDATE_TIME, -1))
             return if (Duration.between(lastUpdateTime,
-                            Instant.now()).compareTo(Duration.ofMinutes(2)) > 0) {
+                            Instant.now()).compareTo(Duration.ofMinutes(1)) > 0) {
                 null
             } else Estimate(
                     Settings.Global.getLong(resolver,
@@ -76,6 +76,18 @@ class Estimate(
                     estimate.averageDischargeTime)
             Settings.Global.putLong(resolver, Settings.Global.BATTERY_ESTIMATES_LAST_UPDATE_TIME,
                     System.currentTimeMillis())
+        }
+
+        /**
+         * Returns when the estimate was last updated as an Instant
+         */
+        @JvmStatic
+        fun getLastCacheUpdateTime(context: Context): Instant {
+            return Instant.ofEpochMilli(
+                    Settings.Global.getLong(
+                            context.contentResolver,
+                            Settings.Global.BATTERY_ESTIMATES_LAST_UPDATE_TIME,
+                            -1))
         }
     }
 }

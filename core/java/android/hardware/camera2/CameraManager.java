@@ -98,7 +98,7 @@ public final class CameraManager {
      * identifiers, while removable cameras have a unique identifier for each
      * individual device, even if they are the same model.</p>
      *
-     * <p>This list doesn't contain physical cameras that can only used as part of a logical
+     * <p>This list doesn't contain physical cameras that can only be used as part of a logical
      * multi-camera device.</p>
      *
      * @return The list of currently connected camera devices.
@@ -263,7 +263,7 @@ public final class CameraManager {
      * immutable for a given camera.</p>
      *
      * <p>From API level 29, this function can also be used to query the capabilities of physical
-     * cameras that can only be used as part of logical multi-camera. These cameras cannot not be
+     * cameras that can only be used as part of logical multi-camera. These cameras cannot be
      * opened directly via {@link #openCamera}</p>
      *
      * @param cameraId The id of the camera device to query. This could be either a standalone
@@ -857,8 +857,10 @@ public final class CameraManager {
      *
      * @param cameraId a non-{@code null} camera identifier
      * @return {@code true} if cameraId is a hidden physical camera device
+     *
+     * @hide
      */
-    private boolean isHiddenPhysicalCamera(String cameraId) {
+    public static boolean isHiddenPhysicalCamera(String cameraId) {
         try {
             ICameraService cameraService = CameraManagerGlobal.get().getCameraService();
             // If no camera service, no support

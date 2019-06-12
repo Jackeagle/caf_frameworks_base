@@ -270,11 +270,12 @@ public final class AudioRecordingConfiguration implements Parcelable {
     }
 
     /**
+     * @hide
      * Returns the system unique ID assigned for the AudioRecord object corresponding to this
      * AudioRecordingConfiguration client.
      * @return the port ID.
      */
-    int getClientPortId() {
+    public int getClientPortId() {
         return mClientPortId;
     }
 

@@ -16,6 +16,8 @@
 
 package com.android.systemui.statusbar.notification.row;
 
+import static android.provider.Settings.Secure.SHOW_NOTIFICATION_SNOOZE;
+
 import static com.android.systemui.SwipeHelper.SWIPED_FAR_ENOUGH_SIZE_FRACTION;
 
 import android.animation.Animator;
@@ -29,6 +31,7 @@ import android.graphics.Point;
 import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.Settings;
 import android.service.notification.StatusBarNotification;
 import android.util.ArrayMap;
 import android.view.LayoutInflater;
@@ -42,7 +45,6 @@ import com.android.systemui.Interpolators;
 import com.android.systemui.R;
 import com.android.systemui.plugins.statusbar.NotificationMenuRowPlugin;
 import com.android.systemui.statusbar.AlphaOptimizedImageView;
-import com.android.systemui.statusbar.notification.NotificationUtils;
 import com.android.systemui.statusbar.notification.row.NotificationGuts.GutsContent;
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout;
 
@@ -80,7 +82,7 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
     private OnMenuEventListener mMenuListener;
     private boolean mDismissRtl;
     private boolean mIsForeground;
-    private final boolean mIsUsingNewInterruptionModel;
+    private final boolean mIsUsingBidirectionalSwipe;
 
     private ValueAnimator mFadeAnimator;
     private boolean mAnimating;
@@ -113,12 +115,19 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
     private boolean mIsUserTouching;
 
     public NotificationMenuRow(Context context) {
+        //TODO: (b/131242807) not using bidirectional swipe for now
+        this(context, false);
+    }
+
+    // Only needed for testing until we want to turn bidirectional swipe back on
+    @VisibleForTesting
+    NotificationMenuRow(Context context, boolean isUsingBidirectionalSwipe) {
         mContext = context;
         mShouldShowMenu = context.getResources().getBoolean(R.bool.config_showNotificationGear);
         mHandler = new Handler(Looper.getMainLooper());
         mLeftMenuItems = new ArrayList<>();
         mRightMenuItems = new ArrayList<>();
-        mIsUsingNewInterruptionModel = NotificationUtils.useNewInterruptionModel(mContext);
+        mIsUsingBidirectionalSwipe = isUsingBidirectionalSwipe;
     }
 
     @Override
@@ -249,20 +258,24 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
         mVertSpaceForIcons = res.getDimensionPixelSize(R.dimen.notification_min_height);
         mLeftMenuItems.clear();
         mRightMenuItems.clear();
+
+        boolean showSnooze = Settings.Secure.getInt(mContext.getContentResolver(),
+                SHOW_NOTIFICATION_SNOOZE, 0) == 1;
+
         // Construct the menu items based on the notification
-        if (!isForeground) {
-            // Only show snooze for non-foreground notifications
+        if (!isForeground && showSnooze) {
+            // Only show snooze for non-foreground notifications, and if the setting is on
             mSnoozeItem = createSnoozeItem(mContext);
         }
         mAppOpsItem = createAppOpsItem(mContext);
-        if (mIsUsingNewInterruptionModel) {
+        if (mIsUsingBidirectionalSwipe) {
             mInfoItem = createInfoItem(mContext, !mParent.getEntry().isHighPriority());
         } else {
             mInfoItem = createInfoItem(mContext);
         }
 
-        if (!mIsUsingNewInterruptionModel) {
-            if (!isForeground) {
+        if (!mIsUsingBidirectionalSwipe) {
+            if (!isForeground && showSnooze) {
                 mRightMenuItems.add(mSnoozeItem);
             }
             mRightMenuItems.add(mInfoItem);
@@ -334,6 +347,7 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
                 && !NotificationStackScrollLayout.isPinnedHeadsUp(getParent())
                 && !mParent.areGutsExposed()
                 && !mParent.isDark()
+                && !mParent.showingAmbientPulsing()
                 && (mCheckForDrag == null || !mHandler.hasCallbacks(mCheckForDrag))) {
             // Only show the menu if we're not a heads up view and guts aren't exposed.
             mCheckForDrag = new CheckForDrag();
@@ -618,12 +632,12 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
 
     @Override
     public boolean shouldShowGutsOnSnapOpen() {
-        return mIsUsingNewInterruptionModel;
+        return mIsUsingBidirectionalSwipe;
     }
 
     @Override
     public MenuItem menuItemToExposeOnSnap() {
-        return mIsUsingNewInterruptionModel ? mInfoItem : null;
+        return mIsUsingBidirectionalSwipe ? mInfoItem : null;
     }
 
     @Override

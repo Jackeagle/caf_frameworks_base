@@ -19,6 +19,8 @@ package com.android.server.power;
 import static android.provider.Settings.System.ADAPTIVE_SLEEP;
 
 import android.Manifest;
+import android.app.ActivityManager;
+import android.app.SynchronousUserSwitchObserver;
 import android.attention.AttentionManagerInternal;
 import android.attention.AttentionManagerInternal.AttentionCallbackInternal;
 import android.content.ContentResolver;
@@ -28,6 +30,7 @@ import android.database.ContentObserver;
 import android.os.Handler;
 import android.os.PowerManager;
 import android.os.PowerManagerInternal;
+import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.UserHandle;
 import android.provider.Settings;
@@ -54,6 +57,8 @@ public class AttentionDetector {
     private static final String TAG = "AttentionDetector";
     private static final boolean DEBUG = false;
 
+    private Context mContext;
+
     private boolean mIsSettingEnabled;
 
     /**
@@ -74,6 +79,14 @@ public class AttentionDetector {
      * If we're currently waiting for an attention callback
      */
     private final AtomicBoolean mRequested;
+
+    private long mLastActedOnNextScreenDimming;
+
+    /**
+     * Monotonously increasing ID for the requests sent.
+     */
+    @VisibleForTesting
+    protected int mRequestId;
 
     /**
      * {@link android.service.attention.AttentionService} API timeout.
@@ -105,36 +118,13 @@ public class AttentionDetector {
     private AtomicLong mConsecutiveTimeoutExtendedCount = new AtomicLong(0);
 
     @VisibleForTesting
-    final AttentionCallbackInternal mCallback = new AttentionCallbackInternal() {
-        @Override
-        public void onSuccess(int result, long timestamp) {
-            Slog.v(TAG, "onSuccess: " + result);
-            if (mRequested.getAndSet(false)) {
-                synchronized (mLock) {
-                    if (mWakefulness != PowerManagerInternal.WAKEFULNESS_AWAKE) {
-                        if (DEBUG) Slog.d(TAG, "Device slept before receiving callback.");
-                        return;
-                    }
-                    if (result == AttentionService.ATTENTION_SUCCESS_PRESENT) {
-                        mOnUserAttention.run();
-                    } else {
-                        resetConsecutiveExtensionCount();
-                    }
-                }
-            }
-        }
-
-        @Override
-        public void onFailure(int error) {
-            Slog.i(TAG, "Failed to check attention: " + error);
-            mRequested.set(false);
-        }
-    };
+    AttentionCallbackInternalImpl mCallback;
 
     public AttentionDetector(Runnable onUserAttention, Object lock) {
         mOnUserAttention = onUserAttention;
         mLock = lock;
         mRequested = new AtomicBoolean(false);
+        mRequestId = 0;
 
         // Device starts with an awake state upon boot.
         mWakefulness = PowerManagerInternal.WAKEFULNESS_AWAKE;
@@ -147,6 +137,7 @@ public class AttentionDetector {
     }
 
     public void systemReady(Context context) {
+        mContext = context;
         updateEnabledFromSettings(context);
         mPackageManager = context.getPackageManager();
         mContentResolver = context.getContentResolver();
@@ -155,6 +146,13 @@ public class AttentionDetector {
                 com.android.internal.R.integer.config_attentionMaximumExtension);
         mMaxAttentionApiTimeoutMillis = context.getResources().getInteger(
                 com.android.internal.R.integer.config_attentionApiTimeout);
+
+        try {
+            final UserSwitchObserver observer = new UserSwitchObserver();
+            ActivityManager.getService().registerUserSwitchObserver(observer, TAG);
+        } catch (RemoteException e) {
+             // Shouldn't happen since in-process.
+        }
 
         context.getContentResolver().registerContentObserver(Settings.System.getUriFor(
                 Settings.System.ADAPTIVE_SLEEP),
@@ -167,6 +165,9 @@ public class AttentionDetector {
     }
 
     public long updateUserActivity(long nextScreenDimming) {
+        if (nextScreenDimming == mLastActedOnNextScreenDimming) {
+            return nextScreenDimming;
+        }
         if (!mIsSettingEnabled) {
             return nextScreenDimming;
         }
@@ -196,9 +197,7 @@ public class AttentionDetector {
             return nextScreenDimming;
         } else if (mRequested.get()) {
             if (DEBUG) {
-                // TODO(b/128134941): consider adding a member ID increasing counter in
-                //  AttentionCallbackInternal to track this better.
-                Slog.d(TAG, "Pending attention callback, wait.");
+                Slog.d(TAG, "Pending attention callback with ID=" + mCallback.mId + ", wait.");
             }
             return whenToCheck;
         }
@@ -208,12 +207,15 @@ public class AttentionDetector {
         // This means that we must assume that the request was successful, and then cancel it
         // afterwards if AttentionManager couldn't deliver it.
         mRequested.set(true);
+        mRequestId++;
+        mLastActedOnNextScreenDimming = nextScreenDimming;
+        mCallback = new AttentionCallbackInternalImpl(mRequestId);
+        Slog.v(TAG, "Checking user attention, ID: " + mRequestId);
         final boolean sent = mAttentionManager.checkAttention(getAttentionTimeout(), mCallback);
         if (!sent) {
             mRequested.set(false);
         }
 
-        Slog.v(TAG, "Checking user attention");
         return whenToCheck;
     }
 
@@ -294,11 +296,54 @@ public class AttentionDetector {
     }
 
     public void dump(PrintWriter pw) {
-        pw.print("AttentionDetector:");
-        pw.print(" mMaximumExtensionMillis=" + mMaximumExtensionMillis);
-        pw.print(" mMaxAttentionApiTimeoutMillis=" + mMaxAttentionApiTimeoutMillis);
-        pw.print(" mLastUserActivityTime(excludingAttention)=" + mLastUserActivityTime);
-        pw.print(" mAttentionServiceSupported=" + isAttentionServiceSupported());
-        pw.print(" mRequested=" + mRequested);
+        pw.println("AttentionDetector:");
+        pw.println(" mMaximumExtensionMillis=" + mMaximumExtensionMillis);
+        pw.println(" mMaxAttentionApiTimeoutMillis=" + mMaxAttentionApiTimeoutMillis);
+        pw.println(" mLastUserActivityTime(excludingAttention)=" + mLastUserActivityTime);
+        pw.println(" mAttentionServiceSupported=" + isAttentionServiceSupported());
+        pw.println(" mRequested=" + mRequested);
+    }
+
+    @VisibleForTesting
+    final class AttentionCallbackInternalImpl extends AttentionCallbackInternal {
+        private final int mId;
+
+        AttentionCallbackInternalImpl(int id) {
+            this.mId = id;
+        }
+
+        @Override
+        public void onSuccess(int result, long timestamp) {
+            Slog.v(TAG, "onSuccess: " + result + ", ID: " + mId);
+            // If we don't check for request ID it's possible to get into a loop: success leads
+            // to the onUserAttention(), which in turn triggers updateUserActivity(), which will
+            // call back onSuccess() instantaneously if there is a cached value, and circle repeats.
+            if (mId == mRequestId && mRequested.getAndSet(false)) {
+                synchronized (mLock) {
+                    if (mWakefulness != PowerManagerInternal.WAKEFULNESS_AWAKE) {
+                        if (DEBUG) Slog.d(TAG, "Device slept before receiving callback.");
+                        return;
+                    }
+                    if (result == AttentionService.ATTENTION_SUCCESS_PRESENT) {
+                        mOnUserAttention.run();
+                    } else {
+                        resetConsecutiveExtensionCount();
+                    }
+                }
+            }
+        }
+
+        @Override
+        public void onFailure(int error) {
+            Slog.i(TAG, "Failed to check attention: " + error + ", ID: " + mId);
+            mRequested.set(false);
+        }
+    }
+
+    private final class UserSwitchObserver extends SynchronousUserSwitchObserver {
+        @Override
+        public void onUserSwitching(int newUserId) throws RemoteException {
+            updateEnabledFromSettings(mContext);
+        }
     }
 }

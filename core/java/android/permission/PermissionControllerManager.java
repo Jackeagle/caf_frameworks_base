@@ -39,6 +39,7 @@ import android.annotation.RequiresPermission;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
 import android.annotation.TestApi;
+import android.app.ActivityThread;
 import android.app.admin.DevicePolicyManager.PermissionGrantState;
 import android.content.ComponentName;
 import android.content.Context;
@@ -172,6 +173,7 @@ public final class PermissionControllerManager {
      *
      * @hide
      */
+    @TestApi
     public interface OnGetAppPermissionResultCallback {
         /**
          * The result for {@link #getAppPermissions(String, OnGetAppPermissionResultCallback,
@@ -232,7 +234,7 @@ public final class PermissionControllerManager {
                 intent.setPackage(context.getPackageManager().getPermissionControllerPackageName());
                 ResolveInfo serviceInfo = context.getPackageManager().resolveService(intent, 0);
 
-                remoteService = new RemoteService(context.getApplicationContext(),
+                remoteService = new RemoteService(ActivityThread.currentApplication(),
                         serviceInfo.getComponentInfo().getComponentName(), handler,
                         context.getUser());
                 sRemoteServices.put(key, remoteService);
@@ -384,6 +386,7 @@ public final class PermissionControllerManager {
      *
      * @hide
      */
+    @TestApi
     @RequiresPermission(Manifest.permission.GET_RUNTIME_PERMISSIONS)
     public void getAppPermissions(@NonNull String packageName,
             @NonNull OnGetAppPermissionResultCallback callback, @Nullable Handler handler) {

@@ -101,7 +101,6 @@ import android.util.SparseArray;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.backup.IBackupTransport;
-import com.android.internal.util.DumpUtils;
 import com.android.internal.util.Preconditions;
 import com.android.server.AppWidgetBackupBridge;
 import com.android.server.EventLogTags;
@@ -234,8 +233,10 @@ public class UserBackupManagerService {
     // CPU on bring-up and increase time-to-UI.
     private static final long INITIALIZATION_DELAY_MILLIS = 3000;
 
-    // Timeout interval for deciding that a bind or clear-data has taken too long
-    private static final long TIMEOUT_INTERVAL = 10 * 1000;
+    // Timeout interval for deciding that a bind has taken too long.
+    private static final long BIND_TIMEOUT_INTERVAL = 10 * 1000;
+    // Timeout interval for deciding that a clear-data has taken too long.
+    private static final long CLEAR_DATA_TIMEOUT_INTERVAL = 30 * 1000;
 
     // User confirmation timeout for a full backup/restore operation.  It's this long in
     // order to give them time to enter the backup password.
@@ -1449,7 +1450,7 @@ public class UserBackupManagerService {
 
                     // success; wait for the agent to arrive
                     // only wait 10 seconds for the bind to happen
-                    long timeoutMark = System.currentTimeMillis() + TIMEOUT_INTERVAL;
+                    long timeoutMark = System.currentTimeMillis() + BIND_TIMEOUT_INTERVAL;
                     while (mConnecting && mConnectedAgent == null
                             && (System.currentTimeMillis() < timeoutMark)) {
                         try {
@@ -1554,15 +1555,21 @@ public class UserBackupManagerService {
                 // can't happen because the activity manager is in this process
             }
 
-            // only wait 10 seconds for the clear data to happen
-            long timeoutMark = System.currentTimeMillis() + TIMEOUT_INTERVAL;
+            // Only wait 30 seconds for the clear data to happen.
+            long timeoutMark = System.currentTimeMillis() + CLEAR_DATA_TIMEOUT_INTERVAL;
             while (mClearingData && (System.currentTimeMillis() < timeoutMark)) {
                 try {
                     mClearDataLock.wait(5000);
                 } catch (InterruptedException e) {
                     // won't happen, but still.
                     mClearingData = false;
+                    Slog.w(TAG, "Interrupted while waiting for " + packageName
+                            + " data to be cleared", e);
                 }
+            }
+
+            if (mClearingData) {
+                Slog.w(TAG, "Clearing app data for " + packageName + " timed out");
             }
         }
     }
@@ -3462,8 +3469,6 @@ public class UserBackupManagerService {
 
     /** Prints service state for 'dumpsys backup'. */
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
-        if (!DumpUtils.checkDumpAndUsageStatsPermission(mContext, TAG, pw)) return;
-
         long identityToken = Binder.clearCallingIdentity();
         try {
             if (args != null) {
@@ -3472,6 +3477,8 @@ public class UserBackupManagerService {
                         pw.println("'dumpsys backup' optional arguments:");
                         pw.println("  -h       : this help text");
                         pw.println("  a[gents] : dump information about defined backup agents");
+                        pw.println("  users    : dump the list of users for which backup service "
+                                + "is running");
                         return;
                     } else if ("agents".startsWith(arg)) {
                         dumpAgents(pw);

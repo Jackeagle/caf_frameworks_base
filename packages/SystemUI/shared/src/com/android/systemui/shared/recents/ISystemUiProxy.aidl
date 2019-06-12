@@ -38,11 +38,6 @@ interface ISystemUiProxy {
     void startScreenPinning(int taskId) = 1;
 
     /**
-     * Enables/disables launcher/overview interaction features {@link InteractionType}.
-     */
-    void setInteractionState(int flags) = 4;
-
-    /**
      * Notifies SystemUI that split screen has been invoked.
      */
     void onSplitScreenInvoked() = 5;
@@ -73,20 +68,15 @@ interface ISystemUiProxy {
     void onStatusBarMotionEvent(in MotionEvent event) = 9;
 
     /**
-     * Get the corner radius of windows in pixels.
-     */
-    float getWindowCornerRadius() = 10;
-
-    /**
-     * If device supports live rounded corners on windows.
-     * This might be turned off for performance reasons
-     */
-    boolean supportsRoundedCornersOnWindows() = 11;
-
-    /**
      * Proxies the assistant gesture's progress started from navigation bar.
      */
     void onAssistantProgress(float progress) = 12;
+
+    /**
+    * Proxies the assistant gesture fling velocity (in pixels per millisecond) upon completion.
+    * Velocity is 0 for drag gestures.
+    */
+    void onAssistantGestureCompletion(float velocity) = 18;
 
     /**
      * Start the assistant.
@@ -97,4 +87,19 @@ interface ISystemUiProxy {
      * Creates a new gesture monitor
      */
     Bundle monitorGestureInput(String name, int displayId) = 14;
+
+    /**
+     * Notifies that the accessibility button in the system's navigation area has been clicked
+     */
+    void notifyAccessibilityButtonClicked(int displayId) = 15;
+
+    /**
+     * Notifies that the accessibility button in the system's navigation area has been long clicked
+     */
+    void notifyAccessibilityButtonLongClicked() = 16;
+
+    /**
+     * Ends the system screen pinning.
+     */
+    void stopScreenPinning() = 17;
 }

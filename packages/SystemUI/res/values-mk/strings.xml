@@ -62,9 +62,10 @@
     <string name="usb_debugging_secondary_user_title" msgid="6353808721761220421">"Отстранувањето грешки на USB не е дозволено"</string>
     <string name="usb_debugging_secondary_user_message" msgid="6067122453571699801">"Корисникот што моментално е најавен на уредов не може да вклучи отстранување грешки на USB. За да ја користите функцијава, префрлете се на примарниот корисник."</string>
     <string name="usb_contaminant_title" msgid="206854874263058490">"USB-портата е оневозможена"</string>
-    <string name="usb_contaminant_message" msgid="2205845572186473860">"За да го заштити уредот од течност и нечистотија, USB-портата е оневозможена и нема да открива додатоци.\n\nЌе ве известиме кога ќе биде безбедно да ја користите USB-портата повторно."</string>
+    <string name="usb_contaminant_message" msgid="7379089091591609111">"За да го заштитиме уредот од течност или нечистотија, USB-портата е оневозможена и нема да ги открива додатоците.\n\nЌе ве известиме кога ќе биде во ред да ја користите USB-портата повторно."</string>
     <string name="usb_port_enabled" msgid="7906141351687694867">"USB-портата е овозможена за откривање полначи и додатоци"</string>
     <string name="usb_disable_contaminant_detection" msgid="2103905315747120033">"Овозможи USB"</string>
+    <string name="learn_more" msgid="5000517160980853569">"Дознајте повеќе"</string>
     <string name="compat_mode_on" msgid="6623839244840638213">"Зумирај да се исполни екранот"</string>
     <string name="compat_mode_off" msgid="4434467572461327898">"Растегни да се исполни екранот"</string>
     <string name="global_action_screenshot" msgid="8329831278085426283">"Слика од екранот"</string>
@@ -118,6 +119,11 @@
     <string name="cancel" msgid="6442560571259935130">"Откажи"</string>
     <string name="biometric_dialog_confirm" msgid="6468457350041712674">"Потврди"</string>
     <string name="biometric_dialog_try_again" msgid="1900185172633183201">"Обиди се повторно"</string>
+    <string name="biometric_dialog_empty_space_description" msgid="7997936968009073717">"Празен регион, допрете за да ја откажете проверката"</string>
+    <string name="biometric_dialog_face_icon_description_idle" msgid="4497694707475970790">"Обидете се повторно"</string>
+    <string name="biometric_dialog_face_icon_description_authenticating" msgid="4512727754496228488">"Го бараме вашето лице"</string>
+    <string name="biometric_dialog_face_icon_description_authenticated" msgid="595380451325425259">"Лицето е проверено"</string>
+    <string name="biometric_dialog_face_icon_description_confirmed" msgid="2003141400387093967">"Потврдено"</string>
     <string name="fingerprint_dialog_touch_sensor" msgid="8511557690663181761">"Допрете го сензорот за отпечатоци"</string>
     <string name="accessibility_fingerprint_dialog_fingerprint_icon" msgid="3125122495414253226">"Икона за отпечатоци"</string>
     <string name="face_dialog_looking_for_face" msgid="7049276266074494689">"Ве бараме вас…"</string>
@@ -271,6 +277,7 @@
     <string name="gps_notification_searching_text" msgid="8574247005642736060">"Се пребарува за GPS"</string>
     <string name="gps_notification_found_text" msgid="4619274244146446464">"Локацијата е поставена со GPS"</string>
     <string name="accessibility_location_active" msgid="2427290146138169014">"Активни барања за локација"</string>
+    <string name="accessibility_sensors_off_active" msgid="157126524598525432">"Исклучувањето на сензорите е активно"</string>
     <string name="accessibility_clear_all" msgid="5235938559247164925">"Исчисти ги сите известувања."</string>
     <string name="notification_group_overflow_indicator" msgid="1863231301642314183">"+ <xliff:g id="NUMBER">%s</xliff:g>"</string>
     <plurals name="notification_group_overflow_description" formatted="false" msgid="4579313201268495404">
@@ -368,6 +375,7 @@
     <string name="quick_settings_night_secondary_label_on_at" msgid="6256314040368487637">"Ќе се вклучи во <xliff:g id="TIME">%s</xliff:g>"</string>
     <string name="quick_settings_secondary_label_until" msgid="2749196569462600150">"До <xliff:g id="TIME">%s</xliff:g>"</string>
     <string name="quick_settings_ui_mode_night_label" msgid="512534812963862137">"Темна тема"</string>
+    <string name="quick_settings_ui_mode_night_label_battery_saver" msgid="3496696903886673256">"Темна тема\nШтедач на батерија"</string>
     <string name="quick_settings_nfc_label" msgid="9012153754816969325">"NFC"</string>
     <string name="quick_settings_nfc_off" msgid="6883274004315134333">"NFC е оневозможено"</string>
     <string name="quick_settings_nfc_on" msgid="6680317193676884311">"NFC е овозможено"</string>
@@ -403,8 +411,7 @@
     <string name="interruption_level_none_twoline" msgid="3957581548190765889">"Целосна\nтишина"</string>
     <string name="interruption_level_priority_twoline" msgid="1564715335217164124">"Само\nприоритетни"</string>
     <string name="interruption_level_alarms_twoline" msgid="3266909566410106146">"Само\nаларми"</string>
-    <!-- no translation found for keyguard_indication_charging_time_wireless (6959284458466962592) -->
-    <skip />
+    <string name="keyguard_indication_charging_time_wireless" msgid="6959284458466962592">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Се полни безжично (<xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g> до полна батерија)"</string>
     <string name="keyguard_indication_charging_time" msgid="2056340799276374421">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Се полни (<xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g> до полна батерија)"</string>
     <string name="keyguard_indication_charging_time_fast" msgid="7767562163577492332">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Брзо полнење (<xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g> до полна батерија)"</string>
     <string name="keyguard_indication_charging_time_slowly" msgid="3769655133567307069">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Бавно полнење (<xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g> до полна батерија)"</string>
@@ -443,11 +450,14 @@
     <string name="battery_saver_notification_title" msgid="8614079794522291840">"Штедачот на батерија е вклучен"</string>
     <string name="battery_saver_notification_text" msgid="820318788126672692">"Ја намалува изведбата и податоците во заднина"</string>
     <string name="battery_saver_notification_action_text" msgid="132118784269455533">"Исклучете го штедачот на батерија"</string>
-    <string name="media_projection_dialog_text" msgid="5751657130671431216">"При снимањето или емитувањето, <xliff:g id="APP_SEEKING_PERMISSION">%s</xliff:g> може да ги сними сите чувствителни информации, како на пример, аудиото што ви е пуштено или лозинките, информациите за плаќање, фотографиите и пораките."</string>
+    <string name="media_projection_dialog_text" msgid="8585357687598538511">"При снимањето или емитувањето, <xliff:g id="APP_SEEKING_PERMISSION">%s</xliff:g> може да ги сними чувствителните информации што се прикажани на вашиот екран или пуштени од вашиот уред, вклучувајќи чувствителни информации како што се аудио, лозинки, информации за плаќање, фотографии и пораки."</string>
+    <string name="media_projection_dialog_service_text" msgid="3075544489835858258">"При снимањето или емитувањето, услугата што ја обезбедува функцијава може да ги сними чувствителните информации што се прикажани на вашиот екран или пуштени од вашиот уред, вклучувајќи чувствителни информации како што се аудио, лозинки, информации за плаќање, фотографии и пораки."</string>
     <string name="media_projection_dialog_title" msgid="8124184308671641248">"Изложување чувствителни информации при емитување/снимање"</string>
     <string name="media_projection_remember_text" msgid="3103510882172746752">"Не покажувај повторно"</string>
     <string name="clear_all_notifications_text" msgid="814192889771462828">"Исчисти сè"</string>
     <string name="manage_notifications_text" msgid="2386728145475108753">"Управувајте"</string>
+    <string name="notification_section_header_gentle" msgid="4372438504154095677">"Тивки известувања"</string>
+    <string name="accessibility_notification_section_header_gentle_clear_all" msgid="4286716295850400959">"Исчисти ги сите тивки известувања"</string>
     <string name="dnd_suppressing_shade_text" msgid="1904574852846769301">"Известувањата се паузирани од „Не вознемирувај“"</string>
     <string name="media_projection_action_text" msgid="8470872969457985954">"Започни сега"</string>
     <string name="empty_shade_text" msgid="708135716272867002">"Нема известувања"</string>
@@ -507,8 +517,7 @@
     <string name="branded_monitoring_description_app_personal" msgid="2669518213949202599">"Поврзани сте на <xliff:g id="APPLICATION">%1$s</xliff:g>, којашто може да ја следи вашата лична активност на мрежата, вклучувајќи ги е-пораките, апликациите и веб-локациите."</string>
     <string name="monitoring_description_app_work" msgid="4612997849787922906">"<xliff:g id="ORGANIZATION">%1$s</xliff:g> управува со вашиот работен профил. Профилот е поврзан на <xliff:g id="APPLICATION">%2$s</xliff:g>, што може да ја следи вашата работна активност на мрежата, заедно со е-пораките, апликациите и веб-сајтовите.\n\nЗа повеќе информации, контактирајте со вашиот администратор."</string>
     <string name="monitoring_description_app_personal_work" msgid="5664165460056859391">"<xliff:g id="ORGANIZATION">%1$s</xliff:g> управува со вашиот работен профил. Профилот е поврзан на <xliff:g id="APPLICATION_WORK">%2$s</xliff:g>, што може да ја следи вашата работна активност на мрежата, заедно со е-пораките, апликациите и веб-сајтовите.\n\nПоврзани сте и на <xliff:g id="APPLICATION_PERSONAL">%3$s</xliff:g>, што може да ја следи вашата лична активност на мрежата."</string>
-    <!-- no translation found for keyguard_indication_trust_unlocked (2712865815371519117) -->
-    <skip />
+    <string name="keyguard_indication_trust_unlocked" msgid="2712865815371519117">"Се одржува отклучен од TrustAgent"</string>
     <string name="keyguard_indication_trust_disabled" msgid="7412534203633528135">"Уредот ќе остане заклучен додека рачно не го отклучите"</string>
     <string name="hidden_notifications_title" msgid="7139628534207443290">"Добивајте известувања побрзо"</string>
     <string name="hidden_notifications_text" msgid="2326409389088668981">"Видете ги пред да отклучите"</string>
@@ -521,16 +530,14 @@
     <string name="accessibility_volume_collapse" msgid="3609549593031810875">"Собери"</string>
     <string name="volume_odi_captions_tip" msgid="1193653197906918269">"Автоматски титлови"</string>
     <string name="accessibility_volume_close_odi_captions_tip" msgid="1163987066404128967">"Совет за затворени титлови"</string>
-    <!-- no translation found for volume_odi_captions_content_description (2950736796270214785) -->
-    <skip />
-    <!-- no translation found for volume_odi_captions_hint_enable (49750248924730302) -->
-    <skip />
-    <!-- no translation found for volume_odi_captions_hint_disable (8980842810619956593) -->
-    <skip />
+    <string name="volume_odi_captions_content_description" msgid="2950736796270214785">"Преклопување титли"</string>
+    <string name="volume_odi_captions_hint_enable" msgid="49750248924730302">"овозможи"</string>
+    <string name="volume_odi_captions_hint_disable" msgid="8980842810619956593">"оневозможи"</string>
     <string name="accessibility_output_chooser" msgid="8185317493017988680">"Префрлете го излезниот уред"</string>
     <string name="screen_pinning_title" msgid="3273740381976175811">"Екранот е прикачен"</string>
     <string name="screen_pinning_description" msgid="8909878447196419623">"Ќе се гледа сѐ додека не го откачите. Допрете и држете „Назад“ и „Краток преглед“ за откачување."</string>
     <string name="screen_pinning_description_recents_invisible" msgid="8281145542163727971">"Ќе се гледа сѐ додека не го откачите. Допрете и задржете „Назад“ и „Почетен екран“ за откачување."</string>
+    <string name="screen_pinning_description_gestural" msgid="1191513974909607884">"Ќе се гледа сѐ додека не го откачите. Лизгајте нагоре и задржете за откачување."</string>
     <string name="screen_pinning_description_accessible" msgid="426190689254018656">"Ќе се гледа сѐ додека не го откачите. Допрете и држете „Краток преглед“ за откачување."</string>
     <string name="screen_pinning_description_recents_invisible_accessible" msgid="6134833683151189507">"Ќе се гледа сѐ додека не го откачите. Допрете и задржете „Почетен екран“ за откачување."</string>
     <string name="screen_pinning_toast" msgid="2266705122951934150">"За откачување на екранов, допрете и задржете ги копчињата „Назад“ и „Краток преглед“"</string>
@@ -634,18 +641,21 @@
     <string name="inline_block_button" msgid="8735843688021655065">"Блокирај"</string>
     <string name="inline_keep_button" msgid="6665940297019018232">"Продолжи да ги прикажуваш"</string>
     <string name="inline_minimize_button" msgid="966233327974702195">"Минимизирај"</string>
-    <string name="inline_silent_button_silent" msgid="6904727667411781466">"Нежно"</string>
+    <string name="inline_silent_button_silent" msgid="5315879183296940969">"Тивко"</string>
     <string name="inline_silent_button_stay_silent" msgid="6308371431217601009">"Продолжи со безгласно прикажување"</string>
-    <string name="inline_silent_button_alert" msgid="2449191160203602471">"Прекинувачки"</string>
+    <string name="inline_silent_button_alert" msgid="6008435419895088034">"Предупредувај"</string>
     <string name="inline_silent_button_keep_alerting" msgid="327696842264359693">"Продолжи да ме предупредуваш"</string>
     <string name="inline_turn_off_notifications" msgid="8635596135532202355">"Исклучи известувања"</string>
     <string name="inline_keep_showing_app" msgid="1723113469580031041">"Дали да продолжат да се прикажуваат известувања од апликацијава?"</string>
-    <string name="hint_text_block" msgid="3554459167504485284">"Блокираните известувања не се појавуваат никаде и не пуштаат звук. Може да ги деблокирате известувањата во поставките."</string>
-    <string name="hint_text_silent" msgid="859468056340177016">"Стишените известувања се појавуваат во сенка, но не се појавуваат на заклучен екран, во вид на рекламен натпис и не пуштаат звук."</string>
-    <string name="hint_text_alert" msgid="2721169810318722524">"Овие известувања ќе дадат звук и ќе се прикажат во фиоката за известување, статусната лента и заклучениот екран"</string>
-    <string name="notification_unblockable_desc" msgid="1037434112919403708">"Известувањава не може да се исклучат"</string>
+    <string name="notification_silence_title" msgid="5763240612242137433">"Тивко"</string>
+    <string name="notification_alert_title" msgid="8031196611815490340">"Предупредувај"</string>
+    <string name="notification_channel_summary_low" msgid="3387466082089715555">"Ви помага да се концентрирате без звук или вибрации."</string>
+    <string name="notification_channel_summary_default" msgid="5994062840431965586">"Ви го привлекува вниманието со звук или вибрации."</string>
+    <string name="notification_unblockable_desc" msgid="4556908766584964102">"Овие известувања не може да се изменат"</string>
     <string name="notification_multichannel_desc" msgid="4695920306092240550">"Оваа група известувања не може да се конфигурира тука"</string>
-    <string name="notification_delegate_header" msgid="9167022191405284627">"преку <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
+    <string name="notification_delegate_header" msgid="2857691673814814270">"Известување преку прокси"</string>
+    <string name="notification_channel_dialog_title" msgid="5745335243729167866">"Сите известувања за <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
+    <string name="see_more_title" msgid="5358726697042112726">"Прикажи повеќе"</string>
     <string name="appops_camera" msgid="8100147441602585776">"Апликацијава ја користи камерата."</string>
     <string name="appops_microphone" msgid="741508267659494555">"Апликацијава го користи микрофонот."</string>
     <string name="appops_overlay" msgid="6165912637560323464">"Апликацијава се прикажува врз други апликации на вашиот екран."</string>
@@ -889,7 +899,7 @@
     <string name="slice_permission_allow" msgid="2340244901366722709">"Дозволи"</string>
     <string name="slice_permission_deny" msgid="7683681514008048807">"Одбиј"</string>
     <string name="auto_saver_title" msgid="1217959994732964228">"Допрете за да закажете „Штедач на батерија“"</string>
-    <string name="auto_saver_text" msgid="6324376061044218113">"Вклучи автоматски кога батеријата е на <xliff:g id="PERCENTAGE">%d</xliff:g> %%"</string>
+    <string name="auto_saver_text" msgid="2563289953551438248">"Вклучи ако е веројатно дека батеријата ќе се испразни"</string>
     <string name="no_auto_saver_action" msgid="8086002101711328500">"Не, фала"</string>
     <string name="auto_saver_enabled_title" msgid="6726474226058316862">"Распоредот за „Штедач на батерија“ е вклучен"</string>
     <string name="auto_saver_enabled_text" msgid="874711029884777579">"Штедачот на батерија ќе се вклучи автоматски кога батеријата ќе падне под <xliff:g id="PERCENTAGE">%d</xliff:g> %%."</string>
@@ -910,6 +920,7 @@
     <string name="bubbles_deep_link_button_description" msgid="8895837143057564517">"Отворете ја <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="bubbles_settings_button_description" msgid="2970630476657287189">"Поставки за баланчињата на <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="bubbles_prompt" msgid="8807968030159469710">"Да се дозволат балончиња од <xliff:g id="APP_NAME">%1$s</xliff:g>?"</string>
+    <string name="manage_bubbles_text" msgid="7027739766859191408">"Управување"</string>
     <string name="no_bubbles" msgid="337101288173078247">"Одбиј"</string>
     <string name="yes_bubbles" msgid="668809525728633841">"Дозволи"</string>
     <string name="ask_me_later_bubbles" msgid="2147688438402939029">"Прашај ме подоцна"</string>
@@ -920,4 +931,9 @@
     <string name="bubble_accessibility_action_move_top_right" msgid="1671844272347036806">"Премести горе десно"</string>
     <string name="bubble_accessibility_action_move_bottom_left" msgid="206369104473183217">"Премести долу лево"</string>
     <string name="bubble_accessibility_action_move_bottom_right" msgid="8705660152384312329">"Премести долу десно"</string>
+    <string name="bubble_dismiss_text" msgid="8028337712674081668">"Отфрли"</string>
+    <!-- no translation found for notification_content_system_nav_changed (7218093915747788444) -->
+    <skip />
+    <!-- no translation found for notification_content_gesture_nav_available (8111130443656460792) -->
+    <skip />
 </resources>

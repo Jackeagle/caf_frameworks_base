@@ -39,7 +39,6 @@ import static android.app.WindowConfiguration.WINDOWING_MODE_SPLIT_SCREEN_SECOND
 import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 import static android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS;
 import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
-import static android.content.Intent.FLAG_ACTIVITY_TASK_ON_HOME;
 import static android.content.pm.ApplicationInfo.FLAG_FACTORY_TEST;
 import static android.content.pm.ConfigurationInfo.GL_ES_VERSION_UNDEFINED;
 import static android.content.pm.PackageManager.FEATURE_ACTIVITIES_ON_SECONDARY_DISPLAYS;
@@ -134,12 +133,14 @@ import android.app.ActivityTaskManager;
 import android.app.ActivityThread;
 import android.app.AlertDialog;
 import android.app.AppGlobals;
+import android.app.AppOpsManager;
 import android.app.Dialog;
 import android.app.IActivityController;
 import android.app.IActivityTaskManager;
 import android.app.IApplicationThread;
 import android.app.IAssistDataReceiver;
 import android.app.INotificationManager;
+import android.app.IRequestFinishCallback;
 import android.app.ITaskStackListener;
 import android.app.Notification;
 import android.app.NotificationManager;
@@ -263,6 +264,7 @@ import com.android.server.am.UserState;
 import com.android.server.appop.AppOpsService;
 import com.android.server.firewall.IntentFirewall;
 import com.android.server.pm.UserManagerService;
+import com.android.server.policy.PermissionPolicyInternal;
 import com.android.server.uri.UriGrantsManagerInternal;
 import com.android.server.vr.VrManagerInternal;
 
@@ -309,6 +311,9 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     public static final int KEY_DISPATCHING_TIMEOUT_MS = 5 * 1000;
     // How long we wait until we timeout on key dispatching during instrumentation.
     static final int INSTRUMENTATION_KEY_DISPATCHING_TIMEOUT_MS = 60 * 1000;
+    // How long we permit background activity starts after an activity in the process
+    // started or finished.
+    static final long ACTIVITY_BG_START_GRACE_PERIOD_MS = 10 * 1000;
 
     /** Used to indicate that an app transition should be animated. */
     static final boolean ANIMATE = true;
@@ -345,6 +350,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     ActivityManagerInternal mAmInternal;
     UriGrantsManagerInternal mUgmInternal;
     private PackageManagerInternal mPmInternal;
+    private PermissionPolicyInternal mPermissionPolicyInternal;
     @VisibleForTesting
     final ActivityTaskManagerInternal mInternal;
     PowerManagerInternal mPowerManagerInternal;
@@ -501,6 +507,12 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
      * is set; any switches after that will clear the time.
      */
     private boolean mDidAppSwitch;
+
+    /**
+     * Last stop app switches time, apps finished before this time cannot start background activity
+     * even if they are in grace period.
+     */
+    private long mLastStopAppSwitchesTime;
 
     IActivityController mController = null;
     boolean mControllerIsAMonkey = false;
@@ -870,6 +882,16 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
 
     boolean hasUserRestriction(String restriction, int userId) {
         return getUserManager().hasUserRestriction(restriction, userId);
+    }
+
+    boolean hasSystemAlertWindowPermission(int callingUid, int callingPid, String callingPackage) {
+        final int mode = getAppOpsService().noteOperation(AppOpsManager.OP_SYSTEM_ALERT_WINDOW,
+                callingUid, callingPackage);
+        if (mode == AppOpsManager.MODE_DEFAULT) {
+            return checkPermission(Manifest.permission.SYSTEM_ALERT_WINDOW, callingPid, callingUid)
+                    == PERMISSION_GRANTED;
+        }
+        return mode == AppOpsManager.MODE_ALLOWED;
     }
 
     protected RecentTasks createRecentTasks() {
@@ -1363,6 +1385,9 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                     .setMayWait(userId)
                     .setIgnoreTargetSecurity(ignoreTargetSecurity)
                     .setFilterCallingUid(isResolver ? 0 /* system */ : targetUid)
+                    // The target may well be in the background, which would normally prevent it
+                    // from starting an activity. Here we definitely want the start to succeed.
+                    .setAllowBackgroundActivityStart(true)
                     .execute();
         } catch (SecurityException e) {
             // XXX need to figure out how to propagate to original app.
@@ -1559,6 +1584,13 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                     }
                 }
             }
+
+            // note down that the process has finished an activity and is in background activity
+            // starts grace period
+            if (r.app != null) {
+                r.app.setLastActivityFinishTimeIfNeeded(SystemClock.uptimeMillis());
+            }
+
             final long origId = Binder.clearCallingIdentity();
             try {
                 boolean res;
@@ -2277,6 +2309,32 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         }
     }
 
+    @Override
+    public void onBackPressedOnTaskRoot(IBinder token, IRequestFinishCallback callback) {
+        synchronized (mGlobalLock) {
+            ActivityRecord r = ActivityRecord.isInStackLocked(token);
+            if (r == null) {
+                return;
+            }
+            ActivityStack stack = r.getActivityStack();
+            if (stack != null && stack.isSingleTaskInstance()) {
+                // Single-task stacks are used for activities which are presented in floating
+                // windows above full screen activities. Instead of directly finishing the
+                // task, a task change listener is used to notify SystemUI so the action can be
+                // handled specially.
+                final TaskRecord task = r.getTaskRecord();
+                mTaskChangeNotificationController
+                        .notifyBackPressedOnTaskRoot(task.getTaskInfo());
+            } else {
+                try {
+                    callback.requestFinish();
+                } catch (RemoteException e) {
+                    Slog.e(TAG, "Failed to invoke request finish callback", e);
+                }
+            }
+        }
+    }
+
     /**
      * TODO: Add mController hook
      */
@@ -2317,9 +2375,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 null /* intent */, "moveTaskToFront");
         if (starter.shouldAbortBackgroundActivityStart(callingUid, callingPid, callingPackage, -1,
                 -1, callerApp, null, false, null)) {
-            boolean abort = !isBackgroundActivityStartsEnabled();
-            starter.showBackgroundActivityBlockedToast(abort, callingPackage);
-            if (abort) {
+            if (!isBackgroundActivityStartsEnabled()) {
                 return;
             }
         }
@@ -2893,7 +2949,8 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             synchronized (mGlobalLock) {
                 final ActivityRecord r = ActivityRecord.isInStackLocked(token);
                 if (r != null) {
-                    final ActivityOptions activityOptions = r.takeOptionsLocked();
+                    final ActivityOptions activityOptions = r.takeOptionsLocked(
+                            true /* fromClient */);
                     return activityOptions == null ? null : activityOptions.toBundle();
                 }
                 return null;
@@ -3000,6 +3057,10 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             if ((sendReceiver = pae.receiver) != null) {
                 // Caller wants result sent back to them.
                 sendBundle = new Bundle();
+                sendBundle.putInt(ActivityTaskManagerInternal.ASSIST_TASK_ID,
+                        pae.activity.getTaskRecord().taskId);
+                sendBundle.putBinder(ActivityTaskManagerInternal.ASSIST_ACTIVITY_ID,
+                        pae.activity.assistToken);
                 sendBundle.putBundle(ASSIST_KEY_DATA, pae.extras);
                 sendBundle.putParcelable(ASSIST_KEY_STRUCTURE, pae.structure);
                 sendBundle.putParcelable(ASSIST_KEY_CONTENT, pae.content);
@@ -3372,6 +3433,11 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
 
                 if (stack.inFreeformWindowingMode()) {
                     stack.setWindowingMode(WINDOWING_MODE_FULLSCREEN);
+                } else if (stack.getParent().inFreeformWindowingMode()) {
+                    // If the window is on a freeform display, set it to undefined. It will be
+                    // resolved to freeform and it can adjust windowing mode when the display mode
+                    // changes in runtime.
+                    stack.setWindowingMode(WINDOWING_MODE_UNDEFINED);
                 } else {
                     stack.setWindowingMode(WINDOWING_MODE_FREEFORM);
                 }
@@ -4669,6 +4735,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         enforceCallerIsRecentsOrHasPermission(STOP_APP_SWITCHES, "stopAppSwitches");
         synchronized (mGlobalLock) {
             mAppSwitchesAllowedTime = SystemClock.uptimeMillis() + APP_SWITCH_DELAY_TIME;
+            mLastStopAppSwitchesTime = SystemClock.uptimeMillis();
             mDidAppSwitch = false;
             getActivityStartController().schedulePendingActivityLaunches(APP_SWITCH_DELAY_TIME);
         }
@@ -4683,6 +4750,10 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             // activity request.
             mAppSwitchesAllowedTime = 0;
         }
+    }
+
+    long getLastStopAppSwitchesTime() {
+        return mLastStopAppSwitchesTime;
     }
 
     void onStartActivitySetDidAppSwitch() {
@@ -5335,13 +5406,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         return mAmInternal.isBackgroundActivityStartsEnabled();
     }
 
-    boolean isPackageNameWhitelistedForBgActivityStarts(@Nullable String packageName) {
-        if (packageName == null) {
-            return false;
-        }
-        return mAmInternal.isPackageNameWhitelistedForBgActivityStarts(packageName);
-    }
-
     void enableScreenAfterBoot(boolean booted) {
         EventLog.writeEvent(EventLogTags.BOOT_PROGRESS_ENABLE_SCREEN,
                 SystemClock.uptimeMillis());
@@ -5774,6 +5838,13 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         return mPmInternal;
     }
 
+    PermissionPolicyInternal getPermissionPolicyInternal() {
+        if (mPermissionPolicyInternal == null) {
+            mPermissionPolicyInternal = LocalServices.getService(PermissionPolicyInternal.class);
+        }
+        return mPermissionPolicyInternal;
+    }
+
     AppWarnings getAppWarningsLocked() {
         return mAppWarnings;
     }
@@ -5798,8 +5869,10 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
      */
     Intent getSecondaryHomeIntent(String preferredPackage) {
         final Intent intent = new Intent(mTopAction, mTopData != null ? Uri.parse(mTopData) : null);
-        if (preferredPackage == null) {
-            // Using the component stored in config if no package name.
+        final boolean useSystemProvidedLauncher = mContext.getResources().getBoolean(
+                com.android.internal.R.bool.config_useSystemProvidedLauncherForSecondary);
+        if (preferredPackage == null || useSystemProvidedLauncher) {
+            // Using the component stored in config if no package name or forced.
             final String secondaryHomeComponent = mContext.getResources().getString(
                     com.android.internal.R.string.config_secondaryHomeComponent);
             intent.setComponent(ComponentName.unflattenFromString(secondaryHomeComponent));
@@ -6542,6 +6615,31 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         }
 
         @Override
+        public ActivityTokens getTopActivityForTask(int taskId) {
+            synchronized (mGlobalLock) {
+                final TaskRecord taskRecord = mRootActivityContainer.anyTaskForId(taskId);
+                if (taskRecord == null) {
+                    Slog.w(TAG, "getApplicationThreadForTopActivity failed:"
+                            + " Requested task not found");
+                    return null;
+                }
+                final ActivityRecord activity = taskRecord.getTopActivity();
+                if (activity == null) {
+                    Slog.w(TAG, "getApplicationThreadForTopActivity failed:"
+                            + " Requested activity not found");
+                    return null;
+                }
+                if (!activity.attachedToProcess()) {
+                    Slog.w(TAG, "getApplicationThreadForTopActivity failed: No process for "
+                            + activity);
+                    return null;
+                }
+                return new ActivityTokens(activity.appToken, activity.assistToken,
+                        activity.app.getThread());
+            }
+        }
+
+        @Override
         public IIntentSender getIntentSender(int type, String packageName,
                 int callingUid, int userId, IBinder token, String resultWho,
                 int requestCode, Intent[] intents, String[] resolvedTypes, int flags,
@@ -6807,15 +6905,9 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             synchronized (mGlobalLock) {
                 final long ident = Binder.clearCallingIdentity();
                 try {
-                    intent.addFlags(FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS |
-                            FLAG_ACTIVITY_TASK_ON_HOME);
-                    ActivityOptions activityOptions = options != null
+                    intent.addFlags(FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
+                    final ActivityOptions activityOptions = options != null
                             ? new ActivityOptions(options) : ActivityOptions.makeBasic();
-                    final ActivityRecord homeActivity =
-                            mRootActivityContainer.getDefaultDisplayHomeActivity();
-                    if (homeActivity != null) {
-                        activityOptions.setLaunchTaskId(homeActivity.getTaskRecord().taskId);
-                    }
                     mContext.startActivityAsUser(intent, activityOptions.toBundle(),
                             UserHandle.CURRENT);
                 } finally {

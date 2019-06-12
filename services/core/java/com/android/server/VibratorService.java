@@ -54,6 +54,7 @@ import android.os.UserHandle;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.os.WorkSource;
+import android.provider.DeviceConfig;
 import android.provider.Settings;
 import android.provider.Settings.SettingNotFoundException;
 import android.util.DebugUtils;
@@ -78,6 +79,7 @@ public class VibratorService extends IVibratorService.Stub
     private static final boolean DEBUG = false;
     private static final String SYSTEM_UI_PACKAGE = "com.android.systemui";
     private static final String EXTERNAL_VIBRATOR_SERVICE = "external_vibrator_service";
+    private static final String RAMPING_RINGER_ENABLED = "ramping_ringer_enabled";
 
     private static final long[] DOUBLE_CLICK_EFFECT_FALLBACK_TIMINGS = { 0, 30, 100, 30 };
 
@@ -113,6 +115,7 @@ public class VibratorService extends IVibratorService.Stub
     private final SparseArray<ScaleLevel> mScaleLevels;
     private final LinkedList<VibrationInfo> mPreviousRingVibrations;
     private final LinkedList<VibrationInfo> mPreviousNotificationVibrations;
+    private final LinkedList<VibrationInfo> mPreviousAlarmVibrations;
     private final LinkedList<VibrationInfo> mPreviousVibrations;
     private final int mPreviousVibrationsLimit;
     private final boolean mAllowPriorityVibrationsInLowPowerMode;
@@ -259,6 +262,10 @@ public class VibratorService extends IVibratorService.Stub
             return VibratorService.this.isRingtone(usageHint);
         }
 
+        public boolean isAlarm() {
+            return VibratorService.this.isAlarm(usageHint);
+        }
+
         public boolean isFromSystem() {
             return uid == Process.SYSTEM_UID || uid == 0 || SYSTEM_UI_PACKAGE.equals(opPkg);
         }
@@ -359,6 +366,7 @@ public class VibratorService extends IVibratorService.Stub
 
         mPreviousRingVibrations = new LinkedList<>();
         mPreviousNotificationVibrations = new LinkedList<>();
+        mPreviousAlarmVibrations = new LinkedList<>();
         mPreviousVibrations = new LinkedList<>();
 
         IntentFilter filter = new IntentFilter();
@@ -601,7 +609,7 @@ public class VibratorService extends IVibratorService.Stub
                 Vibration vib = new Vibration(token, effect, usageHint, uid, opPkg, reason);
                 if (mProcStatesCache.get(uid, ActivityManager.PROCESS_STATE_IMPORTANT_FOREGROUND)
                         > ActivityManager.PROCESS_STATE_IMPORTANT_FOREGROUND
-                        && !vib.isNotification() && !vib.isRingtone()) {
+                        && !vib.isNotification() && !vib.isRingtone() && !vib.isAlarm()) {
                     Slog.e(TAG, "Ignoring incoming vibration as process with"
                             + " uid = " + uid + " is background,"
                             + " usage = " + AudioAttributes.usageToString(vib.usageHint));
@@ -633,6 +641,8 @@ public class VibratorService extends IVibratorService.Stub
             previousVibrations = mPreviousRingVibrations;
         } else if (vib.isNotification()) {
             previousVibrations = mPreviousNotificationVibrations;
+        } else if (vib.isAlarm()) {
+            previousVibrations = mPreviousAlarmVibrations;
         } else {
             previousVibrations = mPreviousVibrations;
         }
@@ -797,6 +807,8 @@ public class VibratorService extends IVibratorService.Stub
             return mNotificationIntensity;
         } else if (vib.isHapticFeedback()) {
             return mHapticFeedbackIntensity;
+        } else if (vib.isAlarm()) {
+            return Vibrator.VIBRATION_INTENSITY_HIGH;
         } else {
             return Vibrator.VIBRATION_INTENSITY_MEDIUM;
         }
@@ -821,6 +833,8 @@ public class VibratorService extends IVibratorService.Stub
             defaultIntensity = mVibrator.getDefaultNotificationVibrationIntensity();
         } else if (vib.isHapticFeedback()) {
             defaultIntensity = mVibrator.getDefaultHapticFeedbackIntensity();
+        } else if (vib.isAlarm()) {
+            defaultIntensity = Vibrator.VIBRATION_INTENSITY_HIGH;
         } else {
             // If we don't know what kind of vibration we're playing then just skip scaling for
             // now.
@@ -861,6 +875,11 @@ public class VibratorService extends IVibratorService.Stub
         // "Also vibrate for calls" Setting in Sound
         if (Settings.System.getInt(
                 mContext.getContentResolver(), Settings.System.VIBRATE_WHEN_RINGING, 0) != 0) {
+            return ringerMode != AudioManager.RINGER_MODE_SILENT;
+        } else if (Settings.Global.getInt(
+                    mContext.getContentResolver(), Settings.Global.APPLY_RAMPING_RINGER, 0) != 0
+                && DeviceConfig.getBoolean(
+                    DeviceConfig.NAMESPACE_TELEPHONY, RAMPING_RINGER_ENABLED, false)) {
             return ringerMode != AudioManager.RINGER_MODE_SILENT;
         } else {
             return ringerMode == AudioManager.RINGER_MODE_VIBRATE;
@@ -1153,6 +1172,10 @@ public class VibratorService extends IVibratorService.Stub
         return usageHint == AudioAttributes.USAGE_ASSISTANCE_SONIFICATION;
     }
 
+    private static boolean isAlarm(int usageHint) {
+        return usageHint == AudioAttributes.USAGE_ALARM;
+    }
+
     private void noteVibratorOnLocked(int uid, long millis) {
         try {
             mBatteryStatsService.noteVibratorOn(uid, millis);
@@ -1384,6 +1407,12 @@ public class VibratorService extends IVibratorService.Stub
                 pw.println(info.toString());
             }
 
+            pw.println("  Previous alarm vibrations:");
+            for (VibrationInfo info : mPreviousAlarmVibrations) {
+                pw.print("    ");
+                pw.println(info.toString());
+            }
+
             pw.println("  Previous vibrations:");
             for (VibrationInfo info : mPreviousVibrations) {
                 pw.print("    ");
@@ -1449,6 +1478,9 @@ public class VibratorService extends IVibratorService.Stub
                 } else if (isHapticFeedback(usage)) {
                     defaultIntensity = mVibrator.getDefaultHapticFeedbackIntensity();
                     currentIntensity = mHapticFeedbackIntensity;
+                } else if (isAlarm(usage)) {
+                    defaultIntensity = Vibrator.VIBRATION_INTENSITY_HIGH;
+                    currentIntensity = Vibrator.VIBRATION_INTENSITY_HIGH;
                 } else {
                     defaultIntensity = 0;
                     currentIntensity = 0;

@@ -82,6 +82,7 @@ import android.os.UserManager;
 import android.os.WorkSource;
 import android.os.WorkSource.WorkChain;
 import android.provider.Settings;
+import android.stats.location.LocationStatsEnums;
 import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
@@ -120,7 +121,9 @@ import com.android.server.location.MockProvider;
 import com.android.server.location.PassiveProvider;
 import com.android.server.location.RemoteListenerHelper;
 
+import java.io.ByteArrayOutputStream;
 import java.io.FileDescriptor;
+import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -267,10 +270,14 @@ public class LocationManagerService extends ILocationManager.Stub {
     @PowerManager.LocationPowerSaveMode
     private int mBatterySaverMode;
 
+    @GuardedBy("mLock")
+    private final LocationUsageLogger mLocationUsageLogger;
+
     public LocationManagerService(Context context) {
         super();
         mContext = context;
         mHandler = FgThread.getHandler();
+        mLocationUsageLogger = new LocationUsageLogger();
 
         // Let the package manager query which are the default location
         // providers as they get certain permissions granted by default.
@@ -2299,6 +2306,7 @@ public class LocationManagerService extends ILocationManager.Stub {
         private boolean mIsForegroundUid;
         private Location mLastFixBroadcast;
         private long mLastStatusBroadcast;
+        private Throwable mStackTrace;  // for debugging only
 
         /**
          * Note: must be constructed with lock held.
@@ -2310,6 +2318,10 @@ public class LocationManagerService extends ILocationManager.Stub {
             mReceiver = receiver;
             mIsForegroundUid = isImportanceForeground(
                     mActivityManager.getPackageImportance(mReceiver.mCallerIdentity.mPackageName));
+
+            if (D && receiver.mCallerIdentity.mPid == Process.myPid()) {
+                mStackTrace = new Throwable();
+            }
 
             ArrayList<UpdateRecord> records = mRecordsByProvider.get(provider);
             if (records == null) {
@@ -2339,7 +2351,18 @@ public class LocationManagerService extends ILocationManager.Stub {
          * Method to be called when a record will no longer be used.
          */
         private void disposeLocked(boolean removeReceiver) {
-            mRequestStatistics.stopRequesting(mReceiver.mCallerIdentity.mPackageName, mProvider);
+            String packageName = mReceiver.mCallerIdentity.mPackageName;
+            mRequestStatistics.stopRequesting(packageName, mProvider);
+
+            mLocationUsageLogger.logLocationApiUsage(
+                    LocationStatsEnums.USAGE_ENDED,
+                    LocationStatsEnums.API_REQUEST_LOCATION_UPDATES,
+                    packageName,
+                    mRealRequest,
+                    mReceiver.isListener(),
+                    mReceiver.isPendingIntent(),
+                    /* radius= */ 0,
+                    mActivityManager.getPackageImportance(packageName));
 
             // remove from mRecordsByProvider
             ArrayList<UpdateRecord> globalRecords = mRecordsByProvider.get(this.mProvider);
@@ -2361,11 +2384,26 @@ public class LocationManagerService extends ILocationManager.Stub {
 
         @Override
         public String toString() {
-            return "UpdateRecord[" + mProvider + " " + mReceiver.mCallerIdentity.mPackageName
-                    + "(" + mReceiver.mCallerIdentity.mUid + (mIsForegroundUid ? " foreground"
-                    : " background")
-                    + ")" + " " + mRealRequest + " "
-                    + mReceiver.mWorkSource + "]";
+            StringBuilder b = new StringBuilder("UpdateRecord[");
+            b.append(mProvider).append(" ");
+            b.append(mReceiver.mCallerIdentity.mPackageName);
+            b.append("(").append(mReceiver.mCallerIdentity.mUid);
+            if (mIsForegroundUid) {
+                b.append(" foreground");
+            } else {
+                b.append(" background");
+            }
+            b.append(") ");
+            b.append(mRealRequest).append(" ").append(mReceiver.mWorkSource);
+
+            if (mStackTrace != null) {
+                ByteArrayOutputStream tmp = new ByteArrayOutputStream();
+                mStackTrace.printStackTrace(new PrintStream(tmp));
+                b.append("\n\n").append(tmp.toString()).append("\n");
+            }
+
+            b.append("]");
+            return b.toString();
         }
     }
 
@@ -2498,6 +2536,13 @@ public class LocationManagerService extends ILocationManager.Stub {
                     throw new IllegalArgumentException(
                             "cannot register both listener and intent");
                 }
+
+                mLocationUsageLogger.logLocationApiUsage(
+                        LocationStatsEnums.USAGE_STARTED,
+                        LocationStatsEnums.API_REQUEST_LOCATION_UPDATES,
+                        packageName, request, listener != null, intent != null,
+                        /* radius= */ 0,
+                        mActivityManager.getPackageImportance(packageName));
 
                 Receiver receiver;
                 if (intent != null) {
@@ -2791,6 +2836,18 @@ public class LocationManagerService extends ILocationManager.Stub {
         }
         long identity = Binder.clearCallingIdentity();
         try {
+            synchronized (mLock) {
+                mLocationUsageLogger.logLocationApiUsage(
+                        LocationStatsEnums.USAGE_STARTED,
+                        LocationStatsEnums.API_REQUEST_GEOFENCE,
+                        packageName,
+                        request,
+                        /* hasListener= */ false,
+                        intent != null,
+                        geofence.getRadius(),
+                        mActivityManager.getPackageImportance(packageName));
+            }
+
             mGeofenceManager.addFence(sanitizedRequest, geofence, intent,
                     allowedResolutionLevel,
                     uid, packageName);
@@ -2811,6 +2868,17 @@ public class LocationManagerService extends ILocationManager.Stub {
         // geo-fence manager uses the public location API, need to clear identity
         long identity = Binder.clearCallingIdentity();
         try {
+            synchronized (mLock) {
+                mLocationUsageLogger.logLocationApiUsage(
+                        LocationStatsEnums.USAGE_ENDED,
+                        LocationStatsEnums.API_REQUEST_GEOFENCE,
+                        packageName,
+                        /* LocationRequest= */ null,
+                        /* hasListener= */ false,
+                        intent != null,
+                        geofence.getRadius(),
+                        mActivityManager.getPackageImportance(packageName));
+            }
             mGeofenceManager.removeFence(geofence, intent);
         } finally {
             Binder.restoreCallingIdentity(identity);
@@ -2894,6 +2962,20 @@ public class LocationManagerService extends ILocationManager.Stub {
             gnssDataListeners.put(binder, linkedListener);
             long identity = Binder.clearCallingIdentity();
             try {
+                if (gnssDataProvider == mGnssMeasurementsProvider
+                        || gnssDataProvider == mGnssStatusProvider) {
+                    mLocationUsageLogger.logLocationApiUsage(
+                            LocationStatsEnums.USAGE_STARTED,
+                            gnssDataProvider == mGnssMeasurementsProvider
+                                ? LocationStatsEnums.API_ADD_GNSS_MEASUREMENTS_LISTENER
+                                : LocationStatsEnums.API_REGISTER_GNSS_STATUS_CALLBACK,
+                            packageName,
+                            /* LocationRequest= */ null,
+                            /* hasListener= */ true,
+                            /* hasIntent= */ false,
+                            /* radius */ 0,
+                            mActivityManager.getPackageImportance(packageName));
+                }
                 if (isThrottlingExemptLocked(callerIdentity)
                         || isImportanceForeground(
                         mActivityManager.getPackageImportance(packageName))) {
@@ -2918,6 +3000,26 @@ public class LocationManagerService extends ILocationManager.Stub {
             LinkedListener<TListener> linkedListener = gnssDataListeners.remove(binder);
             if (linkedListener == null) {
                 return;
+            }
+            long identity = Binder.clearCallingIdentity();
+            try {
+                if (gnssDataProvider == mGnssMeasurementsProvider
+                        || gnssDataProvider == mGnssStatusProvider) {
+                    mLocationUsageLogger.logLocationApiUsage(
+                            LocationStatsEnums.USAGE_ENDED,
+                            gnssDataProvider == mGnssMeasurementsProvider
+                                ? LocationStatsEnums.API_ADD_GNSS_MEASUREMENTS_LISTENER
+                                : LocationStatsEnums.API_REGISTER_GNSS_STATUS_CALLBACK,
+                            linkedListener.mCallerIdentity.mPackageName,
+                            /* LocationRequest= */ null,
+                            /* hasListener= */ true,
+                            /* hasIntent= */ false,
+                            /* radius= */ 0,
+                            mActivityManager.getPackageImportance(
+                                    linkedListener.mCallerIdentity.mPackageName));
+                }
+            } finally {
+                Binder.restoreCallingIdentity(identity);
             }
             unlinkFromListenerDeathNotificationLocked(binder, linkedListener);
             gnssDataProvider.removeListener(listener);
@@ -3004,6 +3106,11 @@ public class LocationManagerService extends ILocationManager.Stub {
             checkResolutionLevelIsSufficientForProviderUseLocked(getCallerAllowedResolutionLevel(),
                     providerName);
 
+            mLocationUsageLogger.logLocationApiUsage(
+                    LocationStatsEnums.USAGE_STARTED,
+                    LocationStatsEnums.API_SEND_EXTRA_COMMAND,
+                    providerName);
+
             // and check for ACCESS_LOCATION_EXTRA_COMMANDS
             if ((mContext.checkCallingOrSelfPermission(ACCESS_LOCATION_EXTRA_COMMANDS)
                     != PERMISSION_GRANTED)) {
@@ -3014,6 +3121,11 @@ public class LocationManagerService extends ILocationManager.Stub {
             if (provider != null) {
                 provider.sendExtraCommandLocked(command, extras);
             }
+
+            mLocationUsageLogger.logLocationApiUsage(
+                    LocationStatsEnums.USAGE_ENDED,
+                    LocationStatsEnums.API_SEND_EXTRA_COMMAND,
+                    providerName);
 
             return true;
         }
@@ -3638,6 +3750,13 @@ public class LocationManagerService extends ILocationManager.Stub {
             if (!mBackgroundThrottlePackageWhitelist.isEmpty()) {
                 pw.println("  Throttling Whitelisted Packages:");
                 for (String packageName : mBackgroundThrottlePackageWhitelist) {
+                    pw.println("    " + packageName);
+                }
+            }
+
+            if (!mIgnoreSettingsPackageWhitelist.isEmpty()) {
+                pw.println("  Bypass Whitelisted Packages:");
+                for (String packageName : mIgnoreSettingsPackageWhitelist) {
                     pw.println("    " + packageName);
                 }
             }

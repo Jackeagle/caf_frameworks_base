@@ -214,7 +214,8 @@ public class NavigationBarFragmentTest extends SysuiBaseFragmentTest {
                 deviceProvisionedController,
                 new MetricsLogger(),
                 mock(AssistManager.class),
-                mOverviewProxyService);
+                mOverviewProxyService,
+                mock(NavigationModeController.class));
     }
 
     private class HostCallbacksForExternalDisplay extends
@@ -267,9 +268,11 @@ public class NavigationBarFragmentTest extends SysuiBaseFragmentTest {
             when(view.getRecentsButton()).thenReturn(mock(ButtonDispatcher.class));
             when(view.getAccessibilityButton()).thenReturn(mock(ButtonDispatcher.class));
             when(view.getRotateSuggestionButton()).thenReturn(mock(RotationContextButton.class));
-            when(view.getBarTransitions()).thenReturn(mock(BarTransitions.class));
+            when(view.getBarTransitions()).thenReturn(mock(NavigationBarTransitions.class));
             when(view.getLightTransitionsController()).thenReturn(
                     mock(LightBarTransitionsController.class));
+            when(view.getRotationButtonController()).thenReturn(
+                    mock(RotationButtonController.class));
             return view;
         }
     }

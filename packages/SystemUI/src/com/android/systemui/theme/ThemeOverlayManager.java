@@ -31,6 +31,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
 class ThemeOverlayManager {
@@ -63,6 +64,9 @@ class ThemeOverlayManager {
     @VisibleForTesting
     static final String OVERLAY_CATEGORY_ICON_LAUNCHER =
             "android.theme.customization.icon_pack.launcher";
+    @VisibleForTesting
+    static final String OVERLAY_CATEGORY_ICON_THEME_PICKER =
+            "android.theme.customization.icon_pack.themepicker";
 
     /*
      * All theme customization categories used by the system, in order that they should be applied,
@@ -75,7 +79,8 @@ class ThemeOverlayManager {
             OVERLAY_CATEGORY_COLOR,
             OVERLAY_CATEGORY_ICON_ANDROID,
             OVERLAY_CATEGORY_ICON_SYSUI,
-            OVERLAY_CATEGORY_ICON_SETTINGS);
+            OVERLAY_CATEGORY_ICON_SETTINGS,
+            OVERLAY_CATEGORY_ICON_THEME_PICKER);
 
     /* Categories that need to applied to the current user as well as the system user. */
     @VisibleForTesting
@@ -91,11 +96,16 @@ class ThemeOverlayManager {
     /* Target package for each overlay category. */
     private final Map<String, String> mCategoryToTargetPackage = new ArrayMap<>();
     private final OverlayManager mOverlayManager;
+    private final Executor mExecutor;
     private final String mLauncherPackage;
+    private final String mThemePickerPackage;
 
-    ThemeOverlayManager(OverlayManager overlayManager, String launcherPackage) {
+    ThemeOverlayManager(OverlayManager overlayManager, Executor executor,
+            String launcherPackage, String themePickerPackage) {
         mOverlayManager = overlayManager;
+        mExecutor = executor;
         mLauncherPackage = launcherPackage;
+        mThemePickerPackage = themePickerPackage;
         mTargetPackageToCategories.put(ANDROID_PACKAGE, Sets.newHashSet(
                 OVERLAY_CATEGORY_COLOR, OVERLAY_CATEGORY_FONT,
                 OVERLAY_CATEGORY_SHAPE, OVERLAY_CATEGORY_ICON_ANDROID));
@@ -105,6 +115,8 @@ class ThemeOverlayManager {
                 Sets.newHashSet(OVERLAY_CATEGORY_ICON_SETTINGS));
         mTargetPackageToCategories.put(mLauncherPackage,
                 Sets.newHashSet(OVERLAY_CATEGORY_ICON_LAUNCHER));
+        mTargetPackageToCategories.put(mThemePickerPackage,
+                Sets.newHashSet(OVERLAY_CATEGORY_ICON_THEME_PICKER));
         mCategoryToTargetPackage.put(OVERLAY_CATEGORY_COLOR, ANDROID_PACKAGE);
         mCategoryToTargetPackage.put(OVERLAY_CATEGORY_FONT, ANDROID_PACKAGE);
         mCategoryToTargetPackage.put(OVERLAY_CATEGORY_SHAPE, ANDROID_PACKAGE);
@@ -112,6 +124,7 @@ class ThemeOverlayManager {
         mCategoryToTargetPackage.put(OVERLAY_CATEGORY_ICON_SYSUI, SYSUI_PACKAGE);
         mCategoryToTargetPackage.put(OVERLAY_CATEGORY_ICON_SETTINGS, SETTINGS_PACKAGE);
         mCategoryToTargetPackage.put(OVERLAY_CATEGORY_ICON_LAUNCHER, mLauncherPackage);
+        mCategoryToTargetPackage.put(OVERLAY_CATEGORY_ICON_THEME_PICKER, mThemePickerPackage);
     }
 
     /**
@@ -149,19 +162,21 @@ class ThemeOverlayManager {
     private void setEnabled(
             String packageName, String category, Set<UserHandle> handles, boolean enabled) {
         for (UserHandle userHandle : handles) {
-            setEnabled(packageName, userHandle, enabled);
+            setEnabledAsync(packageName, userHandle, enabled);
         }
         if (!handles.contains(UserHandle.SYSTEM) && SYSTEM_USER_CATEGORIES.contains(category)) {
-            setEnabled(packageName, UserHandle.SYSTEM, enabled);
+            setEnabledAsync(packageName, UserHandle.SYSTEM, enabled);
         }
     }
 
-    private void setEnabled(String pkg, UserHandle userHandle, boolean enabled) {
-        if (DEBUG) Log.d(TAG, String.format("setEnabled: %s %s %b", pkg, userHandle, enabled));
-        if (enabled) {
-            mOverlayManager.setEnabledExclusiveInCategory(pkg, userHandle);
-        } else {
-            mOverlayManager.setEnabled(pkg, false, userHandle);
-        }
+    private void setEnabledAsync(String pkg, UserHandle userHandle, boolean enabled) {
+        mExecutor.execute(() -> {
+            if (DEBUG) Log.d(TAG, String.format("setEnabled: %s %s %b", pkg, userHandle, enabled));
+            if (enabled) {
+                mOverlayManager.setEnabledExclusiveInCategory(pkg, userHandle);
+            } else {
+                mOverlayManager.setEnabled(pkg, false, userHandle);
+            }
+        });
     }
 }

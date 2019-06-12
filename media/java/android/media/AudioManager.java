@@ -1484,20 +1484,22 @@ public class AudioManager {
      }
 
     /**
-     * Specifies wheather the audio played by this app may or may not be captured by other apps or
+     * Specifies whether the audio played by this app may or may not be captured by other apps or
      * the system.
      *
      * The default is {@link AudioAttributes#ALLOW_CAPTURE_BY_ALL}.
      *
      * There are multiple ways to set this policy:
-     *  - for each tracks independently, see
-     *    {@link AudioAttributes.Builder#setAllowedCapturePolicy(int)}
-     *  - application wide at runtime, with this method
-     *  - application wide at build time, see {@code allowAudioPlaybackCapture} in the application
-     *  manifest.
+     * <ul>
+     * <li> for each track independently, see
+     *    {@link AudioAttributes.Builder#setAllowedCapturePolicy(int)} </li>
+     * <li> application-wide at runtime, with this method </li>
+     * <li> application-wide at build time, see {@code allowAudioPlaybackCapture} in the application
+     *       manifest. </li>
+     * </ul>
      * The most restrictive policy is always applied.
      *
-     * See {@link AudioPlaybackCaptureConfiguration} for more details on the restrictions
+     * See {@link AudioPlaybackCaptureConfiguration} for more details on
      * which audio signals can be captured.
      *
      * @param capturePolicy one of
@@ -3766,9 +3768,24 @@ public class AudioManager {
      * with frameworks/av/include/media/AudioPolicy.h
      */
     /** @hide */
-    public final static int RECORD_CONFIG_EVENT_START = 1;
+    public static final int RECORD_CONFIG_EVENT_NONE = -1;
     /** @hide */
-    public final static int RECORD_CONFIG_EVENT_STOP = 0;
+    public static final int RECORD_CONFIG_EVENT_START = 0;
+    /** @hide */
+    public static final int RECORD_CONFIG_EVENT_STOP = 1;
+    /** @hide */
+    public static final int RECORD_CONFIG_EVENT_UPDATE = 2;
+    /** @hide */
+    public static final int RECORD_CONFIG_EVENT_RELEASE = 3;
+    /**
+     * keep in sync with frameworks/native/include/audiomanager/AudioManager.h
+     */
+    /** @hide */
+    public static final int RECORD_RIID_INVALID = -1;
+    /** @hide */
+    public static final int RECORDER_STATE_STARTED = 0;
+    /** @hide */
+    public static final int RECORDER_STATE_STOPPED = 1;
 
     /**
      * All operations on this list are sync'd on mRecordCallbackLock.
@@ -4252,38 +4269,6 @@ public class AudioManager {
         final IAudioService service = getService();
         try {
             service.handleBluetoothA2dpDeviceConfigChange(device);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-     /**
-     * Indicate A2DP source or sink active device change and eventually suppress
-     * the {@link AudioManager.ACTION_AUDIO_BECOMING_NOISY} intent.
-     * This operation is asynchronous but its execution will still be sequentially scheduled
-     * relative to calls to {@link #setBluetoothHearingAidDeviceConnectionState(BluetoothDevice,
-     * int, boolean, int)} and
-     * {@link #handleBluetoothA2dpDeviceConfigChange(BluetoothDevice)}.
-     * @param device Bluetooth device connected/disconnected
-     * @param state  new connection state (BluetoothProfile.STATE_xxx)
-     * @param profile profile for the A2DP device
-     * (either {@link android.bluetooth.BluetoothProfile.A2DP} or
-     * {@link android.bluetooth.BluetoothProfile.A2DP_SINK})
-     * @param a2dpVolume New volume for the connecting device. Does nothing if
-     * disconnecting. Pass value -1 in case you want this field to be ignored
-     * @param suppressNoisyIntent if true the
-     * {@link AudioManager.ACTION_AUDIO_BECOMING_NOISY} intent will not be sent.
-     * @return a delay in ms that the caller should wait before broadcasting
-     * BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED intent.
-     * {@hide}
-     */
-    public void handleBluetoothA2dpActiveDeviceChange(
-                BluetoothDevice device, int state, int profile,
-                boolean suppressNoisyIntent, int a2dpVolume) {
-        final IAudioService service = getService();
-        try {
-            service.handleBluetoothA2dpActiveDeviceChange(device,
-                state, profile, suppressNoisyIntent, a2dpVolume);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

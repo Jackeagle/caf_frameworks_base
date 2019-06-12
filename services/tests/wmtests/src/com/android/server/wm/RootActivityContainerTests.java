@@ -25,12 +25,12 @@ import static android.app.WindowConfiguration.WINDOWING_MODE_SPLIT_SCREEN_PRIMAR
 import static android.content.pm.ActivityInfo.FLAG_ALWAYS_FOCUSABLE;
 import static android.view.Display.DEFAULT_DISPLAY;
 
-import static com.android.dx.mockito.inline.extended.ExtendedMockito.doAnswer;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.mock;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.never;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.reset;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.spy;
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.times;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.verify;
 import static com.android.server.wm.ActivityDisplay.POSITION_TOP;
@@ -55,6 +55,7 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.ResolveInfo;
+import android.content.res.Resources;
 import android.graphics.Rect;
 import android.platform.test.annotations.Presubmit;
 import android.util.Pair;
@@ -62,6 +63,7 @@ import android.util.Pair;
 import androidx.test.filters.MediumTest;
 
 import com.android.internal.app.ResolverActivity;
+import com.android.server.wm.ActivityStack.ActivityState;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -71,10 +73,10 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Tests for the {@link ActivityStackSupervisor} class.
+ * Tests for the {@link RootActivityContainer} class.
  *
  * Build/Install/Run:
- *  atest WmTests:ActivityStackSupervisorTests
+ *  atest WmTests:RootActivityContainerTests
  */
 @MediumTest
 @Presubmit
@@ -395,21 +397,65 @@ public class RootActivityContainerTests extends ActivityTestsBase {
     }
 
     /**
+     * Verify that a lingering transition is being executed in case the activity to be resumed is
+     * already resumed
+     */
+    @Test
+    public void testResumeActivityLingeringTransition() {
+        // Create a stack at top.
+        final ActivityDisplay display = mRootActivityContainer.getDefaultDisplay();
+        final ActivityStack targetStack = spy(display.createStack(WINDOWING_MODE_FULLSCREEN,
+                ACTIVITY_TYPE_STANDARD, false /* onTop */));
+        final TaskRecord task = new TaskBuilder(mSupervisor).setStack(targetStack).build();
+        final ActivityRecord activity = new ActivityBuilder(mService).setTask(task).build();
+        activity.setState(ActivityState.RESUMED, "test");
+
+        // Assume the stack is at the topmost position
+        assertTrue(targetStack.isTopStackOnDisplay());
+
+        // Use the stack as target to resume.
+        mRootActivityContainer.resumeFocusedStacksTopActivities();
+
+        // Verify the lingering app transition is being executed because it's already resumed
+        verify(targetStack, times(1)).executeAppTransition(any());
+    }
+
+    @Test
+    public void testResumeActivityLingeringTransition_notExecuted() {
+        // Create a stack at bottom.
+        final ActivityDisplay display = mRootActivityContainer.getDefaultDisplay();
+        final ActivityStack targetStack = spy(display.createStack(WINDOWING_MODE_FULLSCREEN,
+                ACTIVITY_TYPE_STANDARD, false /* onTop */));
+        final TaskRecord task = new TaskBuilder(mSupervisor).setStack(targetStack).build();
+        final ActivityRecord activity = new ActivityBuilder(mService).setTask(task).build();
+        activity.setState(ActivityState.RESUMED, "test");
+        display.positionChildAtBottom(targetStack);
+
+        // Assume the stack is at the topmost position
+        assertFalse(targetStack.isTopStackOnDisplay());
+        doReturn(targetStack).when(mRootActivityContainer).getTopDisplayFocusedStack();
+
+        // Use the stack as target to resume.
+        mRootActivityContainer.resumeFocusedStacksTopActivities();
+
+        // Verify the lingering app transition is being executed because it's already resumed
+        verify(targetStack, never()).executeAppTransition(any());
+    }
+
+    /**
      * Tests that home activities can be started on the displays that supports system decorations.
      */
     @Test
     public void testStartHomeOnAllDisplays() {
+        mockResolveHomeActivity();
+
         // Create secondary displays.
         final TestActivityDisplay secondDisplay = spy(createNewActivityDisplay());
         mRootActivityContainer.addChild(secondDisplay, POSITION_TOP);
         doReturn(true).when(secondDisplay).supportsSystemDecorations();
 
         // Create mock tasks and other necessary mocks.
-        TaskBuilder taskBuilder = new TaskBuilder(mService.mStackSupervisor).setCreateStack(false);
-        final TaskRecord.TaskRecordFactory factory = mock(TaskRecord.TaskRecordFactory.class);
-        TaskRecord.setTaskRecordFactory(factory);
-        doAnswer(i -> taskBuilder.build()).when(factory)
-                .create(any(), anyInt(), any(), any(), any(), any());
+        mockTaskRecordFactory();
         doReturn(true).when(mRootActivityContainer)
                 .ensureVisibilityAndConfig(any(), anyInt(), anyBoolean(), anyBoolean());
         doReturn(true).when(mRootActivityContainer).canStartHomeOnDisplay(
@@ -468,6 +514,68 @@ public class RootActivityContainerTests extends ActivityTestsBase {
     }
 
     /**
+     * Tests that secondary home activity should not be resolved if device is still locked.
+     */
+    @Test
+    public void testStartSecondaryHomeOnDisplayWithUserKeyLocked() {
+        // Create secondary displays.
+        final TestActivityDisplay secondDisplay = spy(createNewActivityDisplay());
+        mRootActivityContainer.addChild(secondDisplay, POSITION_TOP);
+
+        doReturn(true).when(secondDisplay).supportsSystemDecorations();
+        // Use invalid user id to let StorageManager.isUserKeyUnlocked() return false.
+        final int currentUser = mRootActivityContainer.mCurrentUser;
+        mRootActivityContainer.mCurrentUser = -1;
+
+        mRootActivityContainer.startHomeOnDisplay(0 /* userId */, "testStartSecondaryHome",
+                secondDisplay.mDisplayId, true /* allowInstrumenting */, true /* fromHomeKey */);
+
+        try {
+            verify(mRootActivityContainer, never()).resolveSecondaryHomeActivity(anyInt(),
+                    anyInt());
+        } finally {
+            mRootActivityContainer.mCurrentUser = currentUser;
+        }
+    }
+
+    /**
+     * Tests that secondary home activity should not be resolved if display does not support system
+     * decorations.
+     */
+    @Test
+    public void testStartSecondaryHomeOnDisplayWithoutSysDecorations() {
+        // Create secondary displays.
+        final TestActivityDisplay secondDisplay = spy(createNewActivityDisplay());
+        mRootActivityContainer.addChild(secondDisplay, POSITION_TOP);
+        doReturn(false).when(secondDisplay).supportsSystemDecorations();
+
+        mRootActivityContainer.startHomeOnDisplay(0 /* userId */, "testStartSecondaryHome",
+                secondDisplay.mDisplayId, true /* allowInstrumenting */, true /* fromHomeKey */);
+
+        verify(mRootActivityContainer, never()).resolveSecondaryHomeActivity(anyInt(), anyInt());
+    }
+
+    /**
+     * Tests that when starting {@link #ResolverActivity} for home, it should use the standard
+     * activity type (in a new stack) so the order of back stack won't be broken.
+     */
+    @Test
+    public void testStartResolverActivityForHome() {
+        final ActivityInfo info = new ActivityInfo();
+        info.applicationInfo = new ApplicationInfo();
+        info.applicationInfo.packageName = "android";
+        info.name = ResolverActivity.class.getName();
+        doReturn(info).when(mRootActivityContainer).resolveHomeActivity(anyInt(), any());
+        mockTaskRecordFactory();
+
+        mRootActivityContainer.startHomeOnDisplay(0 /* userId */, "test", DEFAULT_DISPLAY);
+        final ActivityRecord resolverActivity = mRootActivityContainer.topRunningActivity();
+
+        assertEquals(info, resolverActivity.info);
+        assertEquals(ACTIVITY_TYPE_STANDARD, resolverActivity.getActivityStack().getActivityType());
+    }
+
+    /**
      * Tests that secondary home should be selected if default home not set.
      */
     @Test
@@ -495,18 +603,79 @@ public class RootActivityContainerTests extends ActivityTestsBase {
     }
 
     /**
+     * Tests that the default secondary home activity is always picked when it is in forced by
+     * config_useSystemProvidedLauncherForSecondary.
+     */
+    @Test
+    public void testResolveSecondaryHomeActivityForced() throws Exception {
+        Resources resources = mContext.getResources();
+        spyOn(resources);
+        try {
+            // setUp: set secondary launcher and force it.
+            final String defaultSecondaryHome =
+                    "com.android.test/com.android.test.TestDefaultSecondaryHome";
+            final ComponentName secondaryComp = ComponentName.unflattenFromString(
+                    defaultSecondaryHome);
+            doReturn(defaultSecondaryHome).when(resources).getString(
+                    com.android.internal.R.string.config_secondaryHomeComponent);
+            doReturn(true).when(resources).getBoolean(
+                    com.android.internal.R.bool.config_useSystemProvidedLauncherForSecondary);
+            final Intent secondaryHomeIntent = mService.getSecondaryHomeIntent(null);
+            assertEquals(secondaryComp, secondaryHomeIntent.getComponent());
+            final ActivityInfo aInfoSecondary = new ActivityInfo();
+            aInfoSecondary.name = secondaryComp.getClassName();
+            aInfoSecondary.applicationInfo = new ApplicationInfo();
+            aInfoSecondary.applicationInfo.packageName = secondaryComp.getPackageName();
+            doReturn(aInfoSecondary).when(mRootActivityContainer).resolveHomeActivity(anyInt(),
+                    refEq(secondaryHomeIntent));
+            final Intent homeIntent = mService.getHomeIntent();
+            final ActivityInfo aInfoDefault = new ActivityInfo();
+            aInfoDefault.name = "fakeHomeActivity";
+            aInfoDefault.applicationInfo = new ApplicationInfo();
+            aInfoDefault.applicationInfo.packageName = "fakeHomePackage";
+            doReturn(aInfoDefault).when(mRootActivityContainer).resolveHomeActivity(anyInt(),
+                    refEq(homeIntent));
+            // Let resolveActivities call to validate both main launcher and second launcher so that
+            // resolveActivities call does not work as enabler for secondary.
+            final List<ResolveInfo> resolutions1 = new ArrayList<>();
+            final ResolveInfo resolveInfo1 = new ResolveInfo();
+            resolveInfo1.activityInfo = new ActivityInfo();
+            resolveInfo1.activityInfo.name = aInfoDefault.name;
+            resolveInfo1.activityInfo.applicationInfo = aInfoDefault.applicationInfo;
+            resolutions1.add(resolveInfo1);
+            doReturn(resolutions1).when(mRootActivityContainer).resolveActivities(anyInt(),
+                    refEq(homeIntent));
+            final List<ResolveInfo> resolutions2 = new ArrayList<>();
+            final ResolveInfo resolveInfo2 = new ResolveInfo();
+            resolveInfo2.activityInfo = new ActivityInfo();
+            resolveInfo2.activityInfo.name = aInfoSecondary.name;
+            resolveInfo2.activityInfo.applicationInfo = aInfoSecondary.applicationInfo;
+            resolutions2.add(resolveInfo2);
+            doReturn(resolutions2).when(mRootActivityContainer).resolveActivities(anyInt(),
+                    refEq(secondaryHomeIntent));
+            doReturn(true).when(mRootActivityContainer).canStartHomeOnDisplay(
+                    any(), anyInt(), anyBoolean());
+
+            // Run the test
+            final Pair<ActivityInfo, Intent> resolvedInfo = mRootActivityContainer
+                    .resolveSecondaryHomeActivity(0 /* userId */, 1 /* displayId */);
+            assertEquals(secondaryComp.getClassName(), resolvedInfo.first.name);
+            assertEquals(secondaryComp.getPackageName(),
+                    resolvedInfo.first.applicationInfo.packageName);
+            assertEquals(aInfoSecondary.name, resolvedInfo.first.name);
+        } finally {
+            // tearDown
+            reset(resources);
+        }
+    }
+
+    /**
      * Tests that secondary home should be selected if default home not support secondary displays
      * or there is no matched activity in the same package as selected default home.
      */
     @Test
     public void testResolveSecondaryHomeActivityWhenDefaultHomeNotSupportMultiDisplay() {
-        final Intent defaultHomeIntent = mService.getHomeIntent();
-        final ActivityInfo aInfoDefault = new ActivityInfo();
-        aInfoDefault.name = "fakeHomeActivity";
-        aInfoDefault.applicationInfo = new ApplicationInfo();
-        aInfoDefault.applicationInfo.packageName = "fakeHomePackage";
-        doReturn(aInfoDefault).when(mRootActivityContainer).resolveHomeActivity(anyInt(),
-                refEq(defaultHomeIntent));
+        mockResolveHomeActivity();
 
         final List<ResolveInfo> resolutions = new ArrayList<>();
         doReturn(resolutions).when(mRootActivityContainer).resolveActivities(anyInt(), any());
@@ -533,13 +702,7 @@ public class RootActivityContainerTests extends ActivityTestsBase {
      */
     @Test
     public void testResolveSecondaryHomeActivityWhenDefaultHomeSupportMultiDisplay() {
-        final Intent homeIntent = mService.getHomeIntent();
-        final ActivityInfo aInfoDefault = new ActivityInfo();
-        aInfoDefault.name = "fakeHomeActivity";
-        aInfoDefault.applicationInfo = new ApplicationInfo();
-        aInfoDefault.applicationInfo.packageName = "fakeHomePackage";
-        doReturn(aInfoDefault).when(mRootActivityContainer).resolveHomeActivity(anyInt(),
-                refEq(homeIntent));
+        final ActivityInfo aInfoDefault = mockResolveHomeActivity();
 
         final List<ResolveInfo> resolutions = new ArrayList<>();
         final ResolveInfo infoFake1 = new ResolveInfo();
@@ -570,13 +733,7 @@ public class RootActivityContainerTests extends ActivityTestsBase {
      */
     @Test
     public void testResolveSecondaryHomeActivityWhenOtherActivitySupportMultiDisplay() {
-        final Intent homeIntent = mService.getHomeIntent();
-        final ActivityInfo aInfoDefault = new ActivityInfo();
-        aInfoDefault.name = "fakeHomeActivity";
-        aInfoDefault.applicationInfo = new ApplicationInfo();
-        aInfoDefault.applicationInfo.packageName = "fakeHomePackage";
-        doReturn(aInfoDefault).when(mRootActivityContainer).resolveHomeActivity(anyInt(),
-                refEq(homeIntent));
+        mockResolveHomeActivity();
 
         final List<ResolveInfo> resolutions = new ArrayList<>();
         final ResolveInfo infoFake1 = new ResolveInfo();
@@ -603,5 +760,20 @@ public class RootActivityContainerTests extends ActivityTestsBase {
         assertEquals(infoFake1.activityInfo.applicationInfo.packageName,
                 resolvedInfo.first.applicationInfo.packageName);
         assertEquals(infoFake1.activityInfo.name, resolvedInfo.first.name);
+    }
+
+    /**
+     * Mock {@link RootActivityContainerTests#resolveHomeActivity} for returning consistent activity
+     * info for test cases (the original implementation will resolve from the real package manager).
+     */
+    private ActivityInfo mockResolveHomeActivity() {
+        final Intent homeIntent = mService.getHomeIntent();
+        final ActivityInfo aInfoDefault = new ActivityInfo();
+        aInfoDefault.name = "fakeHomeActivity";
+        aInfoDefault.applicationInfo = new ApplicationInfo();
+        aInfoDefault.applicationInfo.packageName = "fakeHomePackage";
+        doReturn(aInfoDefault).when(mRootActivityContainer).resolveHomeActivity(anyInt(),
+                refEq(homeIntent));
+        return aInfoDefault;
     }
 }

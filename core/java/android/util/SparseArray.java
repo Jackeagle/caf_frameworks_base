@@ -169,11 +169,14 @@ public class SparseArray<E> implements Cloneable {
      * Removes the mapping at the specified index.
      *
      * <p>For indices outside of the range <code>0...size()-1</code>,
-     * the behavior is undefined.</p>
+     * the behavior is undefined for apps targeting {@link android.os.Build.VERSION_CODES#P} and
+     * earlier, and an {@link ArrayIndexOutOfBoundsException} is thrown for apps targeting
+     * {@link android.os.Build.VERSION_CODES#Q} and later.</p>
      */
     public void removeAt(int index) {
-        if (index >= mSize) {
+        if (index >= mSize && UtilConfig.sThrowExceptionForUpperArrayOutOfBounds) {
             // The array might be slightly bigger than mSize, in which case, indexing won't fail.
+            // Check if exception should be thrown outside of the critical path.
             throw new ArrayIndexOutOfBoundsException(index);
         }
         if (mValues[index] != DELETED) {
@@ -281,11 +284,14 @@ public class SparseArray<E> implements Cloneable {
      * key.</p>
      *
      * <p>For indices outside of the range <code>0...size()-1</code>,
-     * the behavior is undefined.</p>
+     * the behavior is undefined for apps targeting {@link android.os.Build.VERSION_CODES#P} and
+     * earlier, and an {@link ArrayIndexOutOfBoundsException} is thrown for apps targeting
+     * {@link android.os.Build.VERSION_CODES#Q} and later.</p>
      */
     public int keyAt(int index) {
-        if (index >= mSize) {
+        if (index >= mSize && UtilConfig.sThrowExceptionForUpperArrayOutOfBounds) {
             // The array might be slightly bigger than mSize, in which case, indexing won't fail.
+            // Check if exception should be thrown outside of the critical path.
             throw new ArrayIndexOutOfBoundsException(index);
         }
         if (mGarbage) {
@@ -307,12 +313,15 @@ public class SparseArray<E> implements Cloneable {
      * associated with the largest key.</p>
      *
      * <p>For indices outside of the range <code>0...size()-1</code>,
-     * the behavior is undefined.</p>
+     * the behavior is undefined for apps targeting {@link android.os.Build.VERSION_CODES#P} and
+     * earlier, and an {@link ArrayIndexOutOfBoundsException} is thrown for apps targeting
+     * {@link android.os.Build.VERSION_CODES#Q} and later.</p>
      */
     @SuppressWarnings("unchecked")
     public E valueAt(int index) {
-        if (index >= mSize) {
+        if (index >= mSize && UtilConfig.sThrowExceptionForUpperArrayOutOfBounds) {
             // The array might be slightly bigger than mSize, in which case, indexing won't fail.
+            // Check if exception should be thrown outside of the critical path.
             throw new ArrayIndexOutOfBoundsException(index);
         }
         if (mGarbage) {
@@ -327,11 +336,15 @@ public class SparseArray<E> implements Cloneable {
      * value for the <code>index</code>th key-value mapping that this
      * SparseArray stores.
      *
-     * <p>For indices outside of the range <code>0...size()-1</code>, the behavior is undefined.</p>
+     * <p>For indices outside of the range <code>0...size()-1</code>, the behavior is undefined for
+     * apps targeting {@link android.os.Build.VERSION_CODES#P} and earlier, and an
+     * {@link ArrayIndexOutOfBoundsException} is thrown for apps targeting
+     * {@link android.os.Build.VERSION_CODES#Q} and later.</p>
      */
     public void setValueAt(int index, E value) {
-        if (index >= mSize) {
+        if (index >= mSize && UtilConfig.sThrowExceptionForUpperArrayOutOfBounds) {
             // The array might be slightly bigger than mSize, in which case, indexing won't fail.
+            // Check if exception should be thrown outside of the critical path.
             throw new ArrayIndexOutOfBoundsException(index);
         }
         if (mGarbage) {

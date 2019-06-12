@@ -97,7 +97,7 @@ interface ITelecomService {
     /**
      * @see TelecomServiceImpl#getSimCallManager
      */
-    PhoneAccountHandle getSimCallManager();
+    PhoneAccountHandle getSimCallManager(int subId);
 
     /**
      * @see TelecomServiceImpl#getSimCallManagerForUser
@@ -300,5 +300,10 @@ interface ITelecomService {
     void addOrRemoveTestCallCompanionApp(String packageName, boolean isAdded);
 
     void setTestAutoModeApp(String packageName);
+
+    /**
+     * @see TelecomServiceImpl#setTestDefaultDialer
+     */
+    void setTestDefaultDialer(in String packageName);
 
 }

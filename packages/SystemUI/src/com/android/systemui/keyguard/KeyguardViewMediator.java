@@ -83,7 +83,7 @@ import com.android.systemui.Dependency;
 import com.android.systemui.SystemUI;
 import com.android.systemui.SystemUIFactory;
 import com.android.systemui.UiOffloadThread;
-import com.android.systemui.classifier.FalsingManager;
+import com.android.systemui.classifier.FalsingManagerFactory;
 import com.android.systemui.statusbar.phone.BiometricUnlockController;
 import com.android.systemui.statusbar.phone.NotificationPanelView;
 import com.android.systemui.statusbar.phone.StatusBar;
@@ -639,8 +639,8 @@ public class KeyguardViewMediator extends SystemUI {
         public int getBouncerPromptReason() {
             int currentUser = ActivityManager.getCurrentUser();
             boolean trust = mTrustManager.isTrustUsuallyManaged(currentUser);
-            boolean fingerprint = mUpdateMonitor.isUnlockWithFingerprintPossible(currentUser);
-            boolean any = trust || fingerprint;
+            boolean biometrics = mUpdateMonitor.isUnlockingWithBiometricsPossible(currentUser);
+            boolean any = trust || biometrics;
             KeyguardUpdateMonitor.StrongAuthTracker strongAuthTracker =
                     mUpdateMonitor.getStrongAuthTracker();
             int strongAuth = strongAuthTracker.getStrongAuthForUser(currentUser);
@@ -1594,7 +1594,7 @@ public class KeyguardViewMediator extends SystemUI {
                     Trace.beginSection("KeyguardViewMediator#handleMessage START_KEYGUARD_EXIT_ANIM");
                     StartKeyguardExitAnimParams params = (StartKeyguardExitAnimParams) msg.obj;
                     handleStartKeyguardExitAnimation(params.startTime, params.fadeoutDuration);
-                    FalsingManager.getInstance(mContext).onSucccessfulUnlock();
+                    FalsingManagerFactory.getInstance(mContext).onSucccessfulUnlock();
                     Trace.endSection();
                     break;
                 case KEYGUARD_DONE_PENDING_TIMEOUT:
@@ -1785,31 +1785,37 @@ public class KeyguardViewMediator extends SystemUI {
         public void run() {
             Trace.beginSection("KeyguardViewMediator.mKeyGuardGoingAwayRunnable");
             if (DEBUG) Log.d(TAG, "keyguardGoingAway");
-            try {
-                mStatusBarKeyguardViewManager.keyguardGoingAway();
+            mStatusBarKeyguardViewManager.keyguardGoingAway();
 
-                int flags = 0;
-                if (mStatusBarKeyguardViewManager.shouldDisableWindowAnimationsForUnlock()
-                        || (mWakeAndUnlocking && !mPulsing)) {
-                    flags |= WindowManagerPolicyConstants
-                            .KEYGUARD_GOING_AWAY_FLAG_NO_WINDOW_ANIMATIONS;
-                }
-                if (mStatusBarKeyguardViewManager.isGoingToNotificationShade()
-                        || (mWakeAndUnlocking && mPulsing)) {
-                    flags |= WindowManagerPolicyConstants.KEYGUARD_GOING_AWAY_FLAG_TO_SHADE;
-                }
-                if (mStatusBarKeyguardViewManager.isUnlockWithWallpaper()) {
-                    flags |= WindowManagerPolicyConstants.KEYGUARD_GOING_AWAY_FLAG_WITH_WALLPAPER;
-                }
-
-                mUpdateMonitor.setKeyguardGoingAway(true /* goingAway */);
-                // Don't actually hide the Keyguard at the moment, wait for window
-                // manager until it tells us it's safe to do so with
-                // startKeyguardExitAnimation.
-                ActivityTaskManager.getService().keyguardGoingAway(flags);
-            } catch (RemoteException e) {
-                Log.e(TAG, "Error while calling WindowManager", e);
+            int flags = 0;
+            if (mStatusBarKeyguardViewManager.shouldDisableWindowAnimationsForUnlock()
+                    || (mWakeAndUnlocking && !mPulsing)) {
+                flags |= WindowManagerPolicyConstants
+                        .KEYGUARD_GOING_AWAY_FLAG_NO_WINDOW_ANIMATIONS;
             }
+            if (mStatusBarKeyguardViewManager.isGoingToNotificationShade()
+                    || (mWakeAndUnlocking && mPulsing)) {
+                flags |= WindowManagerPolicyConstants.KEYGUARD_GOING_AWAY_FLAG_TO_SHADE;
+            }
+            if (mStatusBarKeyguardViewManager.isUnlockWithWallpaper()) {
+                flags |= WindowManagerPolicyConstants.KEYGUARD_GOING_AWAY_FLAG_WITH_WALLPAPER;
+            }
+
+            mUpdateMonitor.setKeyguardGoingAway(true /* goingAway */);
+
+            // Don't actually hide the Keyguard at the moment, wait for window
+            // manager until it tells us it's safe to do so with
+            // startKeyguardExitAnimation.
+            // Posting to mUiOffloadThread to ensure that calls to ActivityTaskManager will be in
+            // order.
+            final int keyguardFlag = flags;
+            mUiOffloadThread.submit(() -> {
+                try {
+                    ActivityTaskManager.getService().keyguardGoingAway(keyguardFlag);
+                } catch (RemoteException e) {
+                    Log.e(TAG, "Error while calling WindowManager", e);
+                }
+            });
             Trace.endSection();
         }
     };
@@ -1923,12 +1929,6 @@ public class KeyguardViewMediator extends SystemUI {
                         + " isSecure=" + isSecure() + " force=" + forceHideHomeRecentsButtons
                         +  " --> flags=0x" + Integer.toHexString(flags));
             }
-
-            // TODO(b/113914868): investigation log for disappearing home button
-            Log.d(TAG, "adjustStatusBarLocked (b/113914868): flags=" + flags
-                    + "mShowing=" + mShowing + " mStatusBarManager=" + mStatusBarManager
-                    + " mOccluded=" + mOccluded + " isSecure=" + isSecure()
-                    + " force=" + forceHideHomeRecentsButtons);
 
             mStatusBarManager.disable(flags);
         }

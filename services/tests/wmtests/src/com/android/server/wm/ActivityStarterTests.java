@@ -79,7 +79,6 @@ import android.view.Gravity;
 import androidx.test.filters.SmallTest;
 
 import com.android.server.wm.LaunchParamsController.LaunchParamsModifier;
-import com.android.server.wm.TaskRecord.TaskRecordFactory;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -330,21 +329,14 @@ public class ActivityStarterTests extends ActivityTestsBase {
                 any(), any(), any(), anyInt(), anyInt(), anyInt(), any(),
                 anyBoolean(), anyBoolean(), any(), any(), any());
 
-        // instrument the stack and task used.
-        final ActivityStack stack = mRootActivityContainer.getDefaultDisplay().createStack(
-                WINDOWING_MODE_FULLSCREEN, ACTIVITY_TYPE_STANDARD, true /* onTop */);
-        final TaskRecord task = new TaskBuilder(mSupervisor)
-                .setCreateStack(false)
-                .build();
-
-        // use factory that only returns spy task.
-        final TaskRecordFactory factory = mock(TaskRecordFactory.class);
-        TaskRecord.setTaskRecordFactory(factory);
-
-        // return task when created.
-        doReturn(task).when(factory).create(any(), anyInt(), any(), any(), any(), any());
+        // Use factory that only returns spy task.
+        mockTaskRecordFactory();
 
         if (mockGetLaunchStack) {
+            // Instrument the stack and task used.
+            final ActivityStack stack = mRootActivityContainer.getDefaultDisplay().createStack(
+                    WINDOWING_MODE_FULLSCREEN, ACTIVITY_TYPE_STANDARD, true /* onTop */);
+
             // Direct starter to use spy stack.
             doReturn(stack).when(mRootActivityContainer)
                     .getLaunchStack(any(), any(), any(), anyBoolean());
@@ -561,7 +553,7 @@ public class ActivityStarterTests extends ActivityTestsBase {
         runAndVerifyBackgroundActivityStartsSubtest("allowed_noStartsAborted", false,
                 UNIMPORTANT_UID, false, PROCESS_STATE_TOP + 1,
                 UNIMPORTANT_UID2, false, PROCESS_STATE_TOP + 1,
-                false, false, false, false, false, false);
+                false, false, false, false, false);
     }
 
     /**
@@ -576,22 +568,22 @@ public class ActivityStarterTests extends ActivityTestsBase {
                 "disallowed_unsupportedUsecase_aborted", true,
                 UNIMPORTANT_UID, false, PROCESS_STATE_TOP + 1,
                 UNIMPORTANT_UID2, false, PROCESS_STATE_TOP + 1,
-                false, false, false, false, false, false);
+                false, false, false, false, false);
         runAndVerifyBackgroundActivityStartsSubtest(
                 "disallowed_callingUidProcessStateTop_aborted", true,
                 UNIMPORTANT_UID, false, PROCESS_STATE_TOP,
                 UNIMPORTANT_UID2, false, PROCESS_STATE_TOP + 1,
-                false, false, false, false, false, false);
+                false, false, false, false, false);
         runAndVerifyBackgroundActivityStartsSubtest(
                 "disallowed_realCallingUidProcessStateTop_aborted", true,
                 UNIMPORTANT_UID, false, PROCESS_STATE_TOP + 1,
                 UNIMPORTANT_UID2, false, PROCESS_STATE_TOP,
-                false, false, false, false, false, false);
+                false, false, false, false, false);
         runAndVerifyBackgroundActivityStartsSubtest(
                 "disallowed_hasForegroundActivities_aborted", true,
                 UNIMPORTANT_UID, false, PROCESS_STATE_TOP + 1,
                 UNIMPORTANT_UID2, false, PROCESS_STATE_TOP + 1,
-                true, false, false, false, false, false);
+                true, false, false, false, false);
     }
 
     /**
@@ -606,51 +598,46 @@ public class ActivityStarterTests extends ActivityTestsBase {
         runAndVerifyBackgroundActivityStartsSubtest("disallowed_rootUid_notAborted", false,
                 Process.ROOT_UID, false, PROCESS_STATE_TOP + 1,
                 UNIMPORTANT_UID2, false, PROCESS_STATE_TOP + 1,
-                false, false, false, false, false, false);
+                false, false, false, false, false);
         runAndVerifyBackgroundActivityStartsSubtest("disallowed_systemUid_notAborted", false,
                 Process.SYSTEM_UID, false, PROCESS_STATE_TOP + 1,
                 UNIMPORTANT_UID2, false, PROCESS_STATE_TOP + 1,
-                false, false, false, false, false, false);
+                false, false, false, false, false);
         runAndVerifyBackgroundActivityStartsSubtest("disallowed_nfcUid_notAborted", false,
                 Process.NFC_UID, false, PROCESS_STATE_TOP + 1,
                 UNIMPORTANT_UID2, false, PROCESS_STATE_TOP + 1,
-                false, false, false, false, false, false);
+                false, false, false, false, false);
         runAndVerifyBackgroundActivityStartsSubtest(
                 "disallowed_callingUidHasVisibleWindow_notAborted", false,
                 UNIMPORTANT_UID, true, PROCESS_STATE_TOP + 1,
                 UNIMPORTANT_UID2, false, PROCESS_STATE_TOP + 1,
-                false, false, false, false, false, false);
+                false, false, false, false, false);
         runAndVerifyBackgroundActivityStartsSubtest(
                 "disallowed_realCallingUidHasVisibleWindow_notAborted", false,
                 UNIMPORTANT_UID, false, PROCESS_STATE_TOP + 1,
                 UNIMPORTANT_UID2, true, PROCESS_STATE_TOP + 1,
-                false, false, false, false, false, false);
+                false, false, false, false, false);
         runAndVerifyBackgroundActivityStartsSubtest(
                 "disallowed_callerIsRecents_notAborted", false,
                 UNIMPORTANT_UID, false, PROCESS_STATE_TOP + 1,
                 UNIMPORTANT_UID2, false, PROCESS_STATE_TOP + 1,
-                false, true, false, false, false, false);
+                false, true, false, false, false);
         runAndVerifyBackgroundActivityStartsSubtest(
                 "disallowed_callerIsWhitelisted_notAborted", false,
                 UNIMPORTANT_UID, false, PROCESS_STATE_TOP + 1,
                 UNIMPORTANT_UID2, false, PROCESS_STATE_TOP + 1,
-                false, false, true, false, false, false);
+                false, false, true, false, false);
         runAndVerifyBackgroundActivityStartsSubtest(
                 "disallowed_callerIsInstrumentingWithBackgroundActivityStartPrivileges_notAborted",
                 false,
                 UNIMPORTANT_UID, false, PROCESS_STATE_TOP + 1,
                 UNIMPORTANT_UID2, false, PROCESS_STATE_TOP + 1,
-                false, false, false, true, false, false);
+                false, false, false, true, false);
         runAndVerifyBackgroundActivityStartsSubtest(
                 "disallowed_callingPackageNameIsDeviceOwner_notAborted", false,
                 UNIMPORTANT_UID, false, PROCESS_STATE_TOP + 1,
                 UNIMPORTANT_UID2, false, PROCESS_STATE_TOP + 1,
-                false, false, false, false, true, false);
-        runAndVerifyBackgroundActivityStartsSubtest(
-                "disallowed_callingPackageNameIsTempWhitelisted_notAborted", false,
-                UNIMPORTANT_UID, false, PROCESS_STATE_TOP + 1,
-                UNIMPORTANT_UID2, false, PROCESS_STATE_TOP + 1,
-                false, false, false, false, false, true);
+                false, false, false, false, true);
     }
 
     private void runAndVerifyBackgroundActivityStartsSubtest(String name, boolean shouldHaveAborted,
@@ -659,7 +646,7 @@ public class ActivityStarterTests extends ActivityTestsBase {
             boolean hasForegroundActivities, boolean callerIsRecents,
             boolean callerIsTempWhitelisted,
             boolean callerIsInstrumentingWithBackgroundActivityStartPrivileges,
-            boolean isCallingUidDeviceOwner, boolean isCallingPackageTempWhitelisted) {
+            boolean isCallingUidDeviceOwner) {
         // window visibility
         doReturn(callingUidHasVisibleWindow).when(mService.mWindowManager.mRoot)
                 .isAnyNonToastWindowVisibleForUid(callingUid);
@@ -687,9 +674,6 @@ public class ActivityStarterTests extends ActivityTestsBase {
                 callerIsInstrumentingWithBackgroundActivityStartPrivileges);
         // callingUid is the device owner
         doReturn(isCallingUidDeviceOwner).when(mService).isDeviceOwner(callingUid);
-        // calling package name is temporarily whitelisted
-        doReturn(isCallingPackageTempWhitelisted).when(mService)
-                .isPackageNameWhitelistedForBgActivityStarts("com.whatever.dude");
 
         final ActivityOptions options = spy(ActivityOptions.makeBasic());
         ActivityStarter starter = prepareStarter(FLAG_ACTIVITY_NEW_TASK)
@@ -704,6 +688,36 @@ public class ActivityStarterTests extends ActivityTestsBase {
         assertEquals(ActivityStarter.getExternalResult(
                 shouldHaveAborted ? START_ABORTED : START_SUCCESS), result);
         verify(options, times(shouldHaveAborted ? 1 : 0)).abort();
+    }
+
+    /**
+     * This test ensures that {@link ActivityStarter#setTargetStackAndMoveToFrontIfNeeded} will
+     * move the existing task to front if the current focused stack doesn't have running task.
+     */
+    @Test
+    public void testBringTaskToFrontWhenFocusedStackIsFinising() {
+        // Put 2 tasks in the same stack (simulate the behavior of home stack).
+        final ActivityRecord activity = new ActivityBuilder(mService)
+                .setCreateTask(true).build();
+        new ActivityBuilder(mService)
+                .setStack(activity.getActivityStack())
+                .setCreateTask(true).build();
+
+        // Create a top finishing activity.
+        final ActivityRecord finishingTopActivity = new ActivityBuilder(mService)
+                .setCreateTask(true).build();
+        finishingTopActivity.getActivityStack().moveToFront("finishingTopActivity");
+
+        assertEquals(finishingTopActivity, mRootActivityContainer.topRunningActivity());
+        finishingTopActivity.finishing = true;
+
+        // Launch the bottom task of the target stack.
+        prepareStarter(FLAG_ACTIVITY_NEW_TASK, false /* mockGetLaunchStack */)
+                .setReason("testBringTaskToFrontWhenTopStackIsFinising")
+                .setIntent(activity.intent)
+                .execute();
+        // The hierarchies of the activity should move to front.
+        assertEquals(activity, mRootActivityContainer.topRunningActivity());
     }
 
     /**

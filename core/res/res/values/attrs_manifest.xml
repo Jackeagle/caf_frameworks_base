@@ -1325,13 +1325,19 @@
          <p>The default value of this attribute is <code>false</code>. -->
     <attr name="resumeWhilePausing" format="boolean" />
 
-    <!-- Indicates that it is okay for this activity to be resized to any dimension. Intended for a
+    <!-- Indicates that it is okay for this activity to be put in multi-window mode. Intended for a
          multi-window device where there can be multiple activities of various sizes on the screen
          at the same time.
 
          <p>The default value is <code>false</code> for applications with
          <code>targetSdkVersion</code> lesser than {@link android.os.Build.VERSION_CODES#N} and
          <code>true</code> otherwise.
+
+         <p>Setting this flag to <code>false</code> lets the system know that the app may not be
+         tested or optimized for multi-window environment. The system may still put such activity in
+         multi-window with compatibility mode applied. It also does not guarantee that there will be
+         no other apps in multi-window visible on screen (e.g. picture-in-picture) or on other
+         displays. Therefore, this flag cannot be used to assure an exclusive resource access.
 
          <p>NOTE: A task's root activity value is applied to all additional activities launched in
          the task. That is if the root activity of a task is resizeable then the system will treat
@@ -1363,8 +1369,7 @@
          Value needs to be greater or equal to 1.0, otherwise it is ignored.
          <p>
          NOTE: This attribute is ignored if the activity has
-         {@link android.R.attr#resizeableActivity} set to true, since that means your activity
-         supports any size. -->
+         {@link android.R.attr#resizeableActivity} set to true. -->
     <attr name="maxAspectRatio" format="float" />
 
     <!-- This value indicates the minimum aspect ratio the activity supports. If the app runs on a
@@ -1377,8 +1382,7 @@
          Value needs to be greater or equal to 1.0, otherwise it is ignored.
          <p>
          NOTE: This attribute is ignored if the activity has
-         {@link android.R.attr#resizeableActivity} set to true, since that means your activity
-         supports any size. -->
+         {@link android.R.attr#resizeableActivity} set to true. -->
     <attr name="minAspectRatio" format="float" />
 
     <!-- This value indicates how tasks rooted at this activity will behave in lockTask mode.
@@ -1690,14 +1694,14 @@
         <attr name="usesNonSdkApi" />
 
         <!-- If {@code true} the user is prompted to keep the app's data on uninstall -->
-        <attr name="hasFragileUserData" />
+        <attr name="hasFragileUserData" format="boolean"/>
 
         <attr name="zygotePreloadName" />
 
         <!-- If {@code true} the system will clear app's data if a restore operation fails.
              This flag is turned on by default. <em>This attribute is usable only by system apps.
              </em> -->
-        <attr name="allowClearUserDataOnFailedRestore"/>
+        <attr name="allowClearUserDataOnFailedRestore" format="boolean"/>
         <!-- If {@code true} the app's non sensitive audio can be captured by other apps with
              {@link android.media.AudioPlaybackCaptureConfiguration} and a
              {@link android.media.projection.MediaProjection}.
@@ -1755,7 +1759,7 @@
         <attr name="banner" />
         <attr name="logo" />
         <attr name="permissionGroup" />
-        <attr name="backgroundPermission" />
+        <attr name="backgroundPermission" format="string"/>
         <attr name="description" />
         <attr name="request" />
         <attr name="protectionLevel" />
@@ -1785,10 +1789,10 @@
         <attr name="banner" />
         <attr name="logo" />
         <attr name="description" />
-        <attr name="request" />
-        <attr name="requestDetail" />
-        <attr name="backgroundRequest" />
-        <attr name="backgroundRequestDetail" />
+        <attr name="request" format="string"/>
+        <attr name="requestDetail" format="string"/>
+        <attr name="backgroundRequest" format="string"/>
+        <attr name="backgroundRequestDetail" format="string"/>
         <attr name="permissionGroupFlags" />
         <attr name="priority" />
     </declare-styleable>
@@ -2254,7 +2258,7 @@
         <attr name="path" />
         <attr name="pathPrefix" />
         <attr name="pathPattern" />
-        <attr name="pathAdvancedPattern" />
+        <attr name="pathAdvancedPattern" format="string"/>
         <attr name="permission" />
         <attr name="readPermission" />
         <attr name="writePermission" />

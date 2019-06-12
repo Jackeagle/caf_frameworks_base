@@ -16,6 +16,9 @@
 
 package com.android.server.wm;
 
+import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
+import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
+import static android.app.WindowConfiguration.WINDOWING_MODE_SPLIT_SCREEN_PRIMARY;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_BEHIND;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE;
@@ -34,6 +37,9 @@ import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentat
 
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.spy;
+import static com.android.server.wm.WindowStateAnimator.STACK_CLIP_AFTER_ANIM;
+import static com.android.server.wm.WindowStateAnimator.STACK_CLIP_BEFORE_ANIM;
+import static com.android.server.wm.WindowStateAnimator.STACK_CLIP_NONE;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -144,6 +150,7 @@ public class AppWindowTokenTests extends WindowTestsBase {
     }
 
     @Test
+    @FlakyTest(bugId = 131005232)
     public void testLandscapeSeascapeRotationByApp() {
         // Some plumbing to get the service ready for rotation updates.
         mWm.mDisplayReady = true;
@@ -372,6 +379,7 @@ public class AppWindowTokenTests extends WindowTestsBase {
     }
 
     @Test
+    @FlakyTest(bugId = 131176283)
     public void testCreateRemoveStartingWindow() {
         mToken.addStartingWindow(mPackageName,
                 android.R.style.Theme, null, "Test", 0, 0, 0, 0, null, true, true, false, true,
@@ -475,16 +483,37 @@ public class AppWindowTokenTests extends WindowTestsBase {
         assertHasStartingWindow(tokenBottom);
     }
 
+    @Test
+    public void testTransitionAnimationBounds() {
+        final Rect stackBounds = new Rect(0, 0, 1000, 600);
+        final Rect taskBounds = new Rect(100, 400, 600, 800);
+        mStack.setBounds(stackBounds);
+        mTask.setBounds(taskBounds);
+
+        // Check that anim bounds for freeform window match task bounds
+        mTask.setWindowingMode(WINDOWING_MODE_FREEFORM);
+        assertEquals(taskBounds, mToken.getAnimationBounds(STACK_CLIP_NONE));
+
+        // STACK_CLIP_AFTER_ANIM should use task bounds since they will be clipped by
+        // bounds animation layer.
+        mTask.setWindowingMode(WINDOWING_MODE_FULLSCREEN);
+        assertEquals(taskBounds, mToken.getAnimationBounds(STACK_CLIP_AFTER_ANIM));
+
+        // STACK_CLIP_BEFORE_ANIM should use stack bounds since it won't be clipped later.
+        mTask.setWindowingMode(WINDOWING_MODE_SPLIT_SCREEN_PRIMARY);
+        assertEquals(stackBounds, mToken.getAnimationBounds(STACK_CLIP_BEFORE_ANIM));
+    }
+
     private void assertHasStartingWindow(AppWindowToken atoken) {
         assertNotNull(atoken.startingSurface);
-        assertNotNull(atoken.startingData);
+        assertNotNull(atoken.mStartingData);
         assertNotNull(atoken.startingWindow);
     }
 
     private void assertNoStartingWindow(AppWindowToken atoken) {
         assertNull(atoken.startingSurface);
         assertNull(atoken.startingWindow);
-        assertNull(atoken.startingData);
+        assertNull(atoken.mStartingData);
         atoken.forAllWindows(windowState -> {
             assertFalse(windowState.getBaseType() == TYPE_APPLICATION_STARTING);
         }, true);

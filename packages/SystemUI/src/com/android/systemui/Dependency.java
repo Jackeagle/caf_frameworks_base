@@ -15,6 +15,7 @@
 package com.android.systemui;
 
 import android.annotation.Nullable;
+import android.app.INotificationManager;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.hardware.SensorPrivacyManager;
@@ -35,17 +36,18 @@ import com.android.systemui.appops.AppOpsController;
 import com.android.systemui.assist.AssistManager;
 import com.android.systemui.bubbles.BubbleController;
 import com.android.systemui.colorextraction.SysuiColorExtractor;
+import com.android.systemui.dock.DockManager;
 import com.android.systemui.fragments.FragmentService;
 import com.android.systemui.keyguard.ScreenLifecycle;
 import com.android.systemui.keyguard.WakefulnessLifecycle;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.DarkIconDispatcher;
+import com.android.systemui.plugins.FalsingManager;
 import com.android.systemui.plugins.PluginDependencyProvider;
 import com.android.systemui.plugins.VolumeDialogController;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.power.EnhancedEstimates;
 import com.android.systemui.power.PowerUI;
-import com.android.systemui.privacy.PrivacyItemController;
 import com.android.systemui.recents.OverviewProxyService;
 import com.android.systemui.shared.plugins.PluginManager;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
@@ -67,6 +69,7 @@ import com.android.systemui.statusbar.notification.NotificationInterruptionState
 import com.android.systemui.statusbar.notification.VisualStabilityManager;
 import com.android.systemui.statusbar.notification.collection.NotificationData.KeyguardEnvironment;
 import com.android.systemui.statusbar.notification.logging.NotificationLogger;
+import com.android.systemui.statusbar.notification.row.ChannelEditorDialogController;
 import com.android.systemui.statusbar.notification.row.NotificationBlockingHelperManager;
 import com.android.systemui.statusbar.notification.row.NotificationGutsManager;
 import com.android.systemui.statusbar.phone.AutoHideController;
@@ -74,6 +77,7 @@ import com.android.systemui.statusbar.phone.KeyguardDismissUtil;
 import com.android.systemui.statusbar.phone.LightBarController;
 import com.android.systemui.statusbar.phone.LockscreenGestureLogger;
 import com.android.systemui.statusbar.phone.ManagedProfileController;
+import com.android.systemui.statusbar.phone.NavigationModeController;
 import com.android.systemui.statusbar.phone.NotificationGroupAlertTransferHelper;
 import com.android.systemui.statusbar.phone.NotificationGroupManager;
 import com.android.systemui.statusbar.phone.ShadeController;
@@ -244,6 +248,7 @@ public class Dependency extends SystemUI {
     @Inject Lazy<LightBarController> mLightBarController;
     @Inject Lazy<IWindowManager> mIWindowManager;
     @Inject Lazy<OverviewProxyService> mOverviewProxyService;
+    @Inject Lazy<NavigationModeController> mNavBarModeController;
     @Inject Lazy<EnhancedEstimates> mEnhancedEstimates;
     @Inject Lazy<VibratorHelper> mVibratorHelper;
     @Inject Lazy<IStatusBarService> mIStatusBarService;
@@ -281,7 +286,6 @@ public class Dependency extends SystemUI {
     @Inject Lazy<SensorPrivacyManager> mSensorPrivacyManager;
     @Inject Lazy<AutoHideController> mAutoHideController;
     @Inject Lazy<ForegroundServiceNotificationListener> mForegroundServiceNotificationListener;
-    @Inject Lazy<PrivacyItemController> mPrivacyItemController;
     @Inject @Named(BG_LOOPER_NAME) Lazy<Looper> mBgLooper;
     @Inject @Named(BG_HANDLER_NAME) Lazy<Handler> mBgHandler;
     @Inject @Named(MAIN_HANDLER_NAME) Lazy<Handler> mMainHandler;
@@ -294,6 +298,10 @@ public class Dependency extends SystemUI {
     @Inject Lazy<PackageManagerWrapper> mPackageManagerWrapper;
     @Inject Lazy<SensorPrivacyController> mSensorPrivacyController;
     @Inject Lazy<DumpController> mDumpController;
+    @Inject Lazy<DockManager> mDockManager;
+    @Inject Lazy<ChannelEditorDialogController> mChannelEditorDialogController;
+    @Inject Lazy<INotificationManager> mINotificationManager;
+    @Inject Lazy<FalsingManager> mFalsingManager;
 
     @Inject
     public Dependency() {
@@ -407,6 +415,8 @@ public class Dependency extends SystemUI {
 
         mProviders.put(OverviewProxyService.class, mOverviewProxyService::get);
 
+        mProviders.put(NavigationModeController.class, mNavBarModeController::get);
+
         mProviders.put(EnhancedEstimates.class, mEnhancedEstimates::get);
 
         mProviders.put(VibratorHelper.class, mVibratorHelper::get);
@@ -460,12 +470,15 @@ public class Dependency extends SystemUI {
         mProviders.put(ForegroundServiceNotificationListener.class,
                 mForegroundServiceNotificationListener::get);
         mProviders.put(ClockManager.class, mClockManager::get);
-        mProviders.put(PrivacyItemController.class, mPrivacyItemController::get);
         mProviders.put(ActivityManagerWrapper.class, mActivityManagerWrapper::get);
         mProviders.put(DevicePolicyManagerWrapper.class, mDevicePolicyManagerWrapper::get);
         mProviders.put(PackageManagerWrapper.class, mPackageManagerWrapper::get);
         mProviders.put(SensorPrivacyController.class, mSensorPrivacyController::get);
         mProviders.put(DumpController.class, mDumpController::get);
+        mProviders.put(DockManager.class, mDockManager::get);
+        mProviders.put(ChannelEditorDialogController.class, mChannelEditorDialogController::get);
+        mProviders.put(INotificationManager.class, mINotificationManager::get);
+        mProviders.put(FalsingManager.class, mFalsingManager::get);
 
         // TODO(b/118592525): to support multi-display , we start to add something which is
         //                    per-display, while others may be global. I think it's time to add

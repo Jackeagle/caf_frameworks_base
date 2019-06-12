@@ -21,6 +21,7 @@ import static android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
+import static android.view.WindowManager.TRANSIT_ACTIVITY_CLOSE;
 
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.atLeast;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doNothing;
@@ -36,6 +37,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 
@@ -162,8 +164,29 @@ public class RecentsAnimationControllerTest extends WindowTestsBase {
 
         // Assume IRecentsAnimationController#cleanupScreenshot called to finish screenshot
         // animation.
+        spyOn(mController.mRecentScreenshotAnimator.mAnimatable);
         mController.mRecentScreenshotAnimator.cancelAnimation();
+        verify(mController.mRecentScreenshotAnimator.mAnimatable).onAnimationLeashLost(any());
         verify(mAnimationCallbacks).onAnimationFinished(REORDER_KEEP_IN_PLACE, true, false);
+    }
+
+    @Test
+    public void testShouldAnimateWhenNoCancelWithDeferredScreenshot() {
+        mWm.setRecentsAnimationController(mController);
+        final AppWindowToken appWindow = createAppWindowToken(mDisplayContent,
+                WINDOWING_MODE_FULLSCREEN, ACTIVITY_TYPE_STANDARD);
+        final WindowState win1 = createWindow(null, TYPE_BASE_APPLICATION, appWindow, "win1");
+        appWindow.addWindow(win1);
+        assertEquals(appWindow.getTask().getTopVisibleAppToken(), appWindow);
+        assertEquals(appWindow.findMainWindow(), win1);
+
+        mController.addAnimation(appWindow.getTask(), false /* isRecentTaskInvisible */);
+        assertTrue(mController.isAnimatingTask(appWindow.getTask()));
+
+        // Assume appWindow transition should animate when no
+        // IRecentsAnimationController#setCancelWithDeferredScreenshot called.
+        assertFalse(mController.shouldCancelWithDeferredScreenshot());
+        assertTrue(appWindow.shouldAnimate(TRANSIT_ACTIVITY_CLOSE));
     }
 
     private static void verifyNoMoreInteractionsExceptAsBinder(IInterface binder) {

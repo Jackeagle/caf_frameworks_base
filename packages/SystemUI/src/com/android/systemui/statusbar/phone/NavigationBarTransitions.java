@@ -16,6 +16,8 @@
 
 package com.android.systemui.statusbar.phone;
 
+import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_3BUTTON;
+
 import static com.android.systemui.statusbar.phone.NavBarTintController.DEFAULT_COLOR_ADAPT_TRANSITION_TIME;
 import static com.android.systemui.statusbar.phone.NavBarTintController.MIN_COLOR_ADAPT_TRANSITION_TIME;
 
@@ -34,8 +36,22 @@ import com.android.internal.statusbar.IStatusBarService;
 import com.android.systemui.Dependency;
 import com.android.systemui.R;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public final class NavigationBarTransitions extends BarTransitions implements
         LightBarTransitionsController.DarkIntensityApplier {
+
+    /**
+     * Notified when the color of nav bar elements changes.
+     */
+    public interface DarkIntensityListener {
+        /**
+         * Called when the color of nav bar elements changes.
+         * @param darkIntensity 0 is the lightest color, 1 is the darkest.
+         */
+        void onDarkIntensity(float darkIntensity);
+    }
 
     private final NavigationBarView mView;
     private final IStatusBarService mBarService;
@@ -46,6 +62,8 @@ public final class NavigationBarTransitions extends BarTransitions implements
     private boolean mLightsOut;
     private boolean mAutoDim;
     private View mNavButtons;
+    private int mNavBarMode = NAV_BAR_MODE_3BUTTON;
+    private List<DarkIntensityListener> mDarkIntensityListeners;
 
     private final Handler mHandler = Handler.getMain();
     private final IWallpaperVisibilityListener mWallpaperVisibilityListener =
@@ -66,6 +84,7 @@ public final class NavigationBarTransitions extends BarTransitions implements
         mLightTransitionsController = new LightBarTransitionsController(view.getContext(), this);
         mAllowAutoDimWallpaperNotVisible = view.getContext().getResources()
                 .getBoolean(R.bool.config_navigation_bar_enable_auto_dim_no_visible_wallpaper);
+        mDarkIntensityListeners = new ArrayList();
 
         IWindowManager windowManagerService = Dependency.get(IWindowManager.class);
         try {
@@ -104,6 +123,8 @@ public final class NavigationBarTransitions extends BarTransitions implements
 
     @Override
     public void setAutoDim(boolean autoDim) {
+        // Ensure we aren't in gestural nav if we are triggering auto dim
+        if (autoDim && NavBarTintController.isEnabled(mView.getContext(), mNavBarMode)) return;
         if (mAutoDim == autoDim) return;
         mAutoDim = autoDim;
         applyLightsOut(true, false);
@@ -163,22 +184,44 @@ public final class NavigationBarTransitions extends BarTransitions implements
         applyDarkIntensity(mLightTransitionsController.getCurrentDarkIntensity());
     }
 
+    @Override
     public void applyDarkIntensity(float darkIntensity) {
         SparseArray<ButtonDispatcher> buttonDispatchers = mView.getButtonDispatchers();
         for (int i = buttonDispatchers.size() - 1; i >= 0; i--) {
             buttonDispatchers.valueAt(i).setDarkIntensity(darkIntensity);
         }
+        mView.getRotationButtonController().setDarkIntensity(darkIntensity);
+        for (DarkIntensityListener listener : mDarkIntensityListeners) {
+            listener.onDarkIntensity(darkIntensity);
+        }
         if (mAutoDim) {
             applyLightsOut(false, true);
         }
-        mView.onDarkIntensityChange(darkIntensity);
     }
 
     @Override
     public int getTintAnimationDuration() {
-        if (NavBarTintController.isEnabled(mView.getContext())) {
+        if (NavBarTintController.isEnabled(mView.getContext(), mNavBarMode)) {
             return Math.max(DEFAULT_COLOR_ADAPT_TRANSITION_TIME, MIN_COLOR_ADAPT_TRANSITION_TIME);
         }
         return LightBarTransitionsController.DEFAULT_TINT_ANIMATION_DURATION;
+    }
+
+    public void onNavigationModeChanged(int mode) {
+        mNavBarMode = mode;
+    }
+
+    /**
+     * Register {@code listener} to be notified when the color of nav bar elements changes.
+     */
+    public void addDarkIntensityListener(DarkIntensityListener listener) {
+        mDarkIntensityListeners.add(listener);
+    }
+
+    /**
+     * Remove {@code listener} from being notified when the color of nav bar elements changes.
+     */
+    public void removeDarkIntensityListener(DarkIntensityListener listener) {
+        mDarkIntensityListeners.remove(listener);
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@ import static android.net.SocketKeepalive.ERROR_INVALID_PORT;
 
 import android.net.SocketKeepalive.InvalidPacketException;
 import android.net.util.IpUtils;
+import android.os.Parcel;
+import android.os.Parcelable;
 import android.system.OsConstants;
 
 import java.net.Inet4Address;
@@ -29,8 +31,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 /** @hide */
-public final class NattKeepalivePacketData extends KeepalivePacketData {
-
+public final class NattKeepalivePacketData extends KeepalivePacketData implements Parcelable {
     // This should only be constructed via static factory methods, such as
     // nattKeepalivePacket
     private NattKeepalivePacketData(InetAddress srcAddress, int srcPort,
@@ -77,4 +78,41 @@ public final class NattKeepalivePacketData extends KeepalivePacketData {
 
         return new NattKeepalivePacketData(srcAddress, srcPort, dstAddress, dstPort, buf.array());
     }
+
+    /** Parcelable Implementation */
+    public int describeContents() {
+        return 0;
+    }
+
+    /** Write to parcel */
+    public void writeToParcel(Parcel out, int flags) {
+        out.writeString(srcAddress.getHostAddress());
+        out.writeString(dstAddress.getHostAddress());
+        out.writeInt(srcPort);
+        out.writeInt(dstPort);
+    }
+
+    /** Parcelable Creator */
+    public static final Parcelable.Creator<NattKeepalivePacketData> CREATOR =
+            new Parcelable.Creator<NattKeepalivePacketData>() {
+                public NattKeepalivePacketData createFromParcel(Parcel in) {
+                    final InetAddress srcAddress =
+                            InetAddresses.parseNumericAddress(in.readString());
+                    final InetAddress dstAddress =
+                            InetAddresses.parseNumericAddress(in.readString());
+                    final int srcPort = in.readInt();
+                    final int dstPort = in.readInt();
+                    try {
+                        return NattKeepalivePacketData.nattKeepalivePacket(srcAddress, srcPort,
+                                    dstAddress, dstPort);
+                    } catch (InvalidPacketException e) {
+                        throw new IllegalArgumentException(
+                                "Invalid NAT-T keepalive data: " + e.error);
+                    }
+                }
+
+                public NattKeepalivePacketData[] newArray(int size) {
+                    return new NattKeepalivePacketData[size];
+                }
+            };
 }

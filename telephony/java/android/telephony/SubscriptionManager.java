@@ -302,9 +302,25 @@ public class SubscriptionManager {
      * subscription.
      *
      * Default value is 0.
+     *
+     * @deprecated Replaced by {@link #DATA_ENABLED_OVERRIDE_RULES}
+     * @hide
      */
-    /** @hide */
+    @Deprecated
     public static final String WHITE_LISTED_APN_DATA = "white_listed_apn_data";
+
+    /**
+     * TelephonyProvider column name data_enabled_override_rules.
+     * It's a list of rules for overriding data enabled settings. The syntax is
+     * For example, "mms=nonDefault" indicates enabling data for mms in non-default subscription.
+     * "default=nonDefault&inVoiceCall" indicates enabling data for internet in non-default
+     * subscription and while is in voice call.
+     *
+     * Default value is empty string.
+     *
+     * @hide
+     */
+    public static final String DATA_ENABLED_OVERRIDE_RULES = "data_enabled_override_rules";
 
     /**
      * This constant is to designate a subscription as a Local-SIM Subscription.
@@ -394,6 +410,12 @@ public class SubscriptionManager {
      */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public static final int NAME_SOURCE_USER_INPUT = 2;
+
+    /**
+     * The name_source is carrier (carrier app, carrier config, etc.)
+     * @hide
+     */
+    public static final int NAME_SOURCE_CARRIER = 3;
 
     /**
      * TelephonyProvider column name for the color of a SIM.
@@ -686,6 +708,15 @@ public class SubscriptionManager {
      * @hide
      */
     public static final String GROUP_UUID = "group_uuid";
+
+    /**
+     * TelephonyProvider column name for group owner. It's the package name who created
+     * the subscription group.
+     *
+     * @hide
+     */
+    public static final String GROUP_OWNER = "group_owner";
+
     /**
      * TelephonyProvider column name for whether a subscription is metered or not, that is, whether
      * the network it connects to charges for subscription or not. For example, paid CBRS or unpaid.
@@ -2064,7 +2095,6 @@ public class SubscriptionManager {
         } else {
             logd("putPhoneIdAndSubIdExtra: no valid subs");
             intent.putExtra(PhoneConstants.PHONE_KEY, phoneId);
-            intent.putExtra(PhoneConstants.SLOT_KEY, phoneId);
         }
     }
 
@@ -2075,9 +2105,6 @@ public class SubscriptionManager {
         intent.putExtra(PhoneConstants.SUBSCRIPTION_KEY, subId);
         intent.putExtra(EXTRA_SUBSCRIPTION_INDEX, subId);
         intent.putExtra(PhoneConstants.PHONE_KEY, phoneId);
-        //FIXME this is using phoneId and slotIndex interchangeably
-        //Eventually, this should be removed as it is not the slot id
-        intent.putExtra(PhoneConstants.SLOT_KEY, phoneId);
     }
 
     /**

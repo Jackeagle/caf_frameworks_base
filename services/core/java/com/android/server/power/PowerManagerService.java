@@ -52,6 +52,7 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.PowerManager;
 import android.os.PowerManager.ServiceType;
+import android.os.PowerManager.WakeData;
 import android.os.PowerManager.WakeReason;
 import android.os.PowerManagerInternal;
 import android.os.PowerSaveState;
@@ -2084,7 +2085,8 @@ public final class PowerManagerService extends SystemService
                     nextTimeout = -1;
                 }
 
-                if ((mUserActivitySummary & USER_ACTIVITY_SCREEN_BRIGHT) != 0) {
+                if ((mUserActivitySummary & USER_ACTIVITY_SCREEN_BRIGHT) != 0
+                        && (mWakeLockSummary & WAKE_LOCK_STAY_AWAKE) == 0) {
                     nextTimeout = mAttentionDetector.updateUserActivity(nextTimeout);
                 }
 
@@ -4850,6 +4852,12 @@ public final class PowerManagerService extends SystemService
         }
     }
 
+    private PowerManager.WakeData getLastWakeupInternal() {
+        synchronized (mLock) {
+            return new WakeData(mLastWakeTime, mLastWakeReason);
+        }
+    }
+
     private final class LocalService extends PowerManagerInternal {
         @Override
         public void setScreenBrightnessOverrideFromWindowManager(int screenBrightness) {
@@ -4970,6 +4978,11 @@ public final class PowerManagerService extends SystemService
         @Override
         public boolean wasDeviceIdleFor(long ms) {
             return wasDeviceIdleForInternal(ms);
+        }
+
+        @Override
+        public WakeData getLastWakeup() {
+            return getLastWakeupInternal();
         }
     }
 }

@@ -21,8 +21,6 @@ import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_SPLIT_SCREEN_PRIMARY;
 import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 import static android.content.pm.ActivityInfo.COLOR_MODE_DEFAULT;
-import static android.content.pm.ActivityInfo.CONFIG_ORIENTATION;
-import static android.content.pm.ActivityInfo.CONFIG_SCREEN_SIZE;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_BEHIND;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSET;
 import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
@@ -80,7 +78,9 @@ import static com.android.server.wm.WindowManagerService.H.NOTIFY_ACTIVITY_DRAWN
 import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_NORMAL;
 import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_WILL_PLACE_SURFACES;
 import static com.android.server.wm.WindowManagerService.logWithStack;
+import static com.android.server.wm.WindowState.LEGACY_POLICY_VISIBILITY;
 import static com.android.server.wm.WindowStateAnimator.STACK_CLIP_AFTER_ANIM;
+import static com.android.server.wm.WindowStateAnimator.STACK_CLIP_BEFORE_ANIM;
 
 import android.annotation.CallSuper;
 import android.annotation.Size;
@@ -144,7 +144,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
     /**
      * Value to increment the z-layer when boosting a layer during animations. BOOST in l33tsp34k.
      */
-    private static final int Z_BOOST_BASE = 800570000;
+    @VisibleForTesting static final int Z_BOOST_BASE = 800570000;
 
     // Non-null only for application tokens.
     final IApplicationToken appToken;
@@ -204,7 +204,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
     boolean removed;
 
     // Information about an application starting window if displayed.
-    StartingData startingData;
+    StartingData mStartingData;
     WindowState startingWindow;
     StartingSurface startingSurface;
     boolean startingDisplayed;
@@ -293,7 +293,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
     private boolean mFreezingScreen;
 
     /** Whether this token should be boosted at the top of all app window tokens. */
-    private boolean mNeedsZBoost;
+    @VisibleForTesting boolean mNeedsZBoost;
     private Letterbox mLetterbox;
 
     private final Point mTmpPoint = new Point();
@@ -386,8 +386,8 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
             // it from behind the starting window, so there is no need for it to also be doing its
             // own stuff.
             win.cancelAnimation();
-            removeStartingWindow();
         }
+        removeStartingWindow();
         updateReportedVisibilityLocked();
     }
 
@@ -509,6 +509,10 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         final DisplayContent displayContent = getDisplayContent();
         displayContent.mOpeningApps.remove(this);
         displayContent.mClosingApps.remove(this);
+        if (isInChangeTransition()) {
+            clearChangeLeash(getPendingTransaction(), true /* cancel */);
+        }
+        displayContent.mChangingApps.remove(this);
         waitingToShow = false;
         hiddenRequested = !visible;
         mDeferHidingClient = deferHidingClient;
@@ -639,8 +643,8 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
                 // If we are being set visible, and the starting window is not yet displayed,
                 // then make sure it doesn't get displayed.
                 if (startingWindow != null && !startingWindow.isDrawnLw()) {
-                    startingWindow.mPolicyVisibility = false;
-                    startingWindow.mPolicyVisibilityAfterAnim = false;
+                    startingWindow.clearPolicyVisibilityFlag(LEGACY_POLICY_VISIBILITY);
+                    startingWindow.mLegacyPolicyVisibilityAfterAnim = false;
                 }
 
                 // We are becoming visible, so better freeze the screen with the windows that are
@@ -875,7 +879,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         if (DEBUG_ADD_REMOVE || DEBUG_TOKEN_MOVEMENT) Slog.v(TAG_WM, "removeAppToken: "
                 + this + " delayed=" + delayed + " Callers=" + Debug.getCallers(4));
 
-        if (startingData != null) {
+        if (mStartingData != null) {
             removeStartingWindow();
         }
 
@@ -1054,7 +1058,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
             // If this is the last window and we had requested a starting transition window,
             // well there is no point now.
             if (DEBUG_STARTING_WINDOW) Slog.v(TAG_WM, "Nulling last startingData");
-            startingData = null;
+            mStartingData = null;
             if (mHiddenSetFromTransferredStartingWindow) {
                 // We set the hidden state to false for the token from a transferred starting window.
                 // We now reset it back to true since the starting window was the last window in the
@@ -1310,7 +1314,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
     void onDisplayChanged(DisplayContent dc) {
         DisplayContent prevDc = mDisplayContent;
         super.onDisplayChanged(dc);
-        if (prevDc == null) {
+        if (prevDc == null || prevDc == mDisplayContent) {
             return;
         }
         if (prevDc.mChangingApps.contains(this)) {
@@ -1333,7 +1337,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
             }
         }
 
-        if (prevDc != mDisplayContent && mLetterbox != null) {
+        if (mLetterbox != null) {
             mLetterbox.onMovedToDisplay(mDisplayContent.getDisplayId());
         }
     }
@@ -1487,13 +1491,13 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
             final long origId = Binder.clearCallingIdentity();
             try {
                 // Transfer the starting window over to the new token.
-                startingData = fromToken.startingData;
+                mStartingData = fromToken.mStartingData;
                 startingSurface = fromToken.startingSurface;
                 startingDisplayed = fromToken.startingDisplayed;
                 fromToken.startingDisplayed = false;
                 startingWindow = tStartingWindow;
                 reportedVisible = fromToken.reportedVisible;
-                fromToken.startingData = null;
+                fromToken.mStartingData = null;
                 fromToken.startingSurface = null;
                 fromToken.startingWindow = null;
                 fromToken.startingMoved = true;
@@ -1539,13 +1543,13 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
                 Binder.restoreCallingIdentity(origId);
             }
             return true;
-        } else if (fromToken.startingData != null) {
+        } else if (fromToken.mStartingData != null) {
             // The previous app was getting ready to show a
             // starting window, but hasn't yet done so.  Steal it!
             if (DEBUG_STARTING_WINDOW) Slog.v(TAG_WM,
                     "Moving pending starting from " + fromToken + " to " + this);
-            startingData = fromToken.startingData;
-            fromToken.startingData = null;
+            mStartingData = fromToken.mStartingData;
+            fromToken.mStartingData = null;
             fromToken.startingMoved = true;
             scheduleAddStartingWindow();
             return true;
@@ -1729,17 +1733,13 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
             return;
         }
 
-        if (mThumbnail == null && getTask() != null) {
-            final TaskSnapshotController snapshotCtrl = mWmService.mTaskSnapshotController;
-            final ArraySet<Task> tasks = new ArraySet<>();
-            tasks.add(getTask());
-            snapshotCtrl.snapshotTasks(tasks);
-            snapshotCtrl.addSkipClosingAppSnapshotTasks(tasks);
-            final ActivityManager.TaskSnapshot snapshot = snapshotCtrl.getSnapshot(
-                    getTask().mTaskId, getTask().mUserId, false /* restoreFromDisk */,
-                    false /* reducedResolution */);
+        Task task = getTask();
+        if (mThumbnail == null && task != null && !hasCommittedReparentToAnimationLeash()) {
+            SurfaceControl.ScreenshotGraphicBuffer snapshot =
+                    mWmService.mTaskSnapshotController.createTaskSnapshot(
+                            task, 1 /* scaleFraction */);
             if (snapshot != null) {
-                mThumbnail = new AppWindowThumbnail(t, this, snapshot.getSnapshot(),
+                mThumbnail = new AppWindowThumbnail(t, this, snapshot.getGraphicBuffer(),
                         true /* relative */);
             }
         }
@@ -1760,8 +1760,8 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
      */
     private void calculateCompatBoundsTransformation(Configuration newParentConfig) {
         final Rect parentAppBounds = newParentConfig.windowConfiguration.getAppBounds();
-        final Rect viewportBounds = parentAppBounds != null
-                ? parentAppBounds : newParentConfig.windowConfiguration.getBounds();
+        final Rect parentBounds = newParentConfig.windowConfiguration.getBounds();
+        final Rect viewportBounds = parentAppBounds != null ? parentAppBounds : parentBounds;
         final Rect appBounds = getWindowConfiguration().getAppBounds();
         final Rect contentBounds = appBounds != null ? appBounds : getResolvedOverrideBounds();
         final float contentW = contentBounds.width();
@@ -1780,6 +1780,8 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         mSizeCompatBounds.set(contentBounds);
         mSizeCompatBounds.offsetTo(0, 0);
         mSizeCompatBounds.scale(mSizeCompatScale);
+        // Ensure to align the top with the parent.
+        mSizeCompatBounds.top = parentBounds.top;
         // The decor inset is included in height.
         mSizeCompatBounds.bottom += viewportBounds.top;
         mSizeCompatBounds.left += offsetX;
@@ -1931,7 +1933,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
                         + ", isAnimationSet=" + isSelfAnimating());
                 if (!w.isDrawnLw()) {
                     Slog.v(TAG, "Not displayed: s=" + winAnimator.mSurfaceController
-                            + " pv=" + w.mPolicyVisibility
+                            + " pv=" + w.isVisibleByPolicy()
                             + " mDrawState=" + winAnimator.drawStateToString()
                             + " ph=" + w.isParentWindowHidden() + " th=" + hiddenRequested
                             + " a=" + isSelfAnimating());
@@ -1981,13 +1983,11 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
                 mLetterbox.attachInput(w);
             }
             getPosition(mTmpPoint);
-            // Get the bounds of the "space-to-fill". We union the Task and the Stack bounds here
-            // to handle both split window (where task-bounds can be larger) and orientation
-            // letterbox (where the task is letterboxed within stack).
-            Rect spaceToFill = getTask().getBounds();
-            if (getStack() != null) {
-                spaceToFill.union(getStack().getBounds());
-            }
+            // Get the bounds of the "space-to-fill". In multi-window mode, the task-level
+            // represents this. In fullscreen-mode, the stack does (since the orientation letterbox
+            // is also applied to the task).
+            Rect spaceToFill = (inMultiWindowMode() || getStack() == null)
+                    ? getTask().getDisplayedBounds() : getStack().getDisplayedBounds();
             mLetterbox.layout(spaceToFill, w.getFrameLw(), mTmpPoint);
         } else if (mLetterbox != null) {
             mLetterbox.hide();
@@ -2001,7 +2001,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         }
         layoutLetterbox(winHint);
         if (mLetterbox != null && mLetterbox.needsApplySurfaceChanges()) {
-            mLetterbox.applySurfaceChanges(mPendingTransaction);
+            mLetterbox.applySurfaceChanges(getPendingTransaction());
         }
     }
 
@@ -2043,7 +2043,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
             return false;
         }
 
-        if (startingData != null) {
+        if (mStartingData != null) {
             return false;
         }
 
@@ -2124,7 +2124,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         }
 
         if (DEBUG_STARTING_WINDOW) Slog.v(TAG_WM, "Creating SplashScreenStartingData");
-        startingData = new SplashScreenStartingData(mWmService, pkg,
+        mStartingData = new SplashScreenStartingData(mWmService, pkg,
                 theme, compatInfo, nonLocalizedLabel, labelRes, icon, logo, windowFlags,
                 getMergedOverrideConfiguration());
         scheduleAddStartingWindow();
@@ -2138,7 +2138,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         }
 
         if (DEBUG_STARTING_WINDOW) Slog.v(TAG_WM, "Creating SnapshotStartingData");
-        startingData = new SnapshotStartingData(mWmService, snapshot);
+        mStartingData = new SnapshotStartingData(mWmService, snapshot);
         scheduleAddStartingWindow();
         return true;
     }
@@ -2157,18 +2157,21 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
 
         @Override
         public void run() {
+            // Can be accessed without holding the global lock
+            final StartingData startingData;
             synchronized (mWmService.mGlobalLock) {
                 // There can only be one adding request, silly caller!
                 mWmService.mAnimationHandler.removeCallbacks(this);
-            }
 
-            if (startingData == null) {
-                // Animation has been canceled... do nothing.
-                if (DEBUG_STARTING_WINDOW) {
-                    Slog.v(TAG, "startingData was nulled out before handling"
-                            + " mAddStartingWindow: " + AppWindowToken.this);
+                if (mStartingData == null) {
+                    // Animation has been canceled... do nothing.
+                    if (DEBUG_STARTING_WINDOW) {
+                        Slog.v(TAG, "startingData was nulled out before handling"
+                                + " mAddStartingWindow: " + AppWindowToken.this);
+                    }
+                    return;
                 }
-                return;
+                startingData = mStartingData;
             }
 
             if (DEBUG_STARTING_WINDOW) {
@@ -2186,20 +2189,21 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
                 synchronized (mWmService.mGlobalLock) {
                     // If the window was successfully added, then
                     // we need to remove it.
-                    if (removed || startingData == null) {
+                    if (removed || mStartingData == null) {
                         if (DEBUG_STARTING_WINDOW) {
                             Slog.v(TAG, "Aborted starting " + AppWindowToken.this
-                                    + ": removed=" + removed + " startingData=" + startingData);
+                                    + ": removed=" + removed + " startingData=" + mStartingData);
                         }
                         startingWindow = null;
-                        startingData = null;
+                        mStartingData = null;
                         abort = true;
                     } else {
                         startingSurface = surface;
                     }
                     if (DEBUG_STARTING_WINDOW && !abort) {
-                        Slog.v(TAG, "Added starting " + AppWindowToken.this + ": startingWindow="
-                                + startingWindow + " startingView=" + startingSurface);
+                        Slog.v(TAG,
+                                "Added starting " + AppWindowToken.this + ": startingWindow="
+                                        + startingWindow + " startingView=" + startingSurface);
                     }
                 }
                 if (abort) {
@@ -2246,21 +2250,21 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
 
     void removeStartingWindow() {
         if (startingWindow == null) {
-            if (startingData != null) {
+            if (mStartingData != null) {
                 // Starting window has not been added yet, but it is scheduled to be added.
                 // Go ahead and cancel the request.
                 if (DEBUG_STARTING_WINDOW) {
                     Slog.v(TAG_WM, "Clearing startingData for token=" + this);
                 }
-                startingData = null;
+                mStartingData = null;
             }
             return;
         }
 
         final WindowManagerPolicy.StartingSurface surface;
-        if (startingData != null) {
+        if (mStartingData != null) {
             surface = startingSurface;
-            startingData = null;
+            mStartingData = null;
             startingSurface = null;
             startingWindow = null;
             startingDisplayed = false;
@@ -2433,14 +2437,19 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         }
     }
 
-    private boolean shouldAnimate(int transit) {
+
+    @VisibleForTesting
+    boolean shouldAnimate(int transit) {
         final boolean isSplitScreenPrimary =
                 getWindowingMode() == WINDOWING_MODE_SPLIT_SCREEN_PRIMARY;
         final boolean allowSplitScreenPrimaryAnimation = transit != TRANSIT_WALLPAPER_OPEN;
 
-        // Don't animate when the task runs recents animation.
+        // Don't animate while the task runs recents animation but only if we are in the mode
+        // where we cancel with deferred screenshot, which means that the controller has
+        // transformed the task.
         final RecentsAnimationController controller = mWmService.getRecentsAnimationController();
-        if (controller != null && controller.isAnimatingTask(getTask())) {
+        if (controller != null && controller.isAnimatingTask(getTask())
+                && controller.shouldCancelWithDeferredScreenshot()) {
             return false;
         }
 
@@ -2475,6 +2484,17 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         return getBounds();
     }
 
+    @VisibleForTesting
+    Rect getAnimationBounds(int appStackClipMode) {
+        if (appStackClipMode == STACK_CLIP_BEFORE_ANIM && getStack() != null) {
+            // Using the stack bounds here effectively applies the clipping before animation.
+            return getStack().getBounds();
+        }
+        // Use task-bounds if available so that activity-level letterbox (maxAspectRatio) is
+        // included in the animation.
+        return getTask() != null ? getTask().getBounds() : getBounds();
+    }
+
     boolean applyAnimationLocked(WindowManager.LayoutParams lp, int transit, boolean enter,
             boolean isVoiceInteraction) {
 
@@ -2495,9 +2515,11 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
             final AnimationAdapter adapter;
             AnimationAdapter thumbnailAdapter = null;
 
-            // Separate position and size for use in animators. Use task-bounds for now so
-            // that activity-level letterbox (maxAspectRatio) is included in the animation.
-            mTmpRect.set(getTask() != null ? getTask().getBounds() : getBounds());
+            final int appStackClipMode =
+                    getDisplayContent().mAppTransition.getAppStackClipMode();
+
+            // Separate position and size for use in animators.
+            mTmpRect.set(getAnimationBounds(appStackClipMode));
             mTmpPoint.set(mTmpRect.left, mTmpRect.top);
             mTmpRect.offsetTo(0, 0);
 
@@ -2531,18 +2553,21 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
                 mTransit = transit;
                 mTransitFlags = getDisplayContent().mAppTransition.getTransitFlags();
             } else {
-                final int appStackClipMode =
-                        getDisplayContent().mAppTransition.getAppStackClipMode();
                 mNeedsAnimationBoundsLayer = (appStackClipMode == STACK_CLIP_AFTER_ANIM);
 
                 final Animation a = loadAnimation(lp, transit, enter, isVoiceInteraction);
                 if (a != null) {
+                    // Only apply corner radius to animation if we're not in multi window mode.
+                    // We don't want rounded corners when in pip or split screen.
+                    final float windowCornerRadius = !inMultiWindowMode()
+                            ? getDisplayContent().getWindowCornerRadius()
+                            : 0;
                     adapter = new LocalAnimationAdapter(
                             new WindowAnimationSpec(a, mTmpPoint, mTmpRect,
                                     getDisplayContent().mAppTransition.canSkipFirstFrame(),
                                     appStackClipMode,
                                     true /* isAppAnimation */,
-                                    mWmService.mWindowCornerRadius),
+                                    windowCornerRadius),
                             mWmService.mSurfaceAnimationRunner);
                     if (a.getZAdjustment() == Animation.ZORDER_TOP) {
                         mNeedsZBoost = true;
@@ -2643,8 +2668,8 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
     }
 
     @Override
-    public void onAnimationLeashDestroyed(Transaction t) {
-        super.onAnimationLeashDestroyed(t);
+    public void onAnimationLeashLost(Transaction t) {
+        super.onAnimationLeashLost(t);
         if (mAnimationBoundsLayer != null) {
             t.remove(mAnimationBoundsLayer);
             mAnimationBoundsLayer = null;
@@ -2693,7 +2718,9 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         if (mNeedsZBoost) {
             layer += Z_BOOST_BASE;
         }
-        leash.setLayer(layer);
+        if (!mNeedsAnimationBoundsLayer) {
+            leash.setLayer(layer);
+        }
 
         final DisplayContent dc = getDisplayContent();
         dc.assignStackOrdering();
@@ -2730,6 +2757,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
 
             // Crop to stack bounds.
             t.setWindowCrop(mAnimationBoundsLayer, mTmpRect);
+            t.setLayer(mAnimationBoundsLayer, layer);
 
             // Reparent leash to animation bounds layer.
             t.reparent(leash, mAnimationBoundsLayer);
@@ -2750,6 +2778,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
     protected void onAnimationFinished() {
         super.onAnimationFinished();
 
+        Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "AWT#onAnimationFinished");
         mTransit = TRANSIT_UNSET;
         mTransitFlags = 0;
         mNeedsZBoost = false;
@@ -2784,6 +2813,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         scheduleAnimation();
 
         mActivityRecord.onAnimationFinished();
+        Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
     }
 
     @Override
@@ -2824,10 +2854,10 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
             }
         }
         t.hide(mTransitChangeLeash);
-        t.reparent(mTransitChangeLeash, null);
+        t.remove(mTransitChangeLeash);
         mTransitChangeLeash = null;
         if (cancel) {
-            onAnimationLeashDestroyed(t);
+            onAnimationLeashLost(t);
         }
     }
 
@@ -2976,8 +3006,8 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
             pw.print(prefix); pw.print("inPendingTransaction=");
                     pw.println(inPendingTransaction);
         }
-        if (startingData != null || removed || firstWindowDrawn || mIsExiting) {
-            pw.print(prefix); pw.print("startingData="); pw.print(startingData);
+        if (mStartingData != null || removed || firstWindowDrawn || mIsExiting) {
+            pw.print(prefix); pw.print("startingData="); pw.print(mStartingData);
                     pw.print(" removed="); pw.print(removed);
                     pw.print(" firstWindowDrawn="); pw.print(firstWindowDrawn);
                     pw.print(" mIsExiting="); pw.println(mIsExiting);
@@ -3027,13 +3057,13 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
 
         if (mSurfaceControl != null) {
             if (show && !mLastSurfaceShowing) {
-                mPendingTransaction.show(mSurfaceControl);
+                getPendingTransaction().show(mSurfaceControl);
             } else if (!show && mLastSurfaceShowing) {
-                mPendingTransaction.hide(mSurfaceControl);
+                getPendingTransaction().hide(mSurfaceControl);
             }
         }
         if (mThumbnail != null) {
-            mThumbnail.setShowing(mPendingTransaction, show);
+            mThumbnail.setShowing(getPendingTransaction(), show);
         }
         mLastSurfaceShowing = show;
         super.prepareSurfaces();
@@ -3193,8 +3223,8 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
 
     private void updateColorTransform() {
         if (mSurfaceControl != null && mLastAppSaturationInfo != null) {
-            mPendingTransaction.setColorTransform(mSurfaceControl, mLastAppSaturationInfo.mMatrix,
-                    mLastAppSaturationInfo.mTranslation);
+            getPendingTransaction().setColorTransform(mSurfaceControl,
+                    mLastAppSaturationInfo.mMatrix, mLastAppSaturationInfo.mTranslation);
             mWmService.scheduleAnimationLocked();
         }
     }

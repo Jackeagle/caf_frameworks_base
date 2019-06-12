@@ -24,13 +24,16 @@ import android.hardware.biometrics.BiometricPrompt;
 import android.hardware.biometrics.IBiometricServiceReceiverInternal;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.os.RemoteException;
 import android.util.Log;
 import android.view.WindowManager;
 
 import com.android.internal.os.SomeArgs;
+import com.android.systemui.Dependency;
 import com.android.systemui.SystemUI;
+import com.android.systemui.keyguard.WakefulnessLifecycle;
 import com.android.systemui.statusbar.CommandQueue;
 
 /**
@@ -57,8 +60,9 @@ public class BiometricDialogImpl extends SystemUI implements CommandQueue.Callba
     private IBiometricServiceReceiverInternal mReceiver;
     private boolean mDialogShowing;
     private Callback mCallback = new Callback();
+    private WakefulnessLifecycle mWakefulnessLifecycle;
 
-    private Handler mHandler = new Handler() {
+    private Handler mHandler = new Handler(Looper.getMainLooper()) {
         @Override
         public void handleMessage(Message msg) {
             switch(msg.what) {
@@ -66,15 +70,19 @@ public class BiometricDialogImpl extends SystemUI implements CommandQueue.Callba
                     handleShowDialog((SomeArgs) msg.obj, false /* skipAnimation */,
                             null /* savedState */);
                     break;
-                case MSG_BIOMETRIC_AUTHENTICATED:
-                    handleBiometricAuthenticated((boolean) msg.obj);
-                    break;
-                case MSG_BIOMETRIC_HELP:
+                case MSG_BIOMETRIC_AUTHENTICATED: {
                     SomeArgs args = (SomeArgs) msg.obj;
-                    handleBiometricHelp((String) args.arg1 /* message */,
-                            (boolean) args.arg2 /* requireTryAgain */);
+                    handleBiometricAuthenticated((boolean) args.arg1 /* authenticated */,
+                            (String) args.arg2 /* failureReason */);
                     args.recycle();
                     break;
+                }
+                case MSG_BIOMETRIC_HELP: {
+                    SomeArgs args = (SomeArgs) msg.obj;
+                    handleBiometricHelp((String) args.arg1 /* message */);
+                    args.recycle();
+                    break;
+                }
                 case MSG_BIOMETRIC_ERROR:
                     handleBiometricError((String) msg.obj);
                     break;
@@ -128,6 +136,16 @@ public class BiometricDialogImpl extends SystemUI implements CommandQueue.Callba
         }
     }
 
+    final WakefulnessLifecycle.Observer mWakefulnessObserver = new WakefulnessLifecycle.Observer() {
+        @Override
+        public void onStartedGoingToSleep() {
+            if (mDialogShowing) {
+                if (DEBUG) Log.d(TAG, "User canceled due to screen off");
+                mHandler.obtainMessage(MSG_USER_CANCELED).sendToTarget();
+            }
+        }
+    };
+
     @Override
     public void start() {
         final PackageManager pm = mContext.getPackageManager();
@@ -136,6 +154,8 @@ public class BiometricDialogImpl extends SystemUI implements CommandQueue.Callba
                 || pm.hasSystemFeature(PackageManager.FEATURE_IRIS)) {
             getComponent(CommandQueue.class).addCallback(this);
             mWindowManager = (WindowManager) mContext.getSystemService(Context.WINDOW_SERVICE);
+            mWakefulnessLifecycle = Dependency.get(WakefulnessLifecycle.class);
+            mWakefulnessLifecycle.addObserver(mWakefulnessObserver);
         }
     }
 
@@ -161,9 +181,14 @@ public class BiometricDialogImpl extends SystemUI implements CommandQueue.Callba
     }
 
     @Override
-    public void onBiometricAuthenticated(boolean authenticated) {
-        if (DEBUG) Log.d(TAG, "onBiometricAuthenticated: " + authenticated);
-        mHandler.obtainMessage(MSG_BIOMETRIC_AUTHENTICATED, authenticated).sendToTarget();
+    public void onBiometricAuthenticated(boolean authenticated, String failureReason) {
+        if (DEBUG) Log.d(TAG, "onBiometricAuthenticated: " + authenticated
+                + " reason: " + failureReason);
+
+        SomeArgs args = SomeArgs.obtain();
+        args.arg1 = authenticated;
+        args.arg2 = failureReason;
+        mHandler.obtainMessage(MSG_BIOMETRIC_AUTHENTICATED, args).sendToTarget();
     }
 
     @Override
@@ -171,7 +196,6 @@ public class BiometricDialogImpl extends SystemUI implements CommandQueue.Callba
         if (DEBUG) Log.d(TAG, "onBiometricHelp: " + message);
         SomeArgs args = SomeArgs.obtain();
         args.arg1 = message;
-        args.arg2 = false; // requireTryAgain
         mHandler.obtainMessage(MSG_BIOMETRIC_HELP, args).sendToTarget();
     }
 
@@ -230,7 +254,7 @@ public class BiometricDialogImpl extends SystemUI implements CommandQueue.Callba
         mDialogShowing = true;
     }
 
-    private void handleBiometricAuthenticated(boolean authenticated) {
+    private void handleBiometricAuthenticated(boolean authenticated, String failureReason) {
         if (DEBUG) Log.d(TAG, "handleBiometricAuthenticated: " + authenticated);
 
         if (authenticated) {
@@ -238,7 +262,7 @@ public class BiometricDialogImpl extends SystemUI implements CommandQueue.Callba
                     mContext.getResources()
                             .getText(mCurrentDialog.getAuthenticatedAccessibilityResourceId()));
             if (mCurrentDialog.requiresConfirmation()) {
-                mCurrentDialog.showConfirmationButton(true /* show */);
+                mCurrentDialog.updateState(BiometricDialogView.STATE_PENDING_CONFIRMATION);
             } else {
                 mCurrentDialog.updateState(BiometricDialogView.STATE_AUTHENTICATED);
                 mHandler.postDelayed(() -> {
@@ -246,16 +270,13 @@ public class BiometricDialogImpl extends SystemUI implements CommandQueue.Callba
                 }, mCurrentDialog.getDelayAfterAuthenticatedDurationMs());
             }
         } else {
-            handleBiometricHelp(mContext.getResources()
-                    .getString(com.android.internal.R.string.biometric_not_recognized),
-                    true /* requireTryAgain */);
-            mCurrentDialog.showTryAgainButton(true /* show */);
+            mCurrentDialog.onAuthenticationFailed(failureReason);
         }
     }
 
-    private void handleBiometricHelp(String message, boolean requireTryAgain) {
+    private void handleBiometricHelp(String message) {
         if (DEBUG) Log.d(TAG, "handleBiometricHelp: " + message);
-        mCurrentDialog.showHelpMessage(message, requireTryAgain);
+        mCurrentDialog.onHelpReceived(message);
     }
 
     private void handleBiometricError(String error) {
@@ -264,7 +285,7 @@ public class BiometricDialogImpl extends SystemUI implements CommandQueue.Callba
             if (DEBUG) Log.d(TAG, "Dialog already dismissed");
             return;
         }
-        mCurrentDialog.showErrorMessage(error);
+        mCurrentDialog.onErrorReceived(error);
     }
 
     private void handleHideDialog(boolean userCanceled) {
@@ -319,7 +340,6 @@ public class BiometricDialogImpl extends SystemUI implements CommandQueue.Callba
 
     private void handleTryAgainPressed() {
         try {
-            mCurrentDialog.clearTemporaryMessage();
             mReceiver.onTryAgainPressed();
         } catch (RemoteException e) {
             Log.e(TAG, "RemoteException when handling try again", e);

@@ -251,18 +251,33 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     int mSeq;
     int mViewVisibility;
     int mSystemUiVisibility;
+
     /**
-     * The visibility of the window based on policy like {@link WindowManagerPolicy}.
+     * The visibility flag of the window based on policy like {@link WindowManagerPolicy}.
      * Normally set by calling {@link #showLw} and {@link #hideLw}.
+     *
+     * TODO: b/131253938 This will eventually be split into individual visibility policy flags.
      */
-    boolean mPolicyVisibility = true;
+    static final int LEGACY_POLICY_VISIBILITY = 1;
     /**
-     * What {@link #mPolicyVisibility} should be set to after a transition animation.
-     * For example, {@link #mPolicyVisibility} might true during an exit animation to hide it and
-     * then set to the value of {@link #mPolicyVisibilityAfterAnim} which is false after the exit
-     * animation is done.
+     * The visibility flag that determines whether this window is visible for the current user.
      */
-    boolean mPolicyVisibilityAfterAnim = true;
+    private static final int VISIBLE_FOR_USER = 1 << 1;
+    private static final int POLICY_VISIBILITY_ALL = VISIBLE_FOR_USER | LEGACY_POLICY_VISIBILITY;
+    /**
+     * The Bitwise-or of flags that contribute to visibility of the WindowState
+     */
+    private int mPolicyVisibility = POLICY_VISIBILITY_ALL;
+
+    /**
+     * Whether {@link #LEGACY_POLICY_VISIBILITY} flag should be set after a transition animation.
+     * For example, {@link #LEGACY_POLICY_VISIBILITY} might be set during an exit animation to hide
+     * it and then unset when the value of {@link #mLegacyPolicyVisibilityAfterAnim} is false
+     * after the exit animation is done.
+     *
+     * TODO: b/131253938 Determine whether this can be changed to use a visibility flag instead.
+     */
+    boolean mLegacyPolicyVisibilityAfterAnim = true;
     // overlay window is hidden because the owning app is suspended
     private boolean mHiddenWhileSuspended;
     private boolean mAppOpVisibility = true;
@@ -1063,7 +1078,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                 + mRequestedWidth + ", mRequestedheight="
                 + mRequestedHeight + ") to" + " (pw=" + pw + ", ph=" + ph
                 + "): frame=" + mWindowFrames.mFrame.toShortString()
-                + " " + mWindowFrames.getInsetsInfo());
+                + " " + mWindowFrames.getInsetsInfo()
+                + " " + mAttrs.getTitle());
     }
 
     // TODO: Look into whether this override is still necessary.
@@ -1297,6 +1313,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         mOrientationChangeTimedOut = true;
     }
 
+    @Override
     DisplayContent getDisplayContent() {
         return mToken.getDisplayContent();
     }
@@ -1414,10 +1431,32 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
     @Override
     boolean isVisible() {
-        return wouldBeVisibleIfPolicyIgnored() && mPolicyVisibility
+        return wouldBeVisibleIfPolicyIgnored() && isVisibleByPolicy()
                 // If we don't have a provider, this window isn't used as a window generating
                 // insets, so nobody can hide it over the inset APIs.
                 && (mInsetProvider == null || mInsetProvider.isClientVisible());
+    }
+
+    /**
+     * Ensures that all the policy visibility bits are set.
+     * @return {@code true} if all flags about visiblity are set
+     */
+    boolean isVisibleByPolicy() {
+        return (mPolicyVisibility & POLICY_VISIBILITY_ALL) == POLICY_VISIBILITY_ALL;
+    }
+
+    void clearPolicyVisibilityFlag(int policyVisibilityFlag) {
+        mPolicyVisibility &= ~policyVisibilityFlag;
+        mWmService.scheduleAnimationLocked();
+    }
+
+    void setPolicyVisibilityFlag(int policyVisibilityFlag) {
+        mPolicyVisibility |= policyVisibilityFlag;
+        mWmService.scheduleAnimationLocked();
+    }
+
+    private boolean isLegacyPolicyVisibility() {
+        return (mPolicyVisibility & LEGACY_POLICY_VISIBILITY) != 0;
     }
 
     /**
@@ -1470,7 +1509,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     boolean isVisibleOrAdding() {
         final AppWindowToken atoken = mAppToken;
         return (mHasSurface || (!mRelayoutCalled && mViewVisibility == View.VISIBLE))
-                && mPolicyVisibility && !isParentWindowHidden()
+                && isVisibleByPolicy() && !isParentWindowHidden()
                 && (atoken == null || !atoken.hiddenRequested)
                 && !mAnimatingExit && !mDestroying;
     }
@@ -1481,7 +1520,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
      * being visible.
      */
     boolean isOnScreen() {
-        if (!mHasSurface || mDestroying || !mPolicyVisibility) {
+        if (!mHasSurface || mDestroying || !isVisibleByPolicy()) {
             return false;
         }
         final AppWindowToken atoken = mAppToken;
@@ -1522,7 +1561,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         }
         final boolean parentAndClientVisible = !isParentWindowHidden()
                 && mViewVisibility == View.VISIBLE && !mToken.isHidden();
-        return mHasSurface && mPolicyVisibility && !mDestroying
+        return mHasSurface && isVisibleByPolicy() && !mDestroying
                 && (parentAndClientVisible || isAnimating());
     }
 
@@ -1551,7 +1590,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     @Override
     public boolean isDisplayedLw() {
         final AppWindowToken atoken = mAppToken;
-        return isDrawnLw() && mPolicyVisibility
+        return isDrawnLw() && isVisibleByPolicy()
                 && ((!isParentWindowHidden() && (atoken == null || !atoken.hiddenRequested))
                         || isAnimating());
     }
@@ -2057,8 +2096,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                 Slog.i(TAG_WM, "  mSurfaceController=" + mWinAnimator.mSurfaceController
                         + " relayoutCalled=" + mRelayoutCalled
                         + " viewVis=" + mViewVisibility
-                        + " policyVis=" + mPolicyVisibility
-                        + " policyVisAfterAnim=" + mPolicyVisibilityAfterAnim
+                        + " policyVis=" + isVisibleByPolicy()
+                        + " policyVisAfterAnim=" + mLegacyPolicyVisibilityAfterAnim
                         + " parentHidden=" + isParentWindowHidden()
                         + " exiting=" + mAnimatingExit + " destroying=" + mDestroying);
                 if (mAppToken != null) {
@@ -2192,7 +2231,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         if (isHiddenFromUserLocked()) {
             if (DEBUG_VISIBILITY) Slog.w(TAG_WM, "user changing, hiding " + this
                     + ", attrs=" + mAttrs.type + ", belonging to " + mOwnerUid);
-            hideLw(false);
+            clearPolicyVisibilityFlag(VISIBLE_FOR_USER);
+        } else {
+            setPolicyVisibilityFlag(VISIBLE_FOR_USER);
         }
     }
 
@@ -2201,14 +2242,16 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         final Region region = inputWindowHandle.touchableRegion;
         setTouchableRegionCropIfNeeded(inputWindowHandle);
 
-        if (mAppToken != null && !mAppToken.getResolvedOverrideBounds().isEmpty()) {
+        final Rect appOverrideBounds = mAppToken != null
+                ? mAppToken.getResolvedOverrideBounds() : null;
+        if (appOverrideBounds != null && !appOverrideBounds.isEmpty()) {
             // There may have touchable letterboxes around the activity, so in order to let the
             // letterboxes are able to receive touch event and slip to activity, the activity with
             // compatibility bounds cannot occupy full screen touchable region.
             if (modal) {
                 // A modal window uses the whole compatibility bounds.
                 flags |= FLAG_NOT_TOUCH_MODAL;
-                mTmpRect.set(mAppToken.getResolvedOverrideBounds());
+                mTmpRect.set(0, 0, appOverrideBounds.width(), appOverrideBounds.height());
             } else {
                 // Non-modal uses the application based frame.
                 mTmpRect.set(mWindowFrames.mCompatFrame);
@@ -2282,13 +2325,17 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     }
 
     void checkPolicyVisibilityChange() {
-        if (mPolicyVisibility != mPolicyVisibilityAfterAnim) {
+        if (isLegacyPolicyVisibility() != mLegacyPolicyVisibilityAfterAnim) {
             if (DEBUG_VISIBILITY) {
                 Slog.v(TAG, "Policy visibility changing after anim in " +
-                        mWinAnimator + ": " + mPolicyVisibilityAfterAnim);
+                        mWinAnimator + ": " + mLegacyPolicyVisibilityAfterAnim);
             }
-            mPolicyVisibility = mPolicyVisibilityAfterAnim;
-            if (!mPolicyVisibility) {
+            if (mLegacyPolicyVisibilityAfterAnim) {
+                setPolicyVisibilityFlag(LEGACY_POLICY_VISIBILITY);
+            } else {
+                clearPolicyVisibilityFlag(LEGACY_POLICY_VISIBILITY);
+            }
+            if (!isVisibleByPolicy()) {
                 mWinAnimator.hide("checkPolicyVisibilityChange");
                 if (isFocused()) {
                     if (DEBUG_FOCUS_LIGHT) Slog.i(TAG,
@@ -2529,7 +2576,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     }
 
     boolean showLw(boolean doAnimation, boolean requestAnim) {
-        if (mPolicyVisibility && mPolicyVisibilityAfterAnim) {
+        if (isLegacyPolicyVisibility() && mLegacyPolicyVisibilityAfterAnim) {
             // Already showing.
             return false;
         }
@@ -2556,18 +2603,18 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         if (DEBUG_VISIBILITY) Slog.v(TAG, "Policy visibility true: " + this);
         if (doAnimation) {
             if (DEBUG_VISIBILITY) Slog.v(TAG, "doAnimation: mPolicyVisibility="
-                    + mPolicyVisibility + " animating=" + isAnimating());
+                    + isLegacyPolicyVisibility() + " animating=" + isAnimating());
             if (!mToken.okToAnimate()) {
                 doAnimation = false;
-            } else if (mPolicyVisibility && !isAnimating()) {
+            } else if (isLegacyPolicyVisibility() && !isAnimating()) {
                 // Check for the case where we are currently visible and
                 // not animating; we do not want to do animation at such a
                 // point to become visible when we already are.
                 doAnimation = false;
             }
         }
-        mPolicyVisibility = true;
-        mPolicyVisibilityAfterAnim = true;
+        setPolicyVisibilityFlag(LEGACY_POLICY_VISIBILITY);
+        mLegacyPolicyVisibilityAfterAnim = true;
         if (doAnimation) {
             mWinAnimator.applyAnimationLocked(TRANSIT_ENTER, true);
         }
@@ -2591,7 +2638,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                 doAnimation = false;
             }
         }
-        boolean current = doAnimation ? mPolicyVisibilityAfterAnim : mPolicyVisibility;
+        boolean current =
+                doAnimation ? mLegacyPolicyVisibilityAfterAnim : isLegacyPolicyVisibility();
         if (!current) {
             // Already hiding.
             return false;
@@ -2602,11 +2650,11 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                 doAnimation = false;
             }
         }
-        mPolicyVisibilityAfterAnim = false;
+        mLegacyPolicyVisibilityAfterAnim = false;
         final boolean isFocused = isFocused();
         if (!doAnimation) {
             if (DEBUG_VISIBILITY) Slog.v(TAG, "Policy visibility false: " + this);
-            mPolicyVisibility = false;
+            clearPolicyVisibilityFlag(LEGACY_POLICY_VISIBILITY);
             // Window is no longer visible -- make sure if we were waiting
             // for it to be displayed before enabling the display, that
             // we allow the display to be enabled now.
@@ -3098,7 +3146,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             }
 
             //TODO (multidisplay): Accessibility supported only for the default display.
-            if (mWmService.mAccessibilityController != null && getDisplayId() == DEFAULT_DISPLAY) {
+            if (mWmService.mAccessibilityController != null && (getDisplayId() == DEFAULT_DISPLAY
+                    || getDisplayContent().getParentWindow() != null)) {
                 mWmService.mAccessibilityController.onSomeWindowResizedOrMovedLocked();
             }
 
@@ -3441,11 +3490,11 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             pw.println(prefix + "mSeq=" + mSeq
                     + " mSystemUiVisibility=0x" + Integer.toHexString(mSystemUiVisibility));
         }
-        if (!mPolicyVisibility || !mPolicyVisibilityAfterAnim || !mAppOpVisibility
+        if (!isVisibleByPolicy() || !mLegacyPolicyVisibilityAfterAnim || !mAppOpVisibility
                 || isParentWindowHidden() || mPermanentlyHidden || mForceHideNonSystemOverlayWindow
                 || mHiddenWhileSuspended) {
-            pw.println(prefix + "mPolicyVisibility=" + mPolicyVisibility
-                    + " mPolicyVisibilityAfterAnim=" + mPolicyVisibilityAfterAnim
+            pw.println(prefix + "mPolicyVisibility=" + isVisibleByPolicy()
+                    + " mLegacyPolicyVisibilityAfterAnim=" + mLegacyPolicyVisibilityAfterAnim
                     + " mAppOpVisibility=" + mAppOpVisibility
                     + " parentHidden=" + isParentWindowHidden()
                     + " mPermanentlyHidden=" + mPermanentlyHidden
@@ -3842,7 +3891,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     boolean performShowLocked() {
         if (isHiddenFromUserLocked()) {
             if (DEBUG_VISIBILITY) Slog.w(TAG, "hiding " + this + ", belonging to " + mOwnerUid);
-            hideLw(false);
+            clearPolicyVisibilityFlag(VISIBLE_FOR_USER);
             return false;
         }
 
@@ -3902,7 +3951,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                     + ": mDrawState=" + mWinAnimator.drawStateToString()
                     + " readyForDisplay=" + isReadyForDisplay()
                     + " starting=" + (mAttrs.type == TYPE_APPLICATION_STARTING)
-                    + " during animation: policyVis=" + mPolicyVisibility
+                    + " during animation: policyVis=" + isVisibleByPolicy()
                     + " parentHidden=" + isParentWindowHidden()
                     + " tok.hiddenRequested="
                     + (mAppToken != null && mAppToken.hiddenRequested)
@@ -4163,7 +4212,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         }
 
         //TODO (multidisplay): Accessibility is supported only for the default display.
-        if (mWmService.mAccessibilityController != null && getDisplayId() == DEFAULT_DISPLAY) {
+        if (mWmService.mAccessibilityController != null && (getDisplayId() == DEFAULT_DISPLAY
+                || getDisplayContent().getParentWindow() != null)) {
             mWmService.mAccessibilityController.onSomeWindowResizedOrMovedLocked();
         }
 
@@ -4311,7 +4361,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                     + ", animating=" + isAnimating());
             if (!isDrawnLw()) {
                 Slog.v(TAG, "Not displayed: s=" + mWinAnimator.mSurfaceController
-                        + " pv=" + mPolicyVisibility
+                        + " pv=" + isVisibleByPolicy()
                         + " mDrawState=" + mWinAnimator.mDrawState
                         + " ph=" + isParentWindowHidden()
                         + " th=" + (mAppToken != null ? mAppToken.hiddenRequested : false)
@@ -4553,9 +4603,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         anim.scaleCurrentDuration(mWmService.getWindowAnimationScaleLocked());
         final AnimationAdapter adapter = new LocalAnimationAdapter(
                 new WindowAnimationSpec(anim, mSurfacePosition, false /* canSkipFirstFrame */,
-                        mWmService.mWindowCornerRadius),
+                        0 /* windowCornerRadius */),
                 mWmService.mSurfaceAnimationRunner);
-        startAnimation(mPendingTransaction, adapter);
+        startAnimation(getPendingTransaction(), adapter);
         commitPendingTransaction();
     }
 
@@ -4601,6 +4651,18 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         float9[Matrix.MSCALE_Y] = mWinAnimator.mDsDy;
         int x = mSurfacePosition.x;
         int y = mSurfacePosition.y;
+
+        // We might be on a display which has been re-parented to a view in another window, so here
+        // computes the global location of our display.
+        DisplayContent dc = getDisplayContent();
+        while (dc != null && dc.getParentWindow() != null) {
+            final WindowState displayParent = dc.getParentWindow();
+            x += displayParent.mWindowFrames.mFrame.left - displayParent.mAttrs.surfaceInsets.left
+                    + (dc.getLocationInParentWindow().x * displayParent.mGlobalScale + 0.5f);
+            y += displayParent.mWindowFrames.mFrame.top - displayParent.mAttrs.surfaceInsets.top
+                    + (dc.getLocationInParentWindow().y * displayParent.mGlobalScale + 0.5f);
+            dc = displayParent.getDisplayContent();
+        }
 
         // If changed, also adjust transformFrameToSurfacePosition
         final WindowContainer parent = getParent();
@@ -4751,8 +4813,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     }
 
     @Override
-    public void onAnimationLeashDestroyed(Transaction t) {
-        super.onAnimationLeashDestroyed(t);
+    public void onAnimationLeashLost(Transaction t) {
+        super.onAnimationLeashLost(t);
         updateSurfacePosition(t);
     }
 

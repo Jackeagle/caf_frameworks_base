@@ -306,11 +306,7 @@ public class BiometricService extends SystemService {
                 }
 
                 case MSG_ON_AUTHENTICATION_FAILED: {
-                    SomeArgs args = (SomeArgs) msg.obj;
-                    handleAuthenticationFailed(
-                            args.argi1 /* cookie */,
-                            (boolean) args.arg1 /* requireConfirmation */);
-                    args.recycle();
+                    handleAuthenticationFailed((String) msg.obj /* failureReason */);
                     break;
                 }
 
@@ -479,7 +475,7 @@ public class BiometricService extends SystemService {
                                 DEFAULT_KEYGUARD_ENABLED ? 1 : 0 /* default */,
                                 userId) != 0);
 
-                if (userId == ActivityManager.getCurrentUser()) {
+                if (userId == ActivityManager.getCurrentUser() && !selfChange) {
                     notifyEnabledOnKeyguardCallbacks(userId);
                 }
             } else if (FACE_UNLOCK_APP_ENABLED.equals(uri)) {
@@ -498,17 +494,25 @@ public class BiometricService extends SystemService {
         }
 
         boolean getFaceEnabledOnKeyguard() {
-            return mFaceEnabledOnKeyguard.getOrDefault(
-                    ActivityManager.getCurrentUser(), DEFAULT_KEYGUARD_ENABLED);
+            final int user = ActivityManager.getCurrentUser();
+            if (!mFaceEnabledOnKeyguard.containsKey(user)) {
+                onChange(true /* selfChange */, FACE_UNLOCK_KEYGUARD_ENABLED, user);
+            }
+            return mFaceEnabledOnKeyguard.get(user);
         }
 
         boolean getFaceEnabledForApps(int userId) {
+            if (!mFaceEnabledForApps.containsKey(userId)) {
+                onChange(true /* selfChange */, FACE_UNLOCK_APP_ENABLED, userId);
+            }
             return mFaceEnabledForApps.getOrDefault(userId, DEFAULT_APP_ENABLED);
         }
 
         boolean getFaceAlwaysRequireConfirmation(int userId) {
-            return mFaceAlwaysRequireConfirmation
-                    .getOrDefault(userId, DEFAULT_ALWAYS_REQUIRE_CONFIRMATION);
+            if (!mFaceAlwaysRequireConfirmation.containsKey(userId)) {
+                onChange(true /* selfChange */, FACE_UNLOCK_ALWAYS_REQUIRE_CONFIRMATION, userId);
+            }
+            return mFaceAlwaysRequireConfirmation.get(userId);
         }
 
         void notifyEnabledOnKeyguardCallbacks(int userId) {
@@ -567,19 +571,24 @@ public class BiometricService extends SystemService {
         @Override
         public void onAuthenticationFailed(int cookie, boolean requireConfirmation)
                 throws RemoteException {
-            SomeArgs args = SomeArgs.obtain();
-            args.argi1 = cookie;
-            args.arg1 = requireConfirmation;
-            mHandler.obtainMessage(MSG_ON_AUTHENTICATION_FAILED, args).sendToTarget();
+            String failureReason = getContext().getString(R.string.biometric_not_recognized);
+            mHandler.obtainMessage(MSG_ON_AUTHENTICATION_FAILED, failureReason).sendToTarget();
         }
 
         @Override
         public void onError(int cookie, int error, String message) throws RemoteException {
-            SomeArgs args = SomeArgs.obtain();
-            args.argi1 = cookie;
-            args.argi2 = error;
-            args.arg1 = message;
-            mHandler.obtainMessage(MSG_ON_ERROR, args).sendToTarget();
+            // Determine if error is hard or soft error. Certain errors (such as TIMEOUT) are
+            // soft errors and we should allow the user to try authenticating again instead of
+            // dismissing BiometricPrompt.
+            if (error == BiometricConstants.BIOMETRIC_ERROR_TIMEOUT) {
+                mHandler.obtainMessage(MSG_ON_AUTHENTICATION_FAILED, message).sendToTarget();
+            } else {
+                SomeArgs args = SomeArgs.obtain();
+                args.argi1 = cookie;
+                args.argi2 = error;
+                args.arg1 = message;
+                mHandler.obtainMessage(MSG_ON_ERROR, args).sendToTarget();
+            }
         }
 
         @Override
@@ -759,7 +768,6 @@ public class BiometricService extends SystemService {
         @Override // Binder call
         public int canAuthenticate(String opPackageName) {
             checkPermission();
-            checkAppOp(opPackageName, Binder.getCallingUid());
 
             final int userId = UserHandle.getCallingUserId();
             final long ident = Binder.clearCallingIdentity();
@@ -832,9 +840,9 @@ public class BiometricService extends SystemService {
     }
 
     private void checkPermission() {
-        if (getContext().checkCallingPermission(USE_FINGERPRINT)
+        if (getContext().checkCallingOrSelfPermission(USE_FINGERPRINT)
                 != PackageManager.PERMISSION_GRANTED) {
-            getContext().enforceCallingPermission(USE_BIOMETRIC,
+            getContext().enforceCallingOrSelfPermission(USE_BIOMETRIC,
                     "Must have USE_BIOMETRIC permission");
         }
     }
@@ -1151,13 +1159,13 @@ public class BiometricService extends SystemService {
 
             // Notify SysUI that the biometric has been authenticated. SysUI already knows
             // the implicit/explicit state and will react accordingly.
-            mStatusBarService.onBiometricAuthenticated(true);
+            mStatusBarService.onBiometricAuthenticated(true, null /* failureReason */);
         } catch (RemoteException e) {
             Slog.e(TAG, "Remote exception", e);
         }
     }
 
-    private void handleAuthenticationFailed(int cookie, boolean requireConfirmation) {
+    private void handleAuthenticationFailed(String failureReason) {
         try {
             // Should never happen, log this to catch bad HAL behavior (e.g. auth succeeded
             // after user dismissed/canceled dialog).
@@ -1166,7 +1174,7 @@ public class BiometricService extends SystemService {
                 return;
             }
 
-            mStatusBarService.onBiometricAuthenticated(false);
+            mStatusBarService.onBiometricAuthenticated(false, failureReason);
 
             // TODO: This logic will need to be updated if BP is multi-modal
             if ((mCurrentAuthSession.mModality & TYPE_FACE) != 0) {
@@ -1312,6 +1320,10 @@ public class BiometricService extends SystemService {
         }
 
         if (acquiredInfo != BiometricConstants.BIOMETRIC_ACQUIRED_GOOD) {
+            if (message == null) {
+                Slog.w(TAG, "Ignoring null message: " + acquiredInfo);
+                return;
+            }
             try {
                 mStatusBarService.onBiometricHelp(message);
             } catch (RemoteException e) {

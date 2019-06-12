@@ -1937,6 +1937,8 @@ public abstract class ConnectionService extends Service {
             return;
         }
 
+        String callingPackage = getOpPackageName();
+
         mAdapter.queryRemoteConnectionServices(new RemoteServiceCallback.Stub() {
             @Override
             public void onResult(
@@ -1965,7 +1967,7 @@ public abstract class ConnectionService extends Service {
                     }
                 }.prepare());
             }
-        });
+        }, callingPackage);
     }
 
     /**
@@ -2054,7 +2056,11 @@ public abstract class ConnectionService extends Service {
                     conference.getConnectTimeMillis(),
                     conference.getConnectionStartElapsedRealTime(),
                     conference.getStatusHints(),
-                    conference.getExtras());
+                    conference.getExtras(),
+                    conference.getAddress(),
+                    conference.getAddressPresentation(),
+                    conference.getCallerDisplayName(),
+                    conference.getCallerDisplayNamePresentation());
 
             mAdapter.addConferenceCall(id, parcelableConference);
             mAdapter.setVideoProvider(id, conference.getVideoProvider());

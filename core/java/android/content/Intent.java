@@ -39,7 +39,6 @@ import android.content.pm.ShortcutInfo;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Rect;
-import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -59,6 +58,8 @@ import android.provider.DocumentsContract;
 import android.provider.DocumentsProvider;
 import android.provider.MediaStore;
 import android.provider.OpenableColumns;
+import android.telecom.PhoneAccount;
+import android.telecom.TelecomManager;
 import android.text.TextUtils;
 import android.util.ArraySet;
 import android.util.AttributeSet;
@@ -1121,6 +1122,12 @@ public class Intent implements Parcelable, Cloneable {
      * <p>Input: {@link #getData} is URI of a phone number to be dialed or a
      * tel: URI of an explicit phone number.
      * <p>Output: nothing.
+     *
+     * <p class="note"><strong>Note:</strong> It is not guaranteed that the call will be placed on
+     * the {@link PhoneAccount} provided in the {@link TelecomManager#EXTRA_PHONE_ACCOUNT_HANDLE}
+     * extra (if specified) and may be placed on another {@link PhoneAccount} with the
+     * {@link PhoneAccount#CAPABILITY_PLACE_EMERGENCY_CALLS} capability, depending on external
+     * factors, such as network conditions and Modem/SIM status.
      * @hide
      */
     @SystemApi
@@ -1882,6 +1889,31 @@ public class Intent implements Parcelable, Cloneable {
             "android.intent.action.REVIEW_PERMISSIONS";
 
     /**
+     * Activity action: Launch UI to show information about the usage
+     * of a given permission. This action would be handled by apps that
+     * want to show details about how and why given permission is being
+     * used.
+     * <p>
+     * <strong>Important:</strong>You must protect the activity that handles
+     * this action with the {@link android.Manifest.permission#START_VIEW_PERMISSION_USAGE
+     *  START_VIEW_PERMISSION_USAGE} permission to ensure that only the
+     * system can launch this activity. The system will not launch
+     * activities that are not properly protected.
+     *
+     * <p>
+     * Input: {@code android.intent.extra.PERMISSION_NAME} specifies the permission
+     * for which the launched UI would be targeted.
+     * </p>
+     * <p>
+     * Output: Nothing.
+     * </p>
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    @RequiresPermission(android.Manifest.permission.START_VIEW_PERMISSION_USAGE)
+    public static final String ACTION_VIEW_PERMISSION_USAGE =
+            "android.intent.action.VIEW_PERMISSION_USAGE";
+
+    /**
      * Activity action: Launch UI to manage a default app.
      * <p>
      * Input: {@link #EXTRA_ROLE_NAME} specifies the role of the default app which will be managed
@@ -2445,6 +2477,18 @@ public class Intent implements Parcelable, Cloneable {
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_PACKAGE_ENABLE_ROLLBACK =
             "android.intent.action.PACKAGE_ENABLE_ROLLBACK";
+    /**
+     * Broadcast Action: Sent to the system rollback manager when the rollback for a certain
+     * package needs to be cancelled.
+     *
+     * <p class="note">This intent is sent by PackageManagerService to notify RollbackManager
+     * that enabling a specific rollback has timed out.
+     *
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    public static final String ACTION_CANCEL_ENABLE_ROLLBACK =
+            "android.intent.action.CANCEL_ENABLE_ROLLBACK";
     /**
      * Broadcast Action: A rollback has been committed.
      *
@@ -8609,6 +8653,13 @@ public class Intent implements Parcelable, Cloneable {
      * fields, the identifier is <em>never</em> used for matching against an {@link IntentFilter};
      * it is as if the identifier has not been set on the Intent.
      *
+     * <p>This can be used, for example, to make this Intent unique from other Intents that
+     * are otherwise the same, for use in creating a {@link android.app.PendingIntent}.  (Be aware
+     * however that the receiver of the PendingIntent will see whatever you put in here.)  The
+     * structure of this string is completely undefined by the platform, however if you are going
+     * to be exposing identifier strings across different applications you may need to define
+     * your own structure if there is no central party defining the contents of this field.</p>
+     *
      * @param identifier The identifier for this Intent.  The contents of the string have no
      *                   meaning to the system, except whether they are exactly the same as
      *                   another identifier.
@@ -10180,6 +10231,9 @@ public class Intent implements Parcelable, Cloneable {
         }
         if (mType != null) {
             proto.write(IntentProto.TYPE, mType);
+        }
+        if (mIdentifier != null) {
+            proto.write(IntentProto.IDENTIFIER, mIdentifier);
         }
         if (mFlags != 0) {
             proto.write(IntentProto.FLAG, "0x" + Integer.toHexString(mFlags));

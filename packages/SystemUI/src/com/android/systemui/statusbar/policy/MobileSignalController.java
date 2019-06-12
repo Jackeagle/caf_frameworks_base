@@ -38,6 +38,7 @@ import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.cdma.EriInfo;
 import com.android.settingslib.Utils;
 import com.android.settingslib.graph.SignalDrawable;
+import com.android.settingslib.net.SignalStrengthUtil;
 import com.android.systemui.R;
 import com.android.systemui.statusbar.policy.NetworkController.IconState;
 import com.android.systemui.statusbar.policy.NetworkController.SignalCallback;
@@ -94,8 +95,7 @@ public class MobileSignalController extends SignalController<
         mPhone = phone;
         mDefaults = defaults;
         mSubscriptionInfo = info;
-        mPhoneStateListener = new MobilePhoneStateListener(info.getSubscriptionId(),
-                receiverLooper);
+        mPhoneStateListener = new MobilePhoneStateListener(receiverLooper);
         mNetworkNameSeparator = getStringIfExists(R.string.status_bar_network_name_separator);
         mNetworkNameDefault = getStringIfExists(
                 com.android.internal.R.string.lockscreen_carrier_default);
@@ -249,9 +249,8 @@ public class MobileSignalController extends SignalController<
     }
 
     private void updateInflateSignalStrength() {
-        mInflateSignalStrengths = SubscriptionManager.getResourcesForSubId(mContext,
-               mSubscriptionInfo.getSubscriptionId())
-               .getBoolean(R.bool.config_inflateSignalStrength);
+        mInflateSignalStrengths = SignalStrengthUtil.shouldInflateSignalStrength(mContext,
+                mSubscriptionInfo.getSubscriptionId());
     }
 
     private int getNumLevels() {
@@ -285,10 +284,6 @@ public class MobileSignalController extends SignalController<
 
     @Override
     public int getQsCurrentIconId() {
-        if (mCurrentState.airplaneMode) {
-            return SignalDrawable.getAirplaneModeState(getNumLevels());
-        }
-
         return getCurrentIconId();
     }
 
@@ -574,8 +569,8 @@ public class MobileSignalController extends SignalController<
     }
 
     class MobilePhoneStateListener extends PhoneStateListener {
-        public MobilePhoneStateListener(int subId, Looper looper) {
-            super(subId, looper);
+        public MobilePhoneStateListener(Looper looper) {
+            super(looper);
         }
 
         @Override

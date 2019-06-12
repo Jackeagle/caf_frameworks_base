@@ -108,6 +108,8 @@ import android.app.ActivityTaskManager;
 import android.app.ActivityThread;
 import android.app.AlarmManager;
 import android.app.AppGlobals;
+import android.app.AppOpsManager;
+import android.app.BroadcastOptions;
 import android.app.IActivityManager;
 import android.app.IActivityTaskManager;
 import android.app.IApplicationThread;
@@ -546,9 +548,7 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
 
     private DevicePolicyConstants mConstants;
 
-    private static boolean ENABLE_LOCK_GUARD = Build.IS_ENG
-            || true // STOPSHIP Remove it.
-            || (SystemProperties.getInt("debug.dpm.lock_guard", 0) == 1);
+    private static final boolean ENABLE_LOCK_GUARD = true;
 
     interface Stats {
         int LOCK_GUARD_GUARD = 0;
@@ -1379,7 +1379,7 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
             }
         }
 
-        void readFromXml(XmlPullParser parser)
+        void readFromXml(XmlPullParser parser, boolean shouldOverridePolicies)
                 throws XmlPullParserException, IOException {
             int outerDepth = parser.getDepth();
             int type;
@@ -1390,7 +1390,10 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
                 }
                 String tag = parser.getName();
                 if (TAG_POLICIES.equals(tag)) {
-                    info.readPoliciesFromXml(parser);
+                    if (shouldOverridePolicies) {
+                        Log.d(LOG_TAG, "Overriding device admin policies from XML.");
+                        info.readPoliciesFromXml(parser);
+                    }
                 } else if (TAG_PASSWORD_QUALITY.equals(tag)) {
                     minimumPasswordMetrics.quality = Integer.parseInt(
                             parser.getAttributeValue(null, ATTR_VALUE));
@@ -1518,9 +1521,8 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
                     }
                 } else if (TAG_PARENT_ADMIN.equals(tag)) {
                     Preconditions.checkState(!isParent);
-
                     parentAdmin = new ActiveAdmin(info, /* parent */ true);
-                    parentAdmin.readFromXml(parser);
+                    parentAdmin.readFromXml(parser, shouldOverridePolicies);
                 } else if (TAG_ORGANIZATION_COLOR.equals(tag)) {
                     organizationColor = Integer.parseInt(
                             parser.getAttributeValue(null, ATTR_VALUE));
@@ -2331,8 +2333,8 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
                 Slog.w(LOG_TAG, "Tried to remove device policy file for user 0! Ignoring.");
                 return;
             }
+            updatePasswordQualityCacheForUserGroup(userHandle);
             mPolicyCache.onUserRemoved(userHandle);
-
             mOwners.removeProfileOwner(userHandle);
             mOwners.writeProfileOwner(userHandle);
 
@@ -2897,12 +2899,18 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
                 admin.getUserHandle()).isEmpty()) {
             return false;
         }
+
+        final BroadcastOptions options = BroadcastOptions.makeBasic();
+        options.setBackgroundActivityStartsAllowed(true);
+
         if (result != null) {
             mContext.sendOrderedBroadcastAsUser(intent, admin.getUserHandle(),
-                    null, result, mHandler, Activity.RESULT_OK, null, null);
+                    null, AppOpsManager.OP_NONE, options.toBundle(),
+                    result, mHandler, Activity.RESULT_OK, null, null);
         } else {
-            mContext.sendBroadcastAsUser(intent, admin.getUserHandle());
+            mContext.sendBroadcastAsUser(intent, admin.getUserHandle(), null, options.toBundle());
         }
+
         return true;
     }
 
@@ -3326,8 +3334,10 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
                                     + userHandle);
                         }
                         if (dai != null) {
+                            boolean shouldOverwritePolicies =
+                                    shouldOverwritePoliciesFromXml(dai.getComponent(), userHandle);
                             ActiveAdmin ap = new ActiveAdmin(dai, /* parent */ false);
-                            ap.readFromXml(parser);
+                            ap.readFromXml(parser, shouldOverwritePolicies);
                             policy.mAdminMap.put(ap.info.getComponent(), ap);
                         }
                     } catch (RuntimeException e) {
@@ -3435,6 +3445,14 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
         if (policy.mStatusBarDisabled) {
             setStatusBarDisabledInternal(policy.mStatusBarDisabled, userHandle);
         }
+    }
+
+    private boolean shouldOverwritePoliciesFromXml(
+            ComponentName deviceAdminComponent, int userHandle) {
+        // http://b/123415062: If DA, overwrite with the stored policies that were agreed by the
+        // user to prevent apps from sneaking additional policies into updates.
+        return !isProfileOwner(deviceAdminComponent, userHandle)
+                && !isDeviceOwner(deviceAdminComponent, userHandle);
     }
 
     private void updateLockTaskPackagesLocked(List<String> packages, int userId) {
@@ -3632,6 +3650,11 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
         updateScreenCaptureDisabled(userId,
                 getScreenCaptureDisabled(null, userId));
         pushUserRestrictions(userId);
+        // When system user is started (device boot), load cache for all users.
+        // This is to mitigate the potential race between loading the cache and keyguard
+        // reading the value during user switch, due to onStartUser() being asynchronous.
+        updatePasswordQualityCacheForUserGroup(
+                userId == UserHandle.USER_SYSTEM ? UserHandle.USER_ALL : userId);
 
         startOwnerService(userId, "start-user");
     }
@@ -4117,13 +4140,19 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
         synchronized (getLockObject()) {
             ActiveAdmin ap = getActiveAdminForCallerLocked(
                     who, DeviceAdminInfo.USES_POLICY_LIMIT_PASSWORD, parent);
-            final PasswordMetrics metrics = ap.minimumPasswordMetrics;
-            if (metrics.quality != quality) {
-                metrics.quality = quality;
-                updatePasswordValidityCheckpointLocked(userId, parent);
-                saveSettingsLocked(userId);
+            final long ident = mInjector.binderClearCallingIdentity();
+            try {
+                final PasswordMetrics metrics = ap.minimumPasswordMetrics;
+                if (metrics.quality != quality) {
+                    metrics.quality = quality;
+                    updatePasswordValidityCheckpointLocked(userId, parent);
+                    updatePasswordQualityCacheForUserGroup(userId);
+                    saveSettingsLocked(userId);
+                }
+                maybeLogPasswordComplexitySet(who, userId, parent, metrics);
+            } finally {
+                mInjector.binderRestoreCallingIdentity(ident);
             }
-            maybeLogPasswordComplexitySet(who, userId, parent, metrics);
         }
         DevicePolicyEventLogger
                 .createEvent(DevicePolicyEnums.SET_PASSWORD_QUALITY)
@@ -4153,6 +4182,32 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
                         metrics, userHandle, parent);
 
         saveSettingsLocked(credentialOwner);
+    }
+
+    /**
+     * Update password quality values in policy cache for all users in the same user group as
+     * the given user. The cached password quality for user X is the aggregated quality among all
+     * admins who have influence of user X's screenlock, i.e. it's equivalent to the return value of
+     * getPasswordQuality(null, user X, false).
+     *
+     * Caches for all users in the same user group often need to be updated alltogether because a
+     * user's admin policy can affect another's aggregated password quality in some situation.
+     * For example a managed profile's policy will affect the parent user if the profile has unified
+     * challenge. A profile can also explicitly set a parent password quality which will affect the
+     * aggregated password quality of the parent user.
+     */
+    private void updatePasswordQualityCacheForUserGroup(@UserIdInt int userId) {
+        final List<UserInfo> users;
+        if (userId == UserHandle.USER_ALL) {
+            users = mUserManager.getUsers();
+        } else {
+            users = mUserManager.getProfiles(userId);
+        }
+        for (UserInfo userInfo : users) {
+            final int currentUserId = userInfo.id;
+            mPolicyCache.setPasswordQuality(currentUserId,
+                    getPasswordQuality(null, currentUserId, false));
+        }
     }
 
     @Override
@@ -6599,7 +6654,7 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
      */
     @Override
     public void setActivePasswordState(PasswordMetrics metrics, int userHandle) {
-        if (!mHasFeature || !mLockPatternUtils.hasSecureLockScreen()) {
+        if (!mLockPatternUtils.hasSecureLockScreen()) {
             return;
         }
         enforceFullCrossUsersPermission(userHandle);
@@ -8024,6 +8079,7 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
             throw new IllegalArgumentException("Component " + who
                     + " not installed for userId:" + userHandle);
         }
+
         final boolean hasIncompatibleAccountsOrNonAdb =
                 hasIncompatibleAccountsOrNonAdbNoLock(userHandle, who);
         synchronized (getLockObject()) {
@@ -8529,9 +8585,30 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
             return;
         }
         enforceCanManageProfileAndDeviceOwners();
-        if ((mIsWatch || hasUserSetupCompleted(userHandle)) && !isCallerWithSystemUid()) {
-            throw new IllegalStateException("Cannot set the profile owner on a user which is "
-                    + "already set-up");
+
+        if ((mIsWatch || hasUserSetupCompleted(userHandle))) {
+            if (!isCallerWithSystemUid()) {
+                throw new IllegalStateException("Cannot set the profile owner on a user which is "
+                        + "already set-up");
+            }
+
+            if (!mIsWatch) {
+                // Only the default supervision profile owner can be set as profile owner after SUW
+                final String supervisor = mContext.getResources().getString(
+                        com.android.internal.R.string
+                                .config_defaultSupervisionProfileOwnerComponent);
+                if (supervisor == null) {
+                    throw new IllegalStateException("Unable to set profile owner post-setup, no"
+                            + "default supervisor profile owner defined");
+                }
+
+                final ComponentName supervisorComponent = ComponentName.unflattenFromString(
+                        supervisor);
+                if (!owner.equals(supervisorComponent)) {
+                    throw new IllegalStateException("Unable to set non-default profile owner"
+                            + " post-setup " + owner);
+                }
+            }
         }
     }
 
@@ -8809,6 +8886,8 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
             mStatLogger.dump(pw, "  ");
             pw.println();
             pw.println("  Encryption Status: " + getEncryptionStatusName(getEncryptionStatus()));
+            pw.println();
+            mPolicyCache.dump("  ", pw);
         }
     }
 
@@ -9648,7 +9727,8 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
                 // Install the profile owner if not present.
                 if (!mIPackageManager.isPackageAvailable(adminPkg, userHandle)) {
                     mIPackageManager.installExistingPackageAsUser(adminPkg, userHandle,
-                            0 /*installFlags*/, PackageManager.INSTALL_REASON_POLICY);
+                            PackageManager.INSTALL_ALL_WHITELIST_RESTRICTED_PERMISSIONS,
+                            PackageManager.INSTALL_REASON_POLICY, null);
                 }
             } catch (RemoteException e) {
                 // Does not happen, same process
@@ -10144,7 +10224,8 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
 
                 // Install the app.
                 mIPackageManager.installExistingPackageAsUser(packageName, userId,
-                        0 /*installFlags*/, PackageManager.INSTALL_REASON_POLICY);
+                        PackageManager.INSTALL_ALL_WHITELIST_RESTRICTED_PERMISSIONS,
+                        PackageManager.INSTALL_REASON_POLICY, null);
                 if (isDemo) {
                     // Ensure the app is also ENABLED for demo users.
                     mIPackageManager.setApplicationEnabledSetting(packageName,
@@ -10198,7 +10279,8 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
                             if (isSystemApp(mIPackageManager, packageName, parentUserId)) {
                                 numberOfAppsInstalled++;
                                 mIPackageManager.installExistingPackageAsUser(packageName, userId,
-                                        0 /*installFlags*/, PackageManager.INSTALL_REASON_POLICY);
+                                        PackageManager.INSTALL_ALL_WHITELIST_RESTRICTED_PERMISSIONS,
+                                        PackageManager.INSTALL_REASON_POLICY, null);
                             } else {
                                 Slog.d(LOG_TAG, "Not enabling " + packageName + " since is not a"
                                         + " system app");
@@ -10257,9 +10339,9 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
                 }
 
                 // Install the package.
-                result = mIPackageManager
-                        .installExistingPackageAsUser(packageName, callingUserId,
-                        0 /*installFlags*/, PackageManager.INSTALL_REASON_POLICY)
+                result = mIPackageManager.installExistingPackageAsUser(packageName, callingUserId,
+                        PackageManager.INSTALL_ALL_WHITELIST_RESTRICTED_PERMISSIONS,
+                        PackageManager.INSTALL_REASON_POLICY, null)
                         == PackageManager.INSTALL_SUCCEEDED;
             } catch (RemoteException re) {
                 // shouldn't happen
@@ -11276,8 +11358,14 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
 
         @Override
         public void reportSeparateProfileChallengeChanged(@UserIdInt int userId) {
-            synchronized (getLockObject()) {
-                updateMaximumTimeToLockLocked(userId);
+            final long ident = mInjector.binderClearCallingIdentity();
+            try {
+                synchronized (getLockObject()) {
+                    updateMaximumTimeToLockLocked(userId);
+                    updatePasswordQualityCacheForUserGroup(userId);
+                }
+            } finally {
+                mInjector.binderRestoreCallingIdentity(ident);
             }
             DevicePolicyEventLogger
                     .createEvent(DevicePolicyEnums.SEPARATE_PROFILE_CHALLENGE_CHANGED)
@@ -11293,7 +11381,6 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
         @Override
         public CharSequence getPrintingDisabledReasonForUser(@UserIdInt int userId) {
             synchronized (getLockObject()) {
-                DevicePolicyData policy = getUserData(userId);
                 if (!mUserManager.hasUserRestriction(UserManager.DISALLOW_PRINTING,
                         UserHandle.of(userId))) {
                     Log.e(LOG_TAG, "printing is enabled");

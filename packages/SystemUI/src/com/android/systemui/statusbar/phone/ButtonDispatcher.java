@@ -23,7 +23,6 @@ import android.animation.ValueAnimator;
 import android.view.View;
 import android.view.View.AccessibilityDelegate;
 
-import com.android.systemui.plugins.statusbar.phone.NavBarButtonProvider.ButtonInterface;
 import com.android.systemui.statusbar.policy.KeyButtonDrawable;
 
 import java.util.ArrayList;
@@ -47,7 +46,7 @@ public class ButtonDispatcher {
     private Boolean mLongClickable;
     private Float mAlpha;
     private Float mDarkIntensity;
-    private Integer mVisibility = -1;
+    private Integer mVisibility = View.VISIBLE;
     private Boolean mDelayTouchFeedback;
     private KeyButtonDrawable mImageDrawable;
     private View mCurrentView;
@@ -86,7 +85,7 @@ public class ButtonDispatcher {
         if (mAlpha != null) {
             view.setAlpha(mAlpha);
         }
-        if (mVisibility != null && mVisibility != -1) {
+        if (mVisibility != null) {
             view.setVisibility(mVisibility);
         }
         if (mAccessibilityDelegate != null) {

@@ -31,17 +31,6 @@ namespace android {
 namespace os {
 namespace statsd {
 
-// Keep this in sync with DumpReportReason enum in stats_log.proto
-enum DumpReportReason {
-    DEVICE_SHUTDOWN = 1,
-    CONFIG_UPDATED = 2,
-    CONFIG_REMOVED = 3,
-    GET_DATA_CALLED = 4,
-    ADB_DUMP = 5,
-    CONFIG_RESET = 6,
-    STATSCOMPANION_DIED = 7,
-    TERMINATION_SIGNAL_RECEIVED = 8
-};
 
 class StatsLogProcessor : public ConfigListener {
 public:
@@ -89,11 +78,18 @@ public:
     void WriteDataToDisk(const DumpReportReason dumpReportReason,
                          const DumpLatency dumpLatency);
 
-    /* Persist metric activation status onto disk. */
-    void WriteMetricsActivationToDisk(int64_t currentTimeNs);
+    /* Persist configs containing metrics with active activations to disk. */
+    void SaveActiveConfigsToDisk(int64_t currentTimeNs);
 
-    /* Load metric activation status from disk. */
-    void LoadMetricsActivationFromDisk();
+    /* Writes the current active status/ttl for all configs and metrics to ProtoOutputStream. */
+    void WriteActiveConfigsToProtoOutputStream(
+            int64_t currentTimeNs, const DumpReportReason reason, ProtoOutputStream* proto);
+
+    /* Load configs containing metrics with active activations from disk. */
+    void LoadActiveConfigsFromDisk();
+
+    /* Sets the active status/ttl for all configs and metrics to the status in ActiveConfigList. */
+    void SetConfigsActiveState(const ActiveConfigList& activeConfigList, int64_t currentTimeNs);
 
     // Reset all configs.
     void resetConfigs();
@@ -158,6 +154,12 @@ private:
 
     void GetActiveConfigsLocked(const int uid, vector<int64_t>& outActiveConfigs);
 
+    void WriteActiveConfigsToProtoOutputStreamLocked(
+            int64_t currentTimeNs, const DumpReportReason reason, ProtoOutputStream* proto);
+
+    void SetConfigsActiveStateLocked(const ActiveConfigList& activeConfigList,
+                                     int64_t currentTimeNs);
+
     void WriteDataToDiskLocked(const DumpReportReason dumpReportReason,
                                const DumpLatency dumpLatency);
     void WriteDataToDiskLocked(const ConfigKey& key, const int64_t timestampNs,
@@ -221,6 +223,10 @@ private:
     FRIEND_TEST(StatsLogProcessorTest, TestDropWhenByteSizeTooLarge);
     FRIEND_TEST(StatsLogProcessorTest, TestActiveConfigMetricDiskWriteRead);
     FRIEND_TEST(StatsLogProcessorTest, TestActivationOnBoot);
+    FRIEND_TEST(StatsLogProcessorTest, TestActivationOnBootMultipleActivations);
+    FRIEND_TEST(StatsLogProcessorTest,
+            TestActivationOnBootMultipleActivationsDifferentActivationTypes);
+    FRIEND_TEST(StatsLogProcessorTest, TestActivationsPersistAcrossSystemServerRestart);
 
     FRIEND_TEST(WakelockDurationE2eTest, TestAggregatedPredicateDimensionsForSumDuration1);
     FRIEND_TEST(WakelockDurationE2eTest, TestAggregatedPredicateDimensionsForSumDuration2);
@@ -235,9 +241,12 @@ private:
     FRIEND_TEST(GaugeMetricE2eTest, TestMultipleFieldsForPushedEvent);
     FRIEND_TEST(GaugeMetricE2eTest, TestRandomSamplePulledEvents);
     FRIEND_TEST(GaugeMetricE2eTest, TestRandomSamplePulledEvent_LateAlarm);
+    FRIEND_TEST(GaugeMetricE2eTest, TestRandomSamplePulledEventsWithActivation);
+    FRIEND_TEST(GaugeMetricE2eTest, TestRandomSamplePulledEventsNoCondition);
     FRIEND_TEST(GaugeMetricE2eTest, TestConditionChangeToTrueSamplePulledEvents);
     FRIEND_TEST(ValueMetricE2eTest, TestPulledEvents);
     FRIEND_TEST(ValueMetricE2eTest, TestPulledEvents_LateAlarm);
+    FRIEND_TEST(ValueMetricE2eTest, TestPulledEvents_WithActivation);
 
     FRIEND_TEST(DimensionInConditionE2eTest, TestCreateCountMetric_NoLink_OR_CombinationCondition);
     FRIEND_TEST(DimensionInConditionE2eTest, TestCreateCountMetric_Link_OR_CombinationCondition);
@@ -264,6 +273,13 @@ private:
     FRIEND_TEST(MetricActivationE2eTest, TestCountMetricWithOneDeactivation);
     FRIEND_TEST(MetricActivationE2eTest, TestCountMetricWithTwoDeactivations);
     FRIEND_TEST(MetricActivationE2eTest, TestCountMetricWithTwoMetricsTwoDeactivations);
+
+    FRIEND_TEST(DurationMetricE2eTest, TestOneBucket);
+    FRIEND_TEST(DurationMetricE2eTest, TestTwoBuckets);
+    FRIEND_TEST(DurationMetricE2eTest, TestWithActivation);
+    FRIEND_TEST(DurationMetricE2eTest, TestWithCondition);
+    FRIEND_TEST(DurationMetricE2eTest, TestWithSlicedCondition);
+    FRIEND_TEST(DurationMetricE2eTest, TestWithActivationAndSlicedCondition);
 };
 
 }  // namespace statsd

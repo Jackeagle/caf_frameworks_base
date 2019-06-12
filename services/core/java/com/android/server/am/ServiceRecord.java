@@ -38,7 +38,6 @@ import android.os.SystemClock;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.util.ArrayMap;
-import android.util.ArraySet;
 import android.util.Slog;
 import android.util.TimeUtils;
 import android.util.proto.ProtoOutputStream;
@@ -131,12 +130,13 @@ final class ServiceRecord extends Binder implements ComponentName.WithComponentN
     int pendingConnectionImportance;   // To be filled in to ProcessRecord once it connects
 
     // any current binding to this service has BIND_ALLOW_BACKGROUND_ACTIVITY_STARTS flag?
-    private boolean hasBindingWhitelistingBgActivityStarts;
+    private boolean mHasBindingWhitelistingBgActivityStarts;
     // is this service currently whitelisted to start activities from background by providing
     // allowBackgroundActivityStarts=true to startServiceLocked()?
-    boolean hasStartedWhitelistingBgActivityStarts;
+    private boolean mHasStartedWhitelistingBgActivityStarts;
     // used to clean up the state of hasStartedWhitelistingBgActivityStarts after a timeout
-    Runnable startedWhitelistingBgActivityStartsCleanUp;
+    private Runnable mStartedWhitelistingBgActivityStartsCleanUp;
+    private ProcessRecord mAppForStartedWhitelistingBgActivityStarts;
 
     String stringName;      // caching of toString
 
@@ -384,13 +384,13 @@ final class ServiceRecord extends Binder implements ComponentName.WithComponentN
         if (whitelistManager) {
             pw.print(prefix); pw.print("whitelistManager="); pw.println(whitelistManager);
         }
-        if (hasBindingWhitelistingBgActivityStarts) {
+        if (mHasBindingWhitelistingBgActivityStarts) {
             pw.print(prefix); pw.print("hasBindingWhitelistingBgActivityStarts=");
-            pw.println(hasBindingWhitelistingBgActivityStarts);
+            pw.println(mHasBindingWhitelistingBgActivityStarts);
         }
-        if (hasStartedWhitelistingBgActivityStarts) {
+        if (mHasStartedWhitelistingBgActivityStarts) {
             pw.print(prefix); pw.print("hasStartedWhitelistingBgActivityStarts=");
-            pw.println(hasStartedWhitelistingBgActivityStarts);
+            pw.println(mHasStartedWhitelistingBgActivityStarts);
         }
         if (delayed) {
             pw.print(prefix); pw.print("delayed="); pw.println(delayed);
@@ -512,7 +512,7 @@ final class ServiceRecord extends Binder implements ComponentName.WithComponentN
         }
         if ((serviceInfo.applicationInfo.flags&ApplicationInfo.FLAG_PERSISTENT) == 0) {
             tracker = ams.mProcessStats.getServiceStateLocked(serviceInfo.packageName,
-                    serviceInfo.applicationInfo.uid, serviceInfo.applicationInfo.versionCode,
+                    serviceInfo.applicationInfo.uid, serviceInfo.applicationInfo.longVersionCode,
                     serviceInfo.processName, serviceInfo.name);
             tracker.applyNewOwner(this);
         }
@@ -530,7 +530,8 @@ final class ServiceRecord extends Binder implements ComponentName.WithComponentN
         if (restartTracker == null) {
             if ((serviceInfo.applicationInfo.flags&ApplicationInfo.FLAG_PERSISTENT) == 0) {
                 restartTracker = ams.mProcessStats.getServiceStateLocked(serviceInfo.packageName,
-                        serviceInfo.applicationInfo.uid, serviceInfo.applicationInfo.versionCode,
+                        serviceInfo.applicationInfo.uid,
+                        serviceInfo.applicationInfo.longVersionCode,
                         serviceInfo.processName, serviceInfo.name);
             }
             if (restartTracker == null) {
@@ -542,13 +543,33 @@ final class ServiceRecord extends Binder implements ComponentName.WithComponentN
 
     public void setProcess(ProcessRecord _proc) {
         if (_proc != null) {
-            if (hasStartedWhitelistingBgActivityStarts || hasBindingWhitelistingBgActivityStarts) {
+            // We're starting a new process for this service, but a previous one is whitelisted.
+            // Remove that whitelisting now (unless the new process is the same as the previous one,
+            // which is a common case).
+            if (mAppForStartedWhitelistingBgActivityStarts != null) {
+                if (mAppForStartedWhitelistingBgActivityStarts != _proc) {
+                    mAppForStartedWhitelistingBgActivityStarts
+                            .removeAllowBackgroundActivityStartsToken(this);
+                    ams.mHandler.removeCallbacks(mStartedWhitelistingBgActivityStartsCleanUp);
+                }
+            }
+            // Make sure the cleanup callback knows about the new process.
+            mAppForStartedWhitelistingBgActivityStarts = mHasStartedWhitelistingBgActivityStarts
+                    ? _proc : null;
+            if (mHasStartedWhitelistingBgActivityStarts
+                    || mHasBindingWhitelistingBgActivityStarts) {
                 _proc.addAllowBackgroundActivityStartsToken(this);
             } else {
                 _proc.removeAllowBackgroundActivityStartsToken(this);
             }
-        } else if (app != null) {
-            app.removeAllowBackgroundActivityStartsToken(this);
+        }
+        if (app != null && app != _proc) {
+            // If the old app is whitelisted because of a service start, leave it whitelisted until
+            // the cleanup callback runs. Otherwise we can remove it from the whitelist immediately
+            // (it can't be bound now).
+            if (!mHasStartedWhitelistingBgActivityStarts) {
+                app.removeAllowBackgroundActivityStartsToken(this);
+            }
             app.updateBoundClientUids();
         }
         app = _proc;
@@ -580,15 +601,17 @@ final class ServiceRecord extends Binder implements ComponentName.WithComponentN
         return connections;
     }
 
-    void putConnection(IBinder binder, ArrayList<ConnectionRecord> clist) {
-        connections.put(binder, clist);
-        // if we have a process attached, add bound client uids of this connection to it
+    void addConnection(IBinder binder, ConnectionRecord c) {
+        ArrayList<ConnectionRecord> clist = connections.get(binder);
+        if (clist == null) {
+            clist = new ArrayList<>();
+            connections.put(binder, clist);
+        }
+        clist.add(c);
+
+        // if we have a process attached, add bound client uid of this connection to it
         if (app != null) {
-            ArraySet<Integer> boundClientUids = new ArraySet<>();
-            for (int i = 0; i < clist.size(); i++) {
-                boundClientUids.add(clist.get(i).clientUid);
-            }
-            app.addBoundClientUids(boundClientUids);
+            app.addBoundClientUid(c.clientUid);
         }
     }
 
@@ -614,22 +637,57 @@ final class ServiceRecord extends Binder implements ComponentName.WithComponentN
                 break;
             }
         }
-        if (hasBindingWhitelistingBgActivityStarts != hasWhitelistingBinding) {
-            hasBindingWhitelistingBgActivityStarts = hasWhitelistingBinding;
-            updateParentProcessBgActivityStartsWhitelistingToken();
-        }
+        setHasBindingWhitelistingBgActivityStarts(hasWhitelistingBinding);
     }
 
     void setHasBindingWhitelistingBgActivityStarts(boolean newValue) {
-        if (hasBindingWhitelistingBgActivityStarts != newValue) {
-            hasBindingWhitelistingBgActivityStarts = newValue;
+        if (mHasBindingWhitelistingBgActivityStarts != newValue) {
+            mHasBindingWhitelistingBgActivityStarts = newValue;
             updateParentProcessBgActivityStartsWhitelistingToken();
         }
     }
 
-    void setHasStartedWhitelistingBgActivityStarts(boolean newValue) {
-        if (hasStartedWhitelistingBgActivityStarts != newValue) {
-            hasStartedWhitelistingBgActivityStarts = newValue;
+    /**
+     * Called when the service is started with allowBackgroundActivityStarts set. We whitelist
+     * it for background activity starts, setting up a callback to remove the whitelisting after a
+     * timeout. Note that the whitelisting persists for the process even if the service is
+     * subsequently stopped.
+     */
+    void whitelistBgActivityStartsOnServiceStart() {
+        setHasStartedWhitelistingBgActivityStarts(true);
+        if (app != null) {
+            mAppForStartedWhitelistingBgActivityStarts = app;
+        }
+
+        // This callback is stateless, so we create it once when we first need it.
+        if (mStartedWhitelistingBgActivityStartsCleanUp == null) {
+            mStartedWhitelistingBgActivityStartsCleanUp = () -> {
+                synchronized (ams) {
+                    if (app == mAppForStartedWhitelistingBgActivityStarts) {
+                        // The process we whitelisted is still running the service. We remove
+                        // the started whitelisting, but it may still be whitelisted via bound
+                        // connections.
+                        setHasStartedWhitelistingBgActivityStarts(false);
+                    } else  if (mAppForStartedWhitelistingBgActivityStarts != null) {
+                        // The process we whitelisted is not running the service. It therefore
+                        // can't be bound so we can unconditionally remove the whitelist.
+                        mAppForStartedWhitelistingBgActivityStarts
+                                .removeAllowBackgroundActivityStartsToken(ServiceRecord.this);
+                    }
+                    mAppForStartedWhitelistingBgActivityStarts = null;
+                }
+            };
+        }
+
+        // if there's a request pending from the past, drop it before scheduling a new one
+        ams.mHandler.removeCallbacks(mStartedWhitelistingBgActivityStartsCleanUp);
+        ams.mHandler.postDelayed(mStartedWhitelistingBgActivityStartsCleanUp,
+                ams.mConstants.SERVICE_BG_ACTIVITY_START_TIMEOUT);
+    }
+
+    private void setHasStartedWhitelistingBgActivityStarts(boolean newValue) {
+        if (mHasStartedWhitelistingBgActivityStarts != newValue) {
+            mHasStartedWhitelistingBgActivityStarts = newValue;
             updateParentProcessBgActivityStartsWhitelistingToken();
         }
     }
@@ -647,8 +705,8 @@ final class ServiceRecord extends Binder implements ComponentName.WithComponentN
         if (app == null) {
             return;
         }
-        if (hasStartedWhitelistingBgActivityStarts || hasBindingWhitelistingBgActivityStarts) {
-            // if the token is already there it's safe to "re-add it" - we're deadling with
+        if (mHasStartedWhitelistingBgActivityStarts || mHasBindingWhitelistingBgActivityStarts) {
+            // if the token is already there it's safe to "re-add it" - we're dealing with
             // a set of Binder objects
             app.addAllowBackgroundActivityStartsToken(this);
         } else {

@@ -836,13 +836,6 @@ public class CarrierConfigManager {
             "carrier_metered_roaming_apn_types_strings";
 
     /**
-     * Default APN types that are metered on IWLAN by the carrier
-     * @hide
-     */
-    public static final String KEY_CARRIER_METERED_IWLAN_APN_TYPES_STRINGS =
-            "carrier_metered_iwlan_apn_types_strings";
-
-    /**
      * CDMA carrier ERI (Enhanced Roaming Indicator) file name
      * @hide
      */
@@ -1139,6 +1132,7 @@ public class CarrierConfigManager {
      * <li>  8: Wi-Fi</li>
      * <li>  9: WiFi Calling</li>
      * <li> 10: VoWifi</li>
+     * <li> 11: %s WiFi Calling</li>
      * @hide
      */
     public static final String KEY_WFC_SPN_FORMAT_IDX_INT = "wfc_spn_format_idx_int";
@@ -1202,7 +1196,7 @@ public class CarrierConfigManager {
      * Override the SPN Display Condition 2 integer bits (lsb). B2, B1 is the last two bits of the
      * spn display condition coding.
      *
-     * The default value -1 mean this field is not config.
+     * The default value -1 mean this field is not set.
      *
      * B1 = 0: display of registered PLMN name not required when registered PLMN is either HPLMN
      * or a PLMN in the service provider PLMN list (see EF_SPDI).
@@ -1241,7 +1235,7 @@ public class CarrierConfigManager {
 
     /**
      * Override the PNN - a string array of comma-separated alpha long and short names:
-     * "alpha_long1, alpha_short1".
+     * "alpha_long1,alpha_short1".
      *
      * Reference: 3GPP TS 31.102 v15.2.0 Section 4.2.58 EF_PNN.
      * @hide
@@ -1259,6 +1253,8 @@ public class CarrierConfigManager {
 
     /**
      * Allow ERI rules to select a carrier name display string when using 3gpp2 access technologies.
+     * If this bit is not set, the carrier name display string will be selected from the carrier
+     * display name resolver which doesn't apply the ERI rules.
      *
      * @hide
      */
@@ -1976,26 +1972,6 @@ public class CarrierConfigManager {
      * @hide
      */
     public static final String KEY_CARRIER_WIFI_STRING_ARRAY = "carrier_wifi_string_array";
-
-    /**
-     * Base64 Encoding method the carrier will use for encoding encrypted IMSI and SSID.
-     * The value set as below:
-     * 2045 - RFC2045 (default value)
-     * 4648 - RFC4648
-     *
-     * @hide
-     */
-    public static final String KEY_IMSI_ENCODING_METHOD_INT = "imsi_encoding_method_int";
-
-    /**
-     * Defines the sequence of sending an encrypted IMSI identity for EAP-SIM/AKA authentication.
-     * The value set as below:
-     * 1 - encrypted IMSI as EAP-RESPONSE/IDENTITY (default one).
-     * 2 - anonymous as EAP-RESPONSE/IDENTITY -> encrypted IMSI as EAP-RESPONSE/AKA|SIM-IDENTITY.
-     *
-     * @hide
-     */
-    public static final String KEY_EAP_IDENTITY_SEQUENCE_INT = "imsi_eap_identity_sequence_int";
 
     /**
      * Time delay (in ms) after which we show the notification to switch the preferred
@@ -2789,7 +2765,7 @@ public class CarrierConfigManager {
         /**
          * Control Plane / SUPL NI emergency extension time in seconds. Default to "0".
          */
-        public static final String KEY_ES_EXTENSION_SEC = KEY_PREFIX + "es_extension_sec";
+        public static final String KEY_ES_EXTENSION_SEC_STRING = KEY_PREFIX + "es_extension_sec";
 
         /**
          * Space separated list of Android package names of proxy applications representing
@@ -2797,7 +2773,7 @@ public class CarrierConfigManager {
          * the framework, as managed by IGnssVisibilityControl.hal. For example,
          * "com.example.mdt com.example.ims".
          */
-        public static final String KEY_NFW_PROXY_APPS = KEY_PREFIX + "nfw_proxy_apps";
+        public static final String KEY_NFW_PROXY_APPS_STRING = KEY_PREFIX + "nfw_proxy_apps";
 
         private static PersistableBundle getDefaults() {
             PersistableBundle defaults = new PersistableBundle();
@@ -2811,10 +2787,63 @@ public class CarrierConfigManager {
             defaults.putString(KEY_USE_EMERGENCY_PDN_FOR_EMERGENCY_SUPL_STRING, "1");
             defaults.putString(KEY_A_GLONASS_POS_PROTOCOL_SELECT_STRING, "0");
             defaults.putString(KEY_GPS_LOCK_STRING, "3");
-            defaults.putString(KEY_ES_EXTENSION_SEC, "0");
-            defaults.putString(KEY_NFW_PROXY_APPS, "");
+            defaults.putString(KEY_ES_EXTENSION_SEC_STRING, "0");
+            defaults.putString(KEY_NFW_PROXY_APPS_STRING, "");
             return defaults;
         }
+    }
+
+    /**
+     * Wi-Fi configs used in Carrier Wi-Fi application.
+     * TODO(b/132059890): Expose it in a future release as systemapi.
+     *
+     * @hide
+     */
+    public static final class Wifi {
+        /** Prefix of all Wifi.KEY_* constants. */
+        public static final String KEY_PREFIX = "wifi.";
+
+        /**
+         * Whenever any information under wifi namespace is changed, the version should be
+         * incremented by 1 so that the device is able to figure out the latest profiles based on
+         * the version.
+         */
+        public static final String KEY_CARRIER_PROFILES_VERSION_INT =
+                KEY_PREFIX + "carrier_profiles_version_int";
+
+        /**
+         * It contains the package name of connection manager that the carrier owns.
+         *
+         * <P>Once it is installed, the profiles installed by Carrier Wi-Fi Application
+         * will be deleted.
+         * Once it is uninstalled, Carrier Wi-Fi Application will re-install the latest profiles.
+         */
+        public static final String KEY_CARRIER_CONNECTION_MANAGER_PACKAGE_STRING =
+                KEY_PREFIX + "carrier_connection_manager_package_string";
+        /**
+         * It is to have the list of wifi networks profiles which contain the information about
+         * the wifi-networks to which carrier wants the device to connect.
+         */
+        public static final String KEY_NETWORK_PROFILES_STRING_ARRAY =
+                KEY_PREFIX + "network_profiles_string_array";
+
+        /**
+         * It is to have the list of Passpoint profiles which contain the information about
+         * the Passpoint networks to which carrier wants the device to connect.
+         */
+        public static final String KEY_PASSPOINT_PROFILES_STRING_ARRAY =
+                KEY_PREFIX + "passpoint_profiles_string_array";
+
+        private static PersistableBundle getDefaults() {
+            PersistableBundle defaults = new PersistableBundle();
+            defaults.putInt(KEY_CARRIER_PROFILES_VERSION_INT, -1);
+            defaults.putString(KEY_CARRIER_CONNECTION_MANAGER_PACKAGE_STRING, null);
+            defaults.putStringArray(KEY_NETWORK_PROFILES_STRING_ARRAY, null);
+            defaults.putStringArray(KEY_PASSPOINT_PROFILES_STRING_ARRAY, null);
+            return defaults;
+        }
+
+        private Wifi() {}
     }
 
    /**
@@ -2908,6 +2937,15 @@ public class CarrierConfigManager {
      */
     public static final String KEY_GSM_RSSI_THRESHOLDS_INT_ARRAY =
             "gsm_rssi_thresholds_int_array";
+
+    /**
+     * Determines whether Wireless Priority Service call is supported over IMS.
+     *
+     * See Wireless Priority Service from https://www.fcc.gov/general/wireless-priority-service-wps
+     * @hide
+     */
+    public static final String KEY_SUPPORT_WPS_OVER_IMS_BOOL =
+            "support_wps_over_ims_bool";
 
     /** The default value for every variable. */
     private final static PersistableBundle sDefaults;
@@ -3043,15 +3081,6 @@ public class CarrierConfigManager {
                 new String[]{"default", "mms", "dun", "supl"});
         sDefaults.putStringArray(KEY_CARRIER_METERED_ROAMING_APN_TYPES_STRINGS,
                 new String[]{"default", "mms", "dun", "supl"});
-        // By default all APNs should be unmetered if the device is on IWLAN. However, we add
-        // default APN as metered here as a workaround for P because in some cases, a data
-        // connection was brought up on cellular, but later on the device camped on IWLAN. That
-        // data connection was incorrectly treated as unmetered due to the current RAT IWLAN.
-        // Marking it as metered for now can workaround the issue.
-        // Todo: This will be fixed in Q when IWLAN full refactoring is completed.
-        sDefaults.putStringArray(KEY_CARRIER_METERED_IWLAN_APN_TYPES_STRINGS,
-                new String[]{"default"});
-
         sDefaults.putIntArray(KEY_ONLY_SINGLE_DC_ALLOWED_INT_ARRAY,
                 new int[]{
                     4, /* IS95A */
@@ -3217,8 +3246,6 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_STK_DISABLE_LAUNCH_BROWSER_BOOL, false);
         sDefaults.putBoolean(KEY_ALLOW_METERED_NETWORK_FOR_CERT_DOWNLOAD_BOOL, false);
         sDefaults.putStringArray(KEY_CARRIER_WIFI_STRING_ARRAY, null);
-        sDefaults.putInt(KEY_IMSI_ENCODING_METHOD_INT, 2045);
-        sDefaults.putInt(KEY_EAP_IDENTITY_SEQUENCE_INT, 1);
         sDefaults.putInt(KEY_PREF_NETWORK_NOTIFICATION_DELAY_INT, -1);
         sDefaults.putInt(KEY_EMERGENCY_NOTIFICATION_DELAY_INT, -1);
         sDefaults.putBoolean(KEY_ALLOW_USSD_REQUESTS_VIA_TELEPHONY_MANAGER_BOOL, true);
@@ -3305,13 +3332,14 @@ public class CarrierConfigManager {
         /* Default value is 10 seconds. */
         sDefaults.putLong(KEY_OPPORTUNISTIC_NETWORK_DATA_SWITCH_HYSTERESIS_TIME_LONG, 10000);
         sDefaults.putAll(Gps.getDefaults());
+        sDefaults.putAll(Wifi.getDefaults());
         sDefaults.putIntArray(KEY_CDMA_ENHANCED_ROAMING_INDICATOR_FOR_HOME_NETWORK_INT_ARRAY,
                 new int[] {
                         1 /* Roaming Indicator Off */
                 });
         sDefaults.putStringArray(KEY_EMERGENCY_NUMBER_PREFIX_STRING_ARRAY, new String[0]);
         sDefaults.putBoolean(KEY_USE_USIM_BOOL, false);
-        sDefaults.putBoolean(KEY_SHOW_WFC_LOCATION_PRIVACY_POLICY_BOOL, true);
+        sDefaults.putBoolean(KEY_SHOW_WFC_LOCATION_PRIVACY_POLICY_BOOL, false);
         sDefaults.putBoolean(KEY_AUTO_CANCEL_CS_REJECT_NOTIFICATION, false);
         sDefaults.putString(KEY_SMART_FORWARDING_CONFIG_COMPONENT_NAME_STRING, "");
         sDefaults.putBoolean(KEY_ALWAYS_SHOW_PRIMARY_SIGNAL_BAR_IN_OPPORTUNISTIC_NETWORK_BOOLEAN,
@@ -3325,6 +3353,7 @@ public class CarrierConfigManager {
                         -97, /* SIGNAL_STRENGTH_GOOD */
                         -89,  /* SIGNAL_STRENGTH_GREAT */
                 });
+        sDefaults.putBoolean(KEY_SUPPORT_WPS_OVER_IMS_BOOL, true);
     }
 
     /**
@@ -3369,8 +3398,7 @@ public class CarrierConfigManager {
      * May throw an {@link IllegalArgumentException} if {@code overrideValues} contains invalid
      * values for the specified config keys.
      *
-     * NOTE: This API is meant for testing purposes only and may only be accessed from the shell UID
-     * during instrumentation testing.
+     * NOTE: This API is meant for testing purposes only.
      *
      * @param subscriptionId The subscription ID for which the override should be done.
      * @param overrideValues Key-value pairs of the values that are to be overridden. If set to

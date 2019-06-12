@@ -157,6 +157,12 @@ public class NetworkUtils {
     public static native void resNetworkCancel(FileDescriptor fd);
 
     /**
+     * DNS resolver series jni method.
+     * Attempts to get network which resolver will use if no network is explicitly selected.
+     */
+    public static native Network getDnsNetwork() throws ErrnoException;
+
+    /**
      * Get the tcp repair window associated with the {@code fd}.
      *
      * @param fd the tcp socket's {@link FileDescriptor}.

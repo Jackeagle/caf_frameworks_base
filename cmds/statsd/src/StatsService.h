@@ -33,6 +33,7 @@
 #include <android/os/IStatsCompanionService.h>
 #include <android/os/IStatsManager.h>
 #include <binder/IResultReceiver.h>
+#include <binder/ParcelFileDescriptor.h>
 #include <utils/Looper.h>
 
 #include <deque>
@@ -72,9 +73,7 @@ public:
     virtual Status informPollAlarmFired();
     virtual Status informAlarmForSubscriberTriggeringFired();
 
-    virtual Status informAllUidData(const vector<int32_t>& uid, const vector<int64_t>& version,
-                                    const vector<String16>& version_string,
-                                    const vector<String16>& app, const vector<String16>& installer);
+    virtual Status informAllUidData(const ParcelFileDescriptor& fd);
     virtual Status informOnePackage(const String16& app, int32_t uid, int64_t version,
                                     const String16& version_string, const String16& installer);
     virtual Status informOnePackageRemoved(const String16& app, int32_t uid);
@@ -189,8 +188,19 @@ public:
      * Binder call to log BinaryPushStateChanged atom.
      */
     virtual Status sendBinaryPushStateChangedAtom(
-            const android::String16& trainName, int64_t trainVersionCode, int options,
-            int32_t state, const std::vector<int64_t>& experimentIds) override;
+            const android::String16& trainNameIn,
+            const int64_t trainVersionCodeIn,
+            const int options,
+            const int32_t state,
+            const std::vector<int64_t>& experimentIdsIn) override;
+
+    /**
+     * Binder call to log WatchdogRollbackOccurred atom.
+     */
+    virtual Status sendWatchdogRollbackOccurredAtom(
+            const int32_t rollbackTypeIn,
+            const android::String16& packageNameIn,
+            const int64_t packageVersionCodeIn) override;
 
     /**
      * Binder call to get registered experiment IDs.
@@ -328,6 +338,11 @@ private:
     status_t cmd_log_app_breadcrumb(int outFd, const Vector<String8>& args);
 
     /**
+     * Write an BinaryPushStateChanged event, as if calling StatsLog.logBinaryPushStateChanged().
+     */
+    status_t cmd_log_binary_push(int outFd, const Vector<String8>& args);
+
+    /**
      * Print contents of a pulled metrics source.
      */
     status_t cmd_print_pulled_metrics(int outFd, const Vector<String8>& args);
@@ -419,6 +434,7 @@ private:
 
     std::shared_ptr<LogEventQueue> mEventQueue;
 
+    FRIEND_TEST(StatsLogProcessorTest, TestActivationsPersistAcrossSystemServerRestart);
     FRIEND_TEST(StatsServiceTest, TestAddConfig_simple);
     FRIEND_TEST(StatsServiceTest, TestAddConfig_empty);
     FRIEND_TEST(StatsServiceTest, TestAddConfig_invalid);

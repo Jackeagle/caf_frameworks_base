@@ -1791,6 +1791,58 @@ public final class Settings {
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_MANAGE_DOMAIN_URLS = "android.settings.MANAGE_DOMAIN_URLS";
 
+    /**
+     * Broadcast to trigger notification of asking user to enable MMS.
+     * Need to specify {@link #EXTRA_ENABLE_MMS_DATA_REQUEST_REASON} and {@link #EXTRA_SUB_ID}.
+     *
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    public static final String ACTION_ENABLE_MMS_DATA_REQUEST =
+            "android.settings.ENABLE_MMS_DATA_REQUEST";
+
+    /**
+     * Integer value that specifies the reason triggering enable MMS data notification.
+     * This must be passed as an extra field to the {@link #ACTION_ENABLE_MMS_DATA_REQUEST}.
+     * Extra with value of EnableMmsDataReason interface.
+     * @hide
+     */
+    public static final String EXTRA_ENABLE_MMS_DATA_REQUEST_REASON =
+            "android.settings.extra.ENABLE_MMS_DATA_REQUEST_REASON";
+
+    /** @hide */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(prefix = { "ENABLE_MMS_DATA_REQUEST_REASON_" }, value = {
+            ENABLE_MMS_DATA_REQUEST_REASON_INCOMING_MMS,
+            ENABLE_MMS_DATA_REQUEST_REASON_OUTGOING_MMS,
+    })
+    public @interface EnableMmsDataReason{}
+
+    /**
+     * Requesting to enable MMS data because there's an incoming MMS.
+     * @hide
+     */
+    public static final int ENABLE_MMS_DATA_REQUEST_REASON_INCOMING_MMS = 0;
+
+    /**
+     * Requesting to enable MMS data because user is sending MMS.
+     * @hide
+     */
+    public static final int ENABLE_MMS_DATA_REQUEST_REASON_OUTGOING_MMS = 1;
+
+    /**
+     * Activity Action: Show screen of a cellular subscription and highlight the
+     * "enable MMS" toggle.
+     * <p>
+     * Input: {@link #EXTRA_SUB_ID}: Sub ID of the subscription.
+     * <p>
+     * Output: Nothing
+     *
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_MMS_MESSAGE_SETTING = "android.settings.MMS_MESSAGE_SETTING";
+
     // End of Intent actions for Settings
 
     /**
@@ -3403,10 +3455,25 @@ public final class Settings {
          */
         public static final String DISPLAY_COLOR_MODE = "display_color_mode";
 
-        private static final Validator DISPLAY_COLOR_MODE_VALIDATOR =
-                new SettingsValidators.InclusiveIntegerRangeValidator(
-                        ColorDisplayManager.COLOR_MODE_NATURAL,
-                        ColorDisplayManager.COLOR_MODE_AUTOMATIC);
+        private static final Validator DISPLAY_COLOR_MODE_VALIDATOR = new Validator() {
+            @Override
+            public boolean validate(@Nullable String value) {
+                // Assume the actual validation that this device can properly handle this kind of
+                // color mode further down in ColorDisplayManager / ColorDisplayService.
+                try {
+                    final int setting = Integer.parseInt(value);
+                    final boolean isInFrameworkRange =
+                            setting >= ColorDisplayManager.COLOR_MODE_NATURAL
+                                    && setting <= ColorDisplayManager.COLOR_MODE_AUTOMATIC;
+                    final boolean isInVendorRange =
+                            setting >= ColorDisplayManager.VENDOR_COLOR_MODE_RANGE_MIN
+                                    && setting <= ColorDisplayManager.VENDOR_COLOR_MODE_RANGE_MAX;
+                    return isInFrameworkRange || isInVendorRange;
+                } catch (NumberFormatException | NullPointerException e) {
+                    return false;
+                }
+            }
+        };
 
         /**
          * The user selected peak refresh rate in frames per second.
@@ -6053,9 +6120,8 @@ public final class Settings {
                 "unknown_sources_default_reversed";
 
         /**
-         * Comma-separated list of location providers that are accessible. Do not rely on
-         * this value being present or correct, or on ContentObserver notifications on the
-         * corresponding Uri.
+         * Comma-separated list of location providers that are enabled. Do not rely on this value
+         * being present or correct, or on ContentObserver notifications on the corresponding Uri.
          *
          * @deprecated The preferred methods for checking provider status and listening for changes
          * are via {@link LocationManager#isProviderEnabled(String)} and
@@ -6098,17 +6164,14 @@ public final class Settings {
 
         /**
          * Location mode is off.
-         *
-         * @deprecated See {@link #LOCATION_MODE}.
          */
-        @Deprecated
         public static final int LOCATION_MODE_OFF = 0;
 
         /**
          * This mode no longer has any distinct meaning, but is interpreted as the location mode is
          * on.
          *
-         * @deprecated See {@link #LOCATION_MODE_ON}.
+         * @deprecated See {@link #LOCATION_MODE}.
          */
         @Deprecated
         public static final int LOCATION_MODE_SENSORS_ONLY = 1;
@@ -6117,7 +6180,7 @@ public final class Settings {
          * This mode no longer has any distinct meaning, but is interpreted as the location mode is
          * on.
          *
-         * @deprecated See {@link #LOCATION_MODE_ON}.
+         * @deprecated See {@link #LOCATION_MODE}.
          */
         @Deprecated
         public static final int LOCATION_MODE_BATTERY_SAVING = 2;
@@ -6126,7 +6189,7 @@ public final class Settings {
          * This mode no longer has any distinct meaning, but is interpreted as the location mode is
          * on.
          *
-         * @deprecated See {@link #LOCATION_MODE_ON}.
+         * @deprecated See {@link #LOCATION_MODE}.
          */
         @Deprecated
         public static final int LOCATION_MODE_HIGH_ACCURACY = 3;
@@ -6134,9 +6197,9 @@ public final class Settings {
         /**
          * Location mode is on.
          *
-         * @deprecated See {@link #LOCATION_MODE}.
+         * @hide
          */
-        @Deprecated
+        @SystemApi
         public static final int LOCATION_MODE_ON = LOCATION_MODE_HIGH_ACCURACY;
 
         /**
@@ -6434,6 +6497,28 @@ public final class Settings {
 
         private static final Validator TOUCH_EXPLORATION_GRANTED_ACCESSIBILITY_SERVICES_VALIDATOR =
                 new SettingsValidators.ComponentNameListValidator(":");
+
+        /**
+         * Whether the Global Actions Panel is enabled.
+         * @hide
+         */
+        public static final String GLOBAL_ACTIONS_PANEL_ENABLED = "global_actions_panel_enabled";
+
+        private static final Validator GLOBAL_ACTIONS_PANEL_ENABLED_VALIDATOR = BOOLEAN_VALIDATOR;
+
+        /**
+         * Whether the Global Actions Panel can be toggled on or off in Settings.
+         * @hide
+         */
+        public static final String GLOBAL_ACTIONS_PANEL_AVAILABLE =
+                "global_actions_panel_available";
+
+        /**
+         * Enables debug mode for the Global Actions Panel.
+         * @hide
+         */
+        public static final String GLOBAL_ACTIONS_PANEL_DEBUG_ENABLED =
+                "global_actions_panel_debug_enabled";
 
         /**
          * Whether the hush gesture has ever been used
@@ -7714,6 +7799,9 @@ public final class Settings {
          */
         public static final String UI_NIGHT_MODE = "ui_night_mode";
 
+        private static final Validator UI_NIGHT_MODE_VALIDATOR =
+                new SettingsValidators.InclusiveIntegerRangeValidator(0, 2);
+
         /**
          * Whether screensavers are enabled.
          * @hide
@@ -7983,6 +8071,25 @@ public final class Settings {
                 "lock_screen_show_notifications";
 
         /**
+         * Indicates whether the lock screen should display silent notifications.
+         * <p>
+         * Type: int (0 for false, 1 for true)
+         *
+         * @hide
+         */
+        public static final String LOCK_SCREEN_SHOW_SILENT_NOTIFICATIONS =
+                "lock_screen_show_silent_notifications";
+
+        /**
+         * Indicates whether snooze options should be shown on notifications
+         * <p>
+         * Type: int (0 for false, 1 for true)
+         *
+         * @hide
+         */
+        public static final String SHOW_NOTIFICATION_SNOOZE = "show_notification_snooze";
+
+        /**
          * List of TV inputs that are currently hidden. This is a string
          * containing the IDs of all hidden TV inputs. Each ID is encoded by
          * {@link android.net.Uri#encode(String)} and separated by ':'.
@@ -8179,6 +8286,16 @@ public final class Settings {
                 "face_unlock_always_require_confirmation";
 
         private static final Validator FACE_UNLOCK_ALWAYS_REQUIRE_CONFIRMATION_VALIDATOR =
+                BOOLEAN_VALIDATOR;
+
+        /**
+         * Whether or not the face unlock education screen has been shown to the user.
+         * @hide
+         */
+        public static final String FACE_UNLOCK_EDUCATION_INFO_DISPLAYED =
+                "face_unlock_education_info_displayed";
+
+        private static final Validator FACE_UNLOCK_EDUCATION_INFO_DISPLAYED_VALIDATOR =
                 BOOLEAN_VALIDATOR;
 
         /**
@@ -8722,12 +8839,33 @@ public final class Settings {
                 SettingsValidators.JSON_OBJECT_VALIDATOR;
 
         /**
+         * Navigation bar mode.
+         *  0 = 3 button
+         *  1 = 2 button
+         *  2 = fully gestural
+         * @hide
+         */
+        public static final String NAVIGATION_MODE =
+                "navigation_mode";
+        private static final Validator NAVIGATION_MODE_VALIDATOR =
+                new SettingsValidators.DiscreteValueValidator(new String[] {"0", "1", "2"});
+
+        /**
          * Controls whether aware is enabled.
          * @hide
          */
         public static final String AWARE_ENABLED = "aware_enabled";
 
         private static final Validator AWARE_ENABLED_VALIDATOR = BOOLEAN_VALIDATOR;
+
+        /**
+         * Controls whether aware_lock is enabled.
+         * @hide
+         */
+        public static final String AWARE_LOCK_ENABLED = "aware_lock_enabled";
+
+        private static final Validator AWARE_LOCK_ENABLED_VALIDATOR = BOOLEAN_VALIDATOR;
+
         /**
          * This are the settings to be backed up.
          *
@@ -8838,6 +8976,8 @@ public final class Settings {
             LOCK_SCREEN_ALLOW_PRIVATE_NOTIFICATIONS,
             LOCK_SCREEN_CUSTOM_CLOCK_FACE,
             LOCK_SCREEN_SHOW_NOTIFICATIONS,
+            LOCK_SCREEN_SHOW_SILENT_NOTIFICATIONS,
+            SHOW_NOTIFICATION_SNOOZE,
             ZEN_DURATION,
             SHOW_ZEN_UPGRADE_NOTIFICATION,
             SHOW_ZEN_SETTINGS_SUGGESTION,
@@ -8849,17 +8989,21 @@ public final class Settings {
             ACCESSIBILITY_INTERACTIVE_UI_TIMEOUT_MS,
             NOTIFICATION_NEW_INTERRUPTION_MODEL,
             TRUST_AGENTS_EXTEND_UNLOCK,
+            UI_NIGHT_MODE,
             LOCK_SCREEN_WHEN_TRUST_LOST,
             SKIP_GESTURE,
             SILENCE_GESTURE,
             THEME_CUSTOMIZATION_OVERLAY_PACKAGES,
+            NAVIGATION_MODE,
             AWARE_ENABLED,
             SKIP_GESTURE_COUNT,
             SILENCE_ALARMS_GESTURE_COUNT,
             SILENCE_NOTIFICATION_GESTURE_COUNT,
             SILENCE_CALL_GESTURE_COUNT,
             SILENCE_TIMER_GESTURE_COUNT,
-            DARK_MODE_DIALOG_SEEN
+            DARK_MODE_DIALOG_SEEN,
+            GLOBAL_ACTIONS_PANEL_ENABLED,
+            AWARE_LOCK_ENABLED
         };
 
         /**
@@ -8985,6 +9129,8 @@ public final class Settings {
             VALIDATORS.put(FACE_UNLOCK_APP_ENABLED, FACE_UNLOCK_APP_ENABLED_VALIDATOR);
             VALIDATORS.put(FACE_UNLOCK_ALWAYS_REQUIRE_CONFIRMATION,
                     FACE_UNLOCK_ALWAYS_REQUIRE_CONFIRMATION_VALIDATOR);
+            VALIDATORS.put(FACE_UNLOCK_EDUCATION_INFO_DISPLAYED,
+                    FACE_UNLOCK_EDUCATION_INFO_DISPLAYED_VALIDATOR);
             VALIDATORS.put(ASSIST_GESTURE_ENABLED, ASSIST_GESTURE_ENABLED_VALIDATOR);
             VALIDATORS.put(ASSIST_GESTURE_SILENCE_ALERTS_ENABLED,
                     ASSIST_GESTURE_SILENCE_ALERTS_ENABLED_VALIDATOR);
@@ -9013,6 +9159,8 @@ public final class Settings {
             VALIDATORS.put(IN_CALL_NOTIFICATION_ENABLED, IN_CALL_NOTIFICATION_ENABLED_VALIDATOR);
             VALIDATORS.put(LOCK_SCREEN_ALLOW_PRIVATE_NOTIFICATIONS, BOOLEAN_VALIDATOR);
             VALIDATORS.put(LOCK_SCREEN_SHOW_NOTIFICATIONS, BOOLEAN_VALIDATOR);
+            VALIDATORS.put(LOCK_SCREEN_SHOW_SILENT_NOTIFICATIONS, BOOLEAN_VALIDATOR);
+            VALIDATORS.put(SHOW_NOTIFICATION_SNOOZE, BOOLEAN_VALIDATOR);
             VALIDATORS.put(ZEN_DURATION, ZEN_DURATION_VALIDATOR);
             VALIDATORS.put(SHOW_ZEN_UPGRADE_NOTIFICATION, BOOLEAN_VALIDATOR);
             VALIDATORS.put(SHOW_ZEN_SETTINGS_SUGGESTION, BOOLEAN_VALIDATOR);
@@ -9033,6 +9181,7 @@ public final class Settings {
             VALIDATORS.put(SILENCE_GESTURE, SILENCE_GESTURE_VALIDATOR);
             VALIDATORS.put(THEME_CUSTOMIZATION_OVERLAY_PACKAGES,
                     THEME_CUSTOMIZATION_OVERLAY_PACKAGES_VALIDATOR);
+            VALIDATORS.put(NAVIGATION_MODE, NAVIGATION_MODE_VALIDATOR);
             VALIDATORS.put(AWARE_ENABLED, AWARE_ENABLED_VALIDATOR);
             VALIDATORS.put(SKIP_GESTURE_COUNT, SKIP_GESTURE_COUNT_VALIDATOR);
             VALIDATORS.put(SILENCE_ALARMS_GESTURE_COUNT, SILENCE_GESTURE_COUNT_VALIDATOR);
@@ -9041,6 +9190,9 @@ public final class Settings {
             VALIDATORS.put(SILENCE_NOTIFICATION_GESTURE_COUNT, SILENCE_GESTURE_COUNT_VALIDATOR);
             VALIDATORS.put(ODI_CAPTIONS_ENABLED, ODI_CAPTIONS_ENABLED_VALIDATOR);
             VALIDATORS.put(DARK_MODE_DIALOG_SEEN, BOOLEAN_VALIDATOR);
+            VALIDATORS.put(UI_NIGHT_MODE, UI_NIGHT_MODE_VALIDATOR);
+            VALIDATORS.put(GLOBAL_ACTIONS_PANEL_ENABLED, GLOBAL_ACTIONS_PANEL_ENABLED_VALIDATOR);
+            VALIDATORS.put(AWARE_LOCK_ENABLED, AWARE_LOCK_ENABLED_VALIDATOR);
         }
 
         /**
@@ -9068,6 +9220,7 @@ public final class Settings {
             CLONE_TO_MANAGED_PROFILE.add(ACCESSIBILITY_ENABLED);
             CLONE_TO_MANAGED_PROFILE.add(ALLOW_MOCK_LOCATION);
             CLONE_TO_MANAGED_PROFILE.add(ALLOWED_GEOLOCATION_ORIGINS);
+            CLONE_TO_MANAGED_PROFILE.add(CONTENT_CAPTURE_ENABLED);
             CLONE_TO_MANAGED_PROFILE.add(ENABLED_ACCESSIBILITY_SERVICES);
             CLONE_TO_MANAGED_PROFILE.add(LOCATION_CHANGER);
             CLONE_TO_MANAGED_PROFILE.add(LOCATION_MODE);
@@ -11124,8 +11277,6 @@ public final class Settings {
          *
          * @hide
          */
-        @SystemApi
-        @TestApi
         public static final int CAPTIVE_PORTAL_MODE_IGNORE = 0;
 
         /**
@@ -11134,8 +11285,6 @@ public final class Settings {
          *
          * @hide
          */
-        @SystemApi
-        @TestApi
         public static final int CAPTIVE_PORTAL_MODE_PROMPT = 1;
 
         /**
@@ -11144,8 +11293,6 @@ public final class Settings {
          *
          * @hide
          */
-        @SystemApi
-        @TestApi
         public static final int CAPTIVE_PORTAL_MODE_AVOID = 2;
 
         /**
@@ -11155,8 +11302,6 @@ public final class Settings {
          * The default for this setting is CAPTIVE_PORTAL_MODE_PROMPT.
          * @hide
          */
-        @SystemApi
-        @TestApi
         public static final String CAPTIVE_PORTAL_MODE = "captive_portal_mode";
 
         /**
@@ -11185,8 +11330,6 @@ public final class Settings {
          *
          * @hide
          */
-        @SystemApi
-        @TestApi
         public static final String CAPTIVE_PORTAL_HTTPS_URL = "captive_portal_https_url";
 
         /**
@@ -11195,8 +11338,6 @@ public final class Settings {
          *
          * @hide
          */
-        @SystemApi
-        @TestApi
         public static final String CAPTIVE_PORTAL_HTTP_URL = "captive_portal_http_url";
 
         /**
@@ -11205,8 +11346,6 @@ public final class Settings {
          *
          * @hide
          */
-        @SystemApi
-        @TestApi
         public static final String CAPTIVE_PORTAL_FALLBACK_URL = "captive_portal_fallback_url";
 
         /**
@@ -11215,8 +11354,6 @@ public final class Settings {
          *
          * @hide
          */
-        @SystemApi
-        @TestApi
         public static final String CAPTIVE_PORTAL_OTHER_FALLBACK_URLS =
                 "captive_portal_other_fallback_urls";
 
@@ -11226,8 +11363,6 @@ public final class Settings {
          * by "@@,@@".
          * @hide
          */
-        @SystemApi
-        @TestApi
         public static final String CAPTIVE_PORTAL_FALLBACK_PROBE_SPECS =
                 "captive_portal_fallback_probe_specs";
 
@@ -11238,8 +11373,6 @@ public final class Settings {
          *
          * @hide
          */
-        @SystemApi
-        @TestApi
         public static final String CAPTIVE_PORTAL_USE_HTTPS = "captive_portal_use_https";
 
         /**
@@ -11248,8 +11381,6 @@ public final class Settings {
          *
          * @hide
          */
-        @SystemApi
-        @TestApi
         public static final String CAPTIVE_PORTAL_USER_AGENT = "captive_portal_user_agent";
 
         /**
@@ -11516,16 +11647,6 @@ public final class Settings {
          */
         public static final String ACTIVITY_STARTS_LOGGING_ENABLED
                 = "activity_starts_logging_enabled";
-
-        /**
-         * Feature flag to enable or disable the background activity starts.
-         * When disabled, apps aren't allowed to start activities unless they're in the foreground.
-         * Type: int (0 for false, 1 for true)
-         * Default: 1
-         * @hide
-         */
-        public static final String BACKGROUND_ACTIVITY_STARTS_ENABLED =
-                "background_activity_starts_enabled";
 
         /**
          * @hide
@@ -11828,6 +11949,7 @@ public final class Settings {
          * sync_adapter_duration            (long)
          * exempted_sync_duration           (long)
          * system_interaction_duration      (long)
+         * initial_foreground_service_start_duration (long)
          * stable_charging_threshold        (long)
          *
          * idle_duration        (long) // This is deprecated and used to circumvent b/26355386.
@@ -11923,6 +12045,36 @@ public final class Settings {
         public static final String JOB_SCHEDULER_CONSTANTS = "job_scheduler_constants";
 
         /**
+         * Job scheduler QuotaController specific settings.
+         * This is encoded as a key=value list, separated by commas. Ex:
+         *
+         * "max_job_count_working=5,max_job_count_rare=2"
+         *
+         * <p>
+         * Type: string
+         *
+         * @hide
+         * @see com.android.server.job.JobSchedulerService.Constants
+         */
+        public static final String JOB_SCHEDULER_QUOTA_CONTROLLER_CONSTANTS =
+                "job_scheduler_quota_controller_constants";
+
+        /**
+         * Job scheduler TimeController specific settings.
+         * This is encoded as a key=value list, separated by commas. Ex:
+         *
+         * "skip_not_ready_jobs=true5,other_key=2"
+         *
+         * <p>
+         * Type: string
+         *
+         * @hide
+         * @see com.android.server.job.JobSchedulerService.Constants
+         */
+        public static final String JOB_SCHEDULER_TIME_CONTROLLER_CONSTANTS =
+                "job_scheduler_time_controller_constants";
+
+        /**
          * ShortcutManager specific settings.
          * This is encoded as a key=value list, separated by commas. Ex:
          *
@@ -11970,26 +12122,27 @@ public final class Settings {
          * entity_list_default use ":" as delimiter for values. Ex:
          *
          * <pre>
-         * smart_linkify_enabled                            (boolean)
-         * system_textclassifier_enabled                    (boolean)
+         * classify_text_max_range_length                   (int)
+         * detect_language_from_text_enabled                (boolean)
+         * entity_list_default                              (String[])
+         * entity_list_editable                             (String[])
+         * entity_list_not_editable                         (String[])
+         * generate_links_log_sample_rate                   (int)
+         * generate_links_max_text_length                   (int)
+         * in_app_conversation_action_types_default         (String[])
+         * lang_id_context_settings                         (float[])
+         * lang_id_threshold_override                       (float)
+         * local_textclassifier_enabled                     (boolean)
          * model_dark_launch_enabled                        (boolean)
-         * smart_selection_enabled                          (boolean)
-         * smart_text_share_enabled                         (boolean)
+         * notification_conversation_action_types_default   (String[])
          * smart_linkify_enabled                            (boolean)
          * smart_select_animation_enabled                   (boolean)
+         * smart_selection_enabled                          (boolean)
+         * smart_text_share_enabled                         (boolean)
          * suggest_selection_max_range_length               (int)
-         * classify_text_max_range_length                   (int)
-         * generate_links_max_text_length                   (int)
-         * generate_links_log_sample_rate                   (int)
-         * entity_list_default                              (String[])
-         * entity_list_not_editable                         (String[])
-         * entity_list_editable                             (String[])
-         * in_app_conversation_action_types_default         (String[])
-         * notification_conversation_action_types_default   (String[])
-         * lang_id_threshold_override                       (float)
+         * system_textclassifier_enabled                    (boolean)
          * template_intent_factory_enabled                  (boolean)
          * translate_in_classification_enabled              (boolean)
-         * detect_language_from_text_enabled                (boolean)
          * </pre>
          *
          * <p>
@@ -14712,6 +14865,18 @@ public final class Settings {
         public static final String TEXT_CLASSIFIER_ACTION_MODEL_PARAMS =
                 "text_classifier_action_model_params";
 
+        /**
+         * The amount of time to suppress "power-off" from the power button after the device has
+         * woken due to a gesture (lifting the phone).  Since users have learned to hit the power
+         * button immediately when lifting their device, it can cause the device to turn off if a
+         * gesture has just woken the device. This value tells us the milliseconds to wait after
+         * a gesture before "power-off" via power-button is functional again. A value of 0 is no
+         * delay, and reverts to the old behavior.
+         *
+         * @hide
+         */
+        public static final String POWER_BUTTON_SUPPRESSION_DELAY_AFTER_GESTURE_WAKE =
+                "power_button_suppression_delay_after_gesture_wake";
     }
 
     /**

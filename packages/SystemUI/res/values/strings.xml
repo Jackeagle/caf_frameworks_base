@@ -166,13 +166,16 @@
     <string name="usb_contaminant_title">USB port disabled</string>
 
     <!-- Message of USB contaminant presence dialog [CHAR LIMIT=NONE] -->
-    <string name="usb_contaminant_message">To protect your device from liquid or debris, the USB port is disabled and won\u2019t detect any accessories.\n\nYou\u2019ll be notified when it\u2019s safe to use the USB port again.</string>
+    <string name="usb_contaminant_message">To protect your device from liquid or debris, the USB port is disabled and won\u2019t detect any accessories.\n\nYou\u2019ll be notified when it\u2019s okay to use the USB port again.</string>
 
     <!-- Toast for enabling ports from USB contaminant dialog [CHAR LIMIT=NONE] -->
     <string name="usb_port_enabled">USB port enabled to detect chargers and accessories</string>
 
     <!-- Button text to disable contaminant detection [CHAR LIMIT=NONE] -->
     <string name="usb_disable_contaminant_detection">Enable USB</string>
+
+    <!-- Button text to disable contaminant detection [CHAR LIMIT=NONE] -->
+    <string name="learn_more">Learn more</string>
 
     <!-- Checkbox label for application compatibility mode ON (zooming app to look like it's running
          on a phone).  [CHAR LIMIT=25] -->
@@ -288,8 +291,18 @@
 
     <!-- Message shown when a biometric is authenticated, asking the user to confirm authentication [CHAR LIMIT=30] -->
     <string name="biometric_dialog_confirm">Confirm</string>
-    <!-- Button name on BiometricPrompt shown when a biometric is detected but not authenticated. Tapping the button resumes authentication [CHAR_LIMIT=30] -->
+    <!-- Button name on BiometricPrompt shown when a biometric is detected but not authenticated. Tapping the button resumes authentication [CHAR LIMIT=30] -->
     <string name="biometric_dialog_try_again">Try again</string>
+    <!-- Content description for empty spaces that are not taken by the biometric dialog. Clicking on these areas will cancel authentication and dismiss the biometric dialog [CHAR LIMIT=NONE] -->
+    <string name="biometric_dialog_empty_space_description">Empty region, tap to cancel authentication</string>
+    <!-- Content description for the face icon when the device is not authenticating anymore [CHAR LIMIT=NONE] -->
+    <string name="biometric_dialog_face_icon_description_idle">Please try again</string>
+    <!-- Content description for the face icon when the device is authenticating [CHAR LIMIT=NONE] -->
+    <string name="biometric_dialog_face_icon_description_authenticating">Looking for your face</string>
+    <!-- Content description for the face icon when the user has been authenticated [CHAR LIMIT=NONE] -->
+    <string name="biometric_dialog_face_icon_description_authenticated">Face authenticated</string>
+    <!-- Content description for the face icon when the user has been authenticated and the confirm button has been pressed [CHAR LIMIT=NONE] -->
+    <string name="biometric_dialog_face_icon_description_confirmed">Confirmed</string>
 
     <!-- Message shown when the system-provided fingerprint dialog is shown, asking for authentication -->
     <string name="fingerprint_dialog_touch_sensor">Touch the fingerprint sensor</string>
@@ -482,6 +495,9 @@
     <!-- Content description of the battery level icon for accessibility (not shown on the screen). [CHAR LIMIT=NONE] -->
     <string name="accessibility_battery_level">Battery <xliff:g id="number">%d</xliff:g> percent.</string>
 
+    <!-- Content description of the battery level icon for accessibility, including the estimated time remaining before the phone runs out of battery (not shown on the screen). [CHAR LIMIT=NONE] -->
+    <string name="accessibility_battery_level_with_estimate">Battery <xliff:g id="percentage" example="95%">%1$s</xliff:g> percent, about <xliff:g id="time" example="Until 3:15pm">%2$s</xliff:g> left based on your usage</string>
+
     <!-- Content description of the battery level icon for accessibility while the device is charging (not shown on the screen). [CHAR LIMIT=NONE] -->
     <string name="accessibility_battery_level_charging">Battery charging, <xliff:g id="battery_percentage">%d</xliff:g> percent.</string>
 
@@ -658,6 +674,9 @@
 
     <!-- Accessibility text describing the presence of active location requests by one or more apps -->
     <string name="accessibility_location_active">Location requests active</string>
+
+    <!-- Accessibility text describing sensors off active. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_sensors_off_active">Sensors off active</string>
 
     <!-- Content description of the clear button in the notification panel for accessibility (not shown on the screen). [CHAR LIMIT=NONE] -->
     <string name="accessibility_clear_all">Clear all notifications.</string>
@@ -868,6 +887,8 @@
     <string name="quick_settings_secondary_label_until">Until <xliff:g id="time" example="7 am">%s</xliff:g></string>
     <!-- QuickSettings: Label for the toggle to activate Dark theme (A.K.A Dark Mode). [CHAR LIMIT=20] -->
     <string name="quick_settings_ui_mode_night_label">Dark Theme</string>
+    <!-- QuickSettings: Label for the Dark theme tile when enabled by battery saver. [CHAR LIMIT=40] -->
+    <string name="quick_settings_ui_mode_night_label_battery_saver">Dark Theme\nBattery saver</string>
 
     <!-- QuickSettings: NFC tile [CHAR LIMIT=NONE] -->
     <string name="quick_settings_nfc_label">NFC</string>
@@ -1085,7 +1106,10 @@
     <string name="battery_saver_notification_action_text">Turn off Battery Saver</string>
 
     <!-- Media projection permission dialog warning text. [CHAR LIMIT=NONE] -->
-    <string name="media_projection_dialog_text">While recording or casting, <xliff:g id="app_seeking_permission" example="Hangouts">%s</xliff:g> can capture any sensitive information, such as audio that you play and your passwords, payment info, photos, and messages.</string>
+    <string name="media_projection_dialog_text">While recording or casting, <xliff:g id="app_seeking_permission" example="Hangouts">%s</xliff:g> can capture any sensitive information that is displayed on your screen or played from your device, including sensitive information such as audio, passwords, payment info, photos and messages.</string>
+
+    <!-- Media projection permission dialog warning text for system services. [CHAR LIMIT=NONE] -->
+    <string name="media_projection_dialog_service_text">While recording or casting, the service providing this function can capture any sensitive information that is displayed on your screen or played from your device, including sensitive information such as audio, passwords, payment info, photos and messages.</string>
 
     <!-- Media projection permission dialog warning title. [CHAR LIMIT=NONE] -->
     <string name="media_projection_dialog_title">Exposing sensitive info during casting/recording </string>
@@ -1098,6 +1122,12 @@
 
     <!-- The text for the manage notifications link. [CHAR LIMIT=40] -->
     <string name="manage_notifications_text">Manage</string>
+
+    <!-- Section title for notifications that do not vibrate or make noise. [CHAR LIMIT=40] -->
+    <string name="notification_section_header_gentle">Silent notifications</string>
+
+    <!-- Content description for accessibility: Tapping this button will dismiss all gentle notifications [CHAR LIMIT=NONE] -->
+    <string name="accessibility_notification_section_header_gentle_clear_all">Clear all silent notifications</string>
 
     <!-- The text to show in the notifications shade when dnd is suppressing notifications. [CHAR LIMIT=100] -->
     <string name="dnd_suppressing_shade_text">Notifications paused by Do Not Disturb</string>
@@ -1342,6 +1372,7 @@
     <!-- Screen pinning dialog description. -->
     <string name="screen_pinning_description">This keeps it in view until you unpin. Touch &amp; hold Back and Overview to unpin.</string>
     <string name="screen_pinning_description_recents_invisible">This keeps it in view until you unpin. Touch &amp; hold Back and Home to unpin.</string>
+    <string name="screen_pinning_description_gestural">This keeps it in view until you unpin. Swipe up &amp; hold to unpin.</string>
     <!-- Screen pinning dialog description. -->
     <string name="screen_pinning_description_accessible">This keeps it in view until you unpin. Touch &amp; hold Overview to unpin.</string>
     <string name="screen_pinning_description_recents_invisible_accessible">This keeps it in view until you unpin. Touch &amp; hold Home to unpin.</string>
@@ -1631,13 +1662,13 @@
     <string name="inline_minimize_button">Minimize</string>
 
     <!-- Notification inline controls: button to show notifications silently, without alerting the user [CHAR_LIMIT=35] -->
-    <string name="inline_silent_button_silent">Gentle</string>
+    <string name="inline_silent_button_silent">Silent</string>
 
     <!-- Notification inline controls: button to continue showing notifications silently [CHAR_LIMIT=35] -->
     <string name="inline_silent_button_stay_silent">Stay silent</string>
 
     <!-- Notification inline controls: button to make notifications alert the user [CHAR_LIMIT=35] -->
-    <string name="inline_silent_button_alert">Interruptive</string>
+    <string name="inline_silent_button_alert">Alerting</string>
 
     <!-- Notification inline controls: button to continue alerting the user when notifications arrive [CHAR_LIMIT=35] -->
     <string name="inline_silent_button_keep_alerting">Keep alerting</string>
@@ -1648,23 +1679,32 @@
     <!-- Notification Inline controls: continue receiving notifications prompt, app level -->
     <string name="inline_keep_showing_app">Keep showing notifications from this app?</string>
 
-    <!-- Hint text for block button in the interruptiveness settings [CHAR_LIMIT=NONE]-->
-    <string name="hint_text_block">Blocked notifications do not appear anywhere or play a sound. You can unblock notifications in settings.</string>
+    <!-- [CHAR LIMIT=100] Notification Importance title -->
+    <string name="notification_silence_title">Silent</string>
 
-    <!-- Hint text for silent button in the interruptiveness settings [CHAR_LIMIT=NONE]-->
-    <string name="hint_text_silent">Silent notifications appear in the shade, but do not appear on the lock screen, present a banner, or play a sound.</string>
+    <!-- [CHAR LIMIT=100] Notification Importance title -->
+    <string name="notification_alert_title">Alerting</string>
 
-    <!-- Hint text for alert button in the interruptiveness settings [CHAR_LIMIT=NONE]-->
-    <string name="hint_text_alert">These notifications will make a sound and show in the notification drawer, status bar, and lock screen</string>
+    <!-- [CHAR LIMIT=150] Notification Importance title: low importance level summary -->
+    <string name="notification_channel_summary_low">Helps you focus without sound or vibration.</string>
+
+    <!-- [CHAR LIMIT=150] Notification Importance title: normal importance level summary -->
+    <string name="notification_channel_summary_default">Gets your attention with sound or vibration.</string>
 
     <!-- Notification: Control panel: Label that displays when the app's notifications cannot be blocked. -->
-    <string name="notification_unblockable_desc">These notifications can\'t be turned off</string>
+    <string name="notification_unblockable_desc">These notifications can\'t be modified.</string>
 
     <!-- Notification: Control panel: label that displays when viewing settings for a group of notifications posted to multiple channels. -->
     <string name="notification_multichannel_desc">This group of notifications cannot be configured here</string>
 
     <!-- Notification: Control panel: Label for the app that posted this notification, if it's not the package that the notification was posted for -->
-    <string name="notification_delegate_header">via <xliff:g id="app_name" example="YouTube">%1$s</xliff:g></string>
+    <string name="notification_delegate_header">Proxied notification</string>
+
+    <!-- [CHAR LIMIT=40 Notification: Label for the inline channel blocking view -->
+    <string name="notification_channel_dialog_title">All <xliff:g id="app_name" example="YouTube">%1$s</xliff:g> notifications</string>
+
+    <!-- [CHAR LIMIT=20 Notification: "See more" button -->
+    <string name="see_more_title">See more</string>
 
     <!-- Notification Inline controls: describes what the app is doing in the background [CHAR_LIMIT=NONE] -->
     <string name="appops_camera">This app is using the camera.</string>
@@ -2332,7 +2372,7 @@
     <string name="auto_saver_title">Tap to schedule Battery Saver</string>
 
     <!-- The content of the notification to suggest enabling automatic battery saver.  [CHAR LIMIT=NONE]-->
-    <string name="auto_saver_text">Turn on automatically when battery is at <xliff:g id="percentage">%d</xliff:g>%%</string>
+    <string name="auto_saver_text">Turn on when battery is likely to run out</string>
 
     <!-- An action on the notification to suggest enabling automatic battery saver: Do not turn on automatic battery saver.  [CHAR LIMIT=NONE]-->
     <string name="no_auto_saver_action">No thanks</string>
@@ -2398,6 +2438,8 @@
     <!-- Text for asking the user whether bubbles (floating app content) should be enabled for an
          app. [CHAR LIMIT=NONE] -->
     <string name="bubbles_prompt">Allow bubbles from <xliff:g id="app_name" example="YouTube">%1$s</xliff:g>?</string>
+    <!-- The text for the manage bubbles link. [CHAR LIMIT=NONE] -->
+    <string name="manage_bubbles_text">Manage</string>
     <!-- Text used for button allowing user to opt out of bubbles [CHAR LIMIT=20] -->
     <string name="no_bubbles">Deny</string>
     <!-- Text used for button allowing user to approve / enable bubbles [CHAR LIMIT=20] -->
@@ -2418,4 +2460,13 @@
     <string name="bubble_accessibility_action_move_bottom_left">Move bottom left</string>
     <!-- Action in accessibility menu to move the stack of bubbles to the bottom right of the screen. [CHAR LIMIT=30]-->
     <string name="bubble_accessibility_action_move_bottom_right">Move bottom right</string>
+    <!-- Text used for the bubble dismiss area. Bubbles dragged to, or flung towards, this area will go away. [CHAR LIMIT=20] -->
+    <string name="bubble_dismiss_text">Dismiss</string>
+
+    <!-- Notification content text when the system navigation mode changes as a result of changing the default launcher [CHAR LIMIT=NONE] -->
+    <string name="notification_content_system_nav_changed">System navigation updated. To make changes, go to Settings.</string>
+
+    <!-- Notification content text when switching to a default launcher that supports gesture navigation [CHAR LIMIT=NONE] -->
+    <string name="notification_content_gesture_nav_available">Go to Settings to update system navigation</string>
+
 </resources>

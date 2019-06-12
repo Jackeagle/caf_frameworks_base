@@ -19,6 +19,7 @@ package com.android.systemui.statusbar.phone;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyFloat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
@@ -28,7 +29,6 @@ import static org.mockito.Mockito.when;
 import android.content.Context;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
-import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.test.filters.SmallTest;
@@ -39,7 +39,6 @@ import com.android.systemui.SysuiTestCase;
 import com.android.systemui.keyguard.DismissCallbackRegistry;
 import com.android.systemui.plugins.ActivityStarter.OnDismissAction;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
-import com.android.systemui.statusbar.StatusBarState;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -199,26 +198,14 @@ public class StatusBarKeyguardViewManagerTest extends SysuiTestCase {
     }
 
     @Test
-    public void onQsExpansionChanged_lockVisibleOnlyWhenCollapsed() {
-        when(mStatusBarStateController.getState()).thenReturn(StatusBarState.KEYGUARD);
-        mStatusBarKeyguardViewManager.onQsExpansionChanged(0);
-        verify(mLockIconContainer).setVisibility(eq(View.VISIBLE));
+    public void setOccluded_animatesPanelExpansion_onlyIfBouncerHidden() {
+        mStatusBarKeyguardViewManager.setOccluded(false /* occluded */, true /* animated */);
+        verify(mStatusBar).animateKeyguardUnoccluding();
 
-        reset(mNotificationPanelView);
-        when(mNotificationPanelView.isQsExpanded()).thenReturn(true);
-        mStatusBarKeyguardViewManager.onQsExpansionChanged(1f);
-        verify(mLockIconContainer).setVisibility(eq(View.INVISIBLE));
-    }
-
-    @Test
-    public void onQsExpansionChanged_lockInvisibleWhenAnimatingAway() {
         when(mBouncer.isShowing()).thenReturn(true);
-        mStatusBarKeyguardViewManager.onQsExpansionChanged(0);
-        verify(mLockIconContainer).setVisibility(eq(View.VISIBLE));
-
-        when(mBouncer.isAnimatingAway()).thenReturn(true);
-        mStatusBarKeyguardViewManager.onQsExpansionChanged(0f);
-        verify(mLockIconContainer).setVisibility(eq(View.INVISIBLE));
+        clearInvocations(mStatusBar);
+        mStatusBarKeyguardViewManager.setOccluded(false /* occluded */, true /* animated */);
+        verify(mStatusBar, never()).animateKeyguardUnoccluding();
     }
 
     private class TestableStatusBarKeyguardViewManager extends StatusBarKeyguardViewManager {

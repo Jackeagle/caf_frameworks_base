@@ -136,8 +136,8 @@ public:
     // ColorSpace.Named.SRGB.ordinal() = 0;
     static constexpr jint SRGB = 0;
 
-    // ColorSpace.Named.DISPLAY_P3.ordinal() = 6;
-    static constexpr jint DISPLAY_P3 = 6;
+    // ColorSpace.Named.DISPLAY_P3.ordinal() = 7;
+    static constexpr jint DISPLAY_P3 = 7;
 };
 
 constexpr jint fromDataspaceToNamedColorSpaceValue(const ui::Dataspace dataspace) {
@@ -387,9 +387,13 @@ static void nativeSetGeometry(JNIEnv* env, jclass clazz, jlong transactionObj, j
     Rect source, dst;
     if (sourceObj != NULL) {
         source = rectFromObj(env, sourceObj);
+    } else {
+        source.makeInvalid();
     }
     if (dstObj != NULL) {
         dst = rectFromObj(env, dstObj);
+    } else {
+        dst.makeInvalid();
     }
     transaction->setGeometry(ctrl, source, dst, orientation);
 }

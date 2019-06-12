@@ -159,6 +159,14 @@ public final class DeviceConfig {
     public static final String NAMESPACE_INTELLIGENCE_ATTENTION = "intelligence_attention";
 
     /**
+     * Definitions for properties related to Content Suggestions.
+     *
+     * @hide
+     */
+    public static final String NAMESPACE_INTELLIGENCE_CONTENT_SUGGESTIONS =
+            "intelligence_content_suggestions";
+
+    /**
      * Namespace for all media native related features.
      *
      * @hide
@@ -255,6 +263,7 @@ public final class DeviceConfig {
      * Namespace for TextClassifier related features.
      *
      * @hide
+     * @see android.provider.Settings.Global.TEXT_CLASSIFIER_CONSTANTS
      */
     @SystemApi
     public static final String NAMESPACE_TEXTCLASSIFIER = "textclassifier";

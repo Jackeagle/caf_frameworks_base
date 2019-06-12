@@ -99,7 +99,7 @@ import com.android.server.LocalServices;
  * data for Tron, logcat, event logs and {@link android.app.WaitResult}.
  *
  * Tests:
- * atest CtsActivityManagerDeviceTestCases:ActivityMetricsLoggerTests
+ * atest CtsWindowManagerDeviceTestCases:ActivityMetricsLoggerTests
  */
 class ActivityMetricsLogger {
 
@@ -326,7 +326,7 @@ class ActivityMetricsLogger {
                                       intent));
         }
 
-        if (!isAnyTransitionActive()) {
+        if (mCurrentTransitionStartTime == INVALID_START_TIME) {
 
             mCurrentTransitionStartTime = SystemClock.uptimeMillis();
             mLastTransitionStartTime = mCurrentTransitionStartTime;
@@ -965,16 +965,13 @@ class ActivityMetricsLogger {
      * @param info
      * */
     private void startTraces(WindowingModeTransitionInfo info) {
-        if (info == null) {
+        if (!Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER) || info == null
+                || info.launchTraceActive) {
             return;
         }
-        int transitionType = getTransitionType(info);
-        if (!info.launchTraceActive && transitionType == TYPE_TRANSITION_WARM_LAUNCH
-                || transitionType == TYPE_TRANSITION_COLD_LAUNCH) {
-            Trace.asyncTraceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "launching: "
-                    + info.launchedActivity.packageName, 0);
-            info.launchTraceActive = true;
-        }
+        Trace.asyncTraceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "launching: "
+                + info.launchedActivity.packageName, 0);
+        info.launchTraceActive = true;
     }
 
     private void stopLaunchTrace(WindowingModeTransitionInfo info) {

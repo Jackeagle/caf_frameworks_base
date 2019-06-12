@@ -60,6 +60,12 @@ interface IAudioService {
 
     oneway void releasePlayer(in int piid);
 
+    int trackRecorder(in IBinder recorder);
+
+    oneway void recorderEvent(in int riid, in int event);
+
+    oneway void releaseRecorder(in int riid);
+
     // Java-only methods below.
 
     oneway void adjustSuggestedStreamVolume(int direction, int suggestedStreamType, int flags,
@@ -171,9 +177,6 @@ interface IAudioService {
             String caller);
 
     void handleBluetoothA2dpDeviceConfigChange(in BluetoothDevice device);
-
-    void handleBluetoothA2dpActiveDeviceChange(in BluetoothDevice device,
-            int state, int profile, boolean suppressNoisyIntent, int a2dpVolume);
 
     @UnsupportedAppUsage
     AudioRoutesInfo startWatchingRoutes(in IAudioRoutesObserver observer);

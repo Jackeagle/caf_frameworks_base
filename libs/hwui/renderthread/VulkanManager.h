@@ -70,10 +70,11 @@ public:
     void destroy();
 
     // Inserts a wait on fence command into the Vulkan command buffer.
-    status_t fenceWait(sp<Fence>& fence);
+    status_t fenceWait(sp<Fence>& fence, GrContext* grContext);
 
-    // Creates a fence that is signaled, when all the pending Vulkan commands are flushed.
-    status_t createReleaseFence(sp<Fence>& nativeFence);
+    // Creates a fence that is signaled when all the pending Vulkan commands are finished on the
+    // GPU.
+    status_t createReleaseFence(sp<Fence>& nativeFence, GrContext* grContext);
 
     // Returned pointers are owned by VulkanManager.
     // An instance of VkFunctorInitParams returned from getVkFunctorInitParams refers to
@@ -89,7 +90,6 @@ private:
     // Sets up the VkInstance and VkDevice objects. Also fills out the passed in
     // VkPhysicalDeviceFeatures struct.
     void setupDevice(GrVkExtensions&, VkPhysicalDeviceFeatures2&);
-    bool setupDummyCommandBuffer();
 
     // simple wrapper class that exists only to initialize a pointer to NULL
     template <typename FNPTR_TYPE>
@@ -164,8 +164,6 @@ private:
     VkQueue mPresentQueue = VK_NULL_HANDLE;
     VkCommandPool mCommandPool = VK_NULL_HANDLE;
 
-    VkCommandBuffer mDummyCB = VK_NULL_HANDLE;
-
     // Variables saved to populate VkFunctorInitParams.
     static const uint32_t mAPIVersion = VK_MAKE_VERSION(1, 1, 0);
     std::vector<VkExtensionProperties> mInstanceExtensionsOwner;
@@ -181,13 +179,6 @@ private:
     SwapBehavior mSwapBehavior = SwapBehavior::Discard;
     GrVkExtensions mExtensions;
     uint32_t mDriverVersion = 0;
-
-    // TODO: Remove once fix has landed. Temporaryly needed for workaround for setting up AHB
-    // surfaces on Qualcomm. Currently if you don't use VkSwapchain Qualcomm is not setting
-    // reporting that we need to use one of their private vendor usage bits which greatly effects
-    // performance if it is not used.
-    bool mIsQualcomm = false;
-    bool isQualcomm() const { return mIsQualcomm; }
 };
 
 } /* namespace renderthread */

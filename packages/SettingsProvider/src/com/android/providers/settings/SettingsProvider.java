@@ -20,12 +20,7 @@ import static android.os.Process.INVALID_UID;
 import static android.os.Process.ROOT_UID;
 import static android.os.Process.SHELL_UID;
 import static android.os.Process.SYSTEM_UID;
-import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_2BUTTON;
 import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_2BUTTON_OVERLAY;
-import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_3BUTTON;
-import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_3BUTTON_OVERLAY;
-import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_GESTURAL;
-import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_GESTURAL_OVERLAY;
 
 import android.Manifest;
 import android.annotation.NonNull;
@@ -41,7 +36,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.om.IOverlayManager;
-import android.content.om.OverlayInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.IPackageManager;
 import android.content.pm.PackageInfo;
@@ -3049,15 +3043,16 @@ public class SettingsProvider extends ContentProvider {
             // Increment the generation first, so observers always see the new value
             mGenerationRegistry.incrementGeneration(key);
 
-            if (isGlobalSettingsKey(key)) {
+            if (isGlobalSettingsKey(key) || isConfigSettingsKey(key)) {
                 final long token = Binder.clearCallingIdentity();
                 try {
-                    if (Global.LOCATION_GLOBAL_KILL_SWITCH.equals(name)) {
+                    if (Global.LOCATION_GLOBAL_KILL_SWITCH.equals(name)
+                            && isGlobalSettingsKey(key)) {
                         // When the global kill switch is updated, send the
                         // change notification for the location setting.
                         notifyLocationChangeForRunningUsers();
                     }
-                    notifyGlobalSettingChangeForRunningUsers(key, name);
+                    notifySettingChangeForRunningUsers(key, name);
                 } finally {
                     Binder.restoreCallingIdentity(token);
                 }
@@ -3097,7 +3092,7 @@ public class SettingsProvider extends ContentProvider {
             }
         }
 
-        private void notifyGlobalSettingChangeForRunningUsers(int key, String name) {
+        private void notifySettingChangeForRunningUsers(int key, String name) {
             // Important: No need to update generation for each user as there
             // is a singleton generation entry for the global settings which
             // is already incremented be the caller.
@@ -3243,7 +3238,7 @@ public class SettingsProvider extends ContentProvider {
         }
 
         private final class UpgradeController {
-            private static final int SETTINGS_VERSION = 177;
+            private static final int SETTINGS_VERSION = 181;
 
             private final int mUserId;
 
@@ -4321,45 +4316,19 @@ public class SettingsProvider extends ContentProvider {
 
                 if (currentVersion == 176) {
                     // Version 176: Migrate the existing swipe up setting into the resource overlay
-                    //              for the navigation bar interaction mode.
+                    //              for the navigation bar interaction mode.  We do so only if the
+                    //              setting is set.
 
-                    final IOverlayManager overlayManager = IOverlayManager.Stub.asInterface(
-                            ServiceManager.getService(Context.OVERLAY_SERVICE));
-                    int navBarMode = -1;
-
-                    // Migrate the swipe up setting only if it is set
                     final SettingsState secureSettings = getSecureSettingsLocked(userId);
                     final Setting swipeUpSetting = secureSettings.getSettingLocked(
                             "swipe_up_to_switch_apps_enabled");
-                    if (swipeUpSetting != null && !swipeUpSetting.isNull()) {
-                        navBarMode = swipeUpSetting.getValue().equals("1")
-                                ? NAV_BAR_MODE_2BUTTON
-                                : NAV_BAR_MODE_3BUTTON;
-                    }
-
-                    // Temporary: Only for migration for dogfooders, to be removed
-                    try {
-                        final OverlayInfo info = overlayManager.getOverlayInfo(
-                                "com.android.internal.experiment.navbar.type.inset",
-                                UserHandle.USER_CURRENT);
-                        if (info != null && info.isEnabled()) {
-                            navBarMode = NAV_BAR_MODE_GESTURAL;
-                        }
-                    } catch (RemoteException e) {
-                        // Ingore, fall through
-                    }
-
-                    if (navBarMode != -1) {
+                    if (swipeUpSetting != null && !swipeUpSetting.isNull()
+                            && swipeUpSetting.getValue().equals("1")) {
+                        final IOverlayManager overlayManager = IOverlayManager.Stub.asInterface(
+                                ServiceManager.getService(Context.OVERLAY_SERVICE));
                         try {
-                            overlayManager.setEnabled(NAV_BAR_MODE_3BUTTON_OVERLAY,
-                                    navBarMode == NAV_BAR_MODE_3BUTTON,
-                                    UserHandle.USER_CURRENT);
-                            overlayManager.setEnabled(NAV_BAR_MODE_2BUTTON_OVERLAY,
-                                    navBarMode == NAV_BAR_MODE_2BUTTON,
-                                    UserHandle.USER_CURRENT);
-                            overlayManager.setEnabled(NAV_BAR_MODE_GESTURAL_OVERLAY,
-                                    navBarMode == NAV_BAR_MODE_GESTURAL,
-                                    UserHandle.USER_CURRENT);
+                            overlayManager.setEnabledExclusiveInCategory(
+                                    NAV_BAR_MODE_2BUTTON_OVERLAY, UserHandle.USER_CURRENT);
                         } catch (RemoteException e) {
                             throw new IllegalStateException(
                                     "Failed to set nav bar interaction mode overlay");
@@ -4369,6 +4338,88 @@ public class SettingsProvider extends ContentProvider {
                     currentVersion = 177;
                 }
 
+                if (currentVersion == 177) {
+                    // Version 177: Set the default value for Secure Settings: AWARE_ENABLED
+
+                    final SettingsState secureSettings = getSecureSettingsLocked(userId);
+
+                    final Setting awareEnabled = secureSettings.getSettingLocked(
+                            Secure.AWARE_ENABLED);
+
+                    if (awareEnabled.isNull()) {
+                        final boolean defAwareEnabled = getContext().getResources().getBoolean(
+                                R.bool.def_aware_enabled);
+                        secureSettings.insertSettingLocked(
+                                Secure.AWARE_ENABLED, defAwareEnabled ? "1" : "0",
+                                null, true, SettingsState.SYSTEM_PACKAGE_NAME);
+                    }
+
+                    currentVersion = 178;
+                }
+
+                if (currentVersion == 178) {
+                    // Version 178: Set the default value for Secure Settings:
+                    // SKIP_GESTURE & SILENCE_GESTURE
+
+                    final SettingsState secureSettings = getSecureSettingsLocked(userId);
+
+                    final Setting skipGesture = secureSettings.getSettingLocked(
+                            Secure.SKIP_GESTURE);
+
+                    if (skipGesture.isNull()) {
+                        final boolean defSkipGesture = getContext().getResources().getBoolean(
+                                R.bool.def_skip_gesture);
+                        secureSettings.insertSettingLocked(
+                                Secure.SKIP_GESTURE, defSkipGesture ? "1" : "0",
+                                null, true, SettingsState.SYSTEM_PACKAGE_NAME);
+                    }
+
+                    final Setting silenceGesture = secureSettings.getSettingLocked(
+                            Secure.SILENCE_GESTURE);
+
+                    if (silenceGesture.isNull()) {
+                        final boolean defSilenceGesture = getContext().getResources().getBoolean(
+                                R.bool.def_silence_gesture);
+                        secureSettings.insertSettingLocked(
+                                Secure.SILENCE_GESTURE, defSilenceGesture ? "1" : "0",
+                                null, true, SettingsState.SYSTEM_PACKAGE_NAME);
+                    }
+
+                    currentVersion = 179;
+                }
+
+                if (currentVersion == 179) {
+                    // Version 178: Reset the default for Secure Settings: NOTIFICATION_BUBBLES
+                    // This is originally set in version 173, however, the default value changed
+                    // so this step is to ensure the value is updated to the correct defaulte
+                    final SettingsState secureSettings = getSecureSettingsLocked(userId);
+
+                    secureSettings.insertSettingLocked(Secure.NOTIFICATION_BUBBLES,
+                            getContext().getResources().getBoolean(
+                                    R.bool.def_notification_bubbles) ? "1" : "0", null,
+                                    true, SettingsState.SYSTEM_PACKAGE_NAME);
+
+                    currentVersion = 180;
+                }
+
+                if (currentVersion == 180) {
+                    // Version 180: Set the default value for Secure Settings: AWARE_LOCK_ENABLED
+
+                    final SettingsState secureSettings = getSecureSettingsLocked(userId);
+
+                    final Setting awareLockEnabled = secureSettings.getSettingLocked(
+                            Secure.AWARE_LOCK_ENABLED);
+
+                    if (awareLockEnabled.isNull()) {
+                        final boolean defAwareLockEnabled = getContext().getResources().getBoolean(
+                                R.bool.def_aware_lock_enabled);
+                        secureSettings.insertSettingLocked(
+                                Secure.AWARE_LOCK_ENABLED, defAwareLockEnabled ? "1" : "0",
+                                null, true, SettingsState.SYSTEM_PACKAGE_NAME);
+                    }
+
+                    currentVersion = 181;
+                }
 
                 // vXXX: Add new settings above this point.
 

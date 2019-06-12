@@ -18,6 +18,7 @@ package com.android.server.job;
 
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER;
+import static android.text.format.DateUtils.MINUTE_IN_MILLIS;
 
 import android.annotation.NonNull;
 import android.annotation.UserIdInt;
@@ -48,6 +49,7 @@ import android.content.pm.IPackageManager;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.PackageManagerInternal;
+import android.content.pm.ParceledListSlice;
 import android.content.pm.ServiceInfo;
 import android.database.ContentObserver;
 import android.net.Uri;
@@ -463,32 +465,6 @@ public class JobSchedulerService extends com.android.server.SystemService
         private static final String KEY_CONN_CONGESTION_DELAY_FRAC = "conn_congestion_delay_frac";
         private static final String KEY_CONN_PREFETCH_RELAX_FRAC = "conn_prefetch_relax_frac";
         private static final String KEY_USE_HEARTBEATS = "use_heartbeats";
-        private static final String KEY_TIME_CONTROLLER_SKIP_NOT_READY_JOBS =
-                "tc_skip_not_ready_jobs";
-        private static final String KEY_QUOTA_CONTROLLER_ALLOWED_TIME_PER_PERIOD_MS =
-                "qc_allowed_time_per_period_ms";
-        private static final String KEY_QUOTA_CONTROLLER_IN_QUOTA_BUFFER_MS =
-                "qc_in_quota_buffer_ms";
-        private static final String KEY_QUOTA_CONTROLLER_WINDOW_SIZE_ACTIVE_MS =
-                "qc_window_size_active_ms";
-        private static final String KEY_QUOTA_CONTROLLER_WINDOW_SIZE_WORKING_MS =
-                "qc_window_size_working_ms";
-        private static final String KEY_QUOTA_CONTROLLER_WINDOW_SIZE_FREQUENT_MS =
-                "qc_window_size_frequent_ms";
-        private static final String KEY_QUOTA_CONTROLLER_WINDOW_SIZE_RARE_MS =
-                "qc_window_size_rare_ms";
-        private static final String KEY_QUOTA_CONTROLLER_MAX_EXECUTION_TIME_MS =
-                "qc_max_execution_time_ms";
-        private static final String KEY_QUOTA_CONTROLLER_MAX_JOB_COUNT_ACTIVE =
-                "qc_max_job_count_active";
-        private static final String KEY_QUOTA_CONTROLLER_MAX_JOB_COUNT_WORKING =
-                "qc_max_job_count_working";
-        private static final String KEY_QUOTA_CONTROLLER_MAX_JOB_COUNT_FREQUENT =
-                "qc_max_job_count_frequent";
-        private static final String KEY_QUOTA_CONTROLLER_MAX_JOB_COUNT_RARE =
-                "qc_max_job_count_rare";
-        private static final String KEY_QUOTA_CONTROLLER_MAX_JOB_COUNT_PER_ALLOWED_TIME =
-                "qc_max_count_per_allowed_time";
 
         private static final int DEFAULT_MIN_IDLE_COUNT = 1;
         private static final int DEFAULT_MIN_CHARGING_COUNT = 1;
@@ -510,30 +486,6 @@ public class JobSchedulerService extends com.android.server.SystemService
         private static final float DEFAULT_CONN_CONGESTION_DELAY_FRAC = 0.5f;
         private static final float DEFAULT_CONN_PREFETCH_RELAX_FRAC = 0.5f;
         private static final boolean DEFAULT_USE_HEARTBEATS = false;
-        private static final boolean DEFAULT_TIME_CONTROLLER_SKIP_NOT_READY_JOBS = true;
-        private static final long DEFAULT_QUOTA_CONTROLLER_ALLOWED_TIME_PER_PERIOD_MS =
-                10 * 60 * 1000L; // 10 minutes
-        private static final long DEFAULT_QUOTA_CONTROLLER_IN_QUOTA_BUFFER_MS =
-                30 * 1000L; // 30 seconds
-        private static final long DEFAULT_QUOTA_CONTROLLER_WINDOW_SIZE_ACTIVE_MS =
-                10 * 60 * 1000L; // 10 minutes for ACTIVE -- ACTIVE apps can run jobs at any time
-        private static final long DEFAULT_QUOTA_CONTROLLER_WINDOW_SIZE_WORKING_MS =
-                2 * 60 * 60 * 1000L; // 2 hours
-        private static final long DEFAULT_QUOTA_CONTROLLER_WINDOW_SIZE_FREQUENT_MS =
-                8 * 60 * 60 * 1000L; // 8 hours
-        private static final long DEFAULT_QUOTA_CONTROLLER_WINDOW_SIZE_RARE_MS =
-                24 * 60 * 60 * 1000L; // 24 hours
-        private static final long DEFAULT_QUOTA_CONTROLLER_MAX_EXECUTION_TIME_MS =
-                4 * 60 * 60 * 1000L; // 4 hours
-        private static final int DEFAULT_QUOTA_CONTROLLER_MAX_JOB_COUNT_ACTIVE =
-                200; // 1200/hr
-        private static final int DEFAULT_QUOTA_CONTROLLER_MAX_JOB_COUNT_WORKING =
-                1200; // 600/hr
-        private static final int DEFAULT_QUOTA_CONTROLLER_MAX_JOB_COUNT_FREQUENT =
-                1800; // 225/hr
-        private static final int DEFAULT_QUOTA_CONTROLLER_MAX_JOB_COUNT_RARE =
-                2400; // 100/hr
-        private static final int DEFAULT_QUOTA_CONTROLLER_MAX_JOB_COUNT_PER_ALLOWED_TIME = 20;
 
         /**
          * Minimum # of idle jobs that must be ready in order to force the JMS to schedule things
@@ -680,97 +632,6 @@ public class JobSchedulerService extends com.android.server.SystemService
          */
         public boolean USE_HEARTBEATS = DEFAULT_USE_HEARTBEATS;
 
-        /**
-         * Whether or not TimeController should skip setting wakeup alarms for jobs that aren't
-         * ready now.
-         */
-        public boolean TIME_CONTROLLER_SKIP_NOT_READY_JOBS =
-                DEFAULT_TIME_CONTROLLER_SKIP_NOT_READY_JOBS;
-
-        /** How much time each app will have to run jobs within their standby bucket window. */
-        public long QUOTA_CONTROLLER_ALLOWED_TIME_PER_PERIOD_MS =
-                DEFAULT_QUOTA_CONTROLLER_ALLOWED_TIME_PER_PERIOD_MS;
-
-        /**
-         * How much time the package should have before transitioning from out-of-quota to in-quota.
-         * This should not affect processing if the package is already in-quota.
-         */
-        public long QUOTA_CONTROLLER_IN_QUOTA_BUFFER_MS =
-                DEFAULT_QUOTA_CONTROLLER_IN_QUOTA_BUFFER_MS;
-
-        /**
-         * The quota window size of the particular standby bucket. Apps in this standby bucket are
-         * expected to run only {@link #QUOTA_CONTROLLER_ALLOWED_TIME_PER_PERIOD_MS} within the past
-         * WINDOW_SIZE_MS.
-         */
-        public long QUOTA_CONTROLLER_WINDOW_SIZE_ACTIVE_MS =
-                DEFAULT_QUOTA_CONTROLLER_WINDOW_SIZE_ACTIVE_MS;
-
-        /**
-         * The quota window size of the particular standby bucket. Apps in this standby bucket are
-         * expected to run only {@link #QUOTA_CONTROLLER_ALLOWED_TIME_PER_PERIOD_MS} within the past
-         * WINDOW_SIZE_MS.
-         */
-        public long QUOTA_CONTROLLER_WINDOW_SIZE_WORKING_MS =
-                DEFAULT_QUOTA_CONTROLLER_WINDOW_SIZE_WORKING_MS;
-
-        /**
-         * The quota window size of the particular standby bucket. Apps in this standby bucket are
-         * expected to run only {@link #QUOTA_CONTROLLER_ALLOWED_TIME_PER_PERIOD_MS} within the past
-         * WINDOW_SIZE_MS.
-         */
-        public long QUOTA_CONTROLLER_WINDOW_SIZE_FREQUENT_MS =
-                DEFAULT_QUOTA_CONTROLLER_WINDOW_SIZE_FREQUENT_MS;
-
-        /**
-         * The quota window size of the particular standby bucket. Apps in this standby bucket are
-         * expected to run only {@link #QUOTA_CONTROLLER_ALLOWED_TIME_PER_PERIOD_MS} within the past
-         * WINDOW_SIZE_MS.
-         */
-        public long QUOTA_CONTROLLER_WINDOW_SIZE_RARE_MS =
-                DEFAULT_QUOTA_CONTROLLER_WINDOW_SIZE_RARE_MS;
-
-        /**
-         * The maximum amount of time an app can have its jobs running within a 24 hour window.
-         */
-        public long QUOTA_CONTROLLER_MAX_EXECUTION_TIME_MS =
-                DEFAULT_QUOTA_CONTROLLER_MAX_EXECUTION_TIME_MS;
-
-        /**
-         * The maximum number of jobs an app can run within this particular standby bucket's
-         * window size.
-         */
-        public int QUOTA_CONTROLLER_MAX_JOB_COUNT_ACTIVE =
-                DEFAULT_QUOTA_CONTROLLER_MAX_JOB_COUNT_ACTIVE;
-
-        /**
-         * The maximum number of jobs an app can run within this particular standby bucket's
-         * window size.
-         */
-        public int QUOTA_CONTROLLER_MAX_JOB_COUNT_WORKING =
-                DEFAULT_QUOTA_CONTROLLER_MAX_JOB_COUNT_WORKING;
-
-        /**
-         * The maximum number of jobs an app can run within this particular standby bucket's
-         * window size.
-         */
-        public int QUOTA_CONTROLLER_MAX_JOB_COUNT_FREQUENT =
-                DEFAULT_QUOTA_CONTROLLER_MAX_JOB_COUNT_FREQUENT;
-
-        /**
-         * The maximum number of jobs an app can run within this particular standby bucket's
-         * window size.
-         */
-        public int QUOTA_CONTROLLER_MAX_JOB_COUNT_RARE =
-                DEFAULT_QUOTA_CONTROLLER_MAX_JOB_COUNT_RARE;
-
-        /**
-         * The maximum number of jobs that can run within the past
-         * {@link #QUOTA_CONTROLLER_ALLOWED_TIME_PER_PERIOD_MS}.
-         */
-        public int QUOTA_CONTROLLER_MAX_JOB_COUNT_PER_ALLOWED_TIME =
-                DEFAULT_QUOTA_CONTROLLER_MAX_JOB_COUNT_PER_ALLOWED_TIME;
-
         private final KeyValueListParser mParser = new KeyValueListParser(',');
 
         void updateConstantsLocked(String value) {
@@ -834,45 +695,6 @@ public class JobSchedulerService extends com.android.server.SystemService
             CONN_PREFETCH_RELAX_FRAC = mParser.getFloat(KEY_CONN_PREFETCH_RELAX_FRAC,
                     DEFAULT_CONN_PREFETCH_RELAX_FRAC);
             USE_HEARTBEATS = mParser.getBoolean(KEY_USE_HEARTBEATS, DEFAULT_USE_HEARTBEATS);
-            TIME_CONTROLLER_SKIP_NOT_READY_JOBS = mParser.getBoolean(
-                    KEY_TIME_CONTROLLER_SKIP_NOT_READY_JOBS,
-                    DEFAULT_TIME_CONTROLLER_SKIP_NOT_READY_JOBS);
-            QUOTA_CONTROLLER_ALLOWED_TIME_PER_PERIOD_MS = mParser.getDurationMillis(
-                    KEY_QUOTA_CONTROLLER_ALLOWED_TIME_PER_PERIOD_MS,
-                    DEFAULT_QUOTA_CONTROLLER_ALLOWED_TIME_PER_PERIOD_MS);
-            QUOTA_CONTROLLER_IN_QUOTA_BUFFER_MS = mParser.getDurationMillis(
-                    KEY_QUOTA_CONTROLLER_IN_QUOTA_BUFFER_MS,
-                    DEFAULT_QUOTA_CONTROLLER_IN_QUOTA_BUFFER_MS);
-            QUOTA_CONTROLLER_WINDOW_SIZE_ACTIVE_MS = mParser.getDurationMillis(
-                    KEY_QUOTA_CONTROLLER_WINDOW_SIZE_ACTIVE_MS,
-                    DEFAULT_QUOTA_CONTROLLER_WINDOW_SIZE_ACTIVE_MS);
-            QUOTA_CONTROLLER_WINDOW_SIZE_WORKING_MS = mParser.getDurationMillis(
-                    KEY_QUOTA_CONTROLLER_WINDOW_SIZE_WORKING_MS,
-                    DEFAULT_QUOTA_CONTROLLER_WINDOW_SIZE_WORKING_MS);
-            QUOTA_CONTROLLER_WINDOW_SIZE_FREQUENT_MS = mParser.getDurationMillis(
-                    KEY_QUOTA_CONTROLLER_WINDOW_SIZE_FREQUENT_MS,
-                    DEFAULT_QUOTA_CONTROLLER_WINDOW_SIZE_FREQUENT_MS);
-            QUOTA_CONTROLLER_WINDOW_SIZE_RARE_MS = mParser.getDurationMillis(
-                    KEY_QUOTA_CONTROLLER_WINDOW_SIZE_RARE_MS,
-                    DEFAULT_QUOTA_CONTROLLER_WINDOW_SIZE_RARE_MS);
-            QUOTA_CONTROLLER_MAX_EXECUTION_TIME_MS = mParser.getDurationMillis(
-                    KEY_QUOTA_CONTROLLER_MAX_EXECUTION_TIME_MS,
-                    DEFAULT_QUOTA_CONTROLLER_MAX_EXECUTION_TIME_MS);
-            QUOTA_CONTROLLER_MAX_JOB_COUNT_ACTIVE = mParser.getInt(
-                    KEY_QUOTA_CONTROLLER_MAX_JOB_COUNT_ACTIVE,
-                    DEFAULT_QUOTA_CONTROLLER_MAX_JOB_COUNT_ACTIVE);
-            QUOTA_CONTROLLER_MAX_JOB_COUNT_WORKING = mParser.getInt(
-                    KEY_QUOTA_CONTROLLER_MAX_JOB_COUNT_WORKING,
-                    DEFAULT_QUOTA_CONTROLLER_MAX_JOB_COUNT_WORKING);
-            QUOTA_CONTROLLER_MAX_JOB_COUNT_FREQUENT = mParser.getInt(
-                    KEY_QUOTA_CONTROLLER_MAX_JOB_COUNT_FREQUENT,
-                    DEFAULT_QUOTA_CONTROLLER_MAX_JOB_COUNT_FREQUENT);
-            QUOTA_CONTROLLER_MAX_JOB_COUNT_RARE = mParser.getInt(
-                    KEY_QUOTA_CONTROLLER_MAX_JOB_COUNT_RARE,
-                    DEFAULT_QUOTA_CONTROLLER_MAX_JOB_COUNT_RARE);
-            QUOTA_CONTROLLER_MAX_JOB_COUNT_PER_ALLOWED_TIME = mParser.getInt(
-                    KEY_QUOTA_CONTROLLER_MAX_JOB_COUNT_PER_ALLOWED_TIME,
-                    DEFAULT_QUOTA_CONTROLLER_MAX_JOB_COUNT_PER_ALLOWED_TIME);
         }
 
         void dump(IndentingPrintWriter pw) {
@@ -915,37 +737,11 @@ public class JobSchedulerService extends com.android.server.SystemService
             pw.printPair(KEY_CONN_CONGESTION_DELAY_FRAC, CONN_CONGESTION_DELAY_FRAC).println();
             pw.printPair(KEY_CONN_PREFETCH_RELAX_FRAC, CONN_PREFETCH_RELAX_FRAC).println();
             pw.printPair(KEY_USE_HEARTBEATS, USE_HEARTBEATS).println();
-            pw.printPair(KEY_TIME_CONTROLLER_SKIP_NOT_READY_JOBS,
-                    TIME_CONTROLLER_SKIP_NOT_READY_JOBS).println();
-            pw.printPair(KEY_QUOTA_CONTROLLER_ALLOWED_TIME_PER_PERIOD_MS,
-                    QUOTA_CONTROLLER_ALLOWED_TIME_PER_PERIOD_MS).println();
-            pw.printPair(KEY_QUOTA_CONTROLLER_IN_QUOTA_BUFFER_MS,
-                    QUOTA_CONTROLLER_IN_QUOTA_BUFFER_MS).println();
-            pw.printPair(KEY_QUOTA_CONTROLLER_WINDOW_SIZE_ACTIVE_MS,
-                    QUOTA_CONTROLLER_WINDOW_SIZE_ACTIVE_MS).println();
-            pw.printPair(KEY_QUOTA_CONTROLLER_WINDOW_SIZE_WORKING_MS,
-                    QUOTA_CONTROLLER_WINDOW_SIZE_WORKING_MS).println();
-            pw.printPair(KEY_QUOTA_CONTROLLER_WINDOW_SIZE_FREQUENT_MS,
-                    QUOTA_CONTROLLER_WINDOW_SIZE_FREQUENT_MS).println();
-            pw.printPair(KEY_QUOTA_CONTROLLER_WINDOW_SIZE_RARE_MS,
-                    QUOTA_CONTROLLER_WINDOW_SIZE_RARE_MS).println();
-            pw.printPair(KEY_QUOTA_CONTROLLER_MAX_EXECUTION_TIME_MS,
-                    QUOTA_CONTROLLER_MAX_EXECUTION_TIME_MS).println();
-            pw.printPair(KEY_QUOTA_CONTROLLER_MAX_JOB_COUNT_ACTIVE,
-                    QUOTA_CONTROLLER_MAX_JOB_COUNT_ACTIVE).println();
-            pw.printPair(KEY_QUOTA_CONTROLLER_MAX_JOB_COUNT_WORKING,
-                    QUOTA_CONTROLLER_MAX_JOB_COUNT_WORKING).println();
-            pw.printPair(KEY_QUOTA_CONTROLLER_MAX_JOB_COUNT_FREQUENT,
-                    QUOTA_CONTROLLER_MAX_JOB_COUNT_FREQUENT).println();
-            pw.printPair(KEY_QUOTA_CONTROLLER_MAX_JOB_COUNT_RARE,
-                    QUOTA_CONTROLLER_MAX_JOB_COUNT_RARE).println();
-            pw.printPair(KEY_QUOTA_CONTROLLER_MAX_JOB_COUNT_PER_ALLOWED_TIME,
-                    QUOTA_CONTROLLER_MAX_JOB_COUNT_PER_ALLOWED_TIME).println();
+
             pw.decreaseIndent();
         }
 
-        void dump(ProtoOutputStream proto, long fieldId) {
-            final long token = proto.start(fieldId);
+        void dump(ProtoOutputStream proto) {
             proto.write(ConstantsProto.MIN_IDLE_COUNT, MIN_IDLE_COUNT);
             proto.write(ConstantsProto.MIN_CHARGING_COUNT, MIN_CHARGING_COUNT);
             proto.write(ConstantsProto.MIN_BATTERY_NOT_LOW_COUNT, MIN_BATTERY_NOT_LOW_COUNT);
@@ -973,40 +769,6 @@ public class JobSchedulerService extends com.android.server.SystemService
             proto.write(ConstantsProto.CONN_CONGESTION_DELAY_FRAC, CONN_CONGESTION_DELAY_FRAC);
             proto.write(ConstantsProto.CONN_PREFETCH_RELAX_FRAC, CONN_PREFETCH_RELAX_FRAC);
             proto.write(ConstantsProto.USE_HEARTBEATS, USE_HEARTBEATS);
-
-            final long tcToken = proto.start(ConstantsProto.TIME_CONTROLLER);
-            proto.write(ConstantsProto.TimeController.SKIP_NOT_READY_JOBS,
-                    TIME_CONTROLLER_SKIP_NOT_READY_JOBS);
-            proto.end(tcToken);
-
-            final long qcToken = proto.start(ConstantsProto.QUOTA_CONTROLLER);
-            proto.write(ConstantsProto.QuotaController.ALLOWED_TIME_PER_PERIOD_MS,
-                    QUOTA_CONTROLLER_ALLOWED_TIME_PER_PERIOD_MS);
-            proto.write(ConstantsProto.QuotaController.IN_QUOTA_BUFFER_MS,
-                    QUOTA_CONTROLLER_IN_QUOTA_BUFFER_MS);
-            proto.write(ConstantsProto.QuotaController.ACTIVE_WINDOW_SIZE_MS,
-                    QUOTA_CONTROLLER_WINDOW_SIZE_ACTIVE_MS);
-            proto.write(ConstantsProto.QuotaController.WORKING_WINDOW_SIZE_MS,
-                    QUOTA_CONTROLLER_WINDOW_SIZE_WORKING_MS);
-            proto.write(ConstantsProto.QuotaController.FREQUENT_WINDOW_SIZE_MS,
-                    QUOTA_CONTROLLER_WINDOW_SIZE_FREQUENT_MS);
-            proto.write(ConstantsProto.QuotaController.RARE_WINDOW_SIZE_MS,
-                    QUOTA_CONTROLLER_WINDOW_SIZE_RARE_MS);
-            proto.write(ConstantsProto.QuotaController.MAX_EXECUTION_TIME_MS,
-                    QUOTA_CONTROLLER_MAX_EXECUTION_TIME_MS);
-            proto.write(ConstantsProto.QuotaController.MAX_JOB_COUNT_ACTIVE,
-                    QUOTA_CONTROLLER_MAX_JOB_COUNT_ACTIVE);
-            proto.write(ConstantsProto.QuotaController.MAX_JOB_COUNT_WORKING,
-                    QUOTA_CONTROLLER_MAX_JOB_COUNT_WORKING);
-            proto.write(ConstantsProto.QuotaController.MAX_JOB_COUNT_FREQUENT,
-                    QUOTA_CONTROLLER_MAX_JOB_COUNT_FREQUENT);
-            proto.write(ConstantsProto.QuotaController.MAX_JOB_COUNT_RARE,
-                    QUOTA_CONTROLLER_MAX_JOB_COUNT_RARE);
-            proto.write(ConstantsProto.QuotaController.MAX_JOB_COUNT_PER_ALLOWED_TIME,
-                    QUOTA_CONTROLLER_MAX_JOB_COUNT_PER_ALLOWED_TIME);
-            proto.end(qcToken);
-
-            proto.end(token);
         }
     }
 
@@ -1295,7 +1057,8 @@ public class JobSchedulerService extends com.android.server.SystemService
             StatsLog.write_non_chained(StatsLog.SCHEDULED_JOB_STATE_CHANGED,
                     uId, null, jobStatus.getBatteryName(),
                     StatsLog.SCHEDULED_JOB_STATE_CHANGED__STATE__SCHEDULED,
-                    JobProtoEnums.STOP_REASON_CANCELLED);
+                    JobProtoEnums.STOP_REASON_CANCELLED, jobStatus.getStandbyBucket(),
+                    jobStatus.getJobId());
 
             // If the job is immediately ready to run, then we can just immediately
             // put it in the pending list and try to schedule it.  This is especially
@@ -1636,6 +1399,9 @@ public class JobSchedulerService extends com.android.server.SystemService
     public void onBootPhase(int phase) {
         if (PHASE_SYSTEM_SERVICES_READY == phase) {
             mConstantsObserver.start(getContext().getContentResolver());
+            for (StateController controller : mControllers) {
+                controller.onSystemServicesReady();
+            }
 
             mAppStateTracker = Preconditions.checkNotNull(
                     LocalServices.getService(AppStateTracker.class));
@@ -1801,7 +1567,8 @@ public class JobSchedulerService extends com.android.server.SystemService
      *
      * @see #maybeQueueReadyJobsForExecutionLocked
      */
-    private JobStatus getRescheduleJobForFailureLocked(JobStatus failureToReschedule) {
+    @VisibleForTesting
+    JobStatus getRescheduleJobForFailureLocked(JobStatus failureToReschedule) {
         final long elapsedNowMillis = sElapsedRealtimeClock.millis();
         final JobInfo job = failureToReschedule.getJob();
 
@@ -1848,12 +1615,28 @@ public class JobSchedulerService extends com.android.server.SystemService
                 elapsedNowMillis + delayMillis,
                 JobStatus.NO_LATEST_RUNTIME, backoffAttempts,
                 failureToReschedule.getLastSuccessfulRunTime(), sSystemClock.millis());
+        if (job.isPeriodic()) {
+            newJob.setOriginalLatestRunTimeElapsed(
+                    failureToReschedule.getOriginalLatestRunTimeElapsed());
+        }
         for (int ic=0; ic<mControllers.size(); ic++) {
             StateController controller = mControllers.get(ic);
             controller.rescheduleForFailureLocked(newJob, failureToReschedule);
         }
         return newJob;
     }
+
+    /**
+     * Maximum time buffer in which JobScheduler will try to optimize periodic job scheduling. This
+     * does not cause a job's period to be larger than requested (eg: if the requested period is
+     * shorter than this buffer). This is used to put a limit on when JobScheduler will intervene
+     * and try to optimize scheduling if the current job finished less than this amount of time to
+     * the start of the next period
+     */
+    private static final long PERIODIC_JOB_WINDOW_BUFFER = 30 * MINUTE_IN_MILLIS;
+
+    /** The maximum period a periodic job can have. Anything higher will be clamped down to this. */
+    public static final long MAX_ALLOWED_PERIOD_MS = 365 * 24 * 60 * 60 * 1000L;
 
     /**
      * Called after a periodic has executed so we can reschedule it. We take the last execution
@@ -1868,23 +1651,69 @@ public class JobSchedulerService extends com.android.server.SystemService
      * @return A new job representing the execution criteria for this instantiation of the
      * recurring job.
      */
-    private JobStatus getRescheduleJobForPeriodic(JobStatus periodicToReschedule) {
+    @VisibleForTesting
+    JobStatus getRescheduleJobForPeriodic(JobStatus periodicToReschedule) {
         final long elapsedNow = sElapsedRealtimeClock.millis();
-        // Compute how much of the period is remaining.
-        long runEarly = 0L;
+        final long newLatestRuntimeElapsed;
+        // Make sure period is in the interval [min_possible_period, max_possible_period].
+        final long period = Math.max(JobInfo.getMinPeriodMillis(),
+                Math.min(MAX_ALLOWED_PERIOD_MS, periodicToReschedule.getJob().getIntervalMillis()));
+        // Make sure flex is in the interval [min_possible_flex, period].
+        final long flex = Math.max(JobInfo.getMinFlexMillis(),
+                Math.min(period, periodicToReschedule.getJob().getFlexMillis()));
+        long rescheduleBuffer = 0;
 
-        // If this periodic was rescheduled it won't have a deadline.
-        if (periodicToReschedule.hasDeadlineConstraint()) {
-            runEarly = Math.max(periodicToReschedule.getLatestRunTimeElapsed() - elapsedNow, 0L);
+        long olrte = periodicToReschedule.getOriginalLatestRunTimeElapsed();
+        if (olrte < 0 || olrte == JobStatus.NO_LATEST_RUNTIME) {
+            Slog.wtf(TAG, "Invalid periodic job original latest run time: " + olrte);
+            olrte = elapsedNow;
         }
-        long flex = periodicToReschedule.getJob().getFlexMillis();
-        long period = periodicToReschedule.getJob().getIntervalMillis();
-        long newLatestRuntimeElapsed = elapsedNow + runEarly + period;
-        long newEarliestRunTimeElapsed = newLatestRuntimeElapsed - flex;
+        final long latestRunTimeElapsed = olrte;
+
+        final long diffMs = Math.abs(elapsedNow - latestRunTimeElapsed);
+        if (elapsedNow > latestRunTimeElapsed) {
+            // The job ran past its expected run window. Have it count towards the current window
+            // and schedule a new job for the next window.
+            if (DEBUG) {
+                Slog.i(TAG, "Periodic job ran after its intended window.");
+            }
+            long numSkippedWindows = (diffMs / period) + 1; // +1 to include original window
+            if (period != flex && diffMs > Math.min(PERIODIC_JOB_WINDOW_BUFFER,
+                    (period - flex) / 2)) {
+                if (DEBUG) {
+                    Slog.d(TAG, "Custom flex job ran too close to next window.");
+                }
+                // For custom flex periods, if the job was run too close to the next window,
+                // skip the next window and schedule for the following one.
+                numSkippedWindows += 1;
+            }
+            newLatestRuntimeElapsed = latestRunTimeElapsed + (period * numSkippedWindows);
+        } else {
+            newLatestRuntimeElapsed = latestRunTimeElapsed + period;
+            if (diffMs < PERIODIC_JOB_WINDOW_BUFFER && diffMs < period / 6) {
+                // Add a little buffer to the start of the next window so the job doesn't run
+                // too soon after this completed one.
+                rescheduleBuffer = Math.min(PERIODIC_JOB_WINDOW_BUFFER, period / 6 - diffMs);
+            }
+        }
+
+        if (newLatestRuntimeElapsed < elapsedNow) {
+            Slog.wtf(TAG, "Rescheduling calculated latest runtime in the past: "
+                    + newLatestRuntimeElapsed);
+            return new JobStatus(periodicToReschedule, getCurrentHeartbeat(),
+                    elapsedNow + period - flex, elapsedNow + period,
+                    0 /* backoffAttempt */,
+                    sSystemClock.millis() /* lastSuccessfulRunTime */,
+                    periodicToReschedule.getLastFailedRunTime());
+        }
+
+        final long newEarliestRunTimeElapsed = newLatestRuntimeElapsed
+                - Math.min(flex, period - rescheduleBuffer);
 
         if (DEBUG) {
             Slog.v(TAG, "Rescheduling executed periodic. New execution window [" +
-                    newEarliestRunTimeElapsed/1000 + ", " + newLatestRuntimeElapsed/1000 + "]s");
+                    newEarliestRunTimeElapsed / 1000 + ", " + newLatestRuntimeElapsed / 1000
+                    + "]s");
         }
         return new JobStatus(periodicToReschedule, getCurrentHeartbeat(),
                 newEarliestRunTimeElapsed, newLatestRuntimeElapsed,
@@ -2474,8 +2303,6 @@ public class JobSchedulerService extends com.android.server.SystemService
                     if (bucket >= mConstants.STANDBY_BEATS.length
                             || (mHeartbeat > appLastRan
                             && mHeartbeat < appLastRan + mConstants.STANDBY_BEATS[bucket])) {
-                        // TODO: log/trace that we're deferring the job due to bucketing if we
-                        // hit this
                         if (job.getWhenStandbyDeferred() == 0) {
                             if (DEBUG_STANDBY) {
                                 Slog.v(TAG, "Bucket deferral: " + mHeartbeat + " < "
@@ -2977,12 +2804,12 @@ public class JobSchedulerService extends com.android.server.SystemService
         }
 
         @Override
-        public List<JobInfo> getAllPendingJobs() throws RemoteException {
+        public ParceledListSlice<JobInfo> getAllPendingJobs() throws RemoteException {
             final int uid = Binder.getCallingUid();
 
             long ident = Binder.clearCallingIdentity();
             try {
-                return JobSchedulerService.this.getPendingJobs(uid);
+                return new ParceledListSlice<>(JobSchedulerService.this.getPendingJobs(uid));
             } finally {
                 Binder.restoreCallingIdentity(ident);
             }
@@ -3118,7 +2945,7 @@ public class JobSchedulerService extends com.android.server.SystemService
          * <p class="note">This is a slow operation, so it should be called sparingly.
          */
         @Override
-        public List<JobSnapshot> getAllJobSnapshots() {
+        public ParceledListSlice<JobSnapshot> getAllJobSnapshots() {
             final int uid = Binder.getCallingUid();
             if (uid != Process.SYSTEM_UID) {
                 throw new SecurityException(
@@ -3129,7 +2956,7 @@ public class JobSchedulerService extends com.android.server.SystemService
                 mJobs.forEachJob((job) -> snapshots.add(
                         new JobSnapshot(job.getJob(), job.getSatisfiedConstraintFlags(),
                                 isReadyToBeExecutedLocked(job))));
-                return snapshots;
+                return new ParceledListSlice<>(snapshots);
             }
         }
     };
@@ -3424,6 +3251,11 @@ public class JobSchedulerService extends com.android.server.SystemService
         };
         synchronized (mLock) {
             mConstants.dump(pw);
+            for (StateController controller : mControllers) {
+                pw.increaseIndent();
+                controller.dumpConstants(pw);
+                pw.decreaseIndent();
+            }
             pw.println();
 
             pw.println("  Heartbeat:");
@@ -3614,7 +3446,13 @@ public class JobSchedulerService extends com.android.server.SystemService
         };
 
         synchronized (mLock) {
-            mConstants.dump(proto, JobSchedulerServiceDumpProto.SETTINGS);
+            final long settingsToken = proto.start(JobSchedulerServiceDumpProto.SETTINGS);
+            mConstants.dump(proto);
+            for (StateController controller : mControllers) {
+                controller.dumpConstants(proto);
+            }
+            proto.end(settingsToken);
+
             proto.write(JobSchedulerServiceDumpProto.CURRENT_HEARTBEAT, mHeartbeat);
             proto.write(JobSchedulerServiceDumpProto.NEXT_HEARTBEAT, mNextBucketHeartbeat[0]);
             proto.write(JobSchedulerServiceDumpProto.NEXT_HEARTBEAT, mNextBucketHeartbeat[1]);

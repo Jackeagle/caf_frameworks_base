@@ -18,7 +18,6 @@ package com.android.server;
 
 import android.app.IActivityController;
 import android.content.BroadcastReceiver;
-import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -64,7 +63,7 @@ public class Watchdog extends Thread {
     static final String TAG = "Watchdog";
 
     /** Debug flag. */
-    public static final boolean DEBUG = true; // STOPSHIP disable it (b/113252928)
+    public static final boolean DEBUG = false;
 
     // Set this to true to use debug default values.
     static final boolean DB = false;
@@ -122,7 +121,6 @@ public class Watchdog extends Thread {
     /* This handler will be used to post message back onto the main thread */
     final ArrayList<HandlerChecker> mHandlerCheckers = new ArrayList<>();
     final HandlerChecker mMonitorChecker;
-    ContentResolver mResolver;
     ActivityManagerService mActivity;
 
     int mPhonePid;
@@ -138,9 +136,11 @@ public class Watchdog extends Thread {
         private final String mName;
         private final long mWaitMax;
         private final ArrayList<Monitor> mMonitors = new ArrayList<Monitor>();
+        private final ArrayList<Monitor> mMonitorQueue = new ArrayList<Monitor>();
         private boolean mCompleted;
         private Monitor mCurrentMonitor;
         private long mStartTime;
+        private int mPauseCount;
 
         HandlerChecker(Handler handler, String name, long waitMaxMillis) {
             mHandler = handler;
@@ -150,21 +150,29 @@ public class Watchdog extends Thread {
         }
 
         void addMonitorLocked(Monitor monitor) {
-            mMonitors.add(monitor);
+            // We don't want to update mMonitors when the Handler is in the middle of checking
+            // all monitors. We will update mMonitors on the next schedule if it is safe
+            mMonitorQueue.add(monitor);
         }
 
         public void scheduleCheckLocked() {
-            if (mMonitors.size() == 0 && mHandler.getLooper().getQueue().isPolling()) {
+            if (mCompleted) {
+                // Safe to update monitors in queue, Handler is not in the middle of work
+                mMonitors.addAll(mMonitorQueue);
+                mMonitorQueue.clear();
+            }
+            if ((mMonitors.size() == 0 && mHandler.getLooper().getQueue().isPolling())
+                    || (mPauseCount > 0)) {
+                // Don't schedule until after resume OR
                 // If the target looper has recently been polling, then
                 // there is no reason to enqueue our checker on it since that
                 // is as good as it not being deadlocked.  This avoid having
-                // to do a context switch to check the thread.  Note that we
-                // only do this if mCheckReboot is false and we have no
-                // monitors, since those would need to be executed at this point.
+                // to do a context switch to check the thread. Note that we
+                // only do this if we have no monitors since those would need to
+                // be executed at this point.
                 mCompleted = true;
                 return;
             }
-
             if (!mCompleted) {
                 // we already have a check in flight, so no need
                 return;
@@ -213,6 +221,10 @@ public class Watchdog extends Thread {
 
         @Override
         public void run() {
+            // Once we get here, we ensure that mMonitors does not change even if we call
+            // #addMonitorLocked because we first add the new monitors to mMonitorQueue and
+            // move them to mMonitors on the next schedule when mCompleted is true, at which
+            // point we have completed execution of this method.
             final int size = mMonitors.size();
             for (int i = 0 ; i < size ; i++) {
                 synchronized (Watchdog.this) {
@@ -224,6 +236,28 @@ public class Watchdog extends Thread {
             synchronized (Watchdog.this) {
                 mCompleted = true;
                 mCurrentMonitor = null;
+            }
+        }
+
+        /** Pause the HandlerChecker. */
+        public void pauseLocked(String reason) {
+            mPauseCount++;
+            // Mark as completed, because there's a chance we called this after the watchog
+            // thread loop called Object#wait after 'WAITED_HALF'. In that case we want to ensure
+            // the next call to #getCompletionStateLocked for this checker returns 'COMPLETED'
+            mCompleted = true;
+            Slog.i(TAG, "Pausing HandlerChecker: " + mName + " for reason: "
+                    + reason + ". Pause count: " + mPauseCount);
+        }
+
+        /** Resume the HandlerChecker from the last {@link #pauseLocked}. */
+        public void resumeLocked(String reason) {
+            if (mPauseCount > 0) {
+                mPauseCount--;
+                Slog.i(TAG, "Resuming HandlerChecker: " + mName + " for reason: "
+                        + reason + ". Pause count: " + mPauseCount);
+            } else {
+                Slog.wtf(TAG, "Already resumed HandlerChecker: " + mName);
             }
         }
     }
@@ -304,10 +338,13 @@ public class Watchdog extends Thread {
                 DEFAULT_TIMEOUT > ZygoteConnectionConstants.WRAPPED_PID_TIMEOUT_MILLIS;
     }
 
+    /**
+     * Registers a {@link BroadcastReceiver} to listen to reboot broadcasts and trigger reboot.
+     * Should be called during boot after the ActivityManagerService is up and registered
+     * as a system service so it can handle registration of a {@link BroadcastReceiver}.
+     */
     public void init(Context context, ActivityManagerService activity) {
-        mResolver = context.getContentResolver();
         mActivity = activity;
-
         context.registerReceiver(new RebootRequestReceiver(),
                 new IntentFilter(Intent.ACTION_REBOOT),
                 android.Manifest.permission.REBOOT, null);
@@ -335,9 +372,6 @@ public class Watchdog extends Thread {
 
     public void addMonitor(Monitor monitor) {
         synchronized (this) {
-            if (isAlive()) {
-                throw new RuntimeException("Monitors can't be added once the Watchdog is running");
-            }
             mMonitorChecker.addMonitorLocked(monitor);
         }
     }
@@ -348,11 +382,53 @@ public class Watchdog extends Thread {
 
     public void addThread(Handler thread, long timeoutMillis) {
         synchronized (this) {
-            if (isAlive()) {
-                throw new RuntimeException("Threads can't be added once the Watchdog is running");
-            }
             final String name = thread.getLooper().getThread().getName();
             mHandlerCheckers.add(new HandlerChecker(thread, name, timeoutMillis));
+        }
+    }
+
+    /**
+     * Pauses Watchdog action for the currently running thread. Useful before executing long running
+     * operations that could falsely trigger the watchdog. Each call to this will require a matching
+     * call to {@link #resumeWatchingCurrentThread}.
+     *
+     * <p>If the current thread has not been added to the Watchdog, this call is a no-op.
+     *
+     * <p>If the Watchdog is already paused for the current thread, this call adds
+     * adds another pause and will require an additional {@link #resumeCurrentThread} to resume.
+     *
+     * <p>Note: Use with care, as any deadlocks on the current thread will be undetected until all
+     * pauses have been resumed.
+     */
+    public void pauseWatchingCurrentThread(String reason) {
+        synchronized (this) {
+            for (HandlerChecker hc : mHandlerCheckers) {
+                if (Thread.currentThread().equals(hc.getThread())) {
+                    hc.pauseLocked(reason);
+                }
+            }
+        }
+    }
+
+    /**
+     * Resumes the last pause from {@link #pauseWatchingCurrentThread} for the currently running
+     * thread.
+     *
+     * <p>If the current thread has not been added to the Watchdog, this call is a no-op.
+     *
+     * <p>If the Watchdog action for the current thread is already resumed, this call logs a wtf.
+     *
+     * <p>If all pauses have been resumed, the Watchdog action is finally resumed, otherwise,
+     * the Watchdog action for the current thread remains paused until resume is called at least
+     * as many times as the calls to pause.
+     */
+    public void resumeWatchingCurrentThread(String reason) {
+        synchronized (this) {
+            for (HandlerChecker hc : mHandlerCheckers) {
+                if (Thread.currentThread().equals(hc.getThread())) {
+                    hc.resumeLocked(reason);
+                }
+            }
         }
     }
 
@@ -468,6 +544,7 @@ public class Watchdog extends Thread {
                     }
                     try {
                         wait(timeout);
+                        // Note: mHandlerCheckers and mMonitorChecker may have changed after waiting
                     } catch (InterruptedException e) {
                         Log.wtf(TAG, e);
                     }
@@ -493,7 +570,7 @@ public class Watchdog extends Thread {
                         continue;
                     } else if (waitState == WAITED_HALF) {
                         if (!waitedHalf) {
-                            if (DEBUG) Slog.d(TAG, "WAITED_HALF");
+                            Slog.i(TAG, "WAITED_HALF");
                             // We've waited half the deadlock-detection interval.  Pull a stack
                             // trace and wait another half.
                             ArrayList<Integer> pids = new ArrayList<Integer>();
@@ -540,9 +617,13 @@ public class Watchdog extends Thread {
             // deadlock and the watchdog as a whole to be ineffective)
             Thread dropboxThread = new Thread("watchdogWriteToDropbox") {
                     public void run() {
-                        mActivity.addErrorToDropBox(
-                                "watchdog", null, "system_server", null, null, null,
-                                subject, null, stack, null);
+                        // If a watched thread hangs before init() is called, we don't have a
+                        // valid mActivity. So we can't log the error to dropbox.
+                        if (mActivity != null) {
+                            mActivity.addErrorToDropBox(
+                                    "watchdog", null, "system_server", null, null, null,
+                                    subject, null, stack, null);
+                        }
                         StatsLog.write(StatsLog.SYSTEM_SERVER_WATCHDOG_OCCURRED, subject);
                     }
                 };

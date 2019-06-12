@@ -38,6 +38,7 @@ import android.view.RemoteAnimationAdapter;
 import android.view.RemoteAnimationDefinition;
 import android.view.RemoteAnimationTarget;
 
+import androidx.test.filters.FlakyTest;
 import androidx.test.filters.SmallTest;
 
 import org.junit.Test;
@@ -96,6 +97,7 @@ public class AppChangeTransitionTests extends WindowTestsBase {
     }
 
     @Test
+    @FlakyTest(bugId = 131005232)
     public void testModeChangeRemoteAnimatorNoSnapshot() {
         // setup currently defaults to no snapshot.
         setUpOnDisplay(mDisplayContent);
@@ -113,6 +115,7 @@ public class AppChangeTransitionTests extends WindowTestsBase {
     }
 
     @Test
+    @FlakyTest(bugId = 131005232)
     public void testCancelPendingChangeOnRemove() {
         // setup currently defaults to no snapshot.
         setUpOnDisplay(mDisplayContent);
@@ -132,6 +135,7 @@ public class AppChangeTransitionTests extends WindowTestsBase {
     }
 
     @Test
+    @FlakyTest(bugId = 131005232)
     public void testNoChangeWhenMoveDisplay() {
         mDisplayContent.setWindowingMode(WINDOWING_MODE_FULLSCREEN);
         final DisplayContent dc1 = createNewDisplay(Display.STATE_ON);
@@ -150,6 +154,24 @@ public class AppChangeTransitionTests extends WindowTestsBase {
         // Make sure we're not waiting for a change animation (no leash)
         assertFalse(mToken.isInChangeTransition());
         assertNull(mToken.getThumbnail());
+
+        waitUntilHandlersIdle();
+        mToken.removeImmediately();
+    }
+
+    @Test
+    public void testCancelPendingChangeOnHide() {
+        // setup currently defaults to no snapshot.
+        setUpOnDisplay(mDisplayContent);
+
+        mTask.setWindowingMode(WINDOWING_MODE_FREEFORM);
+        assertEquals(1, mDisplayContent.mChangingApps.size());
+        assertTrue(mToken.isInChangeTransition());
+
+        // Changing visibility should cancel the change transition and become closing
+        mToken.setVisibility(false, false);
+        assertEquals(0, mDisplayContent.mChangingApps.size());
+        assertFalse(mToken.isInChangeTransition());
 
         waitUntilHandlersIdle();
         mToken.removeImmediately();

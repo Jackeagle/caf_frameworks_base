@@ -1273,6 +1273,23 @@ public class ApnSetting implements Parcelable {
     }
 
     /**
+     * Get supported APN types
+     *
+     * @return list of APN types
+     * @hide
+     */
+    @ApnType
+    public List<Integer> getApnTypes() {
+        List<Integer> types = new ArrayList<>();
+        for (Integer type : APN_TYPE_INT_MAP.keySet()) {
+            if ((mApnTypeBitmask & type) == type) {
+                types.add(type);
+            }
+        }
+        return types;
+    }
+
+    /**
      * @param apnTypeBitmask bitmask of APN types.
      * @return comma delimited list of APN types.
      * @hide
@@ -1293,6 +1310,9 @@ public class ApnSetting implements Parcelable {
      * @hide
      */
     public static String getApnTypeString(int apnType) {
+        if (apnType == TYPE_ALL) {
+            return "*";
+        }
         String apnTypeString = APN_TYPE_INT_MAP.get(apnType);
         return apnTypeString == null ? "Unknown" : apnTypeString;
     }

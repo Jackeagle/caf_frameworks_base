@@ -86,11 +86,6 @@ public abstract class PackageManager {
     /** {@hide} */
     public static final boolean APPLY_DEFAULT_TO_DEVICE_PROTECTED_STORAGE = true;
 
-    /** {@hide} */
-    @SystemApi
-    @TestApi
-    public static boolean RESTRICTED_PERMISSIONS_ENABLED = false;
-
     /**
      * This exception is thrown when a given package, application, or component
      * name cannot be found.
@@ -228,6 +223,7 @@ public abstract class PackageManager {
 
     /** @hide */
     @IntDef(flag = true, prefix = { "GET_", "MATCH_" }, value = {
+            MATCH_ALL,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface ModuleInfoFlags {}
@@ -730,6 +726,8 @@ public abstract class PackageManager {
             INSTALL_APEX,
             INSTALL_ENABLE_ROLLBACK,
             INSTALL_ALLOW_DOWNGRADE,
+            INSTALL_STAGED,
+            INSTALL_DRY_RUN,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface InstallFlags {}
@@ -810,7 +808,7 @@ public abstract class PackageManager {
      *
      * @hide
      */
-    public static final int INSTALL_ALL_WHITELIST_RESTRICTED_PERMISSIONS = 0x00000200;
+    public static final int INSTALL_ALL_WHITELIST_RESTRICTED_PERMISSIONS = 0x00400000;
 
     /** {@hide} */
     public static final int INSTALL_FORCE_VOLUME_UUID = 0x00000200;
@@ -898,6 +896,22 @@ public abstract class PackageManager {
      * @hide
      */
     public static final int INSTALL_ALLOW_DOWNGRADE = 0x00100000;
+
+    /**
+     * Flag parameter for {@link #installPackage} to indicate that this package
+     * is being installed as part of a staged install.
+     *
+     * @hide
+     */
+    public static final int INSTALL_STAGED = 0x00200000;
+
+    /**
+     * Flag parameter for {@link #installPackage} to indicate that package should only be verified
+     * but not installed.
+     *
+     * @hide
+     */
+    public static final int INSTALL_DRY_RUN = 0x00800000;
 
     /** @hide */
     @IntDef(flag = true, prefix = { "DONT_KILL_APP" }, value = {
@@ -1422,6 +1436,14 @@ public abstract class PackageManager {
      * @hide
      */
     public static final int INSTALL_FAILED_MULTIPACKAGE_INCONSISTENCY = -120;
+
+    /**
+     * Installation failed return code: the required installed version code
+     * does not match the currently installed package version code.
+     *
+     * @hide
+     */
+    public static final int INSTALL_FAILED_WRONG_INSTALLED_VERSION = -121;
 
     /** @hide */
     @IntDef(flag = true, prefix = { "DELETE_" }, value = {
@@ -3143,6 +3165,14 @@ public abstract class PackageManager {
     @SystemApi
     public static final int FLAG_PERMISSION_APPLY_RESTRICTION =  1 << 14;
 
+    /**
+     * Permission flag: The permission is granted because the application holds a role.
+     *
+     * @hide
+     */
+    @SystemApi
+    @TestApi
+    public static final int FLAG_PERMISSION_GRANTED_BY_ROLE =  1 << 15;
 
     /**
      * Permission flags: Bitwise or of all permission flags allowing an
@@ -3183,7 +3213,8 @@ public abstract class PackageManager {
             | FLAG_PERMISSION_RESTRICTION_INSTALLER_EXEMPT
             | FLAG_PERMISSION_RESTRICTION_SYSTEM_EXEMPT
             | FLAG_PERMISSION_RESTRICTION_UPGRADE_EXEMPT
-            | FLAG_PERMISSION_APPLY_RESTRICTION;
+            | FLAG_PERMISSION_APPLY_RESTRICTION
+            | FLAG_PERMISSION_GRANTED_BY_ROLE;
 
     /**
      * Injected activity in app that forwards user to setting activity of that app.
@@ -3947,7 +3978,8 @@ public abstract class PackageManager {
             FLAG_PERMISSION_RESTRICTION_UPGRADE_EXEMPT,
             FLAG_PERMISSION_RESTRICTION_SYSTEM_EXEMPT,
             FLAG_PERMISSION_RESTRICTION_INSTALLER_EXEMPT,
-            FLAG_PERMISSION_APPLY_RESTRICTION
+            FLAG_PERMISSION_APPLY_RESTRICTION,
+            FLAG_PERMISSION_GRANTED_BY_ROLE
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface PermissionFlags {}
@@ -6168,15 +6200,7 @@ public abstract class PackageManager {
      * @param activity The component name of the activity that is to be preferred.
      *
      * @hide
-     *
-     * @deprecated This function no longer does anything. It is the platform's
-     * responsibility to assign preferred activities and this cannot be modified
-     * directly. To determine the activities resolved by the platform, use
-     * {@link #resolveActivity} or {@link #queryIntentActivities}. To configure
-     * an app to be responsible for a particular role and to check current role
-     * holders, see {@link android.app.role.RoleManager}.
      */
-    @Deprecated
     @SystemApi
     public void replacePreferredActivity(@NonNull IntentFilter filter, int match,
             @NonNull List<ComponentName> set, @NonNull ComponentName activity) {
@@ -6916,6 +6940,7 @@ public abstract class PackageManager {
             case INSTALL_FAILED_BAD_DEX_METADATA: return "INSTALL_FAILED_BAD_DEX_METADATA";
             case INSTALL_FAILED_MISSING_SPLIT: return "INSTALL_FAILED_MISSING_SPLIT";
             case INSTALL_FAILED_BAD_SIGNATURE: return "INSTALL_FAILED_BAD_SIGNATURE";
+            case INSTALL_FAILED_WRONG_INSTALLED_VERSION: return "INSTALL_FAILED_WRONG_INSTALLED_VERSION";
             default: return Integer.toString(status);
         }
     }
@@ -7030,7 +7055,8 @@ public abstract class PackageManager {
             case FLAG_PERMISSION_RESTRICTION_INSTALLER_EXEMPT: return "RESTRICTION_INSTALLER_EXEMPT";
             case FLAG_PERMISSION_RESTRICTION_SYSTEM_EXEMPT: return "RESTRICTION_SYSTEM_EXEMPT";
             case FLAG_PERMISSION_RESTRICTION_UPGRADE_EXEMPT: return "RESTRICTION_UPGRADE_EXEMPT";
-            case FLAG_PERMISSION_APPLY_RESTRICTION: return "FLAG_PERMISSION_APPLY_RESTRICTION";
+            case FLAG_PERMISSION_APPLY_RESTRICTION: return "APPLY_RESTRICTION";
+            case FLAG_PERMISSION_GRANTED_BY_ROLE: return "GRANTED_BY_ROLE";
             default: return Integer.toString(flag);
         }
     }

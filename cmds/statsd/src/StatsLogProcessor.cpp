@@ -68,12 +68,8 @@ const int FIELD_ID_CURRENT_REPORT_WALL_CLOCK_NANOS = 6;
 const int FIELD_ID_DUMP_REPORT_REASON = 8;
 const int FIELD_ID_STRINGS = 9;
 
-const int FIELD_ID_ACTIVE_CONFIG_LIST = 1;
-const int FIELD_ID_CONFIG_ID = 1;
-const int FIELD_ID_CONFIG_UID = 2;
-const int FIELD_ID_ACTIVE_METRIC = 3;
-const int FIELD_ID_METRIC_ID = 1;
-const int FIELD_ID_TIME_TO_LIVE_NANOS = 2;
+// for ActiveConfigList
+const int FIELD_ID_ACTIVE_CONFIG_LIST_CONFIG = 1;
 
 #define NS_PER_HOUR 3600 * NS_PER_SEC
 
@@ -523,7 +519,7 @@ void StatsLogProcessor::OnConfigRemoved(const ConfigKey& key) {
     std::lock_guard<std::mutex> lock(mMetricsMutex);
     auto it = mMetricsManagers.find(key);
     if (it != mMetricsManagers.end()) {
-        WriteDataToDiskLocked(key, getElapsedRealtimeNs(), CONFIG_REMOVED, 
+        WriteDataToDiskLocked(key, getElapsedRealtimeNs(), CONFIG_REMOVED,
                               NO_TIME_CONSTRAINTS);
         mMetricsManagers.erase(it);
         mUidMap->OnConfigRemoved(key);
@@ -613,13 +609,10 @@ void StatsLogProcessor::WriteDataToDiskLocked(const ConfigKey& key,
     mOnDiskDataConfigs.insert(key);
 }
 
-void StatsLogProcessor::WriteMetricsActivationToDisk(int64_t currentTimeNs) {
+void StatsLogProcessor::SaveActiveConfigsToDisk(int64_t currentTimeNs) {
     std::lock_guard<std::mutex> lock(mMetricsMutex);
-
     const int64_t timeNs = getElapsedRealtimeNs();
     // Do not write to disk if we already have in the last few seconds.
-    // This is to avoid overwriting files that would have the same name if we
-    //   write twice in the same second.
     if (static_cast<unsigned long long> (timeNs) <
             mLastActiveMetricsWriteNs + WRITE_DATA_COOL_DOWN_SEC * NS_PER_SEC) {
         ALOGI("Statsd skipping writing active metrics to disk. Already wrote data in last %d seconds",
@@ -629,29 +622,7 @@ void StatsLogProcessor::WriteMetricsActivationToDisk(int64_t currentTimeNs) {
     mLastActiveMetricsWriteNs = timeNs;
 
     ProtoOutputStream proto;
-
-    for (const auto& pair : mMetricsManagers) {
-        uint64_t activeConfigListToken = proto.start(FIELD_TYPE_MESSAGE | FIELD_COUNT_REPEATED |
-                                                     FIELD_ID_ACTIVE_CONFIG_LIST);
-        proto.write(FIELD_TYPE_INT64 | FIELD_ID_CONFIG_ID, (long long)pair.first.GetId());
-        proto.write(FIELD_TYPE_INT32 | FIELD_ID_CONFIG_UID, pair.first.GetUid());
-
-        vector<MetricProducer*> activeMetrics;
-        pair.second->prepForShutDown(currentTimeNs);
-        pair.second->getActiveMetrics(activeMetrics);
-        for (MetricProducer* metric : activeMetrics) {
-            if (metric->isActive()) {
-                uint64_t metricToken = proto.start(FIELD_TYPE_MESSAGE | FIELD_COUNT_REPEATED |
-                                                   FIELD_ID_ACTIVE_METRIC);
-                proto.write(FIELD_TYPE_INT64 | FIELD_ID_METRIC_ID,
-                            (long long)metric->getMetricId());
-                proto.write(FIELD_TYPE_INT64 | FIELD_ID_TIME_TO_LIVE_NANOS,
-                            (long long)metric->getRemainingTtlNs(currentTimeNs));
-                proto.end(metricToken);
-            }
-        }
-        proto.end(activeConfigListToken);
-    }
+    WriteActiveConfigsToProtoOutputStreamLocked(currentTimeNs, DEVICE_SHUTDOWN, &proto);
 
     string file_name = StringPrintf("%s/active_metrics", STATS_ACTIVE_METRIC_DIR);
     StorageManager::deleteFile(file_name.c_str());
@@ -664,31 +635,72 @@ void StatsLogProcessor::WriteMetricsActivationToDisk(int64_t currentTimeNs) {
     proto.flush(fd.get());
 }
 
-void StatsLogProcessor::LoadMetricsActivationFromDisk() {
+void StatsLogProcessor::WriteActiveConfigsToProtoOutputStream(
+        int64_t currentTimeNs, const DumpReportReason reason, ProtoOutputStream* proto) {
+    std::lock_guard<std::mutex> lock(mMetricsMutex);
+    WriteActiveConfigsToProtoOutputStreamLocked(currentTimeNs, reason, proto);
+}
+
+void StatsLogProcessor::WriteActiveConfigsToProtoOutputStreamLocked(
+        int64_t currentTimeNs,  const DumpReportReason reason, ProtoOutputStream* proto) {
+    for (const auto& pair : mMetricsManagers) {
+        const sp<MetricsManager>& metricsManager = pair.second;
+        uint64_t configToken = proto->start(FIELD_TYPE_MESSAGE | FIELD_COUNT_REPEATED |
+                                                     FIELD_ID_ACTIVE_CONFIG_LIST_CONFIG);
+        metricsManager->writeActiveConfigToProtoOutputStream(currentTimeNs, reason, proto);
+        proto->end(configToken);
+    }
+}
+void StatsLogProcessor::LoadActiveConfigsFromDisk() {
+    std::lock_guard<std::mutex> lock(mMetricsMutex);
     string file_name = StringPrintf("%s/active_metrics", STATS_ACTIVE_METRIC_DIR);
     int fd = open(file_name.c_str(), O_RDONLY | O_CLOEXEC);
-    if (fd != -1) {
-        string content;
-        if (android::base::ReadFdToString(fd, &content)) {
-            ActiveConfigList activeConfigList;
-            if (activeConfigList.ParseFromString(content)) {
-                for (int i = 0; i < activeConfigList.active_config_size(); i++) {
-                    const auto& config = activeConfigList.active_config(i);
-                    ConfigKey key(config.uid(), config.config_id());
-                    auto it = mMetricsManagers.find(key);
-                    if (it == mMetricsManagers.end()) {
-                        ALOGE("No config found for config %s", key.ToString().c_str());
-                        continue;
-                    }
-                    VLOG("Setting active config %s", key.ToString().c_str());
-                    it->second->setActiveMetrics(config, mTimeBaseNs);
-                }
-            }
-            VLOG("Successfully loaded %d active configs.", activeConfigList.active_config_size());
-        }
-        close(fd);
+    if (-1 == fd) {
+        VLOG("Attempt to read %s but failed", file_name.c_str());
+        StorageManager::deleteFile(file_name.c_str());
+        return;
     }
+    string content;
+    if (!android::base::ReadFdToString(fd, &content)) {
+        ALOGE("Attempt to read %s but failed", file_name.c_str());
+        close(fd);
+        StorageManager::deleteFile(file_name.c_str());
+        return;
+    }
+
+    close(fd);
+
+    ActiveConfigList activeConfigList;
+    if (!activeConfigList.ParseFromString(content)) {
+        ALOGE("Attempt to read %s but failed; failed to load active configs", file_name.c_str());
+        StorageManager::deleteFile(file_name.c_str());
+        return;
+    }
+    // Passing in mTimeBaseNs only works as long as we only load from disk is when statsd starts.
+    SetConfigsActiveStateLocked(activeConfigList, mTimeBaseNs);
     StorageManager::deleteFile(file_name.c_str());
+}
+
+void StatsLogProcessor::SetConfigsActiveState(const ActiveConfigList& activeConfigList,
+                                                    int64_t currentTimeNs) {
+    std::lock_guard<std::mutex> lock(mMetricsMutex);
+    SetConfigsActiveStateLocked(activeConfigList, currentTimeNs);
+}
+
+void StatsLogProcessor::SetConfigsActiveStateLocked(const ActiveConfigList& activeConfigList,
+                                                    int64_t currentTimeNs) {
+    for (int i = 0; i < activeConfigList.config_size(); i++) {
+        const auto& config = activeConfigList.config(i);
+        ConfigKey key(config.uid(), config.id());
+        auto it = mMetricsManagers.find(key);
+        if (it == mMetricsManagers.end()) {
+            ALOGE("No config found for config %s", key.ToString().c_str());
+            continue;
+        }
+        VLOG("Setting active config %s", key.ToString().c_str());
+        it->second->loadActiveConfig(config, currentTimeNs);
+    }
+    VLOG("Successfully loaded %d active configs.", activeConfigList.config_size());
 }
 
 void StatsLogProcessor::WriteDataToDiskLocked(const DumpReportReason dumpReportReason,
@@ -709,7 +721,7 @@ void StatsLogProcessor::WriteDataToDiskLocked(const DumpReportReason dumpReportR
     }
 }
 
-void StatsLogProcessor::WriteDataToDisk(const DumpReportReason dumpReportReason, 
+void StatsLogProcessor::WriteDataToDisk(const DumpReportReason dumpReportReason,
                                         const DumpLatency dumpLatency) {
     std::lock_guard<std::mutex> lock(mMetricsMutex);
     WriteDataToDiskLocked(dumpReportReason, dumpLatency);

@@ -18,7 +18,6 @@ package com.android.systemui.statusbar.notification.row;
 import static android.app.AppOpsManager.OP_CAMERA;
 import static android.app.AppOpsManager.OP_RECORD_AUDIO;
 import static android.app.AppOpsManager.OP_SYSTEM_ALERT_WINDOW;
-import static android.service.notification.NotificationListenerService.Ranking.USER_SENTIMENT_NEGATIVE;
 
 import android.app.INotificationManager;
 import android.app.NotificationChannel;
@@ -26,6 +25,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Bundle;
 import android.os.ServiceManager;
 import android.os.UserHandle;
 import android.provider.Settings;
@@ -48,6 +48,7 @@ import com.android.systemui.statusbar.NotificationLockscreenUserManager;
 import com.android.systemui.statusbar.NotificationPresenter;
 import com.android.systemui.statusbar.StatusBarState;
 import com.android.systemui.statusbar.notification.NotificationActivityStarter;
+import com.android.systemui.statusbar.notification.VisualStabilityManager;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
 import com.android.systemui.statusbar.notification.row.NotificationInfo.CheckSaveListener;
 import com.android.systemui.statusbar.notification.stack.NotificationListContainer;
@@ -73,6 +74,7 @@ public class NotificationGutsManager implements Dumpable, NotificationLifetimeEx
 
     private final MetricsLogger mMetricsLogger = Dependency.get(MetricsLogger.class);
     private final Context mContext;
+    private final VisualStabilityManager mVisualStabilityManager;
     private final AccessibilityManager mAccessibilityManager;
 
     // Dependencies:
@@ -96,8 +98,11 @@ public class NotificationGutsManager implements Dumpable, NotificationLifetimeEx
     protected String mKeyToRemoveOnGutsClosed;
 
     @Inject
-    public NotificationGutsManager(Context context) {
+    public NotificationGutsManager(
+            Context context,
+            VisualStabilityManager visualStabilityManager) {
         mContext = context;
+        mVisualStabilityManager = visualStabilityManager;
         mAccessibilityManager = (AccessibilityManager)
                 mContext.getSystemService(Context.ACCESSIBILITY_SERVICE);
     }
@@ -125,13 +130,18 @@ public class NotificationGutsManager implements Dumpable, NotificationLifetimeEx
      * Sends an intent to open the notification settings for a particular package and optional
      * channel.
      */
+    public static final String EXTRA_SHOW_FRAGMENT_ARGUMENTS = ":settings:show_fragment_args";
     private void startAppNotificationSettingsActivity(String packageName, final int appUid,
             final NotificationChannel channel, ExpandableNotificationRow row) {
         final Intent intent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS);
         intent.putExtra(Settings.EXTRA_APP_PACKAGE, packageName);
         intent.putExtra(Settings.EXTRA_APP_UID, appUid);
+
         if (channel != null) {
+            final Bundle args = new Bundle();
             intent.putExtra(EXTRA_FRAGMENT_ARG_KEY, channel.getId());
+            args.putString(EXTRA_FRAGMENT_ARG_KEY, channel.getId());
+            intent.putExtra(EXTRA_SHOW_FRAGMENT_ARGUMENTS, args);
         }
         mNotificationActivityStarter.startNotificationGutsIntent(intent, appUid, row);
     }
@@ -299,9 +309,10 @@ public class NotificationGutsManager implements Dumpable, NotificationLifetimeEx
         notificationInfoView.bindNotification(
                 pmUser,
                 iNotificationManager,
+                mVisualStabilityManager,
                 packageName,
                 row.getEntry().channel,
-                row.getNumUniqueChannels(),
+                row.getUniqueChannels(),
                 sbn,
                 mCheckSaveListener,
                 onSettingsClick,

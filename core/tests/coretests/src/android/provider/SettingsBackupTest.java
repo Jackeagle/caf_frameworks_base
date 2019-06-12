@@ -131,7 +131,6 @@ public class SettingsBackupTest {
                     Settings.Global.AUTOFILL_MAX_VISIBLE_DATASETS,
                     Settings.Global.AUTOMATIC_POWER_SAVE_MODE,
                     Settings.Global.AVERAGE_TIME_TO_DISCHARGE,
-                    Settings.Global.BACKGROUND_ACTIVITY_STARTS_ENABLED,
                     Settings.Global.BATTERY_CHARGING_STATE_UPDATE_DELAY,
                     Settings.Global.BATTERY_ESTIMATES_LAST_UPDATE_TIME,
                     Settings.Global.BROADCAST_BG_CONSTANTS,
@@ -294,6 +293,8 @@ public class SettingsBackupTest {
                     Settings.Global.INTENT_FIREWALL_UPDATE_CONTENT_URL,
                     Settings.Global.INTENT_FIREWALL_UPDATE_METADATA_URL,
                     Settings.Global.JOB_SCHEDULER_CONSTANTS,
+                    Settings.Global.JOB_SCHEDULER_QUOTA_CONTROLLER_CONSTANTS,
+                    Settings.Global.JOB_SCHEDULER_TIME_CONTROLLER_CONSTANTS,
                     Settings.Global.KEEP_PROFILE_IN_BACKGROUND,
                     Settings.Global.KERNEL_CPU_THREAD_READER,
                     Settings.Global.LANG_ID_UPDATE_CONTENT_URL,
@@ -392,6 +393,7 @@ public class SettingsBackupTest {
                     Settings.Global.PDP_WATCHDOG_POLL_INTERVAL_MS,
                     Settings.Global.PDP_WATCHDOG_TRIGGER_PACKET_COUNT,
                     Settings.Global.POLICY_CONTROL,
+                    Settings.Global.POWER_BUTTON_SUPPRESSION_DELAY_AFTER_GESTURE_WAKE,
                     Settings.Global.POWER_MANAGER_CONSTANTS,
                     Settings.Global.PREFERRED_NETWORK_MODE,
                     Settings.Global.PRIVATE_DNS_DEFAULT_MODE,
@@ -633,6 +635,8 @@ public class SettingsBackupTest {
                  Settings.Secure.ENABLED_NOTIFICATION_LISTENERS,
                  Settings.Secure.ENABLED_NOTIFICATION_POLICY_ACCESS_PACKAGES,
                  Settings.Secure.ENABLED_PRINT_SERVICES,
+                 Settings.Secure.GLOBAL_ACTIONS_PANEL_AVAILABLE,
+                 Settings.Secure.GLOBAL_ACTIONS_PANEL_DEBUG_ENABLED,
                  Settings.Secure.IMMERSIVE_MODE_CONFIRMATIONS,
                  Settings.Secure.INCALL_BACK_BUTTON_BEHAVIOR,
                  Settings.Secure.INPUT_METHOD_SELECTOR_VISIBILITY,
@@ -692,7 +696,6 @@ public class SettingsBackupTest {
                  Settings.Secure.TV_INPUT_CUSTOM_LABELS,
                  Settings.Secure.TV_INPUT_HIDDEN_INPUTS,
                  Settings.Secure.TV_USER_SETUP_COMPLETE,
-                 Settings.Secure.UI_NIGHT_MODE, // candidate?
                  Settings.Secure.UNKNOWN_SOURCES_DEFAULT_REVERSED,
                  Settings.Secure.UNSAFE_VOLUME_MUSIC_ACTIVE_MS,
                  Settings.Secure.USB_AUDIO_AUTOMATIC_ROUTING_DISABLED,
@@ -718,7 +721,8 @@ public class SettingsBackupTest {
                  Settings.Secure.LOCATION_ACCESS_CHECK_DELAY_MILLIS,
                  Settings.Secure.BIOMETRIC_DEBUG_ENABLED,
                  Settings.Secure.FACE_UNLOCK_ATTENTION_REQUIRED,
-                 Settings.Secure.FACE_UNLOCK_DIVERSITY_REQUIRED);
+                 Settings.Secure.FACE_UNLOCK_DIVERSITY_REQUIRED,
+                 Settings.Secure.FACE_UNLOCK_EDUCATION_INFO_DISPLAYED);
 
     @Test
     public void systemSettingsBackedUpOrBlacklisted() {
@@ -796,4 +800,3 @@ public class SettingsBackupTest {
     }
 
 }
-
