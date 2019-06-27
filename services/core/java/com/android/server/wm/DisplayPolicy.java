@@ -381,6 +381,8 @@ public class DisplayPolicy {
      */
     @NonNull private Insets mForwardedInsets = Insets.NONE;
 
+    private RefreshRatePolicy mRefreshRatePolicy;
+
     // -------- PolicyHandler --------
     private static final int MSG_UPDATE_DREAMING_SLEEP_TOKEN = 1;
     private static final int MSG_REQUEST_TRANSIENT_BARS = 2;
@@ -591,6 +593,10 @@ public class DisplayPolicy {
             mHasStatusBar = false;
             mHasNavigationBar = mDisplayContent.supportsSystemDecorations();
         }
+
+        mRefreshRatePolicy = new RefreshRatePolicy(mService,
+                mDisplayContent.getDisplayInfo(),
+                mService.mHighRefreshRateBlacklist);
     }
 
     void systemReady() {
@@ -2714,9 +2720,9 @@ public class DisplayPolicy {
                 res.getBoolean(R.bool.config_navBarAlwaysShowOnSideEdgeGesture);
 
         // This should calculate how much above the frame we accept gestures.
-        mBottomGestureAdditionalInset = Math.max(0,
+        mBottomGestureAdditionalInset =
                 res.getDimensionPixelSize(R.dimen.navigation_bar_gesture_height)
-                        - getNavigationBarFrameHeight(portraitRotation, uiMode));
+                        - getNavigationBarFrameHeight(portraitRotation, uiMode);
 
         updateConfigurationAndScreenSizeDependentBehaviors();
         mWindowOutsetBottom = ScreenShapeHelper.getWindowOutsetBottomPx(mContext.getResources());
@@ -3594,6 +3600,10 @@ public class DisplayPolicy {
                     mStatusBar != null && mStatusBar.isVisibleLw(),
                     mNavigationBar != null && mNavigationBar.isVisibleLw(), mHandler);
         }
+    }
+
+    RefreshRatePolicy getRefreshRatePolicy() {
+        return mRefreshRatePolicy;
     }
 
     void dump(String prefix, PrintWriter pw) {

@@ -101,7 +101,6 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.content.pm.UserInfo;
 import android.content.res.Configuration;
-import android.content.res.Resources;
 import android.graphics.Rect;
 import android.os.Binder;
 import android.os.Bundle;
@@ -118,9 +117,7 @@ import android.util.ArraySet;
 import android.util.EventLog;
 import android.util.Pools.SynchronizedPool;
 import android.util.Slog;
-import android.widget.Toast;
 
-import com.android.internal.R;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.app.HeavyWeightSwitcherActivity;
 import com.android.internal.app.IVoiceInteractor;
@@ -161,7 +158,7 @@ class ActivityStarter {
     private ActivityOptions mOptions;
 
     // If it is true, background activity can only be started in an existing task that contains
-    // an activity with same uid.
+    // an activity with same uid, or if activity starts are enabled in developer options.
     private boolean mRestrictedBgActivity;
 
     private int mLaunchMode;
@@ -921,7 +918,7 @@ class ActivityStarter {
                 || stack.getResumedActivity().info.applicationInfo.uid != realCallingUid)) {
             if (!mService.checkAppSwitchAllowedLocked(callingPid, callingUid,
                     realCallingPid, realCallingUid, "Activity start")) {
-                if (!restrictedBgActivity) {
+                if (!(restrictedBgActivity && handleBackgroundActivityAbort(r))) {
                     mController.addPendingActivityLaunch(new PendingActivityLaunch(r,
                             sourceRecord, startFlags, stack, callerApp));
                 }
@@ -1044,12 +1041,6 @@ class ActivityStarter {
                     + " allowed because SYSTEM_ALERT_WINDOW permission is granted.");
             return false;
         }
-        // don't abort if the callingPackage is temporarily whitelisted
-        if (mService.isPackageNameWhitelistedForBgActivityStarts(callingPackage)) {
-            Slog.w(TAG, "Background activity start for " + callingPackage
-                    + " temporarily whitelisted. This will not be supported in future Q builds.");
-            return false;
-        }
         // anything that has fallen through would currently be aborted
         Slog.w(TAG, "Background activity start [callingPackage: " + callingPackage
                 + "; callingUid: " + callingUid
@@ -1072,18 +1063,6 @@ class ActivityStarter {
                     (originatingPendingIntent != null));
         }
         return true;
-    }
-
-    // TODO: remove this toast after feature development is done
-    void showBackgroundActivityBlockedToast(boolean abort, String callingPackage) {
-        final Resources res = mService.mContext.getResources();
-        final String toastMsg = res.getString(abort
-                        ? R.string.activity_starter_block_bg_activity_starts_enforcing
-                        : R.string.activity_starter_block_bg_activity_starts_permissive,
-                callingPackage);
-        mService.mUiHandler.post(() -> {
-            Toast.makeText(mService.mContext, toastMsg, Toast.LENGTH_LONG).show();
-        });
     }
 
     /**
@@ -1457,7 +1436,6 @@ class ActivityStarter {
     private boolean handleBackgroundActivityAbort(ActivityRecord r) {
         // TODO(b/131747138): Remove toast and refactor related code in Q release.
         boolean abort = !mService.isBackgroundActivityStartsEnabled();
-        showBackgroundActivityBlockedToast(abort, r.launchedFromPackage);
         if (!abort) {
             return false;
         }
@@ -1916,7 +1894,7 @@ class ActivityStarter {
 
         mNoAnimation = (mLaunchFlags & FLAG_ACTIVITY_NO_ANIMATION) != 0;
 
-        if (restrictedBgActivity) {
+        if (mRestrictedBgActivity && !mService.isBackgroundActivityStartsEnabled()) {
             mAvoidMoveToFront = true;
             mDoResume = false;
         }
@@ -2380,7 +2358,6 @@ class ActivityStarter {
             if (handleBackgroundActivityAbort(mStartActivity)) {
                 return START_ABORTED;
             }
-            return START_ABORTED;
         }
         // We only want to allow changing stack in two cases:
         // 1. If the target task is not the top one. Otherwise we would move the launching task to
@@ -2553,17 +2530,15 @@ class ActivityStarter {
             if (handleBackgroundActivityAbort(mStartActivity)) {
                 return START_ABORTED;
             }
-            return START_ABORTED;
         }
         final TaskRecord task = (prev != null)
                 ? prev.getTaskRecord() : mTargetStack.createTaskRecord(
                 mSupervisor.getNextTaskIdForUserLocked(mStartActivity.mUserId), mStartActivity.info,
                 mIntent, null, null, true, mStartActivity, mSourceRecord, mOptions);
-        if (mRestrictedBgActivity && !task.containsAppUid(mCallingUid)) {
+        if (mRestrictedBgActivity && prev != null && !task.containsAppUid(mCallingUid)) {
             if (handleBackgroundActivityAbort(mStartActivity)) {
                 return START_ABORTED;
             }
-            return START_ABORTED;
         }
         addOrReparentStartingActivity(task, "setTaskToCurrentTopOrCreateNewTask");
         mTargetStack.positionChildWindowContainerAtTop(task);

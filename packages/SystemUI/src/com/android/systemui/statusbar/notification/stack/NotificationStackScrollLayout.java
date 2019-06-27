@@ -409,7 +409,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements ScrollAd
     private final ViewOutlineProvider mOutlineProvider = new ViewOutlineProvider() {
         @Override
         public void getOutline(View view, Outline outline) {
-            if (mAmbientState.isDarkAtAll() || !mShowDarkShelf) {
+            if (mAmbientState.isDarkAtAll()) {
                 float xProgress = mDarkXInterpolator.getInterpolation(
                         (1 - mLinearDarkAmount) * mBackgroundXFactor);
                 outline.setRoundRect(mBackgroundAnimationRect,
@@ -477,8 +477,6 @@ public class NotificationStackScrollLayout extends ViewGroup implements ScrollAd
     private float mHorizontalPanelTranslation;
     private final NotificationLockscreenUserManager mLockscreenUserManager =
             Dependency.get(NotificationLockscreenUserManager.class);
-    protected final NotificationGutsManager mGutsManager =
-            Dependency.get(NotificationGutsManager.class);
     private final Rect mTmpRect = new Rect();
     private final NotificationEntryManager mEntryManager =
             Dependency.get(NotificationEntryManager.class);
@@ -507,7 +505,6 @@ public class NotificationStackScrollLayout extends ViewGroup implements ScrollAd
     /**
      * If the {@link NotificationShelf} should be visible when dark.
      */
-    private boolean mShowDarkShelf;
     private boolean mAnimateBottomOnLayout;
 
     @Inject
@@ -518,7 +515,8 @@ public class NotificationStackScrollLayout extends ViewGroup implements ScrollAd
             NotificationRoundnessManager notificationRoundnessManager,
             AmbientPulseManager ambientPulseManager,
             DynamicPrivacyController dynamicPrivacyController,
-            ActivityStarter activityStarter) {
+            ActivityStarter activityStarter,
+            StatusBarStateController statusBarStateController) {
         super(context, attrs, 0, 0);
         Resources res = getResources();
 
@@ -534,6 +532,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements ScrollAd
                 new NotificationSectionsManager(
                         this,
                         activityStarter,
+                        statusBarStateController,
                         NotificationUtils.useNewInterruptionModel(context));
         mSectionsManager.inflateViews(context);
         mSectionsManager.setOnClearGentleNotifsClickListener(v -> {
@@ -624,7 +623,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements ScrollAd
         inflateFooterView();
         mVisualStabilityManager.setVisibilityLocationProvider(this::isInVisibleLocation);
         if (mAllowLongPress) {
-            setLongPressListener(mGutsManager::openGuts);
+            setLongPressListener(mNotificationGutsManager::openGuts);
         }
     }
 
@@ -870,6 +869,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements ScrollAd
         int lastSectionBottom =
                 mSections[0].getCurrentBounds().bottom + animationYOffset;
         int previousLeft = left;
+        int previousRight = right;
         boolean first = true;
         for (NotificationSection section : mSections) {
             if (section.getFirstVisibleChild() == null) {
@@ -877,6 +877,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements ScrollAd
             }
             int sectionTop = section.getCurrentBounds().top + animationYOffset;
             int ownLeft = Math.min(Math.max(left, section.getCurrentBounds().left), right);
+            int ownRight = Math.max(Math.min(right, section.getCurrentBounds().right), ownLeft);
             // If sections are directly adjacent to each other, we don't want to draw them
             // as separate roundrects, as the rounded corners right next to each other look
             // bad.
@@ -884,19 +885,20 @@ public class NotificationStackScrollLayout extends ViewGroup implements ScrollAd
                     || (previousLeft != ownLeft && !first)) {
                 canvas.drawRoundRect(ownLeft,
                         backgroundRectTop,
-                        right,
+                        ownRight,
                         lastSectionBottom,
                         mCornerRadius, mCornerRadius, mBackgroundPaint);
                 backgroundRectTop = sectionTop;
             }
             previousLeft = ownLeft;
+            previousRight = ownRight;
             lastSectionBottom =
                     section.getCurrentBounds().bottom + animationYOffset;
             first = false;
         }
         canvas.drawRoundRect(previousLeft,
                 backgroundRectTop,
-                right,
+                previousRight,
                 lastSectionBottom,
                 mCornerRadius, mCornerRadius, mBackgroundPaint);
     }
@@ -913,7 +915,8 @@ public class NotificationStackScrollLayout extends ViewGroup implements ScrollAd
             if (child.getVisibility() != View.GONE
                     && child instanceof ExpandableNotificationRow) {
                 ExpandableNotificationRow row = (ExpandableNotificationRow) child;
-                if ((row.isPinned() || row.isHeadsUpAnimatingAway()) && row.getTranslation() < 0) {
+                if ((row.isPinned() || row.isHeadsUpAnimatingAway()) && row.getTranslation() < 0
+                        && row.getProvider().shouldShowGutsOnSnapOpen()) {
                     top = Math.min(top, row.getTranslationY());
                     bottom = Math.max(bottom, row.getTranslationY() + row.getActualHeight());
                 }
@@ -934,18 +937,11 @@ public class NotificationStackScrollLayout extends ViewGroup implements ScrollAd
             return;
         }
 
-        float alpha =
-                BACKGROUND_ALPHA_DIMMED + (1 - BACKGROUND_ALPHA_DIMMED) * (1.0f - mDimAmount);
-        alpha *= 1f - mInterpolatedDarkAmount;
-        // We need to manually blend in the background color.
-        int scrimColor = mScrimController.getBackgroundColor();
-        int awakeColor = ColorUtils.blendARGB(scrimColor, mBgColor, alpha);
-
         // Interpolate between semi-transparent notification panel background color
         // and white AOD separator.
         float colorInterpolation = MathUtils.smoothStep(0.4f /* start */, 1f /* end */,
                 mLinearDarkAmount);
-        int color = ColorUtils.blendARGB(awakeColor, Color.WHITE, colorInterpolation);
+        int color = ColorUtils.blendARGB(mBgColor, Color.WHITE, colorInterpolation);
 
         if (mCachedBackgroundColor != color) {
             mCachedBackgroundColor = color;
@@ -1365,8 +1361,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements ScrollAd
             mIsClipped = clipped;
         }
 
-        if (!mAmbientPulseManager.hasNotifications()
-                && mAmbientState.isFullyDark() && mShowDarkShelf) {
+        if (!mAmbientPulseManager.hasNotifications() && mAmbientState.isFullyDark()) {
             setClipBounds(null);
         } else if (mAmbientState.isDarkAtAll()) {
             clipToOutline = true;
@@ -2403,11 +2398,6 @@ public class NotificationStackScrollLayout extends ViewGroup implements ScrollAd
         updateScrollability();
         clampScrollPosition();
         mAmbientState.setLayoutMaxHeight(mContentHeight);
-    }
-
-    @ShadeViewRefactor(RefactorComponent.SHADE_VIEW)
-    private boolean isPulsing(NotificationEntry entry) {
-        return mAmbientState.isPulsing(entry);
     }
 
     @Override
@@ -4378,6 +4368,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements ScrollAd
         mStackScrollAlgorithm.setIsExpanded(isExpanded);
         mAmbientState.setShadeExpanded(isExpanded);
         mStateAnimator.setShadeExpanded(isExpanded);
+        mSwipeHelper.setIsExpanded(isExpanded);
         if (changed) {
             if (!mIsExpanded) {
                 mGroupManager.collapseAllGroups();
@@ -4719,9 +4710,6 @@ public class NotificationStackScrollLayout extends ViewGroup implements ScrollAd
         if (mAmbientState.isDark() == dark) {
             return;
         }
-        if (!dark) {
-            mShowDarkShelf = false;
-        }
         mAmbientState.setDark(dark);
         if (animate && mAnimationsEnabled) {
             mDarkNeedsAnimation = true;
@@ -4783,7 +4771,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements ScrollAd
         boolean nowDarkAtAll = mAmbientState.isDarkAtAll();
         if (nowFullyDark != wasFullyDark) {
             updateContentHeight();
-            if (nowFullyDark && mShowDarkShelf) {
+            if (nowFullyDark) {
                 updateDarkShelfVisibility();
             }
         }
@@ -4797,14 +4785,6 @@ public class NotificationStackScrollLayout extends ViewGroup implements ScrollAd
         updateBackgroundDimming();
         updatePanelTranslation();
         requestChildrenUpdate();
-    }
-
-    /**
-     * If the shelf should be visible when the device is in ambient mode (dozing.)
-     */
-    @ShadeViewRefactor(RefactorComponent.SHADE_VIEW)
-    public void showDarkShelf() {
-        mShowDarkShelf = true;
     }
 
     private void updateDarkShelfVisibility() {
@@ -5179,6 +5159,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements ScrollAd
         }
         mPulsing = pulsing;
         mAmbientState.setPulsing(pulsing);
+        mSwipeHelper.setPulsing(pulsing);
         updateNotificationAnimationStates();
         updateAlgorithmHeightAndPadding();
         updateContentHeight();
@@ -5719,6 +5700,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements ScrollAd
                 view.setTranslationY(wakeUplocation);
             }
         }
+        mDimmedNeedsAnimation = true;
     }
 
     @Override
@@ -6161,6 +6143,9 @@ public class NotificationStackScrollLayout extends ViewGroup implements ScrollAd
                         .setType(MetricsEvent.TYPE_ACTION));
                 mHeadsUpManager.setMenuShown(notificationRow.getEntry(), true);
                 mSwipeHelper.onMenuShown(row);
+                mNotificationGutsManager.closeAndSaveGuts(true /* removeLeavebehind */,
+                        false /* force */, false /* removeControls */, -1 /* x */, -1 /* y */,
+                        false /* resetMenu */);
 
                 // Check to see if we want to go directly to the notfication guts
                 NotificationMenuRowPlugin provider = notificationRow.getProvider();
@@ -6168,7 +6153,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements ScrollAd
                     MenuItem item = provider.menuItemToExposeOnSnap();
                     if (item != null) {
                         Point origin = provider.getRevealAnimationOrigin();
-                        mGutsManager.openGuts(row, origin.x, origin.y, item);
+                        mNotificationGutsManager.openGuts(row, origin.x, origin.y, item);
                     } else  {
                         Log.e(TAG, "Provider has shouldShowGutsOnSnapOpen, but provided no "
                                 + "menu item in menuItemtoExposeOnSnap. Skipping.");

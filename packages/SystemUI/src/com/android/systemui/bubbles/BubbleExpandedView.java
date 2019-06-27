@@ -16,11 +16,9 @@
 
 package com.android.systemui.bubbles;
 
-import static android.content.pm.ActivityInfo.DOCUMENT_LAUNCH_ALWAYS;
-import static android.util.StatsLogInternal.BUBBLE_DEVELOPER_ERROR_REPORTED__ERROR__ACTIVITY_INFO_MISSING;
-import static android.util.StatsLogInternal.BUBBLE_DEVELOPER_ERROR_REPORTED__ERROR__ACTIVITY_INFO_NOT_RESIZABLE;
-import static android.util.StatsLogInternal.BUBBLE_DEVELOPER_ERROR_REPORTED__ERROR__DOCUMENT_LAUNCH_NOT_ALWAYS;
 import static android.view.Display.INVALID_DISPLAY;
+
+import static com.android.systemui.bubbles.BubbleController.DEBUG_ENABLE_AUTO_BUBBLE;
 
 import android.annotation.Nullable;
 import android.app.ActivityOptions;
@@ -30,7 +28,6 @@ import android.app.Notification;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
@@ -52,6 +49,7 @@ import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.widget.LinearLayout;
 
+import com.android.internal.policy.ScreenDecorationsUtils;
 import com.android.systemui.Dependency;
 import com.android.systemui.R;
 import com.android.systemui.recents.TriangleShape;
@@ -87,6 +85,7 @@ public class BubbleExpandedView extends LinearLayout implements View.OnClickList
     private int mBubbleHeight;
     private int mPointerWidth;
     private int mPointerHeight;
+    private ShapeDrawable mPointerDrawable;
 
     private NotificationEntry mEntry;
     private PackageManager mPm;
@@ -170,16 +169,11 @@ public class BubbleExpandedView extends LinearLayout implements View.OnClickList
         mPointerWidth = res.getDimensionPixelSize(R.dimen.bubble_pointer_width);
         mPointerHeight = res.getDimensionPixelSize(R.dimen.bubble_pointer_height);
 
-        TypedArray ta = getContext().obtainStyledAttributes(
-                new int[] {android.R.attr.colorBackgroundFloating});
-        int bgColor = ta.getColor(0, Color.WHITE);
-        ta.recycle();
 
-        ShapeDrawable triangleDrawable = new ShapeDrawable(TriangleShape.create(
-                mPointerWidth, mPointerHeight, false /* pointUp */));
-
-        triangleDrawable.setTint(bgColor);
-        mPointerView.setBackground(triangleDrawable);
+        mPointerDrawable = new ShapeDrawable(TriangleShape.create(
+                mPointerWidth, mPointerHeight, true /* pointUp */));
+        mPointerView.setBackground(mPointerDrawable);
+        mPointerView.setVisibility(GONE);
 
         mSettingsIconHeight = getContext().getResources().getDimensionPixelSize(
                 R.dimen.bubble_expanded_header_height);
@@ -190,8 +184,16 @@ public class BubbleExpandedView extends LinearLayout implements View.OnClickList
                 true /* singleTaskInstance */);
         addView(mActivityView);
 
-        // Make sure pointer is below activity view
-        bringChildToFront(mPointerView);
+        // Expanded stack layout, top to bottom:
+        // Expanded view container
+        // ==> bubble row
+        // ==> expanded view
+        //   ==> activity view
+        //   ==> manage button
+        bringChildToFront(mActivityView);
+        bringChildToFront(mSettingsIcon);
+
+        applyThemeAttrs();
 
         setOnApplyWindowInsetsListener((View view, WindowInsets insets) -> {
             // Keep track of IME displaying because we should not make any adjustments that might
@@ -204,6 +206,23 @@ public class BubbleExpandedView extends LinearLayout implements View.OnClickList
             }
             return view.onApplyWindowInsets(insets);
         });
+    }
+
+    void applyThemeAttrs() {
+        TypedArray ta = getContext().obtainStyledAttributes(R.styleable.BubbleExpandedView);
+        int bgColor = ta.getColor(
+                R.styleable.BubbleExpandedView_android_colorBackgroundFloating, Color.WHITE);
+        float cornerRadius = ta.getDimension(
+                R.styleable.BubbleExpandedView_android_dialogCornerRadius, 0);
+        ta.recycle();
+
+        // Update triangle color.
+        mPointerDrawable.setTint(bgColor);
+
+        // Update ActivityView cornerRadius
+        if (ScreenDecorationsUtils.supportsRoundedCornersOnWindows(mContext.getResources())) {
+            mActivityView.setCornerRadius(cornerRadius);
+        }
     }
 
     @Override
@@ -266,7 +285,7 @@ public class BubbleExpandedView extends LinearLayout implements View.OnClickList
         if (mAppIcon == null) {
             mAppIcon = mPm.getDefaultActivityIcon();
         }
-        updateTheme();
+        applyThemeAttrs();
         showSettingsIcon();
         updateExpandedView();
     }
@@ -306,21 +325,6 @@ public class BubbleExpandedView extends LinearLayout implements View.OnClickList
         }
     }
 
-    void updateTheme() {
-        // Get new colors.
-        TypedArray ta = mContext.obtainStyledAttributes(
-                new int[]{android.R.attr.colorBackgroundFloating, android.R.attr.colorForeground});
-        int backgroundColor = ta.getColor(0, Color.WHITE /* default */);
-        int foregroundColor = ta.getColor(1, Color.BLACK /* default */);
-        ta.recycle();
-
-        // Update triangle color.
-        ShapeDrawable triangleDrawable = new ShapeDrawable(
-                TriangleShape.create(mPointerWidth, mPointerHeight, false /* pointUp */));
-        triangleDrawable.setTint(backgroundColor);
-        mPointerView.setBackground(triangleDrawable);
-    }
-
     private void updateExpandedView() {
         mBubbleIntent = getBubbleIntent(mEntry);
         if (mBubbleIntent != null) {
@@ -330,11 +334,10 @@ public class BubbleExpandedView extends LinearLayout implements View.OnClickList
                 mNotifRow = null;
             }
             mActivityView.setVisibility(VISIBLE);
-        } else {
+        } else if (DEBUG_ENABLE_AUTO_BUBBLE) {
             // Hide activity view if we had it previously
             mActivityView.setVisibility(GONE);
             mNotifRow = mEntry.getRow();
-
         }
         updateView();
     }
@@ -345,14 +348,6 @@ public class BubbleExpandedView extends LinearLayout implements View.OnClickList
         }
         mActivityView.performBackPress();
         return true;
-    }
-
-    /**
-     * @return total height that the expanded view occupies.
-     */
-    int getExpandedSize() {
-        return mBubbleHeight + mPointerView.getHeight() + mPointerMargin
-                + mSettingsIconHeight;
     }
 
     void updateHeight() {
@@ -376,8 +371,8 @@ public class BubbleExpandedView extends LinearLayout implements View.OnClickList
                 }
                 desiredHeight = desiredPx > 0 ? desiredPx : mMinHeight;
             }
-            int max = mStackView.getMaxExpandedHeight() - mSettingsIconHeight
-                    - mPointerView.getHeight() - mPointerMargin;
+            int max = mStackView.getMaxExpandedHeight() - mSettingsIconHeight - mPointerHeight
+                    - mPointerMargin;
             float height = Math.min(desiredHeight, max);
             height = Math.max(height, mMinHeight);
             LayoutParams lp = (LayoutParams) mActivityView.getLayoutParams();
@@ -406,7 +401,7 @@ public class BubbleExpandedView extends LinearLayout implements View.OnClickList
             Intent intent = getSettingsIntent(mEntry.notification.getPackageName(),
                     mEntry.notification.getUid());
             mStackView.collapseStack(() -> {
-                mContext.startActivity(intent);
+                mContext.startActivityAsUser(intent, mEntry.notification.getUser());
                 logBubbleClickEvent(mEntry,
                         StatsLog.BUBBLE_UICHANGED__ACTION__HEADER_GO_TO_SETTINGS);
             });
@@ -441,9 +436,10 @@ public class BubbleExpandedView extends LinearLayout implements View.OnClickList
      * Set the x position that the tip of the triangle should point to.
      */
     public void setPointerPosition(float x) {
-        // Adjust for the pointer size
-        x -= (mPointerView.getWidth() / 2f);
-        mPointerView.setTranslationX(x);
+        float halfPointerWidth = mPointerWidth / 2f;
+        float pointerLeft = x - halfPointerWidth;
+        mPointerView.setTranslationX(pointerLeft);
+        mPointerView.setVisibility(VISIBLE);
     }
 
     /**
@@ -524,56 +520,11 @@ public class BubbleExpandedView extends LinearLayout implements View.OnClickList
     @Nullable
     private PendingIntent getBubbleIntent(NotificationEntry entry) {
         Notification notif = entry.notification.getNotification();
-        String packageName = entry.notification.getPackageName();
         Notification.BubbleMetadata data = notif.getBubbleMetadata();
-        if (data != null && canLaunchInActivityView(data.getIntent(), true /* enableLogging */,
-                packageName)) {
+        if (BubbleController.canLaunchInActivityView(mContext, entry) && data != null) {
             return data.getIntent();
-        } else if (BubbleController.shouldUseContentIntent(mContext)
-                && canLaunchInActivityView(notif.contentIntent, false /* enableLogging */,
-                packageName)) {
-            return notif.contentIntent;
         }
         return null;
-    }
-
-    /**
-     * Whether an intent is properly configured to display in an {@link android.app.ActivityView}.
-     *
-     * @param intent the pending intent of the bubble.
-     * @param enableLogging whether bubble developer error should be logged.
-     * @param packageName the notification package name for this bubble.
-     * @return
-     */
-    private boolean canLaunchInActivityView(PendingIntent intent, boolean enableLogging,
-            String packageName) {
-        if (intent == null) {
-            return false;
-        }
-        ActivityInfo info =
-                intent.getIntent().resolveActivityInfo(mContext.getPackageManager(), 0);
-        if (info == null) {
-            if (enableLogging) {
-                StatsLog.write(StatsLog.BUBBLE_DEVELOPER_ERROR_REPORTED, packageName,
-                        BUBBLE_DEVELOPER_ERROR_REPORTED__ERROR__ACTIVITY_INFO_MISSING);
-            }
-            return false;
-        }
-        if (!ActivityInfo.isResizeableMode(info.resizeMode)) {
-            if (enableLogging) {
-                StatsLog.write(StatsLog.BUBBLE_DEVELOPER_ERROR_REPORTED, packageName,
-                        BUBBLE_DEVELOPER_ERROR_REPORTED__ERROR__ACTIVITY_INFO_NOT_RESIZABLE);
-            }
-            return false;
-        }
-        if (info.documentLaunchMode != DOCUMENT_LAUNCH_ALWAYS) {
-            if (enableLogging) {
-                StatsLog.write(StatsLog.BUBBLE_DEVELOPER_ERROR_REPORTED, packageName,
-                        BUBBLE_DEVELOPER_ERROR_REPORTED__ERROR__DOCUMENT_LAUNCH_NOT_ALWAYS);
-            }
-            return false;
-        }
-        return (info.flags & ActivityInfo.FLAG_ALLOW_EMBEDDED) != 0;
     }
 
     /**

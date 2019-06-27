@@ -16,10 +16,14 @@
 
 package com.android.server.policy;
 
+import static android.app.AppOpsManager.MODE_ALLOWED;
+import static android.app.AppOpsManager.MODE_DEFAULT;
+import static android.app.AppOpsManager.MODE_ERRORED;
+import static android.app.AppOpsManager.MODE_IGNORED;
+import static android.app.AppOpsManager.OP_NONE;
 import static android.content.pm.PackageManager.FLAG_PERMISSION_APPLY_RESTRICTION;
 import static android.content.pm.PackageManager.GET_PERMISSIONS;
 
-import android.Manifest;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.UserIdInt;
@@ -37,13 +41,16 @@ import android.content.pm.PermissionInfo;
 import android.os.Build;
 import android.os.Process;
 import android.os.UserHandle;
+import android.os.UserManagerInternal;
 import android.permission.PermissionControllerManager;
 import android.permission.PermissionManagerInternal;
 import android.provider.Telephony;
 import android.telecom.TelecomManager;
 import android.util.Slog;
+import android.util.SparseBooleanArray;
 import android.util.SparseIntArray;
 
+import com.android.internal.annotations.GuardedBy;
 import com.android.server.FgThread;
 import com.android.server.LocalServices;
 import com.android.server.SystemService;
@@ -60,6 +67,13 @@ import java.util.concurrent.CountDownLatch;
  */
 public final class PermissionPolicyService extends SystemService {
     private static final String LOG_TAG = PermissionPolicyService.class.getSimpleName();
+    private static final boolean DEBUG = false;
+
+    private final Object mLock = new Object();
+
+    /** Whether the user is started but not yet stopped */
+    @GuardedBy("mLock")
+    private final SparseBooleanArray mIsStarted = new SparseBooleanArray();
 
     public PermissionPolicyService(@NonNull Context context) {
         super(context);
@@ -71,17 +85,22 @@ public final class PermissionPolicyService extends SystemService {
     public void onStart() {
         final PackageManagerInternal packageManagerInternal = LocalServices.getService(
                 PackageManagerInternal.class);
+        final PermissionManagerInternal permManagerInternal = LocalServices.getService(
+                PermissionManagerInternal.class);
+
         packageManagerInternal.getPackageList(new PackageListObserver() {
             @Override
             public void onPackageAdded(String packageName, int uid) {
-                synchronizePackagePermissionsAndAppOpsForUser(getContext(), packageName,
-                        UserHandle.getUserId(uid));
+                onPackageChanged(packageName, uid);
             }
 
             @Override
             public void onPackageChanged(String packageName, int uid) {
-                synchronizePackagePermissionsAndAppOpsForUser(getContext(), packageName,
-                        UserHandle.getUserId(uid));
+                final int userId = UserHandle.getUserId(uid);
+
+                if (isStarted(userId)) {
+                    synchronizePackagePermissionsAndAppOpsForUser(packageName, userId);
+                }
             }
 
             @Override
@@ -89,20 +108,75 @@ public final class PermissionPolicyService extends SystemService {
                 /* do nothing */
             }
         });
+
+        permManagerInternal.addOnRuntimePermissionStateChangedListener(
+                (packageName, changedUserId) -> {
+                    if (isStarted(changedUserId)) {
+                        synchronizePackagePermissionsAndAppOpsForUser(packageName, changedUserId);
+                    }
+                });
+    }
+
+    @Override
+    public void onBootPhase(int phase) {
+        if (DEBUG) Slog.i(LOG_TAG, "onBootPhase(" + phase + ")");
+
+        if (phase == PHASE_ACTIVITY_MANAGER_READY) {
+            final UserManagerInternal um = LocalServices.getService(UserManagerInternal.class);
+
+            // For some users we might not receive a onStartUser, hence force one here
+            for (int userId : um.getUserIds()) {
+                if (um.isUserRunning(userId)) {
+                    onStartUser(userId);
+                }
+            }
+        }
+    }
+
+    /**
+     * @return Whether the user is started but not yet stopped
+     */
+    private boolean isStarted(@UserIdInt int userId) {
+        synchronized (mLock) {
+            return mIsStarted.get(userId);
+        }
     }
 
     @Override
     public void onStartUser(@UserIdInt int userId) {
-        grantOrUpgradeDefaultRuntimePermissionsInNeeded(getContext(), userId);
-        synchronizePermissionsAndAppOpsForUser(getContext(), userId);
-        startWatchingRuntimePermissionChanges(getContext(), userId);
+        if (DEBUG) Slog.i(LOG_TAG, "onStartUser(" + userId + ")");
+
+        if (isStarted(userId)) {
+            return;
+        }
+
+        grantOrUpgradeDefaultRuntimePermissionsIfNeeded(userId);
+
+        synchronized (mLock) {
+            mIsStarted.put(userId, true);
+        }
+
+        // Force synchronization as permissions might have changed
+        synchronizePermissionsAndAppOpsForUser(userId);
     }
 
-    private static void grantOrUpgradeDefaultRuntimePermissionsInNeeded(@NonNull Context context,
-            @UserIdInt int userId) {
+    @Override
+    public void onStopUser(@UserIdInt int userId) {
+        if (DEBUG) Slog.i(LOG_TAG, "onStopUser(" + userId + ")");
+
+        synchronized (mLock) {
+            mIsStarted.delete(userId);
+        }
+    }
+
+    private void grantOrUpgradeDefaultRuntimePermissionsIfNeeded(@UserIdInt int userId) {
+        if (DEBUG) Slog.i(LOG_TAG, "grantOrUpgradeDefaultPermsIfNeeded(" + userId + ")");
+
         final PackageManagerInternal packageManagerInternal = LocalServices.getService(
                 PackageManagerInternal.class);
         if (packageManagerInternal.wereDefaultPermissionsGrantedSinceBoot(userId)) {
+            if (DEBUG) Slog.i(LOG_TAG, "defaultPermsWereGrantedSinceBoot(" + userId + ")");
+
             // Now call into the permission controller to apply policy around permissions
             final CountDownLatch latch = new CountDownLatch(1);
 
@@ -110,7 +184,8 @@ public final class PermissionPolicyService extends SystemService {
             // there as we are on the main thread and want to block until the work is
             // completed or we time out.
             final PermissionControllerManager permissionControllerManager =
-                    new PermissionControllerManager(getUserContext(context, UserHandle.of(userId)),
+                    new PermissionControllerManager(
+                            getUserContext(getContext(), UserHandle.of(userId)),
                             FgThread.getHandler());
             permissionControllerManager.grantOrUpgradeDefaultRuntimePermissions(
                     FgThread.getExecutor(),
@@ -130,19 +205,9 @@ public final class PermissionPolicyService extends SystemService {
             } catch (InterruptedException e) {
                 /* ignore */
             }
-        }
-    }
 
-    private static void startWatchingRuntimePermissionChanges(@NonNull Context context,
-            int userId) {
-        final PermissionManagerInternal permissionManagerInternal = LocalServices.getService(
-                PermissionManagerInternal.class);
-        permissionManagerInternal.addOnRuntimePermissionStateChangedListener(
-                (packageName, changedUserId) -> {
-                    if (userId == changedUserId) {
-                        synchronizePackagePermissionsAndAppOpsForUser(context, packageName, userId);
-                    }
-                });
+            packageManagerInternal.setRuntimePermissionsFingerPrint(Build.FINGERPRINT, userId);
+        }
     }
 
     private static @Nullable Context getUserContext(@NonNull Context context,
@@ -162,8 +227,14 @@ public final class PermissionPolicyService extends SystemService {
     /**
      * Synchronize a single package.
      */
-    private static void synchronizePackagePermissionsAndAppOpsForUser(@NonNull Context context,
-            @NonNull String packageName, @UserIdInt int userId) {
+    private void synchronizePackagePermissionsAndAppOpsForUser(@NonNull String packageName,
+            @UserIdInt int userId) {
+        if (DEBUG) {
+            Slog.v(LOG_TAG,
+                    "synchronizePackagePermissionsAndAppOpsForUser(" + packageName + ", " + userId
+                            + ")");
+        }
+
         final PackageManagerInternal packageManagerInternal = LocalServices.getService(
                 PackageManagerInternal.class);
         final PackageInfo pkg = packageManagerInternal.getPackageInfo(packageName, 0,
@@ -172,7 +243,7 @@ public final class PermissionPolicyService extends SystemService {
             return;
         }
         final PermissionToOpSynchroniser synchroniser = new PermissionToOpSynchroniser(
-                getUserContext(context, UserHandle.of(userId)));
+                getUserContext(getContext(), UserHandle.of(userId)));
         synchroniser.addPackage(pkg.packageName);
         final String[] sharedPkgNames = packageManagerInternal.getPackagesForSharedUserId(
                 pkg.sharedUserId, userId);
@@ -191,12 +262,13 @@ public final class PermissionPolicyService extends SystemService {
     /**
      * Synchronize all packages
      */
-    private static void synchronizePermissionsAndAppOpsForUser(@NonNull Context context,
-            @UserIdInt int userId) {
+    private void synchronizePermissionsAndAppOpsForUser(@UserIdInt int userId) {
+        if (DEBUG) Slog.i(LOG_TAG, "synchronizePermissionsAndAppOpsForUser(" + userId + ")");
+
         final PackageManagerInternal packageManagerInternal = LocalServices.getService(
                 PackageManagerInternal.class);
         final PermissionToOpSynchroniser synchronizer = new PermissionToOpSynchroniser(
-                getUserContext(context, UserHandle.of(userId)));
+                getUserContext(getContext(), UserHandle.of(userId)));
         packageManagerInternal.forEachPackage((pkg) -> synchronizer.addPackage(pkg.packageName));
         synchronizer.syncPackages();
     }
@@ -229,6 +301,15 @@ public final class PermissionPolicyService extends SystemService {
          *
          * @see #syncRestrictedOps
          */
+        private final @NonNull ArrayList<OpToUnrestrict> mOpsToAllowIfDefault = new ArrayList<>();
+
+        /**
+         * All ops that need to be flipped to allow.
+         *
+         * Currently, only used by the restricted permissions logic.
+         *
+         * @see #syncRestrictedOps
+         */
         private final @NonNull ArrayList<OpToUnrestrict> mOpsToAllow = new ArrayList<>();
 
         /**
@@ -238,7 +319,7 @@ public final class PermissionPolicyService extends SystemService {
          *
          * @see #syncRestrictedOps
          */
-        private final @NonNull ArrayList<OpToUnrestrict> mOpsToIgnore = new ArrayList<>();
+        private final @NonNull ArrayList<OpToUnrestrict> mOpsToIgnoreIfDefault = new ArrayList<>();
 
         /**
          * All foreground permissions
@@ -262,11 +343,16 @@ public final class PermissionPolicyService extends SystemService {
             final int allowCount = mOpsToAllow.size();
             for (int i = 0; i < allowCount; i++) {
                 final OpToUnrestrict op = mOpsToAllow.get(i);
+                setUidModeAllowed(op.code, op.uid);
+            }
+            final int allowIfDefaultCount = mOpsToAllowIfDefault.size();
+            for (int i = 0; i < allowIfDefaultCount; i++) {
+                final OpToUnrestrict op = mOpsToAllowIfDefault.get(i);
                 setUidModeAllowedIfDefault(op.code, op.uid, op.packageName);
             }
-            final int ignoreCount = mOpsToIgnore.size();
-            for (int i = 0; i < ignoreCount; i++) {
-                final OpToUnrestrict op = mOpsToIgnore.get(i);
+            final int ignoreIfDefaultCount = mOpsToIgnoreIfDefault.size();
+            for (int i = 0; i < ignoreIfDefaultCount; i++) {
+                final OpToUnrestrict op = mOpsToIgnoreIfDefault.get(i);
                 setUidModeIgnoredIfDefault(op.code, op.uid, op.packageName);
             }
             final int defaultCount = mOpsToDefault.size();
@@ -341,23 +427,37 @@ public final class PermissionPolicyService extends SystemService {
                 if (applyRestriction) {
                     mOpsToDefault.add(new OpToRestrict(uid, opCode));
                 } else {
-                    mOpsToAllow.add(new OpToUnrestrict(uid, pkg.packageName, opCode));
+                    mOpsToAllowIfDefault.add(new OpToUnrestrict(uid, pkg.packageName, opCode));
                 }
             } else if (permissionInfo.isSoftRestricted()) {
-                // Storage uses a special app op to decide the mount state and
-                // supports soft restriction where the restricted state allows
-                // the permission but only for accessing the medial collections.
-                if (Manifest.permission.READ_EXTERNAL_STORAGE.equals(permission)
-                        || Manifest.permission.WRITE_EXTERNAL_STORAGE.equals(permission)) {
-                    if (applyRestriction) {
-                        mOpsToDefault.add(new OpToRestrict(uid,
-                                AppOpsManager.OP_LEGACY_STORAGE));
-                    } else if (pkg.applicationInfo.hasRequestedLegacyExternalStorage()) {
-                        mOpsToAllow.add(new OpToUnrestrict(uid, pkg.packageName,
-                                AppOpsManager.OP_LEGACY_STORAGE));
-                    } else {
-                        mOpsToIgnore.add(new OpToUnrestrict(uid, pkg.packageName,
-                                AppOpsManager.OP_LEGACY_STORAGE));
+                final SoftRestrictedPermissionPolicy policy =
+                        SoftRestrictedPermissionPolicy.forPermission(mContext, pkg.applicationInfo,
+                                permission);
+
+                final int op = policy.getAppOp();
+                if (op != OP_NONE) {
+                    switch (policy.getAppOpMode()) {
+                        case MODE_DEFAULT:
+                            mOpsToDefault.add(new OpToRestrict(uid, op));
+                            break;
+                        case MODE_ALLOWED:
+                            if (policy.shouldSetAppOpIfNotDefault()) {
+                                mOpsToAllow.add(new OpToUnrestrict(uid, pkg.packageName, op));
+                            } else {
+                                mOpsToAllowIfDefault.add(new OpToUnrestrict(uid, pkg.packageName,
+                                        op));
+                            }
+                            break;
+                        case MODE_IGNORED:
+                            if (policy.shouldSetAppOpIfNotDefault()) {
+                                Slog.wtf(LOG_TAG, "Always ignoring appops is not implemented");
+                            } else {
+                                mOpsToIgnoreIfDefault.add(new OpToUnrestrict(uid, pkg.packageName,
+                                        op));
+                            }
+                            break;
+                        case MODE_ERRORED:
+                            Slog.wtf(LOG_TAG, "Setting appop to errored is not implemented");
                     }
                 }
             }
@@ -401,7 +501,7 @@ public final class PermissionPolicyService extends SystemService {
 
             for (String permission : pkg.requestedPermissions) {
                 final int opCode = AppOpsManager.permissionToOpCode(permission);
-                if (opCode == AppOpsManager.OP_NONE) {
+                if (opCode == OP_NONE) {
                     continue;
                 }
 
@@ -421,6 +521,10 @@ public final class PermissionPolicyService extends SystemService {
             setUidModeIfDefault(opCode, uid, AppOpsManager.MODE_ALLOWED, packageName);
         }
 
+        private void setUidModeAllowed(int opCode, int uid) {
+            mAppOpsManager.setUidMode(opCode, uid, AppOpsManager.MODE_ALLOWED);
+        }
+
         private void setUidModeIgnoredIfDefault(int opCode, int uid, @NonNull String packageName) {
             setUidModeIfDefault(opCode, uid, AppOpsManager.MODE_IGNORED, packageName);
         }
@@ -429,13 +533,13 @@ public final class PermissionPolicyService extends SystemService {
                 @NonNull String packageName) {
             final int currentMode = mAppOpsManager.unsafeCheckOpRaw(AppOpsManager
                     .opToPublicName(opCode), uid, packageName);
-            if (currentMode == AppOpsManager.MODE_DEFAULT) {
+            if (currentMode == MODE_DEFAULT) {
                 mAppOpsManager.setUidMode(opCode, uid, mode);
             }
         }
 
         private void setUidModeDefault(int opCode, int uid) {
-            mAppOpsManager.setUidMode(opCode, uid, AppOpsManager.MODE_DEFAULT);
+            mAppOpsManager.setUidMode(opCode, uid, MODE_DEFAULT);
         }
 
         private class OpToRestrict {
@@ -480,8 +584,9 @@ public final class PermissionPolicyService extends SystemService {
 
         @Override
         public boolean checkStartActivity(@NonNull Intent intent, int callingUid,
-                @NonNull String callingPackage) {
-            if (isActionRemovedForCallingPackage(intent.getAction(), callingPackage)) {
+                @Nullable String callingPackage) {
+            if (callingPackage != null && isActionRemovedForCallingPackage(intent.getAction(),
+                    callingPackage)) {
                 Slog.w(LOG_TAG, "Action Removed: starting " + intent.toString() + " from "
                         + callingPackage + " (uid=" + callingUid + ")");
                 return false;

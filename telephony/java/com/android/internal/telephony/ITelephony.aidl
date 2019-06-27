@@ -460,13 +460,6 @@ interface ITelephony {
     void sendDialerSpecialCode(String callingPackageName, String inputCode);
 
     /**
-     * Returns the network type for data transmission
-     * Legacy call, permission-free
-     */
-    @UnsupportedAppUsage
-    int getNetworkType();
-
-    /**
      * Returns the network type of a subId.
      * @param subId user preferred subId.
      * @param callingPackage package making the call.
@@ -1626,7 +1619,7 @@ interface ITelephony {
      * <p>
      * See {@link UiccCardInfo} for more details on the kind of information available.
      *
-     * @param callingPackage package making the call, used to evaluate carrier privileges 
+     * @param callingPackage package making the call, used to evaluate carrier privileges
      * @return a list of UiccCardInfo objects, representing information on the currently inserted
      * UICCs and eUICCs. Each UiccCardInfo in the list will have private information filtered out if
      * the caller does not have adequate permissions for that card.
@@ -1993,4 +1986,25 @@ interface ITelephony {
      * outgoing SmsManager operation.
      */
     oneway void enqueueSmsPickResult(String callingPackage, IIntegerConsumer subIdResult);
+
+    /**
+     * Returns the MMS user agent.
+     */
+    String getMmsUserAgent(int subId);
+
+    /**
+     * Returns the MMS user agent profile URL.
+     */
+    String getMmsUAProfUrl(int subId);
+
+    /**
+     * Set allowing mobile data during voice call.
+     */
+    boolean setDataAllowedDuringVoiceCall(int subId, boolean allow);
+
+    /**
+     * Check whether data is allowed during voice call. Note this is for dual sim device that
+     * data might be disabled on non-default data subscription but explicitly turned on by settings.
+     */
+    boolean isDataAllowedInVoiceCall(int subId);
 }

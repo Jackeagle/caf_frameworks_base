@@ -551,7 +551,7 @@ public class GlobalActionsDialog implements DialogInterface.OnDismissListener,
 
     private class EmergencyDialerAction extends EmergencyAction {
         private EmergencyDialerAction() {
-            super(R.drawable.ic_faster_emergency,
+            super(com.android.systemui.R.drawable.ic_emergency_star,
                     R.string.global_action_emergency);
         }
 
@@ -1564,8 +1564,11 @@ public class GlobalActionsDialog implements DialogInterface.OnDismissListener,
                     }
 
                     // Unlock rotation, so user can choose to rotate to portrait to see the panel.
-                    RotationPolicy.setRotationLockAtAngle(
-                            mContext, false, RotationUtils.ROTATION_NONE);
+                    // This call is posted so that the rotation does not change until post-layout,
+                    // otherwise onConfigurationChanged() may not get invoked.
+                    mGlobalActionsLayout.post(() ->
+                            RotationPolicy.setRotationLockAtAngle(
+                                    mContext, false, RotationUtils.ROTATION_NONE));
                 }
             } else {
                 if (!rotationLocked) {
@@ -1575,24 +1578,23 @@ public class GlobalActionsDialog implements DialogInterface.OnDismissListener,
                     }
 
                     // Lock to portrait, so the user doesn't accidentally hide the panel.
-                    RotationPolicy.setRotationLockAtAngle(
-                            mContext, true, RotationUtils.ROTATION_NONE);
+                    // This call is posted so that the rotation does not change until post-layout,
+                    // otherwise onConfigurationChanged() may not get invoked.
+                    mGlobalActionsLayout.post(() ->
+                            RotationPolicy.setRotationLockAtAngle(
+                                    mContext, true, RotationUtils.ROTATION_NONE));
                 }
 
                 // Disable rotation suggestions, if enabled
                 setRotationSuggestionsEnabled(false);
 
-                FrameLayout panelContainer = new FrameLayout(mContext);
+                FrameLayout panelContainer =
+                        findViewById(com.android.systemui.R.id.global_actions_panel_container);
                 FrameLayout.LayoutParams panelParams =
                         new FrameLayout.LayoutParams(
                                 FrameLayout.LayoutParams.MATCH_PARENT,
-                                FrameLayout.LayoutParams.WRAP_CONTENT);
+                                FrameLayout.LayoutParams.MATCH_PARENT);
                 panelContainer.addView(mPanelController.getPanelContent(), panelParams);
-                addContentView(
-                        panelContainer,
-                        new ViewGroup.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.MATCH_PARENT));
                 mBackgroundDrawable = mPanelController.getBackgroundDrawable();
                 mScrimAlpha = 1f;
             }
@@ -1600,8 +1602,10 @@ public class GlobalActionsDialog implements DialogInterface.OnDismissListener,
 
         private void initializeLayout() {
             setContentView(getGlobalActionsLayoutId(mContext));
+            fixNavBarClipping();
             mGlobalActionsLayout = findViewById(com.android.systemui.R.id.global_actions_view);
             mGlobalActionsLayout.setOutsideTouchListener(view -> dismiss());
+            ((View) mGlobalActionsLayout.getParent()).setOnClickListener(view -> dismiss());
             mGlobalActionsLayout.setListViewAccessibilityDelegate(new View.AccessibilityDelegate() {
                 @Override
                 public boolean dispatchPopulateAccessibilityEvent(
@@ -1624,9 +1628,20 @@ public class GlobalActionsDialog implements DialogInterface.OnDismissListener,
             getWindow().setBackgroundDrawable(mBackgroundDrawable);
         }
 
+        private void fixNavBarClipping() {
+            ViewGroup content = findViewById(android.R.id.content);
+            content.setClipChildren(false);
+            content.setClipToPadding(false);
+            ViewGroup contentParent = (ViewGroup) content.getParent();
+            contentParent.setClipChildren(false);
+            contentParent.setClipToPadding(false);
+        }
+
         private int getGlobalActionsLayoutId(Context context) {
-            boolean useGridLayout = isForceGridEnabled(context) || shouldUsePanel();
-            if (RotationUtils.getRotation(context) == RotationUtils.ROTATION_SEASCAPE) {
+            int rotation = RotationUtils.getRotation(context);
+            boolean useGridLayout = isForceGridEnabled(context)
+                    || (shouldUsePanel() && rotation == RotationUtils.ROTATION_NONE);
+            if (rotation == RotationUtils.ROTATION_SEASCAPE) {
                 if (useGridLayout) {
                     return com.android.systemui.R.layout.global_actions_grid_seascape;
                 } else {

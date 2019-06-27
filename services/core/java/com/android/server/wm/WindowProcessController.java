@@ -34,6 +34,7 @@ import static com.android.server.wm.ActivityTaskManagerDebugConfig.POSTFIX_CONFI
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.POSTFIX_RELEASE;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.TAG_ATM;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.TAG_WITH_CLASS_NAME;
+import static com.android.server.wm.ActivityTaskManagerService.ACTIVITY_BG_START_GRACE_PERIOD_MS;
 import static com.android.server.wm.ActivityTaskManagerService.INSTRUMENTATION_KEY_DISPATCHING_TIMEOUT_MS;
 import static com.android.server.wm.ActivityTaskManagerService.KEY_DISPATCHING_TIMEOUT_MS;
 import static com.android.server.wm.ActivityTaskManagerService.RELAUNCH_REASON_NONE;
@@ -50,6 +51,7 @@ import android.content.pm.ApplicationInfo;
 import android.content.res.Configuration;
 import android.os.Message;
 import android.os.RemoteException;
+import android.os.SystemClock;
 import android.util.ArraySet;
 import android.util.Log;
 import android.util.Slog;
@@ -163,6 +165,11 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
     private final ArrayList<TaskRecord> mRecentTasks = new ArrayList<>();
     // The most recent top-most activity that was resumed in the process for pre-Q app.
     private ActivityRecord mPreQTopResumedActivity = null;
+    // The last time an activity was launched in the process
+    private long mLastActivityLaunchTime;
+    // The last time an activity was finished in the process while the process participated
+    // in a visible task
+    private long mLastActivityFinishTime;
 
     // Last configuration that was reported to the process.
     private final Configuration mLastReportedConfiguration;
@@ -372,6 +379,20 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         return mUsingWrapper;
     }
 
+    void setLastActivityLaunchTime(long launchTime) {
+        if (launchTime <= mLastActivityLaunchTime) {
+            return;
+        }
+        mLastActivityLaunchTime = launchTime;
+    }
+
+    void setLastActivityFinishTimeIfNeeded(long finishTime) {
+        if (finishTime <= mLastActivityFinishTime || !hasActivityInVisibleTask()) {
+            return;
+        }
+        mLastActivityFinishTime = finishTime;
+    }
+
     public void setAllowBackgroundActivityStarts(boolean allowBackgroundActivityStarts) {
         mAllowBackgroundActivityStarts = allowBackgroundActivityStarts;
     }
@@ -380,6 +401,18 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         // allow if the whitelisting flag was explicitly set
         if (mAllowBackgroundActivityStarts) {
             return true;
+        }
+        // allow if any activity in the caller has either started or finished very recently, and
+        // it must be started or finished after last stop app switches time.
+        final long now = SystemClock.uptimeMillis();
+        if (now - mLastActivityLaunchTime < ACTIVITY_BG_START_GRACE_PERIOD_MS
+                || now - mLastActivityFinishTime < ACTIVITY_BG_START_GRACE_PERIOD_MS) {
+            // if activity is started and finished before stop app switch time, we should not
+            // let app to be able to start background activity even it's in grace period.
+            if (mLastActivityLaunchTime > mAtm.getLastStopAppSwitchesTime()
+                    || mLastActivityFinishTime > mAtm.getLastStopAppSwitchesTime()) {
+                return true;
+            }
         }
         // allow if the proc is instrumenting with background activity starts privs
         if (mInstrumentingWithBackgroundActivityStartPrivileges) {
@@ -439,10 +472,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
 
     @Override
     protected ConfigurationContainer getParent() {
-        // Returning RootActivityContainer as the parent, so that this process controller always
-        // has full configuration and overrides (e.g. from display) are always added on top of
-        // global config.
-        return mAtm.mRootActivityContainer;
+        return null;
     }
 
     @HotPath(caller = HotPath.PROCESS_CHANGE)
@@ -460,6 +490,8 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
     }
 
     void addActivityIfNeeded(ActivityRecord r) {
+        // even if we already track this activity, note down that it has been launched
+        setLastActivityLaunchTime(r.lastLaunchTime);
         if (mActivities.contains(r)) {
             return;
         }

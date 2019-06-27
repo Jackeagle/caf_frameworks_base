@@ -131,6 +131,8 @@
     <!-- no translation found for wfcSpnFormat_spn (4998685024207291232) -->
     <skip />
     <string name="wfcSpnFormat_spn_wifi_calling" msgid="136001023263502280">"<xliff:g id="SPN">%s</xliff:g> વાઇ-ફાઇ કૉલિંગ"</string>
+    <!-- no translation found for wfcSpnFormat_spn_wifi_calling_vo_hyphen (1730997175789582756) -->
+    <skip />
     <string name="wfcSpnFormat_wlan_call" msgid="2533371081782489793">"WLAN કૉલ"</string>
     <string name="wfcSpnFormat_spn_wlan_call" msgid="2315240198303197168">"<xliff:g id="SPN">%s</xliff:g> WLAN કૉલ"</string>
     <string name="wfcSpnFormat_spn_wifi" msgid="6546481665561961938">"<xliff:g id="SPN">%s</xliff:g> વાઇ-ફાઇ"</string>
@@ -261,7 +263,7 @@
     <string name="notification_channel_network_alerts" msgid="2895141221414156525">"નેટવર્ક ચેતવણીઓ"</string>
     <string name="notification_channel_network_available" msgid="4531717914138179517">"નેટવર્ક ઉપલબ્ધ છે"</string>
     <string name="notification_channel_vpn" msgid="8330103431055860618">"VPN સ્થિતિ"</string>
-    <string name="notification_channel_device_admin" msgid="1568154104368069249">"ઉપકરણ વ્યવસ્થાપન"</string>
+    <string name="notification_channel_device_admin" msgid="8353118887482520565">"તમારા IT વ્યવસ્થાપક તરફથી અલર્ટ"</string>
     <string name="notification_channel_alerts" msgid="4496839309318519037">"ચેતવણીઓ"</string>
     <string name="notification_channel_retail_mode" msgid="6088920674914038779">"રિટેલ ડેમો"</string>
     <string name="notification_channel_usb" msgid="9006850475328924681">"USB કનેક્શન"</string>
@@ -565,7 +567,7 @@
     <string name="face_acquired_too_low" msgid="488983581737550912">"ફોનને થોડો નીચે ખસેડો."</string>
     <string name="face_acquired_too_right" msgid="3667075962661863218">"ફોનને ડાબી બાજુ ખસેડો."</string>
     <string name="face_acquired_too_left" msgid="3148242963894703424">"ફોનને જમણી બાજુ ખસેડો."</string>
-    <string name="face_acquired_poor_gaze" msgid="8471716624377228327">"તમારી આંખો ખુલ્લી રાખીને સ્ક્રીનની સામે જુઓ."</string>
+    <string name="face_acquired_poor_gaze" msgid="5606479370806754905">"કૃપા કરીને તમારા ડિવાઇસ તરફ સીધું જુઓ."</string>
     <string name="face_acquired_not_detected" msgid="4885504661626728809">"તમારો ચહેરો દેખાતો નથી. ફોનની સામે જુઓ."</string>
     <string name="face_acquired_too_much_motion" msgid="3149332171102108851">"ડિવાઇસ અસ્થિર છે. ફોનને સ્થિર રાખો."</string>
     <string name="face_acquired_recalibrate" msgid="8077949502893707539">"કૃપા કરીને તમારા ચહેરાની ફરી નોંધણી કરાવો."</string>
@@ -579,7 +581,7 @@
   <string-array name="face_acquired_vendor">
   </string-array>
     <string name="face_error_hw_not_available" msgid="396883585636963908">"ચહેરો ચકાસી શકાતો નથી. હાર્ડવેર ઉપલબ્ધ નથી."</string>
-    <string name="face_error_timeout" msgid="2605673935810019129">"ચહેરા માટેનો સમય સમાપ્ત થયો. ફરી પ્રયાસ કરો."</string>
+    <string name="face_error_timeout" msgid="3202585609451248103">"ચહેરા પ્રમાણીકરણનો ફરીથી પ્રયાસ કરી જુઓ."</string>
     <string name="face_error_no_space" msgid="2712120617457553825">"ચહેરાનો નવો ડેટા સ્ટોર કરી શકતાં નથી. પહેલા જૂનો ડિલીટ કરો."</string>
     <string name="face_error_canceled" msgid="2768146728600802422">"ચહેરા સંબંધિત પ્રક્રિયા રદ કરવામાં આવી છે"</string>
     <string name="face_error_user_canceled" msgid="9003022830076496163">"વપરાશકર્તાએ ચહેરાનું પ્રમાણીકરણ રદ કર્યુ"</string>
@@ -648,6 +650,8 @@
     <string name="permdesc_bindCarrierServices" msgid="1391552602551084192">"ધારકને કેરીઅર સેવાઓ સાથે પ્રતિબદ્ધ થવાની મંજૂરી આપે છે. સામાન્ય ઍપ્લિકેશનો માટે ક્યારેય જરૂરી હોતું નથી."</string>
     <string name="permlab_access_notification_policy" msgid="4247510821662059671">"ખલેલ પાડશો નહીં ઍક્સેસ કરો"</string>
     <string name="permdesc_access_notification_policy" msgid="3296832375218749580">"એપ્લિકેશનને ખલેલ પાડશો નહીં ગોઠવણી વાંચવા અને લખવાની મંજૂરી આપે છે."</string>
+    <string name="permlab_startViewPermissionUsage" msgid="5484728591597709944">"પરવાનગી વપરાશ જુઓને શરૂ કરો"</string>
+    <string name="permdesc_startViewPermissionUsage" msgid="4808345878203594428">"કોઈ ઍપ માટે પરવાનગી વપરાશ શરૂ કરવાની ધારકને મંજૂરી આપે છે. સામાન્ય ઍપ માટે ક્યારેય જરૂર પડી ન શકે."</string>
     <string name="policylab_limitPassword" msgid="4497420728857585791">"પાસવર્ડ નિયમો સેટ કરો"</string>
     <string name="policydesc_limitPassword" msgid="2502021457917874968">"સ્ક્રીન લૉક પાસવર્ડ અને પિનમાં મંજૂર લંબાઈ અને અક્ષરોને નિયંત્રિત કરો."</string>
     <string name="policylab_watchLogin" msgid="5091404125971980158">"સ્ક્રીનને અનલૉક કરવાના પ્રયત્નોનું નિયમન કરો"</string>
@@ -1356,7 +1360,7 @@
     <string name="test_harness_mode_notification_message" msgid="1343197173054407119">"ટેસ્ટ હાર્નેસ મોડ બંધ કરવા માટે ફૅક્ટરી રીસેટ કરો."</string>
     <string name="usb_contaminant_detected_title" msgid="7136400633704058349">"USB પોર્ટમાં પ્રવાહી કે ધૂળ"</string>
     <string name="usb_contaminant_detected_message" msgid="832337061059487250">"USB પોર્ટ ઑટોમૅટિક રીતે બંધ કરવામાં આવ્યો છે. વધુ જાણવા માટે ટૅપ કરો."</string>
-    <string name="usb_contaminant_not_detected_title" msgid="4202417484434906086">"USB પોર્ટનો ઉપયોગ કરવો સુરક્ષિત છે"</string>
+    <string name="usb_contaminant_not_detected_title" msgid="7708281124088684821">"USB પોર્ટનો ઉપયોગ કરવો યોગ્ય છે"</string>
     <string name="usb_contaminant_not_detected_message" msgid="2415791798244545292">"ફોનને હવે કોઈ પ્રવાહી કે ધૂળ હોવાનું જણાયું નથી."</string>
     <string name="taking_remote_bugreport_notification_title" msgid="6742483073875060934">"બગ રિપોર્ટ લઈ રહ્યાં છે…"</string>
     <string name="share_remote_bugreport_notification_title" msgid="4987095013583691873">"બગ રિપોર્ટ શેર કરીએ?"</string>
@@ -1665,8 +1669,12 @@
     <string name="accessibility_shortcut_enabling_service" msgid="7771852911861522636">"ઍક્સેસિબિલિટી શૉર્ટકટે <xliff:g id="SERVICE_NAME">%1$s</xliff:g> ચાલુ કરી"</string>
     <string name="accessibility_shortcut_disabling_service" msgid="2747243438223109821">"ઍક્સેસિબિલિટી શૉર્ટકટે <xliff:g id="SERVICE_NAME">%1$s</xliff:g> બંધ કરી"</string>
     <string name="accessibility_shortcut_spoken_feedback" msgid="8376923232350078434">"<xliff:g id="SERVICE_NAME">%1$s</xliff:g>નો ઉપયોગ કરવા માટે બન્ને વૉલ્યૂમ કીને ત્રણ સેકન્ડ સુધી દબાવી રાખો"</string>
-    <string name="accessibility_button_prompt_text" msgid="4234556536456854251">"જ્યારે તમે ઍક્સેસિબિલિટી બટન પર ટૅપ કરો, ત્યારે ઉપયોગ કરવાની સુવિધા પસંદ કરો:"</string>
-    <string name="accessibility_button_instructional_text" msgid="6942300463612999993">"સુવિધાઓ બદલવા માટે, ઍક્સેસિબિલિટી બટન દબાવી રાખો."</string>
+    <string name="accessibility_button_prompt_text" msgid="1176658502969738564">"જ્યારે તમે ઍક્સેસિબિલિટી બટન પર ટૅપ કરો, ત્યારે ઉપયોગ કરવાની સેવા પસંદ કરો:"</string>
+    <string name="accessibility_gesture_prompt_text" msgid="8259145549733019401">"ઍક્સેસિબિલિટી સંકેત સાથે ઉપયોગ કરવાની સેવા પસંદ કરો (બે આંગળીઓ વડે સ્ક્રીનના નીચેના ભાગથી ઉપરની તરફ સ્વાઇપ કરવા માટે):"</string>
+    <string name="accessibility_gesture_3finger_prompt_text" msgid="1041435574275047665">"ઍક્સેસિબિલિટી સંકેત સાથે ઉપયોગ કરવાની સેવા પસંદ કરો (ત્રણ આંગળીઓ વડે સ્ક્રીનના નીચેના ભાગથી ઉપરની તરફ સ્વાઇપ કરવા માટે):"</string>
+    <string name="accessibility_button_instructional_text" msgid="7003212763213614833">"કોઈ એક સેવાથી બીજી સેવા પર સ્વિચ કરવા માટે, ઍક્સેસિબિલિટી બટનને ટચ કરીને દબાવી રાખો."</string>
+    <string name="accessibility_gesture_instructional_text" msgid="5261788874937410950">"કોઈ એક સેવાથી બીજી સેવા પર સ્વિચ કરવા માટે, બે આંગળીઓ વડે સ્ક્રીનની ઉપરની તરફ સ્વાઇપ કરીને દબાવી રાખો."</string>
+    <string name="accessibility_gesture_3finger_instructional_text" msgid="4969448938984394550">"કોઈ એક સેવાથી બીજી સેવા પર સ્વિચ કરવા માટે, ત્રણ આંગળીઓ વડે સ્ક્રીનની ઉપરની તરફ સ્વાઇપ કરીને દબાવી રાખો."</string>
     <string name="accessibility_magnification_chooser_text" msgid="1227146738764986237">"વિસ્તૃતીકરણ"</string>
     <string name="user_switched" msgid="3768006783166984410">"વર્તમાન વપરાશકર્તા <xliff:g id="NAME">%1$s</xliff:g>."</string>
     <string name="user_switching_message" msgid="2871009331809089783">"<xliff:g id="NAME">%1$s</xliff:g> પર સ્વિચ કરી રહ્યાં છે…"</string>
@@ -1899,9 +1907,7 @@
     <string name="deprecated_target_sdk_app_store" msgid="5032340500368495077">"અપડેટ માટે તપાસો"</string>
     <string name="new_sms_notification_title" msgid="8442817549127555977">"તમારી પાસે નવા સંદેશા છે"</string>
     <string name="new_sms_notification_content" msgid="7002938807812083463">"જોવા માટે SMS ઍપ્લિકેશન ખોલો"</string>
-    <string name="user_encrypted_title" msgid="9054897468831672082">"કેટલીક કાર્યક્ષમતા મર્યાદિત હોઈ શકે છે"</string>
-    <string name="user_encrypted_message" msgid="4923292604515744267">"અનલૉક કરવા માટે ટૅપ કરો"</string>
-    <string name="user_encrypted_detail" msgid="5708447464349420392">"વપરાશકર્તા ડેટા લૉક કર્યો"</string>
+    <string name="profile_encrypted_title" msgid="4260432497586829134">"કેટલીક કાર્યક્ષમતા મર્યાદિત હોઈ શકે છે"</string>
     <string name="profile_encrypted_detail" msgid="3700965619978314974">"કાર્યાલયની પ્રોફાઇલ લૉક કરી"</string>
     <string name="profile_encrypted_message" msgid="6964994232310195874">"કાર્યાલયની પ્રોફાઇલ અનલૉક કરવા ટૅપ કરો"</string>
     <string name="usb_mtp_launch_notification_title" msgid="8359219638312208932">"<xliff:g id="PRODUCT_NAME">%1$s</xliff:g> થી કનેક્ટ કરેલું છે"</string>

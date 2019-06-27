@@ -727,6 +727,7 @@ public abstract class PackageManager {
             INSTALL_ENABLE_ROLLBACK,
             INSTALL_ALLOW_DOWNGRADE,
             INSTALL_STAGED,
+            INSTALL_DRY_RUN,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface InstallFlags {}
@@ -807,7 +808,7 @@ public abstract class PackageManager {
      *
      * @hide
      */
-    public static final int INSTALL_ALL_WHITELIST_RESTRICTED_PERMISSIONS = 0x00000200;
+    public static final int INSTALL_ALL_WHITELIST_RESTRICTED_PERMISSIONS = 0x00400000;
 
     /** {@hide} */
     public static final int INSTALL_FORCE_VOLUME_UUID = 0x00000200;
@@ -903,6 +904,14 @@ public abstract class PackageManager {
      * @hide
      */
     public static final int INSTALL_STAGED = 0x00200000;
+
+    /**
+     * Flag parameter for {@link #installPackage} to indicate that package should only be verified
+     * but not installed.
+     *
+     * @hide
+     */
+    public static final int INSTALL_DRY_RUN = 0x00800000;
 
     /** @hide */
     @IntDef(flag = true, prefix = { "DONT_KILL_APP" }, value = {

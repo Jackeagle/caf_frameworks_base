@@ -8081,6 +8081,15 @@ public final class Settings {
                 "lock_screen_show_silent_notifications";
 
         /**
+         * Indicates whether snooze options should be shown on notifications
+         * <p>
+         * Type: int (0 for false, 1 for true)
+         *
+         * @hide
+         */
+        public static final String SHOW_NOTIFICATION_SNOOZE = "show_notification_snooze";
+
+        /**
          * List of TV inputs that are currently hidden. This is a string
          * containing the IDs of all hidden TV inputs. Each ID is encoded by
          * {@link android.net.Uri#encode(String)} and separated by ':'.
@@ -8830,12 +8839,33 @@ public final class Settings {
                 SettingsValidators.JSON_OBJECT_VALIDATOR;
 
         /**
+         * Navigation bar mode.
+         *  0 = 3 button
+         *  1 = 2 button
+         *  2 = fully gestural
+         * @hide
+         */
+        public static final String NAVIGATION_MODE =
+                "navigation_mode";
+        private static final Validator NAVIGATION_MODE_VALIDATOR =
+                new SettingsValidators.DiscreteValueValidator(new String[] {"0", "1", "2"});
+
+        /**
          * Controls whether aware is enabled.
          * @hide
          */
         public static final String AWARE_ENABLED = "aware_enabled";
 
         private static final Validator AWARE_ENABLED_VALIDATOR = BOOLEAN_VALIDATOR;
+
+        /**
+         * Controls whether aware_lock is enabled.
+         * @hide
+         */
+        public static final String AWARE_LOCK_ENABLED = "aware_lock_enabled";
+
+        private static final Validator AWARE_LOCK_ENABLED_VALIDATOR = BOOLEAN_VALIDATOR;
+
         /**
          * This are the settings to be backed up.
          *
@@ -8947,6 +8977,7 @@ public final class Settings {
             LOCK_SCREEN_CUSTOM_CLOCK_FACE,
             LOCK_SCREEN_SHOW_NOTIFICATIONS,
             LOCK_SCREEN_SHOW_SILENT_NOTIFICATIONS,
+            SHOW_NOTIFICATION_SNOOZE,
             ZEN_DURATION,
             SHOW_ZEN_UPGRADE_NOTIFICATION,
             SHOW_ZEN_SETTINGS_SUGGESTION,
@@ -8963,6 +8994,7 @@ public final class Settings {
             SKIP_GESTURE,
             SILENCE_GESTURE,
             THEME_CUSTOMIZATION_OVERLAY_PACKAGES,
+            NAVIGATION_MODE,
             AWARE_ENABLED,
             SKIP_GESTURE_COUNT,
             SILENCE_ALARMS_GESTURE_COUNT,
@@ -8970,7 +9002,8 @@ public final class Settings {
             SILENCE_CALL_GESTURE_COUNT,
             SILENCE_TIMER_GESTURE_COUNT,
             DARK_MODE_DIALOG_SEEN,
-            GLOBAL_ACTIONS_PANEL_ENABLED
+            GLOBAL_ACTIONS_PANEL_ENABLED,
+            AWARE_LOCK_ENABLED
         };
 
         /**
@@ -9127,6 +9160,7 @@ public final class Settings {
             VALIDATORS.put(LOCK_SCREEN_ALLOW_PRIVATE_NOTIFICATIONS, BOOLEAN_VALIDATOR);
             VALIDATORS.put(LOCK_SCREEN_SHOW_NOTIFICATIONS, BOOLEAN_VALIDATOR);
             VALIDATORS.put(LOCK_SCREEN_SHOW_SILENT_NOTIFICATIONS, BOOLEAN_VALIDATOR);
+            VALIDATORS.put(SHOW_NOTIFICATION_SNOOZE, BOOLEAN_VALIDATOR);
             VALIDATORS.put(ZEN_DURATION, ZEN_DURATION_VALIDATOR);
             VALIDATORS.put(SHOW_ZEN_UPGRADE_NOTIFICATION, BOOLEAN_VALIDATOR);
             VALIDATORS.put(SHOW_ZEN_SETTINGS_SUGGESTION, BOOLEAN_VALIDATOR);
@@ -9147,6 +9181,7 @@ public final class Settings {
             VALIDATORS.put(SILENCE_GESTURE, SILENCE_GESTURE_VALIDATOR);
             VALIDATORS.put(THEME_CUSTOMIZATION_OVERLAY_PACKAGES,
                     THEME_CUSTOMIZATION_OVERLAY_PACKAGES_VALIDATOR);
+            VALIDATORS.put(NAVIGATION_MODE, NAVIGATION_MODE_VALIDATOR);
             VALIDATORS.put(AWARE_ENABLED, AWARE_ENABLED_VALIDATOR);
             VALIDATORS.put(SKIP_GESTURE_COUNT, SKIP_GESTURE_COUNT_VALIDATOR);
             VALIDATORS.put(SILENCE_ALARMS_GESTURE_COUNT, SILENCE_GESTURE_COUNT_VALIDATOR);
@@ -9157,6 +9192,7 @@ public final class Settings {
             VALIDATORS.put(DARK_MODE_DIALOG_SEEN, BOOLEAN_VALIDATOR);
             VALIDATORS.put(UI_NIGHT_MODE, UI_NIGHT_MODE_VALIDATOR);
             VALIDATORS.put(GLOBAL_ACTIONS_PANEL_ENABLED, GLOBAL_ACTIONS_PANEL_ENABLED_VALIDATOR);
+            VALIDATORS.put(AWARE_LOCK_ENABLED, AWARE_LOCK_ENABLED_VALIDATOR);
         }
 
         /**
@@ -11611,16 +11647,6 @@ public final class Settings {
          */
         public static final String ACTIVITY_STARTS_LOGGING_ENABLED
                 = "activity_starts_logging_enabled";
-
-        /**
-         * Feature flag to enable or disable the background activity starts.
-         * When disabled, apps aren't allowed to start activities unless they're in the foreground.
-         * Type: int (0 for false, 1 for true)
-         * Default: 1
-         * @hide
-         */
-        public static final String BACKGROUND_ACTIVITY_STARTS_ENABLED =
-                "background_activity_starts_enabled";
 
         /**
          * @hide

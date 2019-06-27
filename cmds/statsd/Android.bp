@@ -52,6 +52,7 @@ cc_defaults {
         ":statsd_aidl",
         "src/active_config_list.proto",
         "src/statsd_config.proto",
+        "src/uid_data.proto",
         "src/FieldValue.cpp",
         "src/hash.cpp",
         "src/stats_log_util.cpp",
@@ -262,6 +263,7 @@ cc_test {
         "tests/e2e/Anomaly_duration_sum_e2e_test.cpp",
         "tests/e2e/ConfigTtl_e2e_test.cpp",
         "tests/e2e/PartialBucket_e2e_test.cpp",
+        "tests/e2e/DurationMetric_e2e_test.cpp",
         "tests/shell/ShellSubscriber_test.cpp",
     ],
 

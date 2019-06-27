@@ -27,7 +27,6 @@ import static com.android.internal.widget.LockPatternUtils.CREDENTIAL_TYPE_PATTE
 import static com.android.internal.widget.LockPatternUtils.EscrowTokenStateChangeCallback;
 import static com.android.internal.widget.LockPatternUtils.SYNTHETIC_PASSWORD_ENABLED_KEY;
 import static com.android.internal.widget.LockPatternUtils.SYNTHETIC_PASSWORD_HANDLE_KEY;
-import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STRONG_AUTH_REQUIRED_AFTER_BOOT;
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STRONG_AUTH_REQUIRED_AFTER_LOCKOUT;
 import static com.android.internal.widget.LockPatternUtils.USER_FRP;
 import static com.android.internal.widget.LockPatternUtils.frpCredentialEnabled;
@@ -560,10 +559,11 @@ public class LockSettingsService extends ILockSettings.Stub {
 
     public void onCleanupUser(int userId) {
         hideEncryptionNotification(new UserHandle(userId));
-        // User is stopped with its CE key evicted. Require strong auth next time to be able to
-        // unlock the user's storage. Use STRONG_AUTH_REQUIRED_AFTER_BOOT since stopping and
-        // restarting a user later is equivalent to rebooting the device.
-        requireStrongAuth(STRONG_AUTH_REQUIRED_AFTER_BOOT, userId);
+        // User is stopped with its CE key evicted. Restore strong auth requirement to the default
+        // flags after boot since stopping and restarting a user later is equivalent to rebooting
+        // the device.
+        int strongAuthRequired = LockPatternUtils.StrongAuthTracker.getDefaultFlags(mContext);
+        requireStrongAuth(strongAuthRequired, userId);
     }
 
     public void onStartUser(final int userId) {
@@ -600,21 +600,6 @@ public class LockSettingsService extends ILockSettings.Stub {
                 ensureProfileKeystoreUnlocked(userId);
                 // Hide notification first, as tie managed profile lock takes time
                 hideEncryptionNotification(new UserHandle(userId));
-
-                // Now we have unlocked the parent user we should show notifications
-                // about any profiles that exist.
-                List<UserInfo> profiles = mUserManager.getProfiles(userId);
-                for (int i = 0; i < profiles.size(); i++) {
-                    UserInfo profile = profiles.get(i);
-                    final boolean isSecure = isUserSecure(profile.id);
-                    if (isSecure && profile.isManagedProfile()) {
-                        UserHandle userHandle = profile.getUserHandle();
-                        if (!mUserManager.isUserUnlockingOrUnlocked(userHandle) &&
-                                !mUserManager.isQuietModeEnabled(userHandle)) {
-                            showEncryptionNotificationForProfile(userHandle);
-                        }
-                    }
-                }
 
                 if (mUserManager.getUserInfo(userId).isManagedProfile()) {
                     tieManagedProfileLockIfNecessary(userId, null);
@@ -1205,6 +1190,7 @@ public class LockSettingsService extends ILockSettings.Stub {
      */
     private void unlockUser(int userId, byte[] token, byte[] secret) {
         // TODO: make this method fully async so we can update UI with progress strings
+        final boolean alreadyUnlocked = mUserManager.isUserUnlockingOrUnlocked(userId);
         final CountDownLatch latch = new CountDownLatch(1);
         final IProgressListener listener = new IProgressListener.Stub() {
             @Override
@@ -1235,18 +1221,31 @@ public class LockSettingsService extends ILockSettings.Stub {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-        try {
-            if (!mUserManager.getUserInfo(userId).isManagedProfile()) {
-                final List<UserInfo> profiles = mUserManager.getProfiles(userId);
-                for (UserInfo pi : profiles) {
-                    // Unlock managed profile with unified lock
-                    if (tiedManagedProfileReadyToUnlock(pi)) {
-                        unlockChildProfile(pi.id, false /* ignoreUserNotAuthenticated */);
-                    }
+
+        if (mUserManager.getUserInfo(userId).isManagedProfile()) {
+            return;
+        }
+
+        for (UserInfo profile : mUserManager.getProfiles(userId)) {
+            // Unlock managed profile with unified lock
+            if (tiedManagedProfileReadyToUnlock(profile)) {
+                try {
+                    unlockChildProfile(profile.id, false /* ignoreUserNotAuthenticated */);
+                } catch (RemoteException e) {
+                    Log.d(TAG, "Failed to unlock child profile", e);
                 }
             }
-        } catch (RemoteException e) {
-            Log.d(TAG, "Failed to unlock child profile", e);
+            // Now we have unlocked the parent user and attempted to unlock the profile we should
+            // show notifications if the profile is still locked.
+            if (!alreadyUnlocked) {
+                long ident = clearCallingIdentity();
+                try {
+                    maybeShowEncryptionNotificationForUser(profile.id);
+                } finally {
+                    restoreCallingIdentity(ident);
+                }
+            }
+
         }
     }
 

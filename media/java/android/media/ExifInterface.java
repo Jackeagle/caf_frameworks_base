@@ -82,7 +82,7 @@ import java.util.regex.Pattern;
  */
 public class ExifInterface {
     private static final String TAG = "ExifInterface";
-    private static final boolean DEBUG = false;
+    private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
 
     // The Exif tag names. See Tiff 6.0 Section 3 and Section 8.
     /** Type is String. */
@@ -1395,6 +1395,9 @@ public class ExifInterface {
         }
         mAssetInputStream = null;
         mFilename = null;
+        // When FileDescriptor is duplicated and set to FileInputStream, ownership needs to be
+        // clarified in order for garbage collection to take place.
+        boolean isFdOwner = false;
         if (isSeekableFD(fileDescriptor)) {
             mSeekableFileDescriptor = fileDescriptor;
             // Keep the original file descriptor in order to save attributes when it's seekable.
@@ -1402,6 +1405,7 @@ public class ExifInterface {
             // feature won't be working.
             try {
                 fileDescriptor = Os.dup(fileDescriptor);
+                isFdOwner = true;
             } catch (ErrnoException e) {
                 throw e.rethrowAsIOException();
             }
@@ -1411,7 +1415,7 @@ public class ExifInterface {
         mIsInputStream = false;
         FileInputStream in = null;
         try {
-            in = new FileInputStream(fileDescriptor);
+            in = new FileInputStream(fileDescriptor, isFdOwner);
             loadAttributes(in);
         } finally {
             IoUtils.closeQuietly(in);
@@ -1605,12 +1609,15 @@ public class ExifInterface {
                         || exifTag.primaryFormat == IFD_FORMAT_STRING) {
                     dataFormat = exifTag.primaryFormat;
                 } else {
-                    Log.w(TAG, "Given tag (" + tag + ") value didn't match with one of expected "
-                            + "formats: " + IFD_FORMAT_NAMES[exifTag.primaryFormat]
-                            + (exifTag.secondaryFormat == -1 ? "" : ", "
-                            + IFD_FORMAT_NAMES[exifTag.secondaryFormat]) + " (guess: "
-                            + IFD_FORMAT_NAMES[guess.first] + (guess.second == -1 ? "" : ", "
-                            + IFD_FORMAT_NAMES[guess.second]) + ")");
+                    if (DEBUG) {
+                        Log.d(TAG, "Given tag (" + tag
+                                + ") value didn't match with one of expected "
+                                + "formats: " + IFD_FORMAT_NAMES[exifTag.primaryFormat]
+                                + (exifTag.secondaryFormat == -1 ? "" : ", "
+                                + IFD_FORMAT_NAMES[exifTag.secondaryFormat]) + " (guess: "
+                                + IFD_FORMAT_NAMES[guess.first] + (guess.second == -1 ? "" : ", "
+                                + IFD_FORMAT_NAMES[guess.second]) + ")");
+                    }
                     continue;
                 }
                 switch (dataFormat) {
@@ -1688,7 +1695,9 @@ public class ExifInterface {
                         break;
                     }
                     default:
-                        Log.w(TAG, "Data format isn't one of expected formats: " + dataFormat);
+                        if (DEBUG) {
+                            Log.d(TAG, "Data format isn't one of expected formats: " + dataFormat);
+                        }
                         continue;
                 }
             }
@@ -1785,15 +1794,13 @@ public class ExifInterface {
             // Set thumbnail image offset and length
             setThumbnailData(inputStream);
             mIsSupportedFile = true;
-        } catch (IOException e) {
+        } catch (IOException | OutOfMemoryError e) {
             // Ignore exceptions in order to keep the compatibility with the old versions of
             // ExifInterface.
             mIsSupportedFile = false;
-            if (DEBUG) {
-                Log.w(TAG, "Invalid image: ExifInterface got an unsupported image format file"
-                        + "(ExifInterface supports JPEG and some RAW image formats only) "
-                        + "or a corrupted JPEG file to ExifInterface.", e);
-            }
+            Log.w(TAG, "Invalid image: ExifInterface got an unsupported image format file"
+                    + "(ExifInterface supports JPEG and some RAW image formats only) "
+                    + "or a corrupted JPEG file to ExifInterface.", e);
         } finally {
             addDefaultValuesForCompatibility();
 
@@ -1961,7 +1968,7 @@ public class ExifInterface {
             } else if (mSeekableFileDescriptor != null) {
                 FileDescriptor fileDescriptor = Os.dup(mSeekableFileDescriptor);
                 Os.lseek(fileDescriptor, 0, OsConstants.SEEK_SET);
-                in = new FileInputStream(fileDescriptor);
+                in = new FileInputStream(fileDescriptor, true);
             }
             if (in == null) {
                 // Should not be reached this.
@@ -3183,14 +3190,20 @@ public class ExifInterface {
             long byteCount = 0;
             boolean valid = false;
             if (tag == null) {
-                Log.w(TAG, "Skip the tag entry since tag number is not defined: " + tagNumber);
+                if (DEBUG) {
+                    Log.d(TAG, "Skip the tag entry since tag number is not defined: " + tagNumber);
+                }
             } else if (dataFormat <= 0 || dataFormat >= IFD_FORMAT_BYTES_PER_FORMAT.length) {
-                Log.w(TAG, "Skip the tag entry since data format is invalid: " + dataFormat);
+                if (DEBUG) {
+                    Log.d(TAG, "Skip the tag entry since data format is invalid: " + dataFormat);
+                }
             } else {
                 byteCount = (long) numberOfComponents * IFD_FORMAT_BYTES_PER_FORMAT[dataFormat];
                 if (byteCount < 0 || byteCount > Integer.MAX_VALUE) {
-                    Log.w(TAG, "Skip the tag entry since the number of components is invalid: "
-                            + numberOfComponents);
+                    if (DEBUG) {
+                        Log.d(TAG, "Skip the tag entry since the number of components is invalid: "
+                                + numberOfComponents);
+                    }
                 } else {
                     valid = true;
                 }
@@ -3239,7 +3252,9 @@ public class ExifInterface {
                     dataInputStream.seek(offset);
                 } else {
                     // Skip if invalid data offset.
-                    Log.w(TAG, "Skip the tag entry since data offset is invalid: " + offset);
+                    if (DEBUG) {
+                        Log.d(TAG, "Skip the tag entry since data offset is invalid: " + offset);
+                    }
                     dataInputStream.seek(nextEntryOffset);
                     continue;
                 }
@@ -3289,11 +3304,15 @@ public class ExifInterface {
                         dataInputStream.seek(offset);
                         readImageFileDirectory(dataInputStream, nextIfdType);
                     } else {
-                        Log.w(TAG, "Skip jump into the IFD since it has already been read: "
-                                + "IfdType " + nextIfdType + " (at " + offset + ")");
+                        if (DEBUG) {
+                            Log.d(TAG, "Skip jump into the IFD since it has already been read: "
+                                    + "IfdType " + nextIfdType + " (at " + offset + ")");
+                        }
                     }
                 } else {
-                    Log.w(TAG, "Skip jump into the IFD since its offset is invalid: " + offset);
+                    if (DEBUG) {
+                        Log.d(TAG, "Skip jump into the IFD since its offset is invalid: " + offset);
+                    }
                 }
 
                 dataInputStream.seek(nextEntryOffset);
@@ -3348,12 +3367,16 @@ public class ExifInterface {
                         readImageFileDirectory(dataInputStream, IFD_TYPE_PREVIEW);
                     }
                 } else {
-                    Log.w(TAG, "Stop reading file since re-reading an IFD may cause an "
-                            + "infinite loop: " + nextIfdOffset);
+                    if (DEBUG) {
+                        Log.d(TAG, "Stop reading file since re-reading an IFD may cause an "
+                                + "infinite loop: " + nextIfdOffset);
+                    }
                 }
             } else {
-                Log.w(TAG, "Stop reading file since a wrong offset may cause an infinite loop: "
-                        + nextIfdOffset);
+                if (DEBUG) {
+                    Log.d(TAG, "Stop reading file since a wrong offset may cause an infinite loop: "
+                            + nextIfdOffset);
+                }
             }
         }
     }

@@ -355,10 +355,10 @@ public class NotificationEntryManager implements
                     // a child we're keeping around for reply!
                     continue;
                 }
-                entry.setKeepInParent(true);
+                childEntry.setKeepInParent(true);
                 // we need to set this state earlier as otherwise we might generate some weird
                 // animations
-                entry.removeRow();
+                childEntry.removeRow();
             }
         }
     }
@@ -483,6 +483,10 @@ public class NotificationEntryManager implements
         }
 
         updateNotifications();
+
+        for (NotificationEntryListener listener : mNotificationEntryListeners) {
+            listener.onNotificationRankingUpdated(rankingMap);
+        }
     }
 
     private void updateRankingOfPendingNotifications(

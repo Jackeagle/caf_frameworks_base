@@ -33,6 +33,7 @@ import static android.app.AppOpsManager.OP_NONE;
 import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
 import static android.content.pm.ApplicationInfo.HIDDEN_API_ENFORCEMENT_DEFAULT;
 import static android.content.pm.PackageManager.GET_PROVIDERS;
+import static android.content.pm.PackageManager.GET_SHARED_LIBRARY_FILES;
 import static android.content.pm.PackageManager.MATCH_ALL;
 import static android.content.pm.PackageManager.MATCH_ANY_USER;
 import static android.content.pm.PackageManager.MATCH_DEBUG_TRIAGED_MISSING;
@@ -405,6 +406,9 @@ public class ActivityManagerService extends IActivityManager.Stub
      * Priority we boost main thread and RT of top app to.
      */
     public static final int TOP_APP_PRIORITY_BOOST = -10;
+
+    private static final String SYSTEM_PROPERTY_DEVICE_PROVISIONED =
+            "persist.sys.device_provisioned";
 
     static final String TAG = TAG_WITH_CLASS_NAME ? "ActivityManagerService" : TAG_AM;
     static final String TAG_BACKUP = TAG + POSTFIX_BACKUP;
@@ -4915,7 +4919,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                         AutofillManagerInternal.class);
                 if (afm != null) {
                     autofillOptions = afm.getAutofillOptions(
-                            app.info.packageName, app.info.versionCode, app.userId);
+                            app.info.packageName, app.info.longVersionCode, app.userId);
                 }
             }
             ContentCaptureOptions contentCaptureOptions = null;
@@ -6360,8 +6364,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                     // to run in multiple processes, because this is actually
                     // part of the framework so doesn't make sense to track as a
                     // separate apk in the process.
-                    app.addPackage(cpi.applicationInfo.packageName, cpi.applicationInfo.versionCode,
-                            mProcessStats);
+                    app.addPackage(cpi.applicationInfo.packageName,
+                            cpi.applicationInfo.longVersionCode, mProcessStats);
                 }
                 notifyPackageUse(cpi.applicationInfo.packageName,
                                  PackageManager.NOTIFY_PACKAGE_USE_CONTENT_PROVIDER);
@@ -8456,18 +8460,43 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
         }
 
-        if (DEBUG_POWER) {
-            Slog.w(TAG, "noteWakupAlarm[ sourcePkg=" + sourcePkg + ", sourceUid=" + sourceUid
-                    + ", workSource=" + workSource + ", tag=" + tag + "]");
-        }
+        int standbyBucket = 0;
 
         mBatteryStatsService.noteWakupAlarm(sourcePkg, sourceUid, workSource, tag);
         if (workSource != null) {
-            StatsLog.write(StatsLog.WAKEUP_ALARM_OCCURRED, workSource, tag, sourcePkg);
+            String workSourcePackage = workSource.getName(0);
+            int workSourceUid = workSource.getAttributionUid();
+            if (workSourcePackage == null) {
+                workSourcePackage = sourcePkg;
+                workSourceUid = sourceUid;
+            }
+
+            if (mUsageStatsService != null) {
+                standbyBucket = mUsageStatsService.getAppStandbyBucket(workSourcePackage,
+                        UserHandle.getUserId(workSourceUid), SystemClock.elapsedRealtime());
+            }
+
+            StatsLog.write(StatsLog.WAKEUP_ALARM_OCCURRED, workSource, tag, sourcePkg,
+                    standbyBucket);
+            if (DEBUG_POWER) {
+                Slog.w(TAG, "noteWakeupAlarm[ sourcePkg=" + sourcePkg + ", sourceUid=" + sourceUid
+                        + ", workSource=" + workSource + ", tag=" + tag + ", standbyBucket="
+                        + standbyBucket + " wsName=" + workSourcePackage + ")]");
+            }
         } else {
+            if (mUsageStatsService != null) {
+                standbyBucket = mUsageStatsService.getAppStandbyBucket(sourcePkg,
+                        UserHandle.getUserId(sourceUid), SystemClock.elapsedRealtime());
+            }
             StatsLog.write_non_chained(StatsLog.WAKEUP_ALARM_OCCURRED, sourceUid, null, tag,
-                    sourcePkg);
+                    sourcePkg, standbyBucket);
+            if (DEBUG_POWER) {
+                Slog.w(TAG, "noteWakeupAlarm[ sourcePkg=" + sourcePkg + ", sourceUid=" + sourceUid
+                        + ", workSource=" + workSource + ", tag=" + tag + ", standbyBucket="
+                        + standbyBucket + "]");
+            }
         }
+
     }
 
     @Override
@@ -8893,6 +8922,8 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         mAtmInternal.updateTopComponentForFactoryTest();
 
+        watchDeviceProvisioning(mContext);
+
         retrieveSettings();
         mUgmInternal.onSystemReady();
 
@@ -9006,6 +9037,32 @@ public class ActivityManagerService extends IActivityManager.Stub
             traceLog.traceEnd(); // ActivityManagerStartApps
             traceLog.traceEnd(); // PhaseActivityManagerReady
         }
+    }
+
+    private void watchDeviceProvisioning(Context context) {
+        // setting system property based on whether device is provisioned
+
+        if (isDeviceProvisioned(context)) {
+            SystemProperties.set(SYSTEM_PROPERTY_DEVICE_PROVISIONED, "1");
+        } else {
+            // watch for device provisioning change
+            context.getContentResolver().registerContentObserver(
+                    Settings.Global.getUriFor(Settings.Global.DEVICE_PROVISIONED), false,
+                    new ContentObserver(new Handler(Looper.getMainLooper())) {
+                        @Override
+                        public void onChange(boolean selfChange) {
+                            if (isDeviceProvisioned(context)) {
+                                SystemProperties.set(SYSTEM_PROPERTY_DEVICE_PROVISIONED, "1");
+                                context.getContentResolver().unregisterContentObserver(this);
+                            }
+                        }
+                    });
+        }
+    }
+
+    private boolean isDeviceProvisioned(Context context) {
+        return Settings.Global.getInt(context.getContentResolver(),
+                Settings.Global.DEVICE_PROVISIONED, 0) != 0;
     }
 
     private void startBroadcastObservers() {
@@ -14972,7 +15029,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                             ApplicationInfo ai = AppGlobals.getPackageManager().
                                     getApplicationInfo(ssp, STOCK_PM_FLAGS, 0);
                             mBatteryStatsService.notePackageInstalled(ssp,
-                                    ai != null ? ai.versionCode : 0);
+                                    ai != null ? ai.longVersionCode : 0);
                         } catch (RemoteException e) {
                         }
                     }
@@ -18099,13 +18156,20 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
         }
 
+        // The arguments here are untyped because the base ActivityManagerInternal class
+        // doesn't have compile-time visiblity into ActivityServiceConnectionHolder or
+        // ConnectionRecord.
         @Override
-        public void disconnectActivityFromServices(Object connectionHolder) {
+        public void disconnectActivityFromServices(Object connectionHolder, Object conns) {
+            // 'connectionHolder' is an untyped ActivityServiceConnectionsHolder
+            // 'conns' is an untyped HashSet<ConnectionRecord>
+            final ActivityServiceConnectionsHolder holder =
+                    (ActivityServiceConnectionsHolder) connectionHolder;
+            final HashSet<ConnectionRecord> toDisconnect = (HashSet<ConnectionRecord>) conns;
             synchronized(ActivityManagerService.this) {
-                final ActivityServiceConnectionsHolder c =
-                        (ActivityServiceConnectionsHolder) connectionHolder;
-                c.forEachConnection(cr -> mServices.removeConnectionLocked(
-                        (ConnectionRecord) cr, null, c));
+                for (ConnectionRecord cr : toDisconnect) {
+                    mServices.removeConnectionLocked(cr, null, holder);
+                }
             }
         }
 
@@ -18135,10 +18199,6 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         public boolean isActivityStartsLoggingEnabled() {
             return mConstants.mFlagActivityStartsLoggingEnabled;
-        }
-
-        public boolean isPackageNameWhitelistedForBgActivityStarts(String packageName) {
-            return mConstants.mPackageNamesWhitelistedForBgActivityStarts.contains(packageName);
         }
 
         public boolean isBackgroundActivityStartsEnabled() {
@@ -18564,6 +18624,21 @@ public class ActivityManagerService extends IActivityManager.Stub
                 Binder.restoreCallingIdentity(origId);
             }
         }
+    }
+
+    /**
+     * Synchronously update the system ActivityThread, bypassing any deferred threading so any
+     * resources and overlaid values are available immediately.
+     */
+    public void updateSystemUiContext() {
+        PackageManagerInternal packageManagerInternal;
+        synchronized (this) {
+            packageManagerInternal = getPackageManagerInternalLocked();
+        }
+
+        ApplicationInfo ai = packageManagerInternal.getApplicationInfo("android",
+                GET_SHARED_LIBRARY_FILES, Binder.getCallingUid(), UserHandle.USER_SYSTEM);
+        ActivityThread.currentActivityThread().handleSystemApplicationInfoChanged(ai);
     }
 
     void updateApplicationInfoLocked(@NonNull List<String> packagesToUpdate, int userId) {

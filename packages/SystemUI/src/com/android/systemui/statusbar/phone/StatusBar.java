@@ -30,7 +30,6 @@ import static com.android.systemui.Dependency.MAIN_HANDLER;
 import static com.android.systemui.keyguard.WakefulnessLifecycle.WAKEFULNESS_ASLEEP;
 import static com.android.systemui.keyguard.WakefulnessLifecycle.WAKEFULNESS_AWAKE;
 import static com.android.systemui.keyguard.WakefulnessLifecycle.WAKEFULNESS_WAKING;
-import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_BOUNCER_SHOWING;
 import static com.android.systemui.shared.system.WindowManagerWrapper.NAV_BAR_POS_INVALID;
 import static com.android.systemui.shared.system.WindowManagerWrapper.NAV_BAR_POS_LEFT;
 import static com.android.systemui.statusbar.NotificationLockscreenUserManager.PERMISSION_SELF;
@@ -168,7 +167,6 @@ import com.android.systemui.plugins.statusbar.NotificationSwipeActionHelper.Snoo
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.qs.QSFragment;
 import com.android.systemui.qs.QSPanel;
-import com.android.systemui.recents.OverviewProxyService;
 import com.android.systemui.recents.Recents;
 import com.android.systemui.recents.ScreenPinningRequest;
 import com.android.systemui.shared.system.WindowManagerWrapper;
@@ -784,7 +782,6 @@ public class StatusBar extends SystemUI implements DemoMode,
         int disabledFlags2 = result.mDisabledFlags2;
         Dependency.get(InitController.class).addPostInitTask(
                 () -> setUpDisableFlags(disabledFlags1, disabledFlags2));
-
     }
 
     // ================================================================================
@@ -948,6 +945,9 @@ public class StatusBar extends SystemUI implements DemoMode,
         if (UserManager.get(mContext).isUserSwitcherEnabled()) {
             createUserSwitcher();
         }
+
+        mNotificationPanel.setLaunchAffordanceListener(
+                mStatusBarWindow::onShowingLaunchAffordanceChanged);
 
         // Set up the quick settings tile panel
         View container = mStatusBarWindow.findViewById(R.id.qs_frame);
@@ -1306,7 +1306,6 @@ public class StatusBar extends SystemUI implements DemoMode,
                 && !mDozing
                 && !ONLY_CORE_APPS;
         mNotificationPanel.setQsExpansionEnabled(expandEnabled);
-        // STOPSHIP(kozynski, b/129405675) Remove log
         Log.d(TAG, "updateQsExpansionEnabled - QS Expand enabled: " + expandEnabled);
     }
 
@@ -2154,6 +2153,11 @@ public class StatusBar extends SystemUI implements DemoMode,
             WirelessChargingAnimation.makeWirelessChargingAnimation(mContext, null,
                     batteryLevel, null, false).show();
         }
+    }
+
+    @Override
+    public void onRecentsAnimationStateChanged(boolean running) {
+        setInteracting(StatusBarManager.WINDOW_NAVIGATION_BAR, running);
     }
 
     protected @TransitionMode int computeStatusBarMode(int oldVal, int newVal) {
@@ -3133,7 +3137,6 @@ public class StatusBar extends SystemUI implements DemoMode,
 
             // If the state didn't change, we may still need to update public mode
             mLockscreenUserManager.updatePublicMode();
-            mEntryManager.updateNotifications();
         }
         if (mStatusBarStateController.leaveOpenOnKeyguardHide()) {
             if (!mStatusBarStateController.isKeyguardRequested()) {
@@ -3578,10 +3581,6 @@ public class StatusBar extends SystemUI implements DemoMode,
         if (!mBouncerShowing) {
             updatePanelExpansionForKeyguard();
         }
-
-        // Notify overview proxy service of the new states
-        Dependency.get(OverviewProxyService.class).setSystemUiStateFlag(SYSUI_STATE_BOUNCER_SHOWING,
-                isBouncerShowing(), mContext.getDisplayId());
     }
 
     /**
@@ -3623,6 +3622,7 @@ public class StatusBar extends SystemUI implements DemoMode,
 
         @Override
         public void onStartedGoingToSleep() {
+            updateNotificationPanelTouchState();
             notifyHeadsUpGoingToSleep();
             dismissVolumeDialog();
         }
@@ -3655,7 +3655,10 @@ public class StatusBar extends SystemUI implements DemoMode,
      * Keyguard.
      */
     private void updateNotificationPanelTouchState() {
-        mNotificationPanel.setTouchAndAnimationDisabled(!mDeviceInteractive && !mPulsing);
+        boolean goingToSleepWithoutAnimation = isGoingToSleep()
+                && !DozeParameters.getInstance(mContext).shouldControlScreenOff();
+        mNotificationPanel.setTouchAndAnimationDisabled((!mDeviceInteractive && !mPulsing)
+                || goingToSleepWithoutAnimation);
     }
 
     final ScreenLifecycle.Observer mScreenObserver = new ScreenLifecycle.Observer() {
@@ -3962,6 +3965,7 @@ public class StatusBar extends SystemUI implements DemoMode,
                     }
                     updateScrimController();
                     mPulseExpansionHandler.setPulsing(pulsing);
+                    mWakeUpCoordinator.setPulsing(pulsing);
                 }
             }, reason);
             // DozeScrimController is in pulse state, now let's ask ScrimController to start
@@ -3992,7 +3996,6 @@ public class StatusBar extends SystemUI implements DemoMode,
         @Override
         public void dozeTimeTick() {
             mNotificationPanel.dozeTimeTick();
-            mNotificationIconAreaController.dozeTimeTick();
             if (mAmbientIndicationContainer instanceof DozeReceiver) {
                 ((DozeReceiver) mAmbientIndicationContainer).dozeTimeTick();
             }

@@ -36,6 +36,7 @@ import android.content.res.Configuration;
 import android.content.res.Resources.Theme;
 import android.database.sqlite.SQLiteCompatibilityWalFlags;
 import android.database.sqlite.SQLiteGlobal;
+import android.hardware.display.DisplayManagerInternal;
 import android.net.NetworkStackClient;
 import android.os.BaseBundle;
 import android.os.Binder;
@@ -748,10 +749,12 @@ public final class SystemServer {
             if (!disableOtaDexopt) {
                 traceBeginAndSlog("StartOtaDexOptService");
                 try {
+                    Watchdog.getInstance().pauseWatchingCurrentThread("moveab");
                     OtaDexoptService.main(mSystemContext, mPackageManagerService);
                 } catch (Throwable e) {
                     reportWtf("starting OtaDexOptService", e);
                 } finally {
+                    Watchdog.getInstance().resumeWatchingCurrentThread("moveab");
                     traceEnd();
                 }
             }
@@ -789,6 +792,12 @@ public final class SystemServer {
         traceBeginAndSlog("StartSensorPrivacyService");
         mSystemServiceManager.startService(new SensorPrivacyService(mSystemContext));
         traceEnd();
+
+        if (SystemProperties.getInt("persist.sys.displayinset.top", 0) > 0) {
+            // DisplayManager needs the overlay immediately.
+            mActivityManagerService.updateSystemUiContext();
+            LocalServices.getService(DisplayManagerInternal.class).onOverlayChanged();
+        }
 
         // The sensor service needs access to package manager service, app ops
         // service, and permissions service, therefore we start it after them.

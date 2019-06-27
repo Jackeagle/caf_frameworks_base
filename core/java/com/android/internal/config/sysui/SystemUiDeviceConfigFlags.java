@@ -106,12 +106,37 @@ public final class SystemUiDeviceConfigFlags {
      */
     public static final String HASH_SALT_MAX_DAYS = "hash_salt_max_days";
 
-    // Flag related to Privacy Indicators
+    // Flags related to Assistant Handles
 
     /**
-     * Whether the Permissions Hub is showing.
+     * (String) Which behavior mode for the Assistant Handles to use.
      */
-    public static final String PROPERTY_PERMISSIONS_HUB_ENABLED = "permissions_hub_enabled";
+    public static final String ASSIST_HANDLES_BEHAVIOR_MODE = "assist_handles_behavior_mode";
+
+    /**
+     * (long) How long, in milliseconds, to display Assist Handles when showing them temporarily.
+     */
+    public static final String ASSIST_HANDLES_SHOW_AND_GO_DURATION_MS =
+            "assist_handles_show_and_go_duration_ms";
+
+    /**
+     * (long) How long, in milliseconds, to wait before displaying Assist Handles temporarily after
+     * hiding them.
+     */
+    public static final String ASSIST_HANDLES_SHOWN_FREQUENCY_THRESHOLD_MS =
+            "assist_handles_shown_frequency_threshold_ms";
+
+    /**
+     * (long) How long, in milliseconds, for teaching behaviors to wait before considering the user
+     * taught.
+     */
+    public static final String ASSIST_HANDLES_LEARN_TIME_MS = "assist_handles_learn_time_ms";
+
+    /**
+     * (int) How many times for teaching behaviors to see the user perform an action to consider it
+     * taught.
+     */
+    public static final String ASSIST_HANDLES_LEARN_COUNT = "assist_handles_learn_count";
 
     private SystemUiDeviceConfigFlags() { }
 }

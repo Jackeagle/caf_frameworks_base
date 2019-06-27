@@ -46,6 +46,7 @@ import static android.content.Context.BIND_ADJUST_BELOW_PERCEPTIBLE;
 import static android.content.Context.BIND_ALLOW_WHITELIST_MANAGEMENT;
 import static android.content.Context.BIND_AUTO_CREATE;
 import static android.content.Context.BIND_FOREGROUND_SERVICE;
+import static android.content.pm.ActivityInfo.DOCUMENT_LAUNCH_ALWAYS;
 import static android.content.pm.PackageManager.FEATURE_LEANBACK;
 import static android.content.pm.PackageManager.FEATURE_TELEVISION;
 import static android.content.pm.PackageManager.MATCH_ALL;
@@ -82,6 +83,9 @@ import static android.service.notification.NotificationListenerService.REASON_UN
 import static android.service.notification.NotificationListenerService.REASON_USER_STOPPED;
 import static android.service.notification.NotificationListenerService.TRIM_FULL;
 import static android.service.notification.NotificationListenerService.TRIM_LIGHT;
+import static android.util.StatsLogInternal.BUBBLE_DEVELOPER_ERROR_REPORTED__ERROR__ACTIVITY_INFO_MISSING;
+import static android.util.StatsLogInternal.BUBBLE_DEVELOPER_ERROR_REPORTED__ERROR__ACTIVITY_INFO_NOT_RESIZABLE;
+import static android.util.StatsLogInternal.BUBBLE_DEVELOPER_ERROR_REPORTED__ERROR__DOCUMENT_LAUNCH_NOT_ALWAYS;
 import static android.view.WindowManager.LayoutParams.TYPE_TOAST;
 
 import static com.android.server.am.PendingIntentRecord.FLAG_ACTIVITY_SENDER;
@@ -131,6 +135,7 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.IPackageManager;
 import android.content.pm.PackageManager;
@@ -197,6 +202,7 @@ import android.util.Log;
 import android.util.Pair;
 import android.util.Slog;
 import android.util.SparseArray;
+import android.util.StatsLog;
 import android.util.Xml;
 import android.util.proto.ProtoOutputStream;
 import android.view.accessibility.AccessibilityEvent;
@@ -277,7 +283,7 @@ public class NotificationManagerService extends SystemService {
     static final boolean DEBUG_INTERRUPTIVENESS = SystemProperties.getBoolean(
             "debug.notification.interruptiveness", false);
 
-    static final int MAX_PACKAGE_NOTIFICATIONS = 50;
+    static final int MAX_PACKAGE_NOTIFICATIONS = 25;
     static final float DEFAULT_MAX_NOTIFICATION_ENQUEUE_RATE = 5f;
 
     // message codes
@@ -310,13 +316,11 @@ public class NotificationManagerService extends SystemService {
     static final boolean ENABLE_BLOCKED_TOASTS = true;
 
     static final String[] DEFAULT_ALLOWED_ADJUSTMENTS = new String[] {
-            Adjustment.KEY_IMPORTANCE,
             Adjustment.KEY_CONTEXTUAL_ACTIONS,
             Adjustment.KEY_TEXT_REPLIES};
 
     static final String[] NON_BLOCKABLE_DEFAULT_ROLES = new String[] {
             RoleManager.ROLE_DIALER,
-            RoleManager.ROLE_SMS,
             RoleManager.ROLE_EMERGENCY
     };
 
@@ -1032,18 +1036,11 @@ public class NotificationManagerService extends SystemService {
                     final StatusBarNotification n = r.sbn;
                     final int callingUid = n.getUid();
                     final String pkg = n.getPackageName();
-                    final boolean wasBubble = r.getNotification().isBubbleNotification();
                     if (isBubble && isNotificationAppropriateToBubble(r, pkg, callingUid,
                             null /* oldEntry */)) {
                         r.getNotification().flags |= FLAG_BUBBLE;
                     } else {
                         r.getNotification().flags &= ~FLAG_BUBBLE;
-                    }
-                    if (wasBubble != r.getNotification().isBubbleNotification()) {
-                        // Add the "alert only once" flag so that the notification won't HUN
-                        // unnecessarily just because the bubble flag was changed.
-                        r.getNotification().flags |= FLAG_ONLY_ALERT_ONCE;
-                        mListeners.notifyPostedLocked(r, r);
                     }
                 }
             }
@@ -1277,7 +1274,6 @@ public class NotificationManagerService extends SystemService {
                 }
 
                 mHandler.scheduleOnPackageChanged(removingPackage, changeUserId, pkgList, uidList);
-                handleSavePolicyFile();
             }
         }
     };
@@ -2640,18 +2636,25 @@ public class NotificationManagerService extends SystemService {
                 ParceledListSlice channelsList) {
             List<NotificationChannel> channels = channelsList.getList();
             final int channelsSize = channels.size();
+            boolean needsPolicyFileChange = false;
             for (int i = 0; i < channelsSize; i++) {
                 final NotificationChannel channel = channels.get(i);
                 Preconditions.checkNotNull(channel, "channel in list is null");
-                mPreferencesHelper.createNotificationChannel(pkg, uid, channel,
-                        true /* fromTargetApp */, mConditionProviders.isPackageOrComponentAllowed(
+                needsPolicyFileChange = mPreferencesHelper.createNotificationChannel(pkg, uid,
+                        channel, true /* fromTargetApp */,
+                        mConditionProviders.isPackageOrComponentAllowed(
                                 pkg, UserHandle.getUserId(uid)));
-                mListeners.notifyNotificationChannelChanged(pkg,
-                        UserHandle.getUserHandleForUid(uid),
-                        mPreferencesHelper.getNotificationChannel(pkg, uid, channel.getId(), false),
-                        NOTIFICATION_CHANNEL_OR_GROUP_ADDED);
+                if (needsPolicyFileChange) {
+                    mListeners.notifyNotificationChannelChanged(pkg,
+                            UserHandle.getUserHandleForUid(uid),
+                            mPreferencesHelper.getNotificationChannel(pkg, uid, channel.getId(),
+                                    false),
+                            NOTIFICATION_CHANNEL_OR_GROUP_ADDED);
+                }
             }
-            handleSavePolicyFile();
+            if (needsPolicyFileChange) {
+                handleSavePolicyFile();
+            }
         }
 
         @Override
@@ -4822,10 +4825,14 @@ public class NotificationManagerService extends SystemService {
     private boolean isNotificationAppropriateToBubble(NotificationRecord r, String pkg, int userId,
             NotificationRecord oldRecord) {
         Notification notification = r.getNotification();
+        Notification.BubbleMetadata metadata = notification.getBubbleMetadata();
+        boolean intentCanBubble = metadata != null
+                && canLaunchInActivityView(getContext(), metadata.getIntent(), pkg);
 
         // Does the app want to bubble & is able to bubble
-        boolean canBubble = notification.getBubbleMetadata() != null
+        boolean canBubble = intentCanBubble
                 && mPreferencesHelper.areBubblesAllowed(pkg, userId)
+                && mPreferencesHelper.bubblesEnabled(r.sbn.getUser())
                 && r.getChannel().canBubble()
                 && !mActivityManager.isLowRamDevice();
 
@@ -4867,6 +4874,63 @@ public class NotificationManagerService extends SystemService {
             }
         }
         return false;
+    }
+
+    /**
+     * Whether an intent is properly configured to display in an {@link android.app.ActivityView}.
+     *
+     * @param context       the context to use.
+     * @param pendingIntent the pending intent of the bubble.
+     * @param packageName   the notification package name for this bubble.
+     */
+    // Keep checks in sync with BubbleController#canLaunchInActivityView.
+    @VisibleForTesting
+    protected boolean canLaunchInActivityView(Context context, PendingIntent pendingIntent,
+            String packageName) {
+        if (pendingIntent == null) {
+            Log.w(TAG, "Unable to create bubble -- no intent");
+            return false;
+        }
+
+        // Need escalated privileges to get the intent.
+        final long token = Binder.clearCallingIdentity();
+        Intent intent;
+        try {
+            intent = pendingIntent.getIntent();
+        } finally {
+            Binder.restoreCallingIdentity(token);
+        }
+
+        ActivityInfo info = intent != null
+                ? intent.resolveActivityInfo(context.getPackageManager(), 0)
+                : null;
+        if (info == null) {
+            StatsLog.write(StatsLog.BUBBLE_DEVELOPER_ERROR_REPORTED, packageName,
+                    BUBBLE_DEVELOPER_ERROR_REPORTED__ERROR__ACTIVITY_INFO_MISSING);
+            Log.w(TAG, "Unable to send as bubble -- couldn't find activity info for intent: "
+                    + intent);
+            return false;
+        }
+        if (!ActivityInfo.isResizeableMode(info.resizeMode)) {
+            StatsLog.write(StatsLog.BUBBLE_DEVELOPER_ERROR_REPORTED, packageName,
+                    BUBBLE_DEVELOPER_ERROR_REPORTED__ERROR__ACTIVITY_INFO_NOT_RESIZABLE);
+            Log.w(TAG, "Unable to send as bubble -- activity is not resizable for intent: "
+                    + intent);
+            return false;
+        }
+        if (info.documentLaunchMode != DOCUMENT_LAUNCH_ALWAYS) {
+            StatsLog.write(StatsLog.BUBBLE_DEVELOPER_ERROR_REPORTED, packageName,
+                    BUBBLE_DEVELOPER_ERROR_REPORTED__ERROR__DOCUMENT_LAUNCH_NOT_ALWAYS);
+            Log.w(TAG, "Unable to send as bubble -- activity is not documentLaunchMode=always "
+                    + "for intent: " + intent);
+            return false;
+        }
+        if ((info.flags & ActivityInfo.FLAG_ALLOW_EMBEDDED) == 0) {
+            Log.w(TAG, "Unable to send as bubble -- activity is not embeddable for intent: "
+                    + intent);
+            return false;
+        }
+        return true;
     }
 
     private void doChannelWarningToast(CharSequence toastText) {
@@ -6199,12 +6263,15 @@ public class NotificationManagerService extends SystemService {
 
     private void handleOnPackageChanged(boolean removingPackage, int changeUserId,
             String[] pkgList, int[] uidList) {
+        boolean preferencesChanged = removingPackage;
         mListeners.onPackagesChanged(removingPackage, pkgList, uidList);
         mAssistants.onPackagesChanged(removingPackage, pkgList, uidList);
         mConditionProviders.onPackagesChanged(removingPackage, pkgList, uidList);
-        mPreferencesHelper.onPackagesChanged(
+        preferencesChanged |= mPreferencesHelper.onPackagesChanged(
                 removingPackage, changeUserId, pkgList, uidList);
-        handleSavePolicyFile();
+        if (preferencesChanged) {
+            handleSavePolicyFile();
+        }
     }
 
     protected class WorkerHandler extends Handler
@@ -7344,7 +7411,7 @@ public class NotificationManagerService extends SystemService {
         static final String TAG_ENABLED_NOTIFICATION_ASSISTANTS = "enabled_assistants";
 
         private static final String ATT_USER_SET = "user_set";
-        private static final String TAG_ALLOWED_ADJUSTMENT_TYPES = "allowed_adjustments";
+        private static final String TAG_ALLOWED_ADJUSTMENT_TYPES = "q_allowed_adjustments";
         private static final String ATT_TYPES = "types";
 
         private final Object mLock = new Object();

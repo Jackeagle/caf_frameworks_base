@@ -63,7 +63,7 @@ public class Watchdog extends Thread {
     static final String TAG = "Watchdog";
 
     /** Debug flag. */
-    public static final boolean DEBUG = true; // STOPSHIP disable it (b/113252928)
+    public static final boolean DEBUG = false;
 
     // Set this to true to use debug default values.
     static final boolean DB = false;
@@ -570,7 +570,7 @@ public class Watchdog extends Thread {
                         continue;
                     } else if (waitState == WAITED_HALF) {
                         if (!waitedHalf) {
-                            if (DEBUG) Slog.d(TAG, "WAITED_HALF");
+                            Slog.i(TAG, "WAITED_HALF");
                             // We've waited half the deadlock-detection interval.  Pull a stack
                             // trace and wait another half.
                             ArrayList<Integer> pids = new ArrayList<Integer>();
@@ -617,9 +617,13 @@ public class Watchdog extends Thread {
             // deadlock and the watchdog as a whole to be ineffective)
             Thread dropboxThread = new Thread("watchdogWriteToDropbox") {
                     public void run() {
-                        mActivity.addErrorToDropBox(
-                                "watchdog", null, "system_server", null, null, null,
-                                subject, null, stack, null);
+                        // If a watched thread hangs before init() is called, we don't have a
+                        // valid mActivity. So we can't log the error to dropbox.
+                        if (mActivity != null) {
+                            mActivity.addErrorToDropBox(
+                                    "watchdog", null, "system_server", null, null, null,
+                                    subject, null, stack, null);
+                        }
                         StatsLog.write(StatsLog.SYSTEM_SERVER_WATCHDOG_OCCURRED, subject);
                     }
                 };

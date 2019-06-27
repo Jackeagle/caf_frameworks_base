@@ -311,6 +311,9 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     public static final int KEY_DISPATCHING_TIMEOUT_MS = 5 * 1000;
     // How long we wait until we timeout on key dispatching during instrumentation.
     static final int INSTRUMENTATION_KEY_DISPATCHING_TIMEOUT_MS = 60 * 1000;
+    // How long we permit background activity starts after an activity in the process
+    // started or finished.
+    static final long ACTIVITY_BG_START_GRACE_PERIOD_MS = 10 * 1000;
 
     /** Used to indicate that an app transition should be animated. */
     static final boolean ANIMATE = true;
@@ -504,6 +507,12 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
      * is set; any switches after that will clear the time.
      */
     private boolean mDidAppSwitch;
+
+    /**
+     * Last stop app switches time, apps finished before this time cannot start background activity
+     * even if they are in grace period.
+     */
+    private long mLastStopAppSwitchesTime;
 
     IActivityController mController = null;
     boolean mControllerIsAMonkey = false;
@@ -1575,6 +1584,13 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                     }
                 }
             }
+
+            // note down that the process has finished an activity and is in background activity
+            // starts grace period
+            if (r.app != null) {
+                r.app.setLastActivityFinishTimeIfNeeded(SystemClock.uptimeMillis());
+            }
+
             final long origId = Binder.clearCallingIdentity();
             try {
                 boolean res;
@@ -2359,9 +2375,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 null /* intent */, "moveTaskToFront");
         if (starter.shouldAbortBackgroundActivityStart(callingUid, callingPid, callingPackage, -1,
                 -1, callerApp, null, false, null)) {
-            boolean abort = !isBackgroundActivityStartsEnabled();
-            starter.showBackgroundActivityBlockedToast(abort, callingPackage);
-            if (abort) {
+            if (!isBackgroundActivityStartsEnabled()) {
                 return;
             }
         }
@@ -4721,6 +4735,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         enforceCallerIsRecentsOrHasPermission(STOP_APP_SWITCHES, "stopAppSwitches");
         synchronized (mGlobalLock) {
             mAppSwitchesAllowedTime = SystemClock.uptimeMillis() + APP_SWITCH_DELAY_TIME;
+            mLastStopAppSwitchesTime = SystemClock.uptimeMillis();
             mDidAppSwitch = false;
             getActivityStartController().schedulePendingActivityLaunches(APP_SWITCH_DELAY_TIME);
         }
@@ -4735,6 +4750,10 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             // activity request.
             mAppSwitchesAllowedTime = 0;
         }
+    }
+
+    long getLastStopAppSwitchesTime() {
+        return mLastStopAppSwitchesTime;
     }
 
     void onStartActivitySetDidAppSwitch() {
@@ -5387,13 +5406,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         return mAmInternal.isBackgroundActivityStartsEnabled();
     }
 
-    boolean isPackageNameWhitelistedForBgActivityStarts(@Nullable String packageName) {
-        if (packageName == null) {
-            return false;
-        }
-        return mAmInternal.isPackageNameWhitelistedForBgActivityStarts(packageName);
-    }
-
     void enableScreenAfterBoot(boolean booted) {
         EventLog.writeEvent(EventLogTags.BOOT_PROGRESS_ENABLE_SCREEN,
                 SystemClock.uptimeMillis());
@@ -5857,8 +5869,10 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
      */
     Intent getSecondaryHomeIntent(String preferredPackage) {
         final Intent intent = new Intent(mTopAction, mTopData != null ? Uri.parse(mTopData) : null);
-        if (preferredPackage == null) {
-            // Using the component stored in config if no package name.
+        final boolean useSystemProvidedLauncher = mContext.getResources().getBoolean(
+                com.android.internal.R.bool.config_useSystemProvidedLauncherForSecondary);
+        if (preferredPackage == null || useSystemProvidedLauncher) {
+            // Using the component stored in config if no package name or forced.
             final String secondaryHomeComponent = mContext.getResources().getString(
                     com.android.internal.R.string.config_secondaryHomeComponent);
             intent.setComponent(ComponentName.unflattenFromString(secondaryHomeComponent));

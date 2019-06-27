@@ -313,7 +313,8 @@
   <java-symbol type="bool" name="config_ui_enableFadingMarquee" />
   <java-symbol type="bool" name="config_enableHapticTextHandle" />
   <java-symbol type="bool" name="config_use_strict_phone_number_comparation" />
-  <java-symbol type="bool" name="config_use_strict_phone_number_comparation_for_russian" />
+  <java-symbol type="bool" name="config_use_strict_phone_number_comparation_for_russia" />
+  <java-symbol type="bool" name="config_use_strict_phone_number_comparation_for_kazakhstan" />
   <java-symbol type="bool" name="config_single_volume" />
   <java-symbol type="bool" name="config_voice_capable" />
   <java-symbol type="bool" name="config_requireCallCapableAccountForHandle" />
@@ -2880,6 +2881,7 @@
   <java-symbol type="bool" name="config_allowSeamlessRotationDespiteNavBarMoving" />
   <java-symbol type="dimen" name="config_backGestureInset" />
   <java-symbol type="color" name="system_bar_background_semi_transparent" />
+  <java-symbol type="bool" name="config_showGesturalNavigationHints" />
 
   <!-- EditText suggestion popup. -->
   <java-symbol type="id" name="suggestionWindowContainer" />
@@ -3284,9 +3286,16 @@
   <java-symbol type="layout" name="accessibility_button_chooser_item" />
   <java-symbol type="id" name="accessibility_button_chooser_grid" />
   <java-symbol type="id" name="accessibility_button_prompt" />
+  <java-symbol type="id" name="accessibility_button_prompt_prologue" />
   <java-symbol type="id" name="accessibility_button_target_icon" />
   <java-symbol type="id" name="accessibility_button_target_label" />
   <java-symbol type="string" name="accessibility_magnification_chooser_text" />
+
+  <java-symbol type="string" name="accessibility_gesture_prompt_text" />
+  <java-symbol type="string" name="accessibility_gesture_3finger_prompt_text" />
+  <java-symbol type="string" name="accessibility_gesture_instructional_text" />
+  <java-symbol type="string" name="accessibility_gesture_3finger_instructional_text" />
+
   <java-symbol type="drawable" name="ic_accessibility_magnification" />
 
   <!-- com.android.internal.widget.RecyclerView -->
@@ -3697,6 +3706,7 @@
 
   <!-- For Secondary Launcher -->
   <java-symbol type="string" name="config_secondaryHomeComponent" />
+  <java-symbol type="bool" name="config_useSystemProvidedLauncherForSecondary" />
 
   <java-symbol type="string" name="battery_saver_notification_channel_name" />
   <java-symbol type="string" name="battery_saver_sticky_disabled_notification_title" />
@@ -3775,6 +3785,7 @@
   <java-symbol type="drawable" name="iconfactory_adaptive_icon_drawable_wrapper"/>
   <java-symbol type="dimen" name="resolver_icon_size"/>
   <java-symbol type="dimen" name="resolver_badge_size"/>
+  <java-symbol type="dimen" name="resolver_button_bar_spacing"/>
 
   <!-- For DropBox -->
   <java-symbol type="integer" name="config_dropboxLowPriorityBroadcastRateLimitPeriod" />
@@ -3796,4 +3807,5 @@
   <java-symbol type="style" name="Animation.DeviceDefault.Activity.Resolver" />
   
   <java-symbol type="string" name="config_defaultSupervisionProfileOwnerComponent" />
+  <java-symbol type="bool" name="config_inflateSignalStrength" />
 </resources>

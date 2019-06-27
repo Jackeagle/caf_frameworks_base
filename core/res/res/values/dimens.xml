@@ -59,9 +59,7 @@
     <!-- Height of the bottom navigation bar frame in landscape -->
     <dimen name="navigation_bar_frame_height_landscape">@dimen/navigation_bar_frame_height</dimen>
 
-    <!-- The height of the navigation gesture area; if the size is larger than the navigation bar
-        frame width/height, then the difference is the spacing from the navigation bar window to
-        the area that detects gestures. -->
+    <!-- The height of the navigation gesture area if the gesture is starting from the bottom. -->
     <dimen name="navigation_bar_gesture_height">@dimen/navigation_bar_frame_height</dimen>
 
     <!-- Height of the bottom navigation / system bar in car mode. -->
@@ -742,6 +740,7 @@
     <dimen name="chooser_preview_image_border">1dp</dimen>
     <dimen name="chooser_preview_width">-1px</dimen>
     <dimen name="resolver_icon_size">42dp</dimen>
+    <dimen name="resolver_button_bar_spacing">8dp</dimen>
     <dimen name="resolver_badge_size">18dp</dimen>
     <dimen name="chooser_target_width">90dp</dimen>
     <dimen name="chooser_header_scroll_elevation">4dp</dimen>

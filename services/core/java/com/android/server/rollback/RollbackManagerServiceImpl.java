@@ -231,6 +231,20 @@ class RollbackManagerServiceImpl extends IRollbackManager.Stub {
             }
         }, enableRollbackTimedOutFilter, null, getHandler());
 
+        IntentFilter userAddedIntentFilter = new IntentFilter(Intent.ACTION_USER_ADDED);
+        mContext.registerReceiver(new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (Intent.ACTION_USER_ADDED.equals(intent.getAction())) {
+                    final int newUserId = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, -1);
+                    if (newUserId == -1) {
+                        return;
+                    }
+                    registerUserCallbacks(UserHandle.of(newUserId));
+                }
+            }
+        }, userAddedIntentFilter, null, getHandler());
+
         registerTimeChangeReceiver();
     }
 
@@ -909,8 +923,8 @@ class RollbackManagerServiceImpl extends IRollbackManager.Stub {
         }
 
         if (rd != null) {
-            // This is the apk session for a staged session. We have already
-            // backed up the apks, we just need to do user data backup.
+            // This is the apk session for a staged session. We do not need to create a new rollback
+            // for this session.
             PackageParser.PackageLite newPackage = null;
             try {
                 newPackage = PackageParser.parsePackageLite(
@@ -923,8 +937,6 @@ class RollbackManagerServiceImpl extends IRollbackManager.Stub {
             for (PackageRollbackInfo info : rd.info.getPackages()) {
                 if (info.getPackageName().equals(packageName)) {
                     info.getInstalledUsers().addAll(IntArray.wrap(installedUsers));
-                    mAppDataRollbackHelper.snapshotAppData(rd.info.getRollbackId(), info);
-                    saveRollbackData(rd);
                     return true;
                 }
             }
@@ -945,8 +957,7 @@ class RollbackManagerServiceImpl extends IRollbackManager.Stub {
         }
         newRollback.addToken(token);
 
-        return enableRollbackForPackageSession(newRollback.data, packageSession,
-                installedUsers, /* snapshotUserData*/ true);
+        return enableRollbackForPackageSession(newRollback.data, packageSession, installedUsers);
     }
 
     /**
@@ -957,8 +968,7 @@ class RollbackManagerServiceImpl extends IRollbackManager.Stub {
      * @return true on success, false on failure.
      */
     private boolean enableRollbackForPackageSession(RollbackData data,
-            PackageInstaller.SessionInfo session, @NonNull int[] installedUsers,
-            boolean snapshotUserData) {
+            PackageInstaller.SessionInfo session, @NonNull int[] installedUsers) {
         // TODO: Don't attempt to enable rollback for split installs.
         final int installFlags = session.installFlags;
         if ((installFlags & PackageManager.INSTALL_ENABLE_ROLLBACK) == 0) {
@@ -1019,10 +1029,6 @@ class RollbackManagerServiceImpl extends IRollbackManager.Stub {
                 isApex, IntArray.wrap(installedUsers),
                 new SparseLongArray() /* ceSnapshotInodes */);
 
-        if (snapshotUserData && !isApex) {
-            mAppDataRollbackHelper.snapshotAppData(data.info.getRollbackId(), packageRollbackInfo);
-        }
-
         try {
             ApplicationInfo appInfo = pkgInfo.applicationInfo;
             RollbackStore.backupPackageCodePath(data, packageName, appInfo.sourceDir);
@@ -1043,18 +1049,52 @@ class RollbackManagerServiceImpl extends IRollbackManager.Stub {
     }
 
     @Override
-    public void restoreUserData(String packageName, int[] userIds, int appId, long ceDataInode,
-            String seInfo, int token) {
+    public void snapshotAndRestoreUserData(String packageName, int[] userIds, int appId,
+            long ceDataInode, String seInfo, int token) {
         if (Binder.getCallingUid() != Process.SYSTEM_UID) {
-            throw new SecurityException("restoreUserData may only be called by the system.");
+            throw new SecurityException(
+                    "snapshotAndRestoreUserData may only be called by the system.");
         }
 
         getHandler().post(() -> {
+            snapshotUserDataInternal(packageName);
             restoreUserDataInternal(packageName, userIds, appId, ceDataInode, seInfo, token);
             final PackageManagerInternal pmi = LocalServices.getService(
                     PackageManagerInternal.class);
             pmi.finishPackageInstall(token, false);
         });
+    }
+
+    private void snapshotUserDataInternal(String packageName) {
+        synchronized (mLock) {
+            // staged installs
+            ensureRollbackDataLoadedLocked();
+            for (int i = 0; i < mRollbacks.size(); i++) {
+                RollbackData data = mRollbacks.get(i);
+                if (data.state != RollbackData.ROLLBACK_STATE_ENABLING) {
+                    continue;
+                }
+
+                for (PackageRollbackInfo info : data.info.getPackages()) {
+                    if (info.getPackageName().equals(packageName)) {
+                        mAppDataRollbackHelper.snapshotAppData(data.info.getRollbackId(), info);
+                        saveRollbackData(data);
+                        return;
+                    }
+                }
+            }
+            // non-staged installs
+            PackageRollbackInfo info;
+            for (NewRollback rollback : mNewRollbacks) {
+                info = getPackageRollbackInfo(rollback.data, packageName);
+                if (info != null) {
+                    mAppDataRollbackHelper.snapshotAppData(rollback.data.info.getRollbackId(),
+                            info);
+                    saveRollbackData(rollback.data);
+                    return;
+                }
+            }
+        }
     }
 
     private void restoreUserDataInternal(String packageName, int[] userIds, int appId,
@@ -1116,7 +1156,7 @@ class RollbackManagerServiceImpl extends IRollbackManager.Stub {
 
             if (!session.isMultiPackage()) {
                 if (!enableRollbackForPackageSession(newRollback.data, session,
-                            new int[0], /* snapshotUserData */ false)) {
+                            new int[0])) {
                     Log.e(TAG, "Unable to enable rollback for session: " + sessionId);
                     result.offer(false);
                     return;
@@ -1131,7 +1171,7 @@ class RollbackManagerServiceImpl extends IRollbackManager.Stub {
                         return;
                     }
                     if (!enableRollbackForPackageSession(newRollback.data, childSession,
-                                new int[0], /* snapshotUserData */ false)) {
+                                new int[0])) {
                         Log.e(TAG, "Unable to enable rollback for session: " + sessionId);
                         result.offer(false);
                         return;

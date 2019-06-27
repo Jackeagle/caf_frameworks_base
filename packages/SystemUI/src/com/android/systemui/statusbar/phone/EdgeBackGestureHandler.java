@@ -17,10 +17,6 @@ package com.android.systemui.statusbar.phone;
 
 import static android.view.Display.INVALID_DISPLAY;
 
-import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_BOUNCER_SHOWING;
-import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NAV_BAR_HIDDEN;
-import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED;
-
 import android.content.Context;
 import android.content.pm.ParceledListSlice;
 import android.content.res.Resources;
@@ -37,13 +33,14 @@ import android.os.RemoteException;
 import android.os.SystemClock;
 import android.util.Log;
 import android.util.MathUtils;
-import android.view.Choreographer;
 import android.view.Gravity;
 import android.view.IPinnedStackController;
 import android.view.IPinnedStackListener;
 import android.view.ISystemGestureExclusionListener;
+import android.view.InputChannel;
 import android.view.InputDevice;
 import android.view.InputEvent;
+import android.view.InputEventReceiver;
 import android.view.InputMonitor;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
@@ -57,7 +54,6 @@ import com.android.systemui.Dependency;
 import com.android.systemui.R;
 import com.android.systemui.bubbles.BubbleController;
 import com.android.systemui.recents.OverviewProxyService;
-import com.android.systemui.shared.system.InputChannelCompat.InputEventReceiver;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.shared.system.WindowManagerWrapper;
 
@@ -125,8 +121,8 @@ public class EdgeBackGestureHandler implements DisplayListener {
     private final int mEdgeWidth;
     // The slop to distinguish between horizontal and vertical motion
     private final float mTouchSlop;
-    // Minimum distance to move so that is can be considerd as a back swipe
-    private final float mSwipeThreshold;
+    // Duration after which we consider the event as longpress.
+    private final int mLongPressTimeout;
     // The threshold where the touch needs to be at most, such that the arrow is displayed above the
     // finger, otherwise it will be below
     private final int mMinArrowPosition;
@@ -168,12 +164,15 @@ public class EdgeBackGestureHandler implements DisplayListener {
         // TODO: Get this for the current user
         mEdgeWidth = res.getDimensionPixelSize(
                 com.android.internal.R.dimen.config_backGestureInset);
-        mTouchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
-        mSwipeThreshold = res.getDimension(R.dimen.navigation_edge_action_drag_threshold);
+
+        // Reduce the default touch slop to ensure that we can intercept the gesture
+        // before the app starts to react to it.
+        // TODO(b/130352502) Tune this value and extract into a constant
+        mTouchSlop = ViewConfiguration.get(context).getScaledTouchSlop() * 0.75f;
+        mLongPressTimeout = ViewConfiguration.getLongPressTimeout();
 
         mNavBarHeight = res.getDimensionPixelSize(R.dimen.navigation_bar_frame_height);
-        mMinArrowPosition = res.getDimensionPixelSize(
-                R.dimen.navigation_edge_arrow_min_y);
+        mMinArrowPosition = res.getDimensionPixelSize(R.dimen.navigation_edge_arrow_min_y);
         mFingerOffset = res.getDimensionPixelSize(R.dimen.navigation_edge_finger_offset);
     }
 
@@ -253,9 +252,8 @@ public class EdgeBackGestureHandler implements DisplayListener {
             // Register input event receiver
             mInputMonitor = InputManager.getInstance().monitorGestureInput(
                     "edge-swipe", mDisplayId);
-            mInputEventReceiver = new InputEventReceiver(mInputMonitor.getInputChannel(),
-                    Looper.getMainLooper(), Choreographer.getMainThreadInstance(),
-                    this::onInputEvent);
+            mInputEventReceiver = new SysUiInputEventReceiver(
+                    mInputMonitor.getInputChannel(), Looper.getMainLooper());
 
             // Add a nav bar panel window
             mEdgePanel = new NavigationBarEdgePanel(mContext);
@@ -312,15 +310,23 @@ public class EdgeBackGestureHandler implements DisplayListener {
         return !isInExcludedRegion;
     }
 
+    private void cancelGesture(MotionEvent ev) {
+        // Send action cancel to reset all the touch events
+        mAllowGesture = false;
+        MotionEvent cancelEv = MotionEvent.obtain(ev);
+        cancelEv.setAction(MotionEvent.ACTION_CANCEL);
+        mEdgePanel.handleTouch(cancelEv);
+        cancelEv.recycle();
+    }
+
     private void onMotionEvent(MotionEvent ev) {
-        if (ev.getAction() == MotionEvent.ACTION_DOWN) {
+        int action = ev.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN) {
             // Verify if this is in within the touch region and we aren't in immersive mode, and
             // either the bouncer is showing or the notification panel is hidden
             int stateFlags = mOverviewProxyService.getSystemUiStateFlags();
             mIsOnLeftEdge = ev.getX() <= mEdgeWidth;
-            mAllowGesture = (stateFlags & SYSUI_STATE_NAV_BAR_HIDDEN) == 0
-                    && ((stateFlags & SYSUI_STATE_BOUNCER_SHOWING) == SYSUI_STATE_BOUNCER_SHOWING
-                            || (stateFlags & SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED) == 0)
+            mAllowGesture = !QuickStepContract.isBackGestureDisabled(stateFlags)
                     && isWithinTouchRegion((int) ev.getX(), (int) ev.getY());
             if (mAllowGesture) {
                 mEdgePanelLp.gravity = mIsOnLeftEdge
@@ -336,29 +342,35 @@ public class EdgeBackGestureHandler implements DisplayListener {
                 mThresholdCrossed = false;
             }
         } else if (mAllowGesture) {
-            if (!mThresholdCrossed && ev.getAction() == MotionEvent.ACTION_MOVE) {
-                float dx = Math.abs(ev.getX() - mDownPoint.x);
-                float dy = Math.abs(ev.getY() - mDownPoint.y);
-                if (dy > dx && dy > mTouchSlop) {
-                    // Send action cancel to reset all the touch events
-                    mAllowGesture = false;
-                    MotionEvent cancelEv = MotionEvent.obtain(ev);
-                    cancelEv.setAction(MotionEvent.ACTION_CANCEL);
-                    mEdgePanel.handleTouch(cancelEv);
-                    cancelEv.recycle();
+            if (!mThresholdCrossed) {
+                if (action == MotionEvent.ACTION_POINTER_DOWN) {
+                    // We do not support multi touch for back gesture
+                    cancelGesture(ev);
                     return;
+                } else if (action == MotionEvent.ACTION_MOVE) {
+                    if ((ev.getEventTime() - ev.getDownTime()) > mLongPressTimeout) {
+                        cancelGesture(ev);
+                        return;
+                    }
+                    float dx = Math.abs(ev.getX() - mDownPoint.x);
+                    float dy = Math.abs(ev.getY() - mDownPoint.y);
+                    if (dy > dx && dy > mTouchSlop) {
+                        cancelGesture(ev);
+                        return;
 
-                } else if (dx > dy && dx > mTouchSlop) {
-                    mThresholdCrossed = true;
-                    // Capture inputs
-                    mInputMonitor.pilferPointers();
+                    } else if (dx > dy && dx > mTouchSlop) {
+                        mThresholdCrossed = true;
+                        // Capture inputs
+                        mInputMonitor.pilferPointers();
+                    }
                 }
+
             }
 
             // forward touch
             mEdgePanel.handleTouch(ev);
 
-            boolean isUp = ev.getAction() == MotionEvent.ACTION_UP;
+            boolean isUp = action == MotionEvent.ACTION_UP;
             if (isUp) {
                 boolean performAction = mEdgePanel.shouldTriggerBack();
                 if (performAction) {
@@ -369,7 +381,7 @@ public class EdgeBackGestureHandler implements DisplayListener {
                 mOverviewProxyService.notifyBackAction(performAction, (int) mDownPoint.x,
                         (int) mDownPoint.y, false /* isButton */, !mIsOnLeftEdge);
             }
-            if (isUp || ev.getAction() == MotionEvent.ACTION_CANCEL) {
+            if (isUp || action == MotionEvent.ACTION_CANCEL) {
                 mRegionSamplingHelper.stop();
             } else {
                 updateSamplingRect();
@@ -428,5 +440,16 @@ public class EdgeBackGestureHandler implements DisplayListener {
             ev.setDisplayId(bubbleDisplayId);
         }
         InputManager.getInstance().injectInputEvent(ev, InputManager.INJECT_INPUT_EVENT_MODE_ASYNC);
+    }
+
+    class SysUiInputEventReceiver extends InputEventReceiver {
+        SysUiInputEventReceiver(InputChannel channel, Looper looper) {
+            super(channel, looper);
+        }
+
+        public void onInputEvent(InputEvent event) {
+            EdgeBackGestureHandler.this.onInputEvent(event);
+            finishInputEvent(event, true);
+        }
     }
 }

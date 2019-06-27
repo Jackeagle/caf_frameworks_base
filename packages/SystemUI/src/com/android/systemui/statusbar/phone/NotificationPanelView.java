@@ -100,6 +100,7 @@ import com.android.systemui.util.InjectionInflationController;
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -141,6 +142,7 @@ public class NotificationPanelView extends PanelView implements
     private static final String COUNTER_PANEL_OPEN_PEEK = "panel_open_peek";
 
     private static final Rect mDummyDirtyRect = new Rect(0, 0, 1, 1);
+    private static final Rect mEmptyRect = new Rect();
 
     private static final AnimationProperties CLOCK_ANIMATION_PROPERTIES = new AnimationProperties()
             .setDuration(StackStateAnimator.ANIMATION_DURATION_STANDARD);
@@ -151,7 +153,8 @@ public class NotificationPanelView extends PanelView implements
     private final NotificationWakeUpCoordinator mWakeUpCoordinator;
     private final PulseExpansionHandler mPulseExpansionHandler;
 
-    private KeyguardAffordanceHelper mAffordanceHelper;
+    @VisibleForTesting
+    protected KeyguardAffordanceHelper mAffordanceHelper;
     private KeyguardUserSwitcher mKeyguardUserSwitcher;
     @VisibleForTesting
     protected KeyguardStatusBarView mKeyguardStatusBar;
@@ -340,6 +343,7 @@ public class NotificationPanelView extends PanelView implements
      */
     private int mThemeResId;
     private KeyguardIndicationController mKeyguardIndicationController;
+    private Consumer<Boolean> mAffordanceLaunchListener;
 
     @Inject
     public NotificationPanelView(@Named(VIEW_CONTEXT) Context context, AttributeSet attrs,
@@ -445,6 +449,14 @@ public class NotificationPanelView extends PanelView implements
                 R.dimen.keyguard_indication_bottom_padding);
         mQsNotificationTopPadding = getResources().getDimensionPixelSize(
                 R.dimen.qs_notification_padding);
+    }
+
+    /**
+     * @see #launchCamera(boolean, int)
+     * @see #setLaunchingAffordance(boolean)
+     */
+    public void setLaunchAffordanceListener(Consumer<Boolean> listener) {
+        mAffordanceLaunchListener = listener;
     }
 
     public void updateResources() {
@@ -586,6 +598,25 @@ public class NotificationPanelView extends PanelView implements
             mQs.setHeightOverride(mQs.getDesiredHeight());
         }
         updateMaxHeadsUpTranslation();
+        updateGestureExclusionRect();
+    }
+
+    private void updateGestureExclusionRect() {
+        Rect exclusionRect = calculateGestureExclusionRect();
+        setSystemGestureExclusionRects(exclusionRect.isEmpty()
+                ? Collections.EMPTY_LIST
+                : Collections.singletonList(exclusionRect));
+    }
+
+    private Rect calculateGestureExclusionRect() {
+        Rect exclusionRect = null;
+        if (isFullyCollapsed()) {
+            // Note: The heads up manager also calculates the non-pinned touchable region
+            exclusionRect = mHeadsUpManager.calculateTouchableRegion();
+        }
+        return exclusionRect != null
+                ? exclusionRect
+                : mEmptyRect;
     }
 
     private void setIsFullWidth(boolean isFullWidth) {
@@ -1430,10 +1461,8 @@ public class NotificationPanelView extends PanelView implements
         } else if (statusBarState == StatusBarState.KEYGUARD
                 || statusBarState == StatusBarState.SHADE_LOCKED) {
             mKeyguardBottomArea.setVisibility(View.VISIBLE);
-            mKeyguardBottomArea.setAlpha(1f);
         } else {
             mKeyguardBottomArea.setVisibility(View.GONE);
-            mKeyguardBottomArea.setAlpha(1f);
         }
     }
 
@@ -1790,6 +1819,7 @@ public class NotificationPanelView extends PanelView implements
         updateHeader();
         updateNotificationTranslucency();
         updatePanelExpanded();
+        updateGestureExclusionRect();
         if (DEBUG) {
             invalidate();
         }
@@ -2560,6 +2590,7 @@ public class NotificationPanelView extends PanelView implements
             mNotificationStackScroller.runAfterAnimationFinished(
                     mHeadsUpExistenceChangedRunnable);
         }
+        updateGestureExclusionRect();
     }
 
     public void setHeadsUpAnimatingAway(boolean headsUpAnimatingAway) {
@@ -2743,6 +2774,9 @@ public class NotificationPanelView extends PanelView implements
     private void setLaunchingAffordance(boolean launchingAffordance) {
         getLeftIcon().setLaunchingAffordance(launchingAffordance);
         getRightIcon().setLaunchingAffordance(launchingAffordance);
+        if (mAffordanceLaunchListener != null) {
+            mAffordanceLaunchListener.accept(launchingAffordance);
+        }
     }
 
     /**
@@ -2853,9 +2887,6 @@ public class NotificationPanelView extends PanelView implements
         if (dozing == mDozing) return;
         mDozing = dozing;
         mNotificationStackScroller.setDark(mDozing, animate, wakeUpTouchLocation);
-        if (mDozing) {
-            mNotificationStackScroller.showDarkShelf();
-        }
         mKeyguardBottomArea.setDozing(mDozing, animate);
 
         if (mBarState == StatusBarState.KEYGUARD
@@ -2984,6 +3015,7 @@ public class NotificationPanelView extends PanelView implements
     @Override
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
         super.dump(fd, pw, args);
+        pw.println("    gestureExclusionRect: " + calculateGestureExclusionRect());
         if (mKeyguardStatusBar != null) {
             mKeyguardStatusBar.dump(fd, pw, args);
         }

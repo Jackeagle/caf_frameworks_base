@@ -48,6 +48,7 @@ import "frameworks/base/core/proto/android/stats/docsui/docsui_enums.proto";
 import "frameworks/base/core/proto/android/stats/enums.proto";
 import "frameworks/base/core/proto/android/stats/intelligence/enums.proto";
 import "frameworks/base/core/proto/android/stats/launcher/launcher.proto";
+import "frameworks/base/core/proto/android/stats/location/location_enums.proto";
 import "frameworks/base/core/proto/android/stats/mediametrics/mediametrics.proto";
 import "frameworks/base/core/proto/android/stats/storage/storage_enums.proto";
 import "frameworks/base/core/proto/android/stats/style/style_enums.proto";
@@ -269,7 +270,7 @@ message Atom {
         AssistGestureProgressReported assist_gesture_progress_reported = 176;
         TouchGestureClassified touch_gesture_classified = 177;
         HiddenApiUsed hidden_api_used = 178 [(allow_from_any_uid) = true];
-        StyleUIChanged style_ui_changed = 179;
+        StyleUIChanged style_ui_changed = 179 [(log_from_module) = "style"];
         PrivacyIndicatorsInteracted privacy_indicators_interacted =
             180 [(log_from_module) = "permissioncontroller"];
         AppInstallOnExternalStorageReported app_install_on_external_storage_reported = 181;
@@ -294,8 +295,6 @@ message Atom {
         MediametricsMediadrmReported mediametrics_mediadrm_reported = 198;
         MediametricsNuPlayerReported mediametrics_nuplayer_reported = 199;
         MediametricsRecorderReported mediametrics_recorder_reported = 200;
-        VehicleMapServicePacketReported vms_packet_reported = 201;
-        VehicleMapServicePacketFailureReported vms_packet_failure_reported = 202;
         CarPowerStateChanged car_power_state_changed = 203;
         GarageModeInfo garage_mode_info = 204;
         TestAtomReported test_atom_reported = 205 [(log_from_module) = "cts"];
@@ -303,6 +302,7 @@ message Atom {
         ContentCaptureServiceEvents content_capture_service_events = 207;
         ContentCaptureSessionEvents content_capture_session_events = 208;
         ContentCaptureFlushed content_capture_flushed = 209;
+        LocationManagerApiUsageReported location_manager_api_usage_reported = 210;
     }
 
     // Pulled events will start at field 10000.
@@ -750,6 +750,22 @@ message ScheduledJobStateChanged {
     // This is only applicable when the state is FINISHED.
     // The default value is STOP_REASON_UNKNOWN.
     optional android.app.job.StopReasonEnum stop_reason = 4;
+
+    // The standby bucket of the app that scheduled the job. These match the framework constants
+    // defined in JobSchedulerService.java with the addition of UNKNOWN using -1, as ACTIVE is
+    // already assigned 0.
+    enum Bucket {
+        UNKNOWN = -1;
+        ACTIVE = 0;
+        WORKING_SET = 1;
+        FREQUENT = 2;
+        RARE = 3;
+        NEVER = 4;
+    }
+    optional Bucket standby_bucket = 5 [default = UNKNOWN];
+
+    // The job id (as assigned by the app).
+    optional int32 job_id = 6;
 }
 
 /**
@@ -978,6 +994,19 @@ message WakeupAlarmOccurred {
 
     // Name of source package (for historical reasons, since BatteryStats tracked it).
     optional string package_name = 3;
+
+    // These enum values match the STANDBY_BUCKET_XXX constants defined in UsageStatsManager.java.
+    enum Bucket {
+        UNKNOWN = 0;
+        EXEMPTED = 5;
+        ACTIVE = 10;
+        WORKING_SET = 20;
+        FREQUENT = 30;
+        RARE = 40;
+        NEVER = 50;
+    }
+    // The App Standby bucket of the app that scheduled the alarm at the time the alarm fired.
+    optional Bucket app_standby_bucket = 4;
 }
 
 /**
@@ -2471,6 +2500,8 @@ message StyleUIChanged {
     optional int32 launcher_grid = 6;
     optional int32 wallpaper_category_hash = 7;
     optional int32 wallpaper_id_hash = 8;
+    optional int32 color_preference = 9;
+    optional android.stats.style.LocationPreference location_preference = 10;
 }
 
 /**
@@ -6110,6 +6141,9 @@ message DangerousPermissionState {
 
     // If the permission is granted to the uid
     optional bool is_granted = 4;
+
+    // Permission flags as per android.content.pm.PermissionFlags
+    optional int32 permission_flags = 5;
 }
 
 /**
@@ -6387,42 +6421,6 @@ message IntelligenceEventReported {
 }
 
 /**
- * Logs information about Vehicle Map Service packets. It specifies the layer
- * type, subtype, data version and size of the packet.
- */
-message VehicleMapServicePacketReported {
-  // Identifies the type of data being transported by a Vehicle Maps Service
-  // packet.
-  optional int32 layer_type = 1;
-  // Identifies the subtype of the layer.
-  optional int32 layer_subtype = 2;
-  // Identifies the version of the data being transported by a Vehicle Maps
-  // Service packet.
-  optional int32 version = 3;
-  // Size in bytes of the packet.
-  optional int64 size_in_bytes = 4;
-}
-
-/**
- * Logs that a Vehicle Map Service packet failed to be delivered.
- */
-message VehicleMapServicePacketFailureReported {
-  // Identifies the type of data being transported by a Vehicle Map Service
-  // packet.
-  optional int32 layer_type = 1;
-  // Identifies the subtype of the layer.
-  optional int32 layer_subtype = 2;
-  // Identifies the version of the data being transported by a Vehicle Map
-  // Service packet.
-  optional int32 version = 3;
-  // Identifies the package name of the publisher of the data.
-  optional string publisher_name = 4;
-  // Identifies the package name of the subscriber of the data. An empty string
-  // signifies that there are zero subscribers for the packet.
-  optional string subscriber_name = 5;
-}
-
-/**
  * Logs when Car Power state changed.
  *
  * Logged from:
@@ -6488,4 +6486,61 @@ message AppOps {
     // For long-running operations, total duration of the operation
     // while the app was in the background (only for trusted requests)
     optional int64 trusted_background_duration_millis = 9;
+}
+
+/**
+ * Location Manager API Usage information(e.g. API under usage,
+ * API call's parameters).
+ * Logged from:
+ *  frameworks/base/services/core/java/com/android/server/LocationManagerService.java
+ */
+message LocationManagerApiUsageReported {
+
+    // Indicating if usage starts or usage ends.
+    optional android.stats.location.UsageState state = 1;
+
+    // LocationManagerService's API in use.
+    // We can identify which API from LocationManager is
+    // invoking current LMS API by the combination of
+    // API parameter(e.g. is_listener_null, is_intent_null,
+    // is_location_request_null)
+    optional android.stats.location.LocationManagerServiceApi api_in_use = 2;
+
+    // Name of the package calling the API.
+    optional string calling_package_name = 3;
+
+    // Type of the location provider.
+    optional android.stats.location.ProviderType provider = 4;
+
+    // Quality of the location request
+    optional android.stats.location.LocationRequestQuality quality = 5;
+
+    // The desired interval for active location updates, in milliseconds.
+    // Bucketized to reduce cardinality.
+    optional android.stats.location.LocationRequestIntervalBucket bucketized_interval = 6;
+
+    // Minimum distance between location updates, in meters.
+    // Bucketized to reduce cardinality.
+    optional android.stats.location.SmallestDisplacementBucket
+            bucketized_smallest_displacement = 7;
+
+    // The number of location updates.
+    optional int64 num_updates = 8;
+
+    // The request expiration time, in millisecond since boot.
+    // Bucketized to reduce cardinality.
+    optional android.stats.location.ExpirationBucket
+            bucketized_expire_in = 9;
+
+    // Type of Callback passed in for this API.
+    optional android.stats.location.CallbackType callback_type = 10;
+
+    // The radius of the central point of the alert
+    // region, in meters. Only for API REQUEST_GEOFENCE.
+    // Bucketized to reduce cardinality.
+    optional android.stats.location.GeofenceRadiusBucket bucketized_radius = 11;
+
+    // Activity Importance of API caller.
+    // Categorized to 3 types that are interesting from location's perspective.
+    optional android.stats.location.ActivityImportance activiy_importance = 12;
 }
