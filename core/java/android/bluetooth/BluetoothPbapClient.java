@@ -103,6 +103,67 @@ public final class BluetoothPbapClient implements BluetoothProfile {
     private static final long PBAP_FILTER_EMAIL = 1 << 8;
     private static final long PBAP_FILTER_NICKNAME = 1 << 23;
 
+    /**
+     * Intent used to broadcast the pull vCard listing result
+     *
+     * <p>This intent will have 4 extras:
+     * <ul>
+     *   <li> {@link EXTRA_PULL_VCARD_LISTING_RESULT} - Pull vCard listing result. </li>
+     *   <li> {@link EXTRA_PHONEBOOK_SIZE} - Phonebook size. </li>
+     *   <li> {@link EXTRA_NEW_MISSED_CALLS} - missd call number. </li>
+     *   <li> {@link EXTRA_KEY_VCARD_LISTING} - vCard list. </li>
+     * </ul>
+     *
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH} permission to
+     * receive.
+     */
+    public static final String ACTION_PULL_VCARD_LISTING_RESULT =
+            "android.bluetooth.pbapclient.profile.action.PULL_VCARD_LISTING_RESULT";
+
+    /**
+     * Extra for pull vCard listing result
+     */
+    public static final String EXTRA_PULL_VCARD_LISTING_RESULT =
+            "android.bluetooth.pbapclient.profile.extra.PULL_VCARD_LISTING_RESULT";
+
+    /**
+     * Extra for phonebook size
+     */
+    public static final String EXTRA_PHONEBOOK_SIZE =
+            "android.bluetooth.pbapclient.profile.extra.PULL_PHONEBOOK_SIZE";
+
+    /**
+     * Extra for missed calls
+     */
+    public static final String EXTRA_NEW_MISSED_CALLS =
+            "android.bluetooth.pbapclient.profile.extra.NEW_MISSED_CALLS";
+
+    /**
+     * Extra for vCard listing
+     */
+    public static final String EXTRA_VCARD_LISTING =
+            "android.bluetooth.pbapclient.profile.extra.VCARD_LISTING";
+
+     /**
+     * Intent used to broadcast the pull set phonebook result
+     *
+     * <p>This intent will have 1 extras:
+     * <ul>
+     *   <li> {@link EXTRA_SET_PHONEBOOK_RESULT} - Set phonebook result. </li>
+     * </ul>
+     *
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH} permission to
+     * receive.
+     */
+    public static final String ACTION_SET_PHONEBOOK_RESULT =
+            "android.bluetooth.pbapclient.profile.action.SET_PHONEBOOK_RESULT";
+
+    /**
+     * Extra for set phonebook result
+     */
+    public static final String EXTRA_SET_PHONEBOOK_RESULT =
+            "android.bluetooth.pbapclient.profile.extra.SET_PHONEBOOK_RESULT";
+
     private volatile IBluetoothPbapClient mService;
     private final Context mContext;
     private ServiceListener mServiceListener;
@@ -483,6 +544,81 @@ public final class BluetoothPbapClient implements BluetoothProfile {
             try {
                 return service.pullPhonebook(device, pbName, filter,
                         listStartOffset, maxListCount);
+            } catch (RemoteException e) {
+                Log.e(TAG, Log.getStackTraceString(new Throwable()));
+                return false;
+            }
+        }
+        if (service == null) {
+            Log.w(TAG, "Proxy not attached to service");
+        }
+        return false;
+    }
+
+    /**
+     * Pull vcard listing
+     *
+     * <p> The pbName can be phonebook or call-history
+     * {@link #PB_PATH}, {@link #MCH_PATH},
+     * {@link #ICH_PATH}, {@link #OCH_PATH}
+     * {@link #SIM1_PB_PATH}, {@link #SIM1_MCH_PATH},
+     * {@link #SIM1_ICH_PATH}, {@link #SIM1_OCH_PATH}
+     *
+     * @param device Paired bluetooth device
+     * @param pbName Phonebook name
+     * @param order listing order type
+     * @param searchProp search attribute types
+     * @param searchValue indicate contained vCard
+     * @param maxListCount max phonebook count
+     * @param listStartOffset start offset
+     *
+     * @return <code>true</code> if command has been issued successfully; <code>false</code>
+     * otherwise;
+     */
+    public boolean pullVcardListing(BluetoothDevice device, String pbName, byte order,
+            byte searchProp, String searchValue, int maxListCount, int listStartOffset) {
+        if (DBG) {
+            log("pullVcardListing, device: " + device + ", pbName: " + pbName);
+        }
+        final IBluetoothPbapClient service = mService;
+        if (service != null && isEnabled() && isValidDevice(device)) {
+            try {
+                return service.pullVcardListing(device, pbName, order, searchProp,
+                        searchValue, maxListCount, listStartOffset);
+            } catch (RemoteException e) {
+                Log.e(TAG, Log.getStackTraceString(new Throwable()));
+                return false;
+            }
+        }
+        if (service == null) {
+            Log.w(TAG, "Proxy not attached to service");
+        }
+        return false;
+    }
+
+    /**
+     * Set phonebook
+     *
+     * <p> The pbName can be phonebook or call-history
+     * {@link #PB_PATH}, {@link #MCH_PATH},
+     * {@link #ICH_PATH}, {@link #OCH_PATH}
+     * {@link #SIM1_PB_PATH}, {@link #SIM1_MCH_PATH},
+     * {@link #SIM1_ICH_PATH}, {@link #SIM1_OCH_PATH}
+     *
+     * @param device Paired bluetooth device
+     * @param pbName Phonebook name
+     *
+     * @return <code>true</code> if command has been issued successfully; <code>false</code>
+     * otherwise;
+     */
+    public boolean setPhonebook(BluetoothDevice device, String pbName) {
+        if (DBG) {
+            log("setPhonebook, device: " + device + ", pbName: " + pbName);
+        }
+        final IBluetoothPbapClient service = mService;
+        if (service != null && isEnabled() && isValidDevice(device)) {
+            try {
+                return service.setPhonebook(device, pbName);
             } catch (RemoteException e) {
                 Log.e(TAG, Log.getStackTraceString(new Throwable()));
                 return false;
