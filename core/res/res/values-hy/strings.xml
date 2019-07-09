@@ -131,8 +131,7 @@
     <!-- no translation found for wfcSpnFormat_spn (4998685024207291232) -->
     <skip />
     <string name="wfcSpnFormat_spn_wifi_calling" msgid="136001023263502280">"<xliff:g id="SPN">%s</xliff:g> Wi-Fi-ի միջոցով զանգեր"</string>
-    <!-- no translation found for wfcSpnFormat_spn_wifi_calling_vo_hyphen (1730997175789582756) -->
-    <skip />
+    <string name="wfcSpnFormat_spn_wifi_calling_vo_hyphen" msgid="1730997175789582756">"<xliff:g id="SPN">%s</xliff:g> Զանգեր Wi-Fi-ի միջոցով"</string>
     <string name="wfcSpnFormat_wlan_call" msgid="2533371081782489793">"Զանգ WLAN ցանցով"</string>
     <string name="wfcSpnFormat_spn_wlan_call" msgid="2315240198303197168">"<xliff:g id="SPN">%s</xliff:g> WLAN ցանցով զանգեր"</string>
     <string name="wfcSpnFormat_spn_wifi" msgid="6546481665561961938">"<xliff:g id="SPN">%s</xliff:g> Wi-Fi"</string>
@@ -257,7 +256,7 @@
     <string name="notification_channel_security" msgid="7345516133431326347">"Անվտանգություն"</string>
     <string name="notification_channel_car_mode" msgid="3553380307619874564">"Մեքենայի ռեժիմ"</string>
     <string name="notification_channel_account" msgid="7577959168463122027">"Հաշվի կարգավիճակ"</string>
-    <string name="notification_channel_developer" msgid="7579606426860206060">"Մշակողի հաղորդագրություններ"</string>
+    <string name="notification_channel_developer" msgid="7579606426860206060">"Հաղորդագրություններ ծրագրավորողների համար"</string>
     <string name="notification_channel_updates" msgid="4794517569035110397">"Թարմացումներ"</string>
     <string name="notification_channel_network_status" msgid="5025648583129035447">"Ցանցի կարգավիճակ"</string>
     <string name="notification_channel_network_alerts" msgid="2895141221414156525">"Ցանցային զգուշացումներ"</string>
@@ -1131,8 +1130,10 @@
     <string name="whichViewApplication" msgid="3272778576700572102">"Բացել հետևյալ ծրագրով՝"</string>
     <string name="whichViewApplicationNamed" msgid="2286418824011249620">"Բացել հավելվածով՝ %1$s"</string>
     <string name="whichViewApplicationLabel" msgid="2666774233008808473">"Բացել"</string>
-    <string name="whichGiveAccessToApplication" msgid="8279395245414707442">"Թույլատրեք, որ <xliff:g id="HOST">%1$s</xliff:g> տիրույթը հղումները բացվեն հետևյալ հավելվածում՝"</string>
-    <string name="whichGiveAccessToApplicationNamed" msgid="7992388824107710849">"Թույլատրեք, որ <xliff:g id="HOST">%1$s</xliff:g> տիրույթի հղումները բացվեն <xliff:g id="APPLICATION">%2$s</xliff:g> հավելվածում"</string>
+    <string name="whichOpenHostLinksWith" msgid="3788174881117226583">"<xliff:g id="HOST">%1$s</xliff:g> տեսակի հղումները բացել…"</string>
+    <string name="whichOpenLinksWith" msgid="6392123355599572804">"Հղումները բացել…"</string>
+    <string name="whichOpenLinksWithApp" msgid="8225991685366651614">"Հղումները բացել <xliff:g id="APPLICATION">%1$s</xliff:g> դիտարկիչում"</string>
+    <string name="whichOpenHostLinksWithApp" msgid="3464470639011045589">"<xliff:g id="HOST">%1$s</xliff:g> տեսակի հղումները բացել <xliff:g id="APPLICATION">%2$s</xliff:g> դիտարկիչում"</string>
     <string name="whichGiveAccessToApplicationLabel" msgid="6142688895536868827">"Թույլատրել"</string>
     <string name="whichEditApplication" msgid="144727838241402655">"Խմբագրել հետևյալ ծրագրով՝"</string>
     <string name="whichEditApplicationNamed" msgid="1775815530156447790">"Խմբագրել հետևյալով՝ %1$s"</string>
@@ -1150,7 +1151,7 @@
     <string name="whichImageCaptureApplicationNamed" msgid="8619384150737825003">"Լուսանկարել %1$s հավելվածի օգնությամբ"</string>
     <string name="whichImageCaptureApplicationLabel" msgid="6390303445371527066">"Լուսանկարել"</string>
     <string name="alwaysUse" msgid="4583018368000610438">"Օգտագործել ըստ կանխադրման այս գործողության համար:"</string>
-    <string name="use_a_different_app" msgid="8134926230585710243">"Օգտագործել այլ հավելված"</string>
+    <string name="use_a_different_app" msgid="8134926230585710243">"Ուրիշ հավելված"</string>
     <string name="clearDefaultHintMsg" msgid="3252584689512077257">"Մաքրել լռելյայնը Համակարգի կարգավորումներ &gt; Ծրագրեր &gt;Ներբեռնված էջից:"</string>
     <string name="chooseActivity" msgid="7486876147751803333">"Ընտրել գործողություն"</string>
     <string name="chooseUsbActivity" msgid="6894748416073583509">"Ընտրեք հավելված USB սարքի համար"</string>
@@ -1584,7 +1585,8 @@
     <string name="launchBrowserDefault" msgid="2057951947297614725">"Գործարկե՞լ զննարկիչը:"</string>
     <string name="SetupCallDefault" msgid="5834948469253758575">"Ընդունե՞լ զանգը:"</string>
     <string name="activity_resolver_use_always" msgid="8017770747801494933">"Միշտ"</string>
-    <string name="activity_resolver_use_once" msgid="2404644797149173758">"Միայն մեկ անգամ"</string>
+    <string name="activity_resolver_set_always" msgid="1422574191056490585">"Միշտ բացել"</string>
+    <string name="activity_resolver_use_once" msgid="2404644797149173758">"Միայն այս անգամ"</string>
     <string name="activity_resolver_app_settings" msgid="8965806928986509855">"Կարգավորումներ"</string>
     <string name="activity_resolver_work_profiles_support" msgid="185598180676883455">"%1$s-ը չի աջակցում աշխատանքային պրոֆիլներ"</string>
     <string name="default_audio_route_name" product="tablet" msgid="4617053898167127471">"Գրասալիկ"</string>
@@ -1613,8 +1615,6 @@
     <string name="display_manager_overlay_display_name" msgid="5142365982271620716">"Վերածածկ #<xliff:g id="ID">%1$d</xliff:g>"</string>
     <string name="display_manager_overlay_display_title" msgid="652124517672257172">"<xliff:g id="NAME">%1$s</xliff:g>. <xliff:g id="WIDTH">%2$d</xliff:g>x<xliff:g id="HEIGHT">%3$d</xliff:g>, <xliff:g id="DPI">%4$d</xliff:g> կմվ"</string>
     <string name="display_manager_overlay_display_secure_suffix" msgid="6022119702628572080">", անվտանգ"</string>
-    <string name="activity_starter_block_bg_activity_starts_permissive" msgid="6995473033438879646">"<xliff:g id="PACKAGENAME">%1$s</xliff:g> հավելվածի գործողությունները ֆոնային ռեժիմում կարգելափակվեն Android Q-ի հաջորդ կառուցումներում։ Մանրամասն տեղեկություններ կարող եք գտնել g.co/dev/bgblock էջում։"</string>
-    <string name="activity_starter_block_bg_activity_starts_enforcing" msgid="3317816771072146229">"<xliff:g id="PACKAGENAME">%1$s</xliff:g> հավելվածի գործողությունները ֆոնային ռեժիմում արգելափակվեցին։ Մանրամասն տեղեկություններ կարող եք գտնել g.co/dev/bgblock էջում։"</string>
     <string name="kg_forgot_pattern_button_text" msgid="8852021467868220608">"Մոռացել եմ սխեման"</string>
     <string name="kg_wrong_pattern" msgid="1850806070801358830">"Սխալ սխեմա"</string>
     <string name="kg_wrong_password" msgid="2333281762128113157">"Սխալ գաղտնաբառ"</string>
@@ -1668,18 +1668,12 @@
     <string name="accessibility_shortcut_enabling_service" msgid="7771852911861522636">"Մատչելիության դյուրանցումն միացրել է <xliff:g id="SERVICE_NAME">%1$s</xliff:g> ծառայությունը"</string>
     <string name="accessibility_shortcut_disabling_service" msgid="2747243438223109821">"Մատչելիության դյուրանցումն անջատել է <xliff:g id="SERVICE_NAME">%1$s</xliff:g> ծառայությունը"</string>
     <string name="accessibility_shortcut_spoken_feedback" msgid="8376923232350078434">"«<xliff:g id="SERVICE_NAME">%1$s</xliff:g>» ծառայությունն օգտագործելու համար սեղմեք և 3 վայրկյան պահեք ձայնի ուժգնության երկու կոճակները"</string>
-    <!-- no translation found for accessibility_button_prompt_text (1176658502969738564) -->
-    <skip />
-    <!-- no translation found for accessibility_gesture_prompt_text (8259145549733019401) -->
-    <skip />
-    <!-- no translation found for accessibility_gesture_3finger_prompt_text (1041435574275047665) -->
-    <skip />
-    <!-- no translation found for accessibility_button_instructional_text (7003212763213614833) -->
-    <skip />
-    <!-- no translation found for accessibility_gesture_instructional_text (5261788874937410950) -->
-    <skip />
-    <!-- no translation found for accessibility_gesture_3finger_instructional_text (4969448938984394550) -->
-    <skip />
+    <string name="accessibility_button_prompt_text" msgid="1176658502969738564">"Ընտրեք ծառայությունը, որը կգործարկվի «Հատուկ գործառույթներ» կոճակին հպելու դեպքում՝"</string>
+    <string name="accessibility_gesture_prompt_text" msgid="8259145549733019401">"Ընտրեք ծառայությունը, որը կգործարկվի հատուկ գործառույթների ժեստն անելու դեպքում (երկու մատը էկրանի ներքևից սահեցրեք վերև)՝"</string>
+    <string name="accessibility_gesture_3finger_prompt_text" msgid="1041435574275047665">"Ընտրեք ծառայությունը, որը կգործարկվի հատուկ գործառույթների ժեստն անելու դեպքում (երեք մատը էկրանի ներքևից սահեցրեք վերև)՝"</string>
+    <string name="accessibility_button_instructional_text" msgid="7003212763213614833">"Մեկ ծառայությունից մյուսին անցնելու համար հպեք «Հատուկ գործառույթներ» կոճակին և պահեք:"</string>
+    <string name="accessibility_gesture_instructional_text" msgid="5261788874937410950">"Մեկ ծառայությունից մյուսին անցնելու համար երկու մատը սահեցրեք վերև և պահեք:"</string>
+    <string name="accessibility_gesture_3finger_instructional_text" msgid="4969448938984394550">"Մեկ ծառայությունից մյուսին անցնելու համար երեք մատը սահեցրեք վերև և պահեք:"</string>
     <string name="accessibility_magnification_chooser_text" msgid="1227146738764986237">"Խոշորացում"</string>
     <string name="user_switched" msgid="3768006783166984410">"Ներկայիս օգտատերը <xliff:g id="NAME">%1$s</xliff:g>:"</string>
     <string name="user_switching_message" msgid="2871009331809089783">"Փոխարկվում է <xliff:g id="NAME">%1$s</xliff:g>-ին..."</string>
@@ -1912,7 +1906,7 @@
     <string name="deprecated_target_sdk_app_store" msgid="5032340500368495077">"Ստուգել նոր տարբերակի առկայությունը"</string>
     <string name="new_sms_notification_title" msgid="8442817549127555977">"Դուք ունեք նոր հաղորդագրություններ"</string>
     <string name="new_sms_notification_content" msgid="7002938807812083463">"Դիտելու համար բացել SMS հավելվածը"</string>
-    <string name="profile_encrypted_title" msgid="4260432497586829134">"Որոշ գործառույթներ կարող են չգործել"</string>
+    <string name="profile_encrypted_title" msgid="4260432497586829134">"Որոշ գործառույթներ կարող են չաշխատել"</string>
     <string name="profile_encrypted_detail" msgid="3700965619978314974">"Աշխատանքային պրոֆիլը կողպված է"</string>
     <string name="profile_encrypted_message" msgid="6964994232310195874">"Հպեք՝ այն ապակողպելու համար"</string>
     <string name="usb_mtp_launch_notification_title" msgid="8359219638312208932">"Միացված է <xliff:g id="PRODUCT_NAME">%1$s</xliff:g>-ին"</string>

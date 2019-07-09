@@ -431,7 +431,7 @@ public final class OomAdjuster {
             for (int i = 0; i < N; i++) {
                 ProcessRecord app = mProcessList.mLruProcesses.get(i);
                 if (!app.killedByAm && app.thread != null && app.containsCycle == true) {
-                    if (computeOomAdjLocked(app, ProcessList.UNKNOWN_ADJ, TOP_APP, true, now,
+                    if (computeOomAdjLocked(app, app.getCurRawAdj(), TOP_APP, true, now,
                             true)) {
                         retryCycles = true;
                     }
@@ -1264,7 +1264,7 @@ public final class OomAdjuster {
                                         cr.trackProcState(procState, mAdjSeq, now);
                                         trackedProcState = true;
                                     }
-                                } else if ((cr.flags & Context.BIND_ADJUST_BELOW_PERCEPTIBLE) != 0
+                                } else if ((cr.flags & Context.BIND_NOT_PERCEPTIBLE) != 0
                                         && clientAdj < ProcessList.PERCEPTIBLE_APP_ADJ
                                         && adj > ProcessList.PERCEPTIBLE_LOW_APP_ADJ) {
                                     newAdj = ProcessList.PERCEPTIBLE_LOW_APP_ADJ;

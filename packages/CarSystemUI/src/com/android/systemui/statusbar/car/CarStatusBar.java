@@ -63,6 +63,7 @@ import com.android.systemui.SystemUIFactory;
 import com.android.systemui.classifier.FalsingLog;
 import com.android.systemui.classifier.FalsingManagerFactory;
 import com.android.systemui.fragments.FragmentHostManager;
+import com.android.systemui.keyguard.ScreenLifecycle;
 import com.android.systemui.plugins.qs.QS;
 import com.android.systemui.qs.car.CarQSFragment;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
@@ -127,6 +128,7 @@ public class CarStatusBar extends StatusBar implements
     private SwitchToGuestTimer mSwitchToGuestTimer;
     private NotificationDataManager mNotificationDataManager;
     private NotificationClickHandlerFactory mNotificationClickHandlerFactory;
+    private ScreenLifecycle mScreenLifecycle;
 
     // The container for the notifications.
     private CarNotificationView mNotificationView;
@@ -163,6 +165,8 @@ public class CarStatusBar extends StatusBar implements
     private boolean mIsNotificationCardSwiping;
     // If notification shade is being swiped vertically to close.
     private boolean mIsSwipingVerticallyToClose;
+    // Whether heads-up notifications should be shown when shade is open.
+    private boolean mEnableHeadsUpNotificationWhenNotificationShadeOpen;
 
     private final CarPowerStateListener mCarPowerStateListener =
             (int state) -> {
@@ -230,6 +234,9 @@ public class CarStatusBar extends StatusBar implements
         mPowerManagerHelper.connectToCarService();
 
         mSwitchToGuestTimer = new SwitchToGuestTimer(mContext);
+
+        mScreenLifecycle = Dependency.get(ScreenLifecycle.class);
+        mScreenLifecycle.addObserver(mScreenObserver);
     }
 
     /**
@@ -315,7 +322,6 @@ public class CarStatusBar extends StatusBar implements
     public void showKeyguard() {
         super.showKeyguard();
         updateNavBarForKeyguardContent();
-        dismissKeyguardWhenUserSwitcherNotDisplayed();
     }
 
     /**
@@ -340,7 +346,7 @@ public class CarStatusBar extends StatusBar implements
 
         CarSystemUIFactory factory = SystemUIFactory.getInstance();
         mCarFacetButtonController = factory.getCarDependencyComponent()
-            .getCarFacetButtonController();
+                .getCarFacetButtonController();
         mNotificationPanelBackground = getDefaultWallpaper();
         mScrimController.setScrimBehindDrawable(mNotificationPanelBackground);
 
@@ -455,6 +461,8 @@ public class CarStatusBar extends StatusBar implements
                     }
                 });
 
+        mEnableHeadsUpNotificationWhenNotificationShadeOpen = mContext.getResources().getBoolean(
+                R.bool.config_enableHeadsUpNotificationWhenNotificationShadeOpen);
         CarHeadsUpNotificationManager carHeadsUpNotificationManager =
                 new CarSystemUIHeadsUpNotificationManager(mContext,
                         mNotificationClickHandlerFactory, mNotificationDataManager);
@@ -917,6 +925,16 @@ public class CarStatusBar extends StatusBar implements
                 Log.e(TAG, "Getting StackInfo from activity manager failed", e);
             }
         }
+
+        @Override
+        public void onTaskDisplayChanged(int taskId, int newDisplayId) {
+            try {
+                mCarFacetButtonController.taskChanged(
+                        ActivityTaskManager.getService().getAllStackInfos());
+            } catch (Exception e) {
+                Log.e(TAG, "Getting StackInfo from activity manager failed", e);
+            }
+        }
     }
 
     private void onDrivingStateChanged(CarDrivingStateEvent notUsed) {
@@ -978,6 +996,13 @@ public class CarStatusBar extends StatusBar implements
         }
     }
 
+    final ScreenLifecycle.Observer mScreenObserver = new ScreenLifecycle.Observer() {
+        @Override
+        public void onScreenTurnedOn() {
+            dismissKeyguardWhenUserSwitcherNotDisplayed();
+        }
+    };
+
     // We automatically dismiss keyguard unless user switcher is being shown on the keyguard.
     private void dismissKeyguardWhenUserSwitcherNotDisplayed() {
         if (mFullscreenUserSwitcher == null) {
@@ -1000,6 +1025,10 @@ public class CarStatusBar extends StatusBar implements
      * Dismisses the keyguard and shows bouncer if authentication is necessary.
      */
     public void dismissKeyguard() {
+        // Don't dismiss keyguard when the screen is off.
+        if (mScreenLifecycle.getScreenState() == ScreenLifecycle.SCREEN_OFF) {
+            return;
+        }
         executeRunnableDismissingKeyguard(null/* runnable */, null /* cancelAction */,
                 true /* dismissShade */, true /* afterKeyguardGone */, true /* deferred */);
     }
@@ -1258,11 +1287,18 @@ public class CarStatusBar extends StatusBar implements
         }
 
         @Override
+        protected void setInternalInsetsInfo(ViewTreeObserver.InternalInsetsInfo info,
+                HeadsUpEntry currentNotification, boolean panelExpanded) {
+            super.setInternalInsetsInfo(info, currentNotification, mPanelExpanded);
+        }
+
+        @Override
         protected void setHeadsUpVisible() {
             // if the Notifications panel is showing don't show the Heads up
-            if (mPanelExpanded) {
+            if (!mEnableHeadsUpNotificationWhenNotificationShadeOpen && mPanelExpanded) {
                 return;
             }
+
             super.setHeadsUpVisible();
             if (mHeadsUpPanel.getVisibility() == View.VISIBLE) {
                 mStatusBarWindowController.setHeadsUpShowing(true);

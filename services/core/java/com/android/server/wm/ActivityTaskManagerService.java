@@ -4521,20 +4521,25 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         enforceCallerIsRecentsOrHasPermission(READ_FRAME_BUFFER, "getTaskSnapshot()");
         final long ident = Binder.clearCallingIdentity();
         try {
-            final TaskRecord task;
-            synchronized (mGlobalLock) {
-                task = mRootActivityContainer.anyTaskForId(taskId,
-                        MATCH_TASK_IN_STACKS_OR_RECENT_TASKS);
-                if (task == null) {
-                    Slog.w(TAG, "getTaskSnapshot: taskId=" + taskId + " not found");
-                    return null;
-                }
-            }
-            // Don't call this while holding the lock as this operation might hit the disk.
-            return task.getSnapshot(reducedResolution);
+            return getTaskSnapshot(taskId, reducedResolution, true /* restoreFromDisk */);
         } finally {
             Binder.restoreCallingIdentity(ident);
         }
+    }
+
+    private ActivityManager.TaskSnapshot getTaskSnapshot(int taskId, boolean reducedResolution,
+            boolean restoreFromDisk) {
+        final TaskRecord task;
+        synchronized (mGlobalLock) {
+            task = mRootActivityContainer.anyTaskForId(taskId,
+                    MATCH_TASK_IN_STACKS_OR_RECENT_TASKS);
+            if (task == null) {
+                Slog.w(TAG, "getTaskSnapshot: taskId=" + taskId + " not found");
+                return null;
+            }
+        }
+        // Don't call this while holding the lock as this operation might hit the disk.
+        return task.getSnapshot(reducedResolution, restoreFromDisk);
     }
 
     @Override
@@ -4776,18 +4781,12 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
 
     private void applyUpdateVrModeLocked(ActivityRecord r) {
         // VR apps are expected to run in a main display. If an app is turning on VR for
-        // itself, but lives in a dynamic stack, then make sure that it is moved to the main
-        // fullscreen stack before enabling VR Mode.
-        // TODO: The goal of this code is to keep the VR app on the main display. When the
-        // stack implementation changes in the future, keep in mind that the use of the fullscreen
-        // stack is a means to move the activity to the main display and a moveActivityToDisplay()
-        // option would be a better choice here.
+        // itself, but isn't on the main display, then move it there before enabling VR Mode.
         if (r.requestedVrComponent != null && r.getDisplayId() != DEFAULT_DISPLAY) {
-            Slog.i(TAG, "Moving " + r.shortComponentName + " from stack " + r.getStackId()
-                    + " to main stack for VR");
-            final ActivityStack stack = mRootActivityContainer.getDefaultDisplay().getOrCreateStack(
-                    WINDOWING_MODE_FULLSCREEN, r.getActivityType(), true /* toTop */);
-            moveTaskToStack(r.getTaskRecord().taskId, stack.mStackId, true /* toTop */);
+            Slog.i(TAG, "Moving " + r.shortComponentName + " from display " + r.getDisplayId()
+                    + " to main display for VR");
+            mRootActivityContainer.moveStackToDisplay(
+                    r.getStackId(), DEFAULT_DISPLAY, true /* toTop */);
         }
         mH.post(() -> {
             if (!mVrController.onVrModeChanged(r)) {
@@ -7413,10 +7412,10 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         }
 
         @Override
-        public ActivityManager.TaskSnapshot getTaskSnapshot(int taskId, boolean reducedResolution) {
-            synchronized (mGlobalLock) {
-                return ActivityTaskManagerService.this.getTaskSnapshot(taskId, reducedResolution);
-            }
+        public ActivityManager.TaskSnapshot getTaskSnapshotNoRestore(int taskId,
+                boolean reducedResolution) {
+            return ActivityTaskManagerService.this.getTaskSnapshot(taskId, reducedResolution,
+                    false /* restoreFromDisk */);
         }
 
         @Override
