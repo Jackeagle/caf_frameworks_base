@@ -20,6 +20,7 @@ import static android.Manifest.permission.RECEIVE_DATA_ACTIVITY_CHANGE;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.net.ConnectivityManager.CONNECTIVITY_ACTION;
 import static android.net.ConnectivityManager.NETID_UNSET;
+import static android.net.ConnectivityManager.PRIVATE_DNS_MODE_OPPORTUNISTIC;
 import static android.net.ConnectivityManager.TYPE_ETHERNET;
 import static android.net.ConnectivityManager.TYPE_NONE;
 import static android.net.ConnectivityManager.TYPE_VPN;
@@ -2615,9 +2616,11 @@ public class ConnectivityService extends IConnectivityManager.Stub
                     final boolean valid = ((msg.arg1 & NETWORK_VALIDATION_RESULT_VALID) != 0);
                     final boolean wasValidated = nai.lastValidated;
                     final boolean wasDefault = isDefaultNetwork(nai);
-                    if (nai.everCaptivePortalDetected && !nai.captivePortalLoginNotified
-                            && valid) {
-                        nai.captivePortalLoginNotified = true;
+                    // Only show a connected notification if the network is pending validation
+                    // after the captive portal app was open, and it has now validated.
+                    if (nai.captivePortalValidationPending && valid) {
+                        // User is now logged in, network validated.
+                        nai.captivePortalValidationPending = false;
                         showNetworkNotification(nai, NotificationType.LOGGED_IN);
                     }
 
@@ -2688,9 +2691,6 @@ public class ConnectivityService extends IConnectivityManager.Stub
                         final int oldScore = nai.getCurrentScore();
                         nai.lastCaptivePortalDetected = visible;
                         nai.everCaptivePortalDetected |= visible;
-                        if (visible) {
-                            nai.captivePortalLoginNotified = false;
-                        }
                         if (nai.lastCaptivePortalDetected &&
                             Settings.Global.CAPTIVE_PORTAL_MODE_AVOID == getCaptivePortalMode()) {
                             if (DBG) log("Avoiding captive portal network: " + nai.name());
@@ -3499,6 +3499,12 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 new CaptivePortal(new CaptivePortalImpl(network).asBinder()));
         appIntent.setFlags(Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT | Intent.FLAG_ACTIVITY_NEW_TASK);
 
+        // This runs on a random binder thread, but getNetworkAgentInfoForNetwork is thread-safe,
+        // and captivePortalValidationPending is volatile.
+        final NetworkAgentInfo nai = getNetworkAgentInfoForNetwork(network);
+        if (nai != null) {
+            nai.captivePortalValidationPending = true;
+        }
         Binder.withCleanCallingIdentity(() ->
                 mContext.startActivityAsUser(appIntent, UserHandle.CURRENT));
     }
@@ -3599,21 +3605,31 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
     private void showNetworkNotification(NetworkAgentInfo nai, NotificationType type) {
         final String action;
+        final boolean highPriority;
         switch (type) {
             case LOGGED_IN:
                 action = Settings.ACTION_WIFI_SETTINGS;
                 mHandler.removeMessages(EVENT_TIMEOUT_NOTIFICATION);
                 mHandler.sendMessageDelayed(mHandler.obtainMessage(EVENT_TIMEOUT_NOTIFICATION,
                         nai.network.netId, 0), TIMEOUT_NOTIFICATION_DELAY_MS);
+                // High priority because it is a direct result of the user logging in to a portal.
+                highPriority = true;
                 break;
             case NO_INTERNET:
                 action = ConnectivityManager.ACTION_PROMPT_UNVALIDATED;
+                // High priority because it is only displayed for explicitly selected networks.
+                highPriority = true;
                 break;
             case LOST_INTERNET:
                 action = ConnectivityManager.ACTION_PROMPT_LOST_VALIDATION;
+                // High priority because it could help the user avoid unexpected data usage.
+                highPriority = true;
                 break;
             case PARTIAL_CONNECTIVITY:
                 action = ConnectivityManager.ACTION_PROMPT_PARTIAL_CONNECTIVITY;
+                // Don't bother the user with a high-priority notification if the network was not
+                // explicitly selected by the user.
+                highPriority = nai.networkMisc.explicitlySelected;
                 break;
             default:
                 Slog.wtf(TAG, "Unknown notification type " + type);
@@ -3630,23 +3646,41 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
         PendingIntent pendingIntent = PendingIntent.getActivityAsUser(
                 mContext, 0, intent, PendingIntent.FLAG_CANCEL_CURRENT, null, UserHandle.CURRENT);
-        mNotifier.showNotification(nai.network.netId, type, nai, null, pendingIntent, true);
+
+        mNotifier.showNotification(nai.network.netId, type, nai, null, pendingIntent, highPriority);
+    }
+
+    private boolean shouldPromptUnvalidated(NetworkAgentInfo nai) {
+        // Don't prompt if the network is validated, and don't prompt on captive portals
+        // because we're already prompting the user to sign in.
+        if (nai.everValidated || nai.everCaptivePortalDetected) {
+            return false;
+        }
+
+        // If a network has partial connectivity, always prompt unless the user has already accepted
+        // partial connectivity and selected don't ask again. This ensures that if the device
+        // automatically connects to a network that has partial Internet access, the user will
+        // always be able to use it, either because they've already chosen "don't ask again" or
+        // because we have prompt them.
+        if (nai.partialConnectivity && !nai.networkMisc.acceptPartialConnectivity) {
+            return true;
+        }
+
+        // If a network has no Internet access, only prompt if the network was explicitly selected
+        // and if the user has not already told us to use the network regardless of whether it
+        // validated or not.
+        if (nai.networkMisc.explicitlySelected && !nai.networkMisc.acceptUnvalidated) {
+            return true;
+        }
+
+        return false;
     }
 
     private void handlePromptUnvalidated(Network network) {
         if (VDBG || DDBG) log("handlePromptUnvalidated " + network);
         NetworkAgentInfo nai = getNetworkAgentInfoForNetwork(network);
 
-        // Only prompt if the network is unvalidated or network has partial internet connectivity
-        // and was explicitly selected by the user, and if we haven't already been told to switch
-        // to it regardless of whether it validated or not. Also don't prompt on captive portals
-        // because we're already prompting the user to sign in.
-        if (nai == null || nai.everValidated || nai.everCaptivePortalDetected
-                || !nai.networkMisc.explicitlySelected || nai.networkMisc.acceptUnvalidated
-                // TODO: Once the value of acceptPartialConnectivity is moved to IpMemoryStore,
-                // we should reevaluate how to handle acceptPartialConnectivity when network just
-                // connected.
-                || nai.networkMisc.acceptPartialConnectivity) {
+        if (nai == null || !shouldPromptUnvalidated(nai)) {
             return;
         }
 
@@ -4355,7 +4389,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
     /**
      * @return VPN information for accounting, or null if we can't retrieve all required
-     *         information, e.g underlying ifaces.
+     *         information, e.g primary underlying iface.
      */
     @Nullable
     private VpnInfo createVpnInfo(Vpn vpn) {
@@ -4367,24 +4401,17 @@ public class ConnectivityService extends IConnectivityManager.Stub
         // see VpnService.setUnderlyingNetworks()'s javadoc about how to interpret
         // the underlyingNetworks list.
         if (underlyingNetworks == null) {
-            NetworkAgentInfo defaultNai = getDefaultNetwork();
-            if (defaultNai != null) {
-                underlyingNetworks = new Network[] { defaultNai.network };
+            NetworkAgentInfo defaultNetwork = getDefaultNetwork();
+            if (defaultNetwork != null && defaultNetwork.linkProperties != null) {
+                info.primaryUnderlyingIface = getDefaultNetwork().linkProperties.getInterfaceName();
+            }
+        } else if (underlyingNetworks.length > 0) {
+            LinkProperties linkProperties = getLinkProperties(underlyingNetworks[0]);
+            if (linkProperties != null) {
+                info.primaryUnderlyingIface = linkProperties.getInterfaceName();
             }
         }
-        if (underlyingNetworks != null && underlyingNetworks.length > 0) {
-            List<String> interfaces = new ArrayList<>();
-            for (Network network : underlyingNetworks) {
-                LinkProperties lp = getLinkProperties(network);
-                if (lp != null && !TextUtils.isEmpty(lp.getInterfaceName())) {
-                    interfaces.add(lp.getInterfaceName());
-                }
-            }
-            if (!interfaces.isEmpty()) {
-                info.underlyingIfaces = interfaces.toArray(new String[interfaces.size()]);
-            }
-        }
-        return info.underlyingIfaces == null ? null : info;
+        return info.primaryUnderlyingIface == null ? null : info;
     }
 
     /**
@@ -6880,8 +6907,10 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
         final int userId = UserHandle.getCallingUserId();
 
-        final IpMemoryStore ipMemoryStore = IpMemoryStore.getMemoryStore(mContext);
-        ipMemoryStore.factoryReset();
+        Binder.withCleanCallingIdentity(() -> {
+            final IpMemoryStore ipMemoryStore = IpMemoryStore.getMemoryStore(mContext);
+            ipMemoryStore.factoryReset();
+        });
 
         // Turn airplane mode off
         setAirplaneMode(false);
@@ -6929,6 +6958,12 @@ public class ConnectivityService extends IConnectivityManager.Stub
                     }
                 }
             }
+        }
+
+        // restore private DNS settings to default mode (opportunistic)
+        if (!mUserManager.hasUserRestriction(UserManager.DISALLOW_CONFIG_PRIVATE_DNS)) {
+            Settings.Global.putString(mContext.getContentResolver(),
+                    Settings.Global.PRIVATE_DNS_MODE, PRIVATE_DNS_MODE_OPPORTUNISTIC);
         }
 
         Settings.Global.putString(mContext.getContentResolver(),

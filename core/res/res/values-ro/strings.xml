@@ -1150,8 +1150,10 @@
     <string name="whichViewApplication" msgid="3272778576700572102">"Deschideți cu"</string>
     <string name="whichViewApplicationNamed" msgid="2286418824011249620">"Deschideți cu %1$s"</string>
     <string name="whichViewApplicationLabel" msgid="2666774233008808473">"Deschideți"</string>
-    <string name="whichGiveAccessToApplication" msgid="8279395245414707442">"Permiteți accesul pentru a deschide linkurile <xliff:g id="HOST">%1$s</xliff:g> cu"</string>
-    <string name="whichGiveAccessToApplicationNamed" msgid="7992388824107710849">"Permiteți accesul pentru a deschide linkurile <xliff:g id="HOST">%1$s</xliff:g> cu <xliff:g id="APPLICATION">%2$s</xliff:g>"</string>
+    <string name="whichOpenHostLinksWith" msgid="3788174881117226583">"Deschideți linkurile <xliff:g id="HOST">%1$s</xliff:g> cu"</string>
+    <string name="whichOpenLinksWith" msgid="6392123355599572804">"Deschideți linkurile cu"</string>
+    <string name="whichOpenLinksWithApp" msgid="8225991685366651614">"Deschideți linkurile cu <xliff:g id="APPLICATION">%1$s</xliff:g>"</string>
+    <string name="whichOpenHostLinksWithApp" msgid="3464470639011045589">"Deschideți linkurile <xliff:g id="HOST">%1$s</xliff:g> cu <xliff:g id="APPLICATION">%2$s</xliff:g>"</string>
     <string name="whichGiveAccessToApplicationLabel" msgid="6142688895536868827">"Permiteți accesul"</string>
     <string name="whichEditApplication" msgid="144727838241402655">"Editați cu"</string>
     <string name="whichEditApplicationNamed" msgid="1775815530156447790">"Editați cu %1$s"</string>
@@ -1606,6 +1608,7 @@
     <string name="launchBrowserDefault" msgid="2057951947297614725">"Lansați browserul?"</string>
     <string name="SetupCallDefault" msgid="5834948469253758575">"Acceptați apelul?"</string>
     <string name="activity_resolver_use_always" msgid="8017770747801494933">"Întotdeauna"</string>
+    <string name="activity_resolver_set_always" msgid="1422574191056490585">"Schimbați la „Deschideți întotdeauna”"</string>
     <string name="activity_resolver_use_once" msgid="2404644797149173758">"Numai o dată"</string>
     <string name="activity_resolver_app_settings" msgid="8965806928986509855">"Setări"</string>
     <string name="activity_resolver_work_profiles_support" msgid="185598180676883455">"%1$s nu acceptă profilul de serviciu"</string>
@@ -1635,8 +1638,6 @@
     <string name="display_manager_overlay_display_name" msgid="5142365982271620716">"Suprapunerea <xliff:g id="ID">%1$d</xliff:g>"</string>
     <string name="display_manager_overlay_display_title" msgid="652124517672257172">"<xliff:g id="NAME">%1$s</xliff:g>: <xliff:g id="WIDTH">%2$d</xliff:g>x<xliff:g id="HEIGHT">%3$d</xliff:g>, <xliff:g id="DPI">%4$d</xliff:g> dpi"</string>
     <string name="display_manager_overlay_display_secure_suffix" msgid="6022119702628572080">", securizat"</string>
-    <string name="activity_starter_block_bg_activity_starts_permissive" msgid="6995473033438879646">"Începerea activității în fundal de la <xliff:g id="PACKAGENAME">%1$s</xliff:g> va fi blocată în versiunile Q viitoare. Consultați g.co/dev/bgblock."</string>
-    <string name="activity_starter_block_bg_activity_starts_enforcing" msgid="3317816771072146229">"Începerea activității din fundal de la <xliff:g id="PACKAGENAME">%1$s</xliff:g> este blocată. Consultați g.co/dev/bgblock."</string>
     <string name="kg_forgot_pattern_button_text" msgid="8852021467868220608">"Model uitat"</string>
     <string name="kg_wrong_pattern" msgid="1850806070801358830">"Model greșit"</string>
     <string name="kg_wrong_password" msgid="2333281762128113157">"Parolă greșită"</string>
@@ -1695,8 +1696,8 @@
     <string name="accessibility_gesture_prompt_text" msgid="8259145549733019401">"Alegeți un serviciu pe care să îl folosiți cu gestul de accesibilitate (glisați în sus cu două degete din partea de jos a ecranului):"</string>
     <string name="accessibility_gesture_3finger_prompt_text" msgid="1041435574275047665">"Alegeți un serviciu pe care să îl folosiți cu gestul de accesibilitate (glisați în sus cu trei degete din partea de jos a ecranului):"</string>
     <string name="accessibility_button_instructional_text" msgid="7003212763213614833">"Pentru a comuta între servicii, atingeți lung butonul de accesibilitate."</string>
-    <string name="accessibility_gesture_instructional_text" msgid="5261788874937410950">"Pentru a comuta între servicii, glisați în sus cu două degete și țineți lung."</string>
-    <string name="accessibility_gesture_3finger_instructional_text" msgid="4969448938984394550">"Pentru a comuta între servicii, glisați în sus cu trei degete și țineți lung."</string>
+    <string name="accessibility_gesture_instructional_text" msgid="5261788874937410950">"Pentru a schimba între servicii, glisați în sus cu două degete și țineți lung."</string>
+    <string name="accessibility_gesture_3finger_instructional_text" msgid="4969448938984394550">"Pentru a schimba între servicii, glisați în sus cu trei degete și țineți lung."</string>
     <string name="accessibility_magnification_chooser_text" msgid="1227146738764986237">"Mărire"</string>
     <string name="user_switched" msgid="3768006783166984410">"Utilizator curent: <xliff:g id="NAME">%1$s</xliff:g>."</string>
     <string name="user_switching_message" msgid="2871009331809089783">"Se comută la <xliff:g id="NAME">%1$s</xliff:g>…"</string>

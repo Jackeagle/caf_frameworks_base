@@ -567,7 +567,7 @@
     <string name="face_acquired_too_right" msgid="3667075962661863218">"Mugitu telefonoa ezkerretara."</string>
     <string name="face_acquired_too_left" msgid="3148242963894703424">"Mugitu telefonoa eskuinetara."</string>
     <string name="face_acquired_poor_gaze" msgid="5606479370806754905">"Begiratu zuzenago gailuari."</string>
-    <string name="face_acquired_not_detected" msgid="4885504661626728809">"Ez da agertzen aurpegia. Begiratu telefonoari."</string>
+    <string name="face_acquired_not_detected" msgid="4885504661626728809">"Ez da hautematen aurpegia. Begiratu telefonoari."</string>
     <string name="face_acquired_too_much_motion" msgid="3149332171102108851">"Mugimendu gehiegi dago. Eutsi tinko telefonoari."</string>
     <string name="face_acquired_recalibrate" msgid="8077949502893707539">"Erregistratu berriro aurpegia."</string>
     <string name="face_acquired_too_different" msgid="7663983770123789694">"Ez dugu ezagutzen aurpegi hori. Saiatu berriro."</string>
@@ -887,7 +887,7 @@
     <string name="keyguard_accessibility_expand_lock_area" msgid="519859720934178024">"Zabaldu desblokeatzeko eremua."</string>
     <string name="keyguard_accessibility_slide_unlock" msgid="2959928478764697254">"Hatza lerratuta desblokeatzea."</string>
     <string name="keyguard_accessibility_pattern_unlock" msgid="1490840706075246612">"Ereduaren bidez desblokeatzea."</string>
-    <string name="keyguard_accessibility_face_unlock" msgid="4817282543351718535">"Aurpegiaren bidez desblokeatzea."</string>
+    <string name="keyguard_accessibility_face_unlock" msgid="4817282543351718535">"Aurpegiaren bidez desblokeatzeko aukera."</string>
     <string name="keyguard_accessibility_pin_unlock" msgid="2469687111784035046">"PIN kodearen bidez desblokeatzea."</string>
     <string name="keyguard_accessibility_sim_pin_unlock" msgid="9149698847116962307">"SIM txartela desblokeatzeko PIN kodea."</string>
     <string name="keyguard_accessibility_sim_puk_unlock" msgid="9106899279724723341">"SIM txartela desblokeatzeko PUK kodea."</string>
@@ -1130,8 +1130,10 @@
     <string name="whichViewApplication" msgid="3272778576700572102">"Ireki honekin:"</string>
     <string name="whichViewApplicationNamed" msgid="2286418824011249620">"Irekin %1$s aplikazioarekin"</string>
     <string name="whichViewApplicationLabel" msgid="2666774233008808473">"Ireki"</string>
-    <string name="whichGiveAccessToApplication" msgid="8279395245414707442">"Eman <xliff:g id="HOST">%1$s</xliff:g> estekak irekitzeko baimena aplikazio honi:"</string>
-    <string name="whichGiveAccessToApplicationNamed" msgid="7992388824107710849">"Eman <xliff:g id="APPLICATION">%2$s</xliff:g> aplikazioari <xliff:g id="HOST">%1$s</xliff:g> irekitzeko baimena"</string>
+    <string name="whichOpenHostLinksWith" msgid="3788174881117226583">"Ireki <xliff:g id="HOST">%1$s</xliff:g> ostalariko estekak honekin:"</string>
+    <string name="whichOpenLinksWith" msgid="6392123355599572804">"Ireki estekak honekin:"</string>
+    <string name="whichOpenLinksWithApp" msgid="8225991685366651614">"Ireki estekak <xliff:g id="APPLICATION">%1$s</xliff:g> aplikazioarekin"</string>
+    <string name="whichOpenHostLinksWithApp" msgid="3464470639011045589">"Ireki <xliff:g id="HOST">%1$s</xliff:g> ostalariko estekak <xliff:g id="APPLICATION">%2$s</xliff:g> aplikazioarekin"</string>
     <string name="whichGiveAccessToApplicationLabel" msgid="6142688895536868827">"Eman sarbidea"</string>
     <string name="whichEditApplication" msgid="144727838241402655">"Editatu honekin:"</string>
     <string name="whichEditApplicationNamed" msgid="1775815530156447790">"Editatu %1$s aplikazioarekin"</string>
@@ -1309,7 +1311,7 @@
     <string name="select_character" msgid="3365550120617701745">"Txertatu karakterea"</string>
     <string name="sms_control_title" msgid="7296612781128917719">"SMS mezuak bidaltzen"</string>
     <string name="sms_control_message" msgid="3867899169651496433">"&lt;b&gt;<xliff:g id="APP_NAME">%1$s</xliff:g>&lt;/b&gt; SMS asko ari da bidaltzen. Mezuak bidaltzen jarrai dezan onartu nahi duzu?"</string>
-    <string name="sms_control_yes" msgid="3663725993855816807">"Onartu"</string>
+    <string name="sms_control_yes" msgid="3663725993855816807">"Baimendu"</string>
     <string name="sms_control_no" msgid="625438561395534982">"Ukatu"</string>
     <string name="sms_short_code_confirm_message" msgid="1645436466285310855">"&lt;b&gt;<xliff:g id="APP_NAME">%1$s</xliff:g>&lt;/b&gt; aplikazioak mezu bat bidali nahi du &lt;b&gt;<xliff:g id="DEST_ADDRESS">%2$s</xliff:g>&lt;/b&gt; helbidera."</string>
     <string name="sms_short_code_details" msgid="5873295990846059400">"Baliteke horrek mugikorreko kontuan "<b>"gastuak eragitea"</b>"."</string>
@@ -1444,7 +1446,7 @@
     <string name="grant_credentials_permission_message_header" msgid="2106103817937859662">"Aplikazio hauetako bat edo gehiago kontua orain eta etorkizunean atzitzeko baimena eskatzen ari dira."</string>
     <string name="grant_credentials_permission_message_footer" msgid="3125211343379376561">"Eskaera onartu nahi duzu?"</string>
     <string name="grant_permissions_header_text" msgid="6874497408201826708">"Sarbide-eskaera"</string>
-    <string name="allow" msgid="7225948811296386551">"Onartu"</string>
+    <string name="allow" msgid="7225948811296386551">"Baimendu"</string>
     <string name="deny" msgid="2081879885755434506">"Ukatu"</string>
     <string name="permission_request_notification_title" msgid="6486759795926237907">"Baimena eskatu da"</string>
     <string name="permission_request_notification_with_subtitle" msgid="8530393139639560189">"Baimena eskatu da \n<xliff:g id="ACCOUNT">%s</xliff:g> konturako."</string>
@@ -1546,8 +1548,8 @@
     <string name="storage_internal" msgid="3570990907910199483">"Barneko biltegiratze partekatua"</string>
     <string name="storage_sd_card" msgid="3282948861378286745">"SD txartela"</string>
     <string name="storage_sd_card_label" msgid="6347111320774379257">"<xliff:g id="MANUFACTURER">%s</xliff:g> SD txartela"</string>
-    <string name="storage_usb_drive" msgid="6261899683292244209">"USB unitatea"</string>
-    <string name="storage_usb_drive_label" msgid="4501418548927759953">"<xliff:g id="MANUFACTURER">%s</xliff:g> USB unitatea"</string>
+    <string name="storage_usb_drive" msgid="6261899683292244209">"USB bidezko unitatea"</string>
+    <string name="storage_usb_drive_label" msgid="4501418548927759953">"<xliff:g id="MANUFACTURER">%s</xliff:g> enpresaren USB bidezko unitatea"</string>
     <string name="storage_usb" msgid="3017954059538517278">"USB memoria"</string>
     <string name="extract_edit_menu_button" msgid="8940478730496610137">"Editatu"</string>
     <string name="data_usage_warning_title" msgid="6499834033204801605">"Datuen erabileraren abisua"</string>
@@ -1584,6 +1586,7 @@
     <string name="launchBrowserDefault" msgid="2057951947297614725">"Arakatzailea abiarazi nahi duzu?"</string>
     <string name="SetupCallDefault" msgid="5834948469253758575">"Deia onartu nahi duzu?"</string>
     <string name="activity_resolver_use_always" msgid="8017770747801494933">"Beti"</string>
+    <string name="activity_resolver_set_always" msgid="1422574191056490585">"Ezarri beti irekitzeko"</string>
     <string name="activity_resolver_use_once" msgid="2404644797149173758">"Behin soilik"</string>
     <string name="activity_resolver_app_settings" msgid="8965806928986509855">"Ezarpenak"</string>
     <string name="activity_resolver_work_profiles_support" msgid="185598180676883455">"%1$s abiarazleak ez du laneko profil hau onartzen"</string>
@@ -1613,8 +1616,6 @@
     <string name="display_manager_overlay_display_name" msgid="5142365982271620716">"<xliff:g id="ID">%1$d</xliff:g>. gainjartzea"</string>
     <string name="display_manager_overlay_display_title" msgid="652124517672257172">"<xliff:g id="NAME">%1$s</xliff:g>: <xliff:g id="WIDTH">%2$d</xliff:g> x <xliff:g id="HEIGHT">%3$d</xliff:g>, <xliff:g id="DPI">%4$d</xliff:g> dpi"</string>
     <string name="display_manager_overlay_display_secure_suffix" msgid="6022119702628572080">", segurua"</string>
-    <string name="activity_starter_block_bg_activity_starts_permissive" msgid="6995473033438879646">"<xliff:g id="PACKAGENAME">%1$s</xliff:g> paketearen atzeko planoko jardueraren abio hau blokeatu egingo da Q bertsioaren etorkizuneko konpilazioetan. Joan g.co/dev/bgblock helbidera."</string>
-    <string name="activity_starter_block_bg_activity_starts_enforcing" msgid="3317816771072146229">"Blokeatu da <xliff:g id="PACKAGENAME">%1$s</xliff:g> paketearen atzeko planoko jardueraren abioa. Joan g.co/dev/bgblock helbidera."</string>
     <string name="kg_forgot_pattern_button_text" msgid="8852021467868220608">"Eredua ahaztu zaizu"</string>
     <string name="kg_wrong_pattern" msgid="1850806070801358830">"Eredu okerra"</string>
     <string name="kg_wrong_password" msgid="2333281762128113157">"Pasahitz okerra"</string>
@@ -1668,18 +1669,12 @@
     <string name="accessibility_shortcut_enabling_service" msgid="7771852911861522636">"Erabilerraztasun-lasterbideak <xliff:g id="SERVICE_NAME">%1$s</xliff:g> aktibatu du"</string>
     <string name="accessibility_shortcut_disabling_service" msgid="2747243438223109821">"Erabilerraztasun-lasterbideak <xliff:g id="SERVICE_NAME">%1$s</xliff:g> desaktibatu du"</string>
     <string name="accessibility_shortcut_spoken_feedback" msgid="8376923232350078434">"<xliff:g id="SERVICE_NAME">%1$s</xliff:g> erabiltzeko, eduki sakatuta bolumen-tekla biak hiru segundoz"</string>
-    <!-- no translation found for accessibility_button_prompt_text (1176658502969738564) -->
-    <skip />
-    <!-- no translation found for accessibility_gesture_prompt_text (8259145549733019401) -->
-    <skip />
-    <!-- no translation found for accessibility_gesture_3finger_prompt_text (1041435574275047665) -->
-    <skip />
-    <!-- no translation found for accessibility_button_instructional_text (7003212763213614833) -->
-    <skip />
-    <!-- no translation found for accessibility_gesture_instructional_text (5261788874937410950) -->
-    <skip />
-    <!-- no translation found for accessibility_gesture_3finger_instructional_text (4969448938984394550) -->
-    <skip />
+    <string name="accessibility_button_prompt_text" msgid="1176658502969738564">"Aukeratu zer zerbitzu erabili nahi duzun Erabilerraztasuna botoia sakatzean:"</string>
+    <string name="accessibility_gesture_prompt_text" msgid="8259145549733019401">"Aukeratu zer zerbitzu erabili nahi duzun erabilerraztasun-keinua egitean (hau da, bi hatz pantailaren behealdetik gora pasatzean):"</string>
+    <string name="accessibility_gesture_3finger_prompt_text" msgid="1041435574275047665">"Aukeratu zer zerbitzu erabili nahi duzun erabilerraztasun-keinua egitean (hau da, hiru hatz pantailaren behealdetik gora pasatzean):"</string>
+    <string name="accessibility_button_instructional_text" msgid="7003212763213614833">"Zerbitzu batetik bestera aldatzeko, eduki sakatuta Erabilerraztasuna botoia."</string>
+    <string name="accessibility_gesture_instructional_text" msgid="5261788874937410950">"Zerbitzu batetik bestera aldatzeko, pasatu bi hatz pantailaren behealdetik gora eta eduki sakatuta une batez."</string>
+    <string name="accessibility_gesture_3finger_instructional_text" msgid="4969448938984394550">"Zerbitzu batetik bestera aldatzeko, pasatu hiru hatz pantailaren behealdetik gora eta eduki sakatuta une batez."</string>
     <string name="accessibility_magnification_chooser_text" msgid="1227146738764986237">"Lupa"</string>
     <string name="user_switched" msgid="3768006783166984410">"Uneko erabiltzailea: <xliff:g id="NAME">%1$s</xliff:g>."</string>
     <string name="user_switching_message" msgid="2871009331809089783">"<xliff:g id="NAME">%1$s</xliff:g> erabiltzailera aldatzen…"</string>
@@ -1852,7 +1847,7 @@
     </plurals>
     <string name="zen_mode_until" msgid="7336308492289875088">"<xliff:g id="FORMATTEDTIME">%1$s</xliff:g> arte"</string>
     <string name="zen_mode_alarm" msgid="9128205721301330797">"<xliff:g id="FORMATTEDTIME">%1$s</xliff:g> arte (hurrengo alarma)"</string>
-    <string name="zen_mode_forever" msgid="931849471004038757">"Desaktibatu arte"</string>
+    <string name="zen_mode_forever" msgid="931849471004038757">"Zuk desaktibatu arte"</string>
     <string name="zen_mode_forever_dnd" msgid="3792132696572189081">"\"Ez molestatu\" desaktibatzen duzun arte"</string>
     <string name="zen_mode_rule_name_combination" msgid="191109939968076477">"<xliff:g id="FIRST">%1$s</xliff:g> / <xliff:g id="REST">%2$s</xliff:g>"</string>
     <string name="toolbar_collapse_description" msgid="2821479483960330739">"Tolestu"</string>

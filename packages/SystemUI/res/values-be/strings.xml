@@ -199,6 +199,7 @@
     <!-- String.format failed for translation -->
     <!-- no translation found for accessibility_battery_level (7451474187113371965) -->
     <skip />
+    <string name="accessibility_battery_level_with_estimate" msgid="9033100930684311630">"Зарад акумулятара ў працэнтах: <xliff:g id="PERCENTAGE">%1$s</xliff:g>. Пры такім выкарыстанні яго хопіць прыблізна на <xliff:g id="TIME">%2$s</xliff:g>"</string>
     <string name="accessibility_battery_level_charging" msgid="1147587904439319646">"Зарадка акумулятара: <xliff:g id="BATTERY_PERCENTAGE">%d</xliff:g>%%."</string>
     <string name="accessibility_settings_button" msgid="799583911231893380">"Сістэмныя налады."</string>
     <string name="accessibility_notifications_button" msgid="4498000369779421892">"Апавяшчэнні."</string>
@@ -380,8 +381,8 @@
     <string name="quick_settings_night_secondary_label_until_sunrise" msgid="4453017157391574402">"Да ўсходу сонца"</string>
     <string name="quick_settings_night_secondary_label_on_at" msgid="6256314040368487637">"Уключыць у <xliff:g id="TIME">%s</xliff:g>"</string>
     <string name="quick_settings_secondary_label_until" msgid="2749196569462600150">"Да <xliff:g id="TIME">%s</xliff:g>"</string>
-    <string name="quick_settings_ui_mode_night_label" msgid="512534812963862137">"Цёмная тэма"</string>
-    <string name="quick_settings_ui_mode_night_label_battery_saver" msgid="3496696903886673256">"Цёмная тэма\nЭканомія зараду"</string>
+    <string name="quick_settings_ui_mode_night_label" msgid="3419947801072692538">"Цёмная тэма"</string>
+    <string name="quick_settings_ui_mode_night_label_battery_saver" msgid="7438725724589758362">"Цёмная тэма\nЭканомія зараду"</string>
     <string name="quick_settings_nfc_label" msgid="9012153754816969325">"NFC"</string>
     <string name="quick_settings_nfc_off" msgid="6883274004315134333">"NFC адключаны"</string>
     <string name="quick_settings_nfc_on" msgid="6680317193676884311">"NFC уключаны"</string>
@@ -536,7 +537,7 @@
     <string name="accessibility_volume_settings" msgid="4915364006817819212">"Налады гуку"</string>
     <string name="accessibility_volume_expand" msgid="5946812790999244205">"Разгарнуць"</string>
     <string name="accessibility_volume_collapse" msgid="3609549593031810875">"Згарнуць"</string>
-    <string name="volume_odi_captions_tip" msgid="1193653197906918269">"Аўтаматычныя цітры"</string>
+    <string name="volume_odi_captions_tip" msgid="1193653197906918269">"Аўтаматычныя субцітры"</string>
     <string name="accessibility_volume_close_odi_captions_tip" msgid="1163987066404128967">"Падказка \"Схавайце цітры\""</string>
     <string name="volume_odi_captions_content_description" msgid="2950736796270214785">"Накладанне субцітраў"</string>
     <string name="volume_odi_captions_hint_enable" msgid="49750248924730302">"уключыць"</string>
@@ -663,7 +664,7 @@
     <string name="notification_multichannel_desc" msgid="4695920306092240550">"Тут канфігурыраваць гэту групу апавяшчэнняў забаронена"</string>
     <string name="notification_delegate_header" msgid="2857691673814814270">"Праксіраванае апавяшчэнне"</string>
     <string name="notification_channel_dialog_title" msgid="5745335243729167866">"Усе апавяшчэнні праграмы \"<xliff:g id="APP_NAME">%1$s</xliff:g>\""</string>
-    <string name="see_more_title" msgid="5358726697042112726">"Разгарнуць"</string>
+    <string name="see_more_title" msgid="5358726697042112726">"Яшчэ"</string>
     <string name="appops_camera" msgid="8100147441602585776">"Гэта праграма выкарыстоўвае камеру."</string>
     <string name="appops_microphone" msgid="741508267659494555">"Гэта праграма выкарыстоўвае мікрафон."</string>
     <string name="appops_overlay" msgid="6165912637560323464">"Гэта праграма паказваецца на экране паверх іншых праграм."</string>
@@ -789,7 +790,7 @@
     <string name="drag_to_add_tiles" msgid="230586591689084925">"Перацягніце патрэбныя пліткі"</string>
     <string name="drag_to_rearrange_tiles" msgid="4566074720193667473">"Каб змяніць парадак плітак, утрымлівайце і перацягвайце іх"</string>
     <string name="drag_to_remove_tiles" msgid="3361212377437088062">"Перацягніце сюды, каб выдаліць"</string>
-    <string name="drag_to_remove_disabled" msgid="2390968976638993382">"Трэба па меншай меры 6 плітак"</string>
+    <string name="drag_to_remove_disabled" msgid="4785920129548299268">"Мінімальная колькасць плітак: <xliff:g id="MIN_NUM_TILES">%1$d</xliff:g>"</string>
     <string name="qs_edit" msgid="2232596095725105230">"Рэдагаваць"</string>
     <string name="tuner_time" msgid="6572217313285536011">"Час"</string>
   <string-array name="clock_options">
@@ -944,8 +945,6 @@
     <string name="bubble_accessibility_action_move_bottom_left" msgid="206369104473183217">"Перамясціць лявей і ніжэй"</string>
     <string name="bubble_accessibility_action_move_bottom_right" msgid="8705660152384312329">"Перамясціць правей і ніжэй"</string>
     <string name="bubble_dismiss_text" msgid="8028337712674081668">"Адхіліць"</string>
-    <!-- no translation found for notification_content_system_nav_changed (7218093915747788444) -->
-    <skip />
-    <!-- no translation found for notification_content_gesture_nav_available (8111130443656460792) -->
-    <skip />
+    <string name="notification_content_system_nav_changed" msgid="7218093915747788444">"Навігацыя ў сістэме абноўлена. Каб унесці змяненні, перайдзіце ў Налады."</string>
+    <string name="notification_content_gesture_nav_available" msgid="8111130443656460792">"Перайдзіце ў Налады, каб абнавіць параметры навігацыі ў сістэме"</string>
 </resources>
