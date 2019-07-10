@@ -176,12 +176,8 @@ public final class UsbAlsaManager {
 
         int state = (enabled ? 1 : 0);
         int alsaCard = audioDevice.mCard;
-        int alsaDevice = audioDevice.mDevice;
-        if (alsaCard < 0 || alsaDevice < 0) {
-            Slog.e(TAG, "Invalid alsa card or device alsaCard: " + alsaCard +
-                        " alsaDevice: " + alsaDevice);
-            return;
-        }
+        //int alsaDevice = audioDevice.mDevice;
+        int alsaDevice = 0;
 
         String address = AudioService.makeAlsaAddressString(alsaCard, alsaDevice);
         try {
@@ -194,6 +190,7 @@ public final class UsbAlsaManager {
                     device = (audioDevice == mAccessoryAudioDevice
                         ? AudioSystem.DEVICE_OUT_USB_ACCESSORY
                         : AudioSystem.DEVICE_OUT_USB_DEVICE);
+                    device = AudioSystem.DEVICE_OUT_USB_DEVICE; // Fix Me
                 }
                 if (DEBUG) {
                     Slog.i(TAG, "pre-call device:0x" + Integer.toHexString(device) +
@@ -201,10 +198,13 @@ public final class UsbAlsaManager {
                 }
                 mAudioService.setWiredDeviceConnectionState(
                         device, state, address, audioDevice.getDeviceName(), TAG);
+                mAudioService.setWiredDeviceConnectionState(
+                        AudioSystem.DEVICE_IN_USB_DEVICE, state, address, audioDevice.getDeviceName(), TAG);
+
             }
 
             // Capture Device
-            if (audioDevice.mHasCapture) {
+/*            if (audioDevice.mHasCapture) {
                 int device;
                 if (mIsInputHeadset) {
                     device = AudioSystem.DEVICE_IN_USB_HEADSET;
@@ -215,7 +215,7 @@ public final class UsbAlsaManager {
                 }
                 mAudioService.setWiredDeviceConnectionState(
                         device, state, address, audioDevice.getDeviceName(), TAG);
-            }
+            }*/
         } catch (RemoteException e) {
             Slog.e(TAG, "RemoteException in setWiredDeviceConnectionState");
         }

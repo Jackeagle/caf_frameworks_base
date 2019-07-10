@@ -507,13 +507,22 @@ public class UsbDeviceManager {
 
         public void updateState(String state) {
             int connected, configured;
+            final  boolean uac1_enabled = UsbManager.containsFunction
+                    (SystemProperties.get(USB_CONFIG_PROPERTY), "uac1");
 
             if ("DISCONNECTED".equals(state)) {
                 connected = 0;
                 configured = 0;
+                if (uac1_enabled) {
+                    Slog.e(TAG, "Disconnected - setting acmode false ");
+                    mUsbAlsaManager.setAccessoryAudioState(false, 1, 0x4000);
+                }
             } else if ("CONNECTED".equals(state)) {
                 connected = 1;
                 configured = 0;
+                if (uac1_enabled) {
+                    mUsbAlsaManager.setAccessoryAudioState(true, 1, 0x4000);
+                }
             } else if ("CONFIGURED".equals(state)) {
                 connected = 1;
                 configured = 1;
