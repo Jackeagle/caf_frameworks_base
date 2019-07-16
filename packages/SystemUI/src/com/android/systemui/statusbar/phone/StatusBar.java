@@ -1312,7 +1312,8 @@ public class StatusBar extends SystemUI implements DemoMode,
         if (mBrightnessMirrorController != null) {
             mBrightnessMirrorController.onDensityOrFontScaleChanged();
         }
-        mStatusBarKeyguardViewManager.onDensityOrFontScaleChanged();
+        if (mStatusBarKeyguardViewManager != null)
+            mStatusBarKeyguardViewManager.onDensityOrFontScaleChanged();
         // TODO: Bring these out of StatusBar.
         ((UserInfoControllerImpl) Dependency.get(UserInfoController.class))
                 .onDensityOrFontScaleChanged();
@@ -1553,13 +1554,17 @@ public class StatusBar extends SystemUI implements DemoMode,
         mFingerprintUnlockController = new FingerprintUnlockController(mContext,
                 mDozeScrimController, keyguardViewMediator,
                 mScrimController, this, UnlockMethodCache.getInstance(mContext));
-        mStatusBarKeyguardViewManager = keyguardViewMediator.registerStatusBar(this,
-                getBouncerContainer(), mScrimController,
-                mFingerprintUnlockController);
+        if (keyguardViewMediator != null) {
+            mStatusBarKeyguardViewManager = keyguardViewMediator.registerStatusBar(this,
+                    getBouncerContainer(), mScrimController,
+                    mFingerprintUnlockController);
+        }
         mKeyguardIndicationController
                 .setStatusBarKeyguardViewManager(mStatusBarKeyguardViewManager);
         mFingerprintUnlockController.setStatusBarKeyguardViewManager(mStatusBarKeyguardViewManager);
-        mRemoteInputController.addCallback(mStatusBarKeyguardViewManager);
+        if (mStatusBarKeyguardViewManager != null) {
+            mRemoteInputController.addCallback(mStatusBarKeyguardViewManager);
+        }
 
         mRemoteInputController.addCallback(new RemoteInputController.Callback() {
             @Override
@@ -1580,7 +1585,8 @@ public class StatusBar extends SystemUI implements DemoMode,
             }
         });
 
-        mKeyguardViewMediatorCallback = keyguardViewMediator.getViewMediatorCallback();
+        if (keyguardViewMediator != null)
+            mKeyguardViewMediatorCallback = keyguardViewMediator.getViewMediatorCallback();
         mLightBarController.setFingerprintUnlockController(mFingerprintUnlockController);
         Trace.endSection();
     }
@@ -3122,7 +3128,8 @@ public class StatusBar extends SystemUI implements DemoMode,
         for (int i = 0; i < size; i++) {
             clonedList.get(i).run();
         }
-        mStatusBarKeyguardViewManager.readyForKeyguardDone();
+        if (mStatusBarKeyguardViewManager != null)
+            mStatusBarKeyguardViewManager.readyForKeyguardDone();
     }
 
     @Override
@@ -3194,7 +3201,7 @@ public class StatusBar extends SystemUI implements DemoMode,
 
         // Trimming will happen later if Keyguard is showing - doing it here might cause a jank in
         // the bouncer appear animation.
-        if (!mStatusBarKeyguardViewManager.isShowing()) {
+        if (mStatusBarKeyguardViewManager != null && !mStatusBarKeyguardViewManager.isShowing()) {
             WindowManagerGlobal.getInstance().trimMemory(ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN);
         }
     }
@@ -3746,7 +3753,8 @@ public class StatusBar extends SystemUI implements DemoMode,
     }
 
     public void readyForKeyguardDone() {
-        mStatusBarKeyguardViewManager.readyForKeyguardDone();
+        if (mStatusBarKeyguardViewManager != null)
+            mStatusBarKeyguardViewManager.readyForKeyguardDone();
     }
 
     public void executeRunnableDismissingKeyguard(final Runnable runnable,
@@ -3756,7 +3764,7 @@ public class StatusBar extends SystemUI implements DemoMode,
             final boolean deferred) {
         dismissKeyguardThenExecute(() -> {
             if (runnable != null) {
-                if (mStatusBarKeyguardViewManager.isShowing()
+                if (mStatusBarKeyguardViewManager != null && mStatusBarKeyguardViewManager.isShowing()
                         && mStatusBarKeyguardViewManager.isOccluded()) {
                     mStatusBarKeyguardViewManager.addAfterKeyguardGoneRunnable(runnable);
                 } else {
@@ -3863,7 +3871,7 @@ public class StatusBar extends SystemUI implements DemoMode,
             mFingerprintUnlockController.startWakeAndUnlock(
                     FingerprintUnlockController.MODE_WAKE_AND_UNLOCK_PULSING);
         }
-        if (mStatusBarKeyguardViewManager.isShowing()) {
+        if (mStatusBarKeyguardViewManager != null && mStatusBarKeyguardViewManager.isShowing()) {
             mStatusBarKeyguardViewManager.dismissWithAction(action, cancelAction,
                     afterKeyguardGone);
         } else {
@@ -4047,9 +4055,9 @@ public class StatusBar extends SystemUI implements DemoMode,
     // State logging
 
     private void logStateToEventlog() {
-        boolean isShowing = mStatusBarKeyguardViewManager.isShowing();
-        boolean isOccluded = mStatusBarKeyguardViewManager.isOccluded();
-        boolean isBouncerShowing = mStatusBarKeyguardViewManager.isBouncerShowing();
+        boolean isShowing = mStatusBarKeyguardViewManager != null && mStatusBarKeyguardViewManager.isShowing();
+        boolean isOccluded = mStatusBarKeyguardViewManager !=null && mStatusBarKeyguardViewManager.isOccluded();
+        boolean isBouncerShowing = mStatusBarKeyguardViewManager != null && mStatusBarKeyguardViewManager.isBouncerShowing();
         boolean isSecure = mUnlockMethodCache.isMethodSecure();
         boolean canSkipBouncer = mUnlockMethodCache.canSkipBouncer();
         int stateFingerprint = getLoggingFingerprint(mState,
@@ -4599,9 +4607,9 @@ public class StatusBar extends SystemUI implements DemoMode,
     }
 
     private void updatePublicMode() {
-        final boolean showingKeyguard = mStatusBarKeyguardViewManager.isShowing();
+        final boolean showingKeyguard = mStatusBarKeyguardViewManager !=null && mStatusBarKeyguardViewManager.isShowing();
         final boolean devicePublic = showingKeyguard
-                && mStatusBarKeyguardViewManager.isSecure(mCurrentUserId);
+                && mStatusBarKeyguardViewManager != null && mStatusBarKeyguardViewManager.isSecure(mCurrentUserId);
 
         // Look for public mode users. Users are considered public in either case of:
         //   - device keyguard is shown in secure mode;
@@ -4615,7 +4623,7 @@ public class StatusBar extends SystemUI implements DemoMode,
                 // TrustManagerService updates its internal records, resulting in an incorrect
                 // state being cached in mLockscreenPublicMode. (b/35951989)
                 if (mLockPatternUtils.isSeparateProfileChallengeEnabled(userId)
-                        && mStatusBarKeyguardViewManager.isSecure(userId)) {
+                        && mStatusBarKeyguardViewManager != null && mStatusBarKeyguardViewManager.isSecure(userId)) {
                     isProfilePublic = mKeyguardManager.isDeviceLocked(userId);
                 }
             }
@@ -4660,9 +4668,10 @@ public class StatusBar extends SystemUI implements DemoMode,
         updateNotifications();
         checkBarModes();
         updateMediaMetaData(false, mState != StatusBarState.KEYGUARD);
-        mKeyguardMonitor.notifyKeyguardState(mStatusBarKeyguardViewManager.isShowing(),
+        mKeyguardMonitor.notifyKeyguardState((mStatusBarKeyguardViewManager != null &&
+                mStatusBarKeyguardViewManager.isShowing()),
                 mUnlockMethodCache.isMethodSecure(),
-                mStatusBarKeyguardViewManager.isOccluded());
+                (mStatusBarKeyguardViewManager != null && mStatusBarKeyguardViewManager.isOccluded()));
         Trace.endSection();
     }
 
@@ -4751,12 +4760,12 @@ public class StatusBar extends SystemUI implements DemoMode,
 
     public boolean interceptMediaKey(KeyEvent event) {
         return mState == StatusBarState.KEYGUARD
-                && mStatusBarKeyguardViewManager.interceptMediaKey(event);
+                && mStatusBarKeyguardViewManager != null && mStatusBarKeyguardViewManager.interceptMediaKey(event);
     }
 
     protected boolean shouldUnlockOnMenuPressed() {
         return mDeviceInteractive && mState != StatusBarState.SHADE
-            && mStatusBarKeyguardViewManager.shouldDismissOnMenuPressed();
+            && mStatusBarKeyguardViewManager != null && mStatusBarKeyguardViewManager.shouldDismissOnMenuPressed();
     }
 
     public boolean onMenuPressed() {
@@ -4774,7 +4783,7 @@ public class StatusBar extends SystemUI implements DemoMode,
     }
 
     public boolean onBackPressed() {
-        if (mStatusBarKeyguardViewManager.onBackPressed()) {
+        if (mStatusBarKeyguardViewManager != null && mStatusBarKeyguardViewManager.onBackPressed()) {
             return true;
         }
         if (mNotificationPanel.isQsExpanded()) {
@@ -4811,8 +4820,9 @@ public class StatusBar extends SystemUI implements DemoMode,
     }
 
     protected void showBouncer() {
-        mWaitingForKeyguardExit = mStatusBarKeyguardViewManager.isShowing();
-        mStatusBarKeyguardViewManager.dismiss();
+        mWaitingForKeyguardExit = mStatusBarKeyguardViewManager != null && mStatusBarKeyguardViewManager.isShowing();
+        if (mStatusBarKeyguardViewManager != null)
+            mStatusBarKeyguardViewManager.dismiss();
     }
 
     private void instantExpandNotificationsPanel() {
@@ -5372,7 +5382,8 @@ public class StatusBar extends SystemUI implements DemoMode,
             where.getLocationInWindow(mTmpInt2);
             mWakeUpTouchLocation = new PointF(mTmpInt2[0] + where.getWidth() / 2,
                     mTmpInt2[1] + where.getHeight() / 2);
-            mStatusBarKeyguardViewManager.notifyDeviceWakeUpRequested();
+            if (mStatusBarKeyguardViewManager != null)
+                mStatusBarKeyguardViewManager.notifyDeviceWakeUpRequested();
             mFalsingManager.onScreenOnFromTouch();
         }
     }
@@ -5396,7 +5407,7 @@ public class StatusBar extends SystemUI implements DemoMode,
             return;
         }
         if (!mNotificationPanel.canCameraGestureBeLaunched(
-                mStatusBarKeyguardViewManager.isShowing() && mExpandedVisible)) {
+                mStatusBarKeyguardViewManager != null && mStatusBarKeyguardViewManager.isShowing() && mExpandedVisible)) {
             if (DEBUG_CAMERA_LIFT) Slog.d(TAG, "Can't launch camera right now, mExpandedVisible: " +
                     mExpandedVisible);
             return;
@@ -5404,10 +5415,11 @@ public class StatusBar extends SystemUI implements DemoMode,
         if (!mDeviceInteractive) {
             PowerManager pm = mContext.getSystemService(PowerManager.class);
             pm.wakeUp(SystemClock.uptimeMillis(), "com.android.systemui:CAMERA_GESTURE");
-            mStatusBarKeyguardViewManager.notifyDeviceWakeUpRequested();
+            if (mStatusBarKeyguardViewManager != null)
+                mStatusBarKeyguardViewManager.notifyDeviceWakeUpRequested();
         }
         vibrateForCameraGesture();
-        if (!mStatusBarKeyguardViewManager.isShowing()) {
+        if (mStatusBarKeyguardViewManager != null && !mStatusBarKeyguardViewManager.isShowing()) {
             startActivityDismissingKeyguard(KeyguardBottomAreaView.INSECURE_CAMERA_INTENT,
                     false /* onlyProvisioned */, true /* dismissShade */,
                     true /* disallowEnterPictureInPictureWhileLaunching */, null /* callback */);
@@ -5471,7 +5483,8 @@ public class StatusBar extends SystemUI implements DemoMode,
             mDozing = false;
         }
         mStatusBarWindowManager.setDozing(mDozing);
-        mStatusBarKeyguardViewManager.setDozing(mDozing);
+        if (mStatusBarKeyguardViewManager != null)
+            mStatusBarKeyguardViewManager.setDozing(mDozing);
         if (mAmbientIndicationContainer instanceof DozeReceiver) {
             ((DozeReceiver) mAmbientIndicationContainer).setDozing(mDozing);
         }
@@ -5644,7 +5657,7 @@ public class StatusBar extends SystemUI implements DemoMode,
 
         @Override
         public void onDoubleTap(float screenX, float screenY) {
-            if (screenX > 0 && screenY > 0 && mAmbientIndicationContainer != null 
+            if (screenX > 0 && screenY > 0 && mAmbientIndicationContainer != null
                 && mAmbientIndicationContainer.getVisibility() == View.VISIBLE) {
                 mAmbientIndicationContainer.getLocationOnScreen(mTmpInt2);
                 float viewX = screenX - mTmpInt2[0];
@@ -5865,7 +5878,8 @@ public class StatusBar extends SystemUI implements DemoMode,
             }
             final boolean isActivity = pendingIntent.isActivity();
             if (isActivity) {
-                final boolean keyguardShowing = mStatusBarKeyguardViewManager.isShowing();
+                final boolean keyguardShowing = mStatusBarKeyguardViewManager != null &&
+                                                     mStatusBarKeyguardViewManager.isShowing();
                 final boolean afterKeyguardGone = PreviewInflater.wouldLaunchResolverActivity(
                         mContext, pendingIntent.getIntent(), mCurrentUserId);
                 dismissKeyguardThenExecute(new OnDismissAction() {
@@ -6920,7 +6934,7 @@ public class StatusBar extends SystemUI implements DemoMode,
     public void startPendingIntentDismissingKeyguard(final PendingIntent intent) {
         if (!isDeviceProvisioned()) return;
 
-        final boolean keyguardShowing = mStatusBarKeyguardViewManager.isShowing();
+        final boolean keyguardShowing = mStatusBarKeyguardViewManager != null && mStatusBarKeyguardViewManager.isShowing();
         final boolean afterKeyguardGone = intent.isActivity()
                 && PreviewInflater.wouldLaunchResolverActivity(mContext, intent.getIntent(),
                 mCurrentUserId);
@@ -7107,7 +7121,7 @@ public class StatusBar extends SystemUI implements DemoMode,
                         }
                     };
 
-                    if (mStatusBarKeyguardViewManager.isShowing()
+                    if (mStatusBarKeyguardViewManager != null && mStatusBarKeyguardViewManager.isShowing()
                             && mStatusBarKeyguardViewManager.isOccluded()) {
                         mStatusBarKeyguardViewManager.addAfterKeyguardGoneRunnable(runnable);
                     } else {

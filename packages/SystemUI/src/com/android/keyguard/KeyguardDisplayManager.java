@@ -51,8 +51,10 @@ public class KeyguardDisplayManager {
     public void show() {
         if (!mShowing) {
             if (DEBUG) Slog.v(TAG, "show");
-            mMediaRouter.addCallback(MediaRouter.ROUTE_TYPE_REMOTE_DISPLAY,
-                    mMediaRouterCallback, MediaRouter.CALLBACK_FLAG_PASSIVE_DISCOVERY);
+            if (mMediaRouter != null) {
+                mMediaRouter.addCallback(MediaRouter.ROUTE_TYPE_REMOTE_DISPLAY,
+                        mMediaRouterCallback, MediaRouter.CALLBACK_FLAG_PASSIVE_DISCOVERY);
+            }
             updateDisplays(true);
         }
         mShowing = true;
@@ -61,7 +63,8 @@ public class KeyguardDisplayManager {
     public void hide() {
         if (mShowing) {
             if (DEBUG) Slog.v(TAG, "hide");
-            mMediaRouter.removeCallback(mMediaRouterCallback);
+            if (mMediaRouter != null)
+                mMediaRouter.removeCallback(mMediaRouterCallback);
             updateDisplays(false);
         }
         mShowing = false;
@@ -99,8 +102,11 @@ public class KeyguardDisplayManager {
     protected void updateDisplays(boolean showing) {
         Presentation originalPresentation = mPresentation;
         if (showing) {
-            MediaRouter.RouteInfo route = mMediaRouter.getSelectedRoute(
+            MediaRouter.RouteInfo route = null;
+            if (mMediaRouter != null) {
+                route = mMediaRouter.getSelectedRoute(
                     MediaRouter.ROUTE_TYPE_REMOTE_DISPLAY);
+            }
             boolean useDisplay = route != null
                     && route.getPlaybackType() == MediaRouter.RouteInfo.PLAYBACK_TYPE_REMOTE;
             Display presentationDisplay = useDisplay ? route.getPresentationDisplay() : null;

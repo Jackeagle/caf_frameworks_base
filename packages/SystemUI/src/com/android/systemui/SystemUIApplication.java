@@ -68,7 +68,7 @@ public class SystemUIApplication extends Application implements SysUiServiceProv
     /**
      * The classes of the stuff to start.
      */
-    private final Class<?>[] SERVICES = new Class[] {
+    /*private final Class<?>[] SERVICES = new Class[] {
             Dependency.class,
             NotificationChannels.class,
             CommandQueue.CommandQueueStart.class,
@@ -88,22 +88,22 @@ public class SystemUIApplication extends Application implements SysUiServiceProv
             LatencyTester.class,
             GlobalActionsComponent.class,
             RoundedCorners.class,
-    };
+    };*/
 
     /**
      * The classes of the stuff to start for each user.  This is a subset of the services listed
      * above.
      */
-    private final Class<?>[] SERVICES_PER_USER = new Class[] {
+    /*private final Class<?>[] SERVICES_PER_USER = new Class[] {
             Dependency.class,
             NotificationChannels.class,
             Recents.class
-    };
+    };*/
 
     /**
      * Hold a reference on the stuff we start.
      */
-    private final SystemUI[] mServices = new SystemUI[SERVICES.length];
+    private SystemUI[] mServices;
     private boolean mServicesStarted;
     private boolean mBootCompleted;
     private final Map<Class<?>, Object> mComponents = new HashMap<>();
@@ -149,7 +149,8 @@ public class SystemUIApplication extends Application implements SysUiServiceProv
             // been broadcasted on startup for the primary SystemUI process.  Instead, for
             // components which require the SystemUI component to be initialized per-user, we
             // start those components now for the current non-system user.
-            startServicesIfNeeded(SERVICES_PER_USER);
+            //startServicesIfNeeded(SERVICES_PER_USER);
+            startSecondaryUserServicesIfNeeded();
         }
     }
 
@@ -161,7 +162,9 @@ public class SystemUIApplication extends Application implements SysUiServiceProv
      */
 
     public void startServicesIfNeeded() {
-        startServicesIfNeeded(SERVICES);
+        //startServicesIfNeeded(SERVICES);
+         String[] names = getResources().getStringArray(R.array.config_systemUIServiceComponents);
+         startServicesIfNeeded(names);
     }
 
     /**
@@ -171,13 +174,17 @@ public class SystemUIApplication extends Application implements SysUiServiceProv
      * <p>This method must only be called from the main thread.</p>
      */
     void startSecondaryUserServicesIfNeeded() {
-        startServicesIfNeeded(SERVICES_PER_USER);
+        //startServicesIfNeeded(SERVICES_PER_USER);
+         String[] names =
+                   getResources().getStringArray(R.array.config_systemUIServiceComponentsPerUser);
+         startServicesIfNeeded(names);
     }
 
-    private void startServicesIfNeeded(Class<?>[] services) {
+    private void startServicesIfNeeded(String[] services) {
         if (mServicesStarted) {
             return;
         }
+        mServices = new SystemUI[services.length];
 
         if (!mBootCompleted) {
             // check to see if maybe it was already completed long before we began
@@ -195,14 +202,16 @@ public class SystemUIApplication extends Application implements SysUiServiceProv
         log.traceBegin("StartServices");
         final int N = services.length;
         for (int i = 0; i < N; i++) {
-            Class<?> cl = services[i];
-            if (DEBUG) Log.d(TAG, "loading: " + cl);
-            log.traceBegin("StartServices" + cl.getSimpleName());
+            String clsName = services[i];
+            if (DEBUG) Log.d(TAG, "loading: " + clsName);
+            log.traceBegin("StartServices" + clsName);
             long ti = System.currentTimeMillis();
+            Class cls;
             try {
-
-                Object newService = SystemUIFactory.getInstance().createInstance(cl);
-                mServices[i] = (SystemUI) ((newService == null) ? cl.newInstance() : newService);
+                cls = Class.forName(clsName);
+                mServices[i] = (SystemUI) cls.newInstance();
+            } catch(ClassNotFoundException ex){
+                throw new RuntimeException(ex);
             } catch (IllegalAccessException ex) {
                 throw new RuntimeException(ex);
             } catch (InstantiationException ex) {
@@ -218,7 +227,7 @@ public class SystemUIApplication extends Application implements SysUiServiceProv
             // Warn if initialization of component takes too long
             ti = System.currentTimeMillis() - ti;
             if (ti > 1000) {
-                Log.w(TAG, "Initialization of " + cl.getName() + " took " + ti + " ms");
+                Log.w(TAG, "Initialization of " + cls.getName() + " took " + ti + " ms");
             }
             if (mBootCompleted) {
                 mServices[i].onBootCompleted();
