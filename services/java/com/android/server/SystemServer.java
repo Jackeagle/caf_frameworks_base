@@ -680,9 +680,11 @@ public final class SystemServer {
         traceEnd();
 
         // Tracks whether the updatable WebView is in a ready state and watches for update installs.
-        traceBeginAndSlog("StartWebViewUpdateService");
-        mWebViewUpdateService = mSystemServiceManager.startService(WebViewUpdateService.class);
-        traceEnd();
+        if(!SystemProperties.getBoolean("config.disable_webview", false)){
+            traceBeginAndSlog("StartWebViewUpdateService");
+            mWebViewUpdateService = mSystemServiceManager.startService(WebViewUpdateService.class);
+            traceEnd();
+        }
     }
 
     /**
@@ -721,6 +723,9 @@ public final class SystemServer {
         boolean disableRtt = SystemProperties.getBoolean("config.disable_rtt", false);
         boolean disableMediaProjection = SystemProperties.getBoolean("config.disable_mediaproj",
                 false);
+        boolean disableMediaRouter = SystemProperties.getBoolean("config.disable_mediarouter",false);
+        boolean disableWebView = SystemProperties.getBoolean("config.disable_webview", false);
+        boolean disableClockwork = SystemProperties.getBoolean("config.disable_clockwork", false);
         boolean disableSerial = SystemProperties.getBoolean("config.disable_serial", false);
         boolean disableSearchManager = SystemProperties.getBoolean("config.disable_searchmanager",
                 false);
@@ -1505,14 +1510,16 @@ public final class SystemServer {
             }
 
             if (!disableNonCoreServices) {
-                traceBeginAndSlog("StartMediaRouterService");
-                try {
-                    mediaRouter = new MediaRouterService(context);
-                    ServiceManager.addService(Context.MEDIA_ROUTER_SERVICE, mediaRouter);
-                } catch (Throwable e) {
-                    reportWtf("starting MediaRouterService", e);
+                if(!disableMediaRouter){
+                    traceBeginAndSlog("StartMediaRouterService");
+                    try {
+                        mediaRouter = new MediaRouterService(context);
+                        ServiceManager.addService(Context.MEDIA_ROUTER_SERVICE, mediaRouter);
+                    } catch (Throwable e) {
+                        reportWtf("starting MediaRouterService", e);
+                    }
+                    traceEnd();
                 }
-                traceEnd();
 
                 if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT)) {
                     traceBeginAndSlog("StartFingerprintSensor");
@@ -1552,20 +1559,21 @@ public final class SystemServer {
             traceEnd();
         }
 
-        if (context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WATCH)) {
+        if (context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WATCH)
+                && !disableClockwork) {
             traceBeginAndSlog("StartWearConnectivityService");
-            //mSystemServiceManager.startService(WEAR_CONNECTIVITY_SERVICE_CLASS);
+            mSystemServiceManager.startService(WEAR_CONNECTIVITY_SERVICE_CLASS);
             traceEnd();
 
             if (!disableNonCoreServices) {
                 traceBeginAndSlog("StartWearTimeService");
-               // mSystemServiceManager.startService(WEAR_DISPLAY_SERVICE_CLASS);
-                //mSystemServiceManager.startService(WEAR_TIME_SERVICE_CLASS);
+                mSystemServiceManager.startService(WEAR_DISPLAY_SERVICE_CLASS);
+                mSystemServiceManager.startService(WEAR_TIME_SERVICE_CLASS);
                 traceEnd();
 
                 if (enableLeftyService) {
                     traceBeginAndSlog("StartWearLeftyService");
-                   // mSystemServiceManager.startService(WEAR_LEFTY_SERVICE_CLASS);
+                    mSystemServiceManager.startService(WEAR_LEFTY_SERVICE_CLASS);
                     traceEnd();
                 }
             }
@@ -1747,7 +1755,7 @@ public final class SystemServer {
             // be completed before allowring 3rd party
             final String WEBVIEW_PREPARATION = "WebViewFactoryPreparation";
             Future<?> webviewPrep = null;
-            if (!mOnlyCore) {
+            if (!disableWebView && !mOnlyCore) {
                 webviewPrep = SystemServerInitThreadPool.get().submit(() -> {
                     Slog.i(TAG, WEBVIEW_PREPARATION);
                     TimingsTraceLog traceLog = new TimingsTraceLog(
