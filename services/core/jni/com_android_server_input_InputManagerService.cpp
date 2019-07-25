@@ -279,7 +279,8 @@ private:
         // Display size information.
         DisplayViewport internalViewport;
         DisplayViewport externalViewport;
-        DisplayViewport tertiaryViewport;
+        DisplayViewport tertiaryViewport1;
+        DisplayViewport tertiaryViewport2;
         Vector<DisplayViewport> virtualViewports;
 
         // System UI visibility.
@@ -425,8 +426,10 @@ void NativeInputManager::setDisplayViewport(int32_t type, const DisplayViewport&
             v = &mLocked.externalViewport;
         } else if (viewportType == ViewportType::VIEWPORT_INTERNAL) {
             v = &mLocked.internalViewport;
-        } else if (viewportType == ViewportType::VIEWPORT_TERTIARY) {
-            v = &mLocked.tertiaryViewport;
+        } else if (viewportType == ViewportType::VIEWPORT_TERTIARY1) {
+            v = &mLocked.tertiaryViewport1;
+        } else if (viewportType == ViewportType::VIEWPORT_TERTIARY2) {
+            v = &mLocked.tertiaryViewport2;
         }
 
         if (v != NULL && *v != viewport) {
@@ -533,8 +536,10 @@ void NativeInputManager::getReaderConfiguration(InputReaderConfiguration* outCon
                 mLocked.internalViewport);
         outConfig->setPhysicalDisplayViewport(ViewportType::VIEWPORT_EXTERNAL,
                 mLocked.externalViewport);
-        outConfig->setPhysicalDisplayViewport(ViewportType::VIEWPORT_TERTIARY,
-                mLocked.tertiaryViewport);
+        outConfig->setPhysicalDisplayViewport(ViewportType::VIEWPORT_TERTIARY1,
+                mLocked.tertiaryViewport1);
+        outConfig->setPhysicalDisplayViewport(ViewportType::VIEWPORT_TERTIARY2,
+                mLocked.tertiaryViewport2);
         outConfig->setVirtualDisplayViewports(mLocked.virtualViewports);
 
         outConfig->disabledDevices = mLocked.disabledInputDevices;
