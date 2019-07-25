@@ -447,7 +447,7 @@ final class LocalDisplayAdapter extends DisplayAdapter {
                     }
                 } else {
                     mInfo.type = Display.TYPE_BUILT_IN;
-                    mInfo.touch = DisplayDeviceInfo.TOUCH_INTERNAL;
+                    mInfo.touch = DisplayDeviceInfo.TOUCH_EXTERNAL;
                     mInfo.name = getContext().getResources().getString(
                             com.android.internal.R.string.display_manager_built_in_display_name);
                     mInfo.flags |= DisplayDeviceInfo.FLAG_ROTATES_WITH_CONTENT;
