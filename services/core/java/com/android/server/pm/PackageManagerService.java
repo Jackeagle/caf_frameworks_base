@@ -319,6 +319,8 @@ import com.android.server.pm.permission.PermissionManagerService;
 import com.android.server.pm.permission.PermissionManagerServiceInternal;
 import com.android.server.pm.permission.PermissionManagerServiceInternal.PermissionCallback;
 import com.android.server.pm.permission.PermissionsState;
+import com.android.server.policy.PermissionPolicyInternal;
+import com.android.server.policy.PermissionPolicyInternal.OnInitializedCallback;
 import com.android.server.security.VerityUtils;
 import com.android.server.storage.DeviceStorageMonitorInternal;
 import com.android.server.wm.ActivityTaskManagerInternal;
@@ -16590,13 +16592,13 @@ public class PackageManagerService extends IPackageManager.Stub
                                 && compareSignatures(sharedUserSignatures,
                                         pkg.mSigningDetails.signatures)
                                         != PackageManager.SIGNATURE_MATCH) {
-                            if (SystemProperties.getInt("ro.product.first_api_level", 0) <= 28) {
+                            if (SystemProperties.getInt("ro.product.first_api_level", 0) <= 29) {
                                 // Mismatched signatures is an error and silently skipping system
                                 // packages will likely break the device in unforeseen ways.
-                                // However,
-                                // we allow the device to boot anyway because, prior to P,
-                                // vendors were
-                                // not expecting the platform to crash in this situation.
+                                // However, we allow the device to boot anyway because, prior to Q,
+                                // vendors were not expecting the platform to crash in this
+                                // situation.
+                                // This WILL be a hard failure on any new API levels after Q.
                                 throw new ReconcileFailure(
                                         INSTALL_PARSE_FAILED_INCONSISTENT_CERTIFICATES,
                                         "Signature mismatch for shared user: "
@@ -21633,6 +21635,17 @@ public class PackageManagerService extends IPackageManager.Stub
             mPermissionManager.updateAllPermissions(
                     StorageManager.UUID_PRIVATE_INTERNAL, false, mPackages.values(),
                     mPermissionCallback);
+
+            final PermissionPolicyInternal permissionPolicyInternal =
+                    LocalServices.getService(PermissionPolicyInternal.class);
+            permissionPolicyInternal.setOnInitializedCallback(userId -> {
+                // The SDK updated case is already handled when we run during the ctor.
+                synchronized (mPackages) {
+                    mPermissionManager.updateAllPermissions(
+                            StorageManager.UUID_PRIVATE_INTERNAL, false /*sdkUpdated*/,
+                            mPackages.values(), mPermissionCallback);
+                }
+            });
         }
 
         // Watch for external volumes that come and go over time
