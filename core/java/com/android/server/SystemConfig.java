@@ -732,6 +732,17 @@ public class SystemConfig {
            unsupportFeatures.add("android.hardware.sensor.stepdetector");
            unsupportFeatures.add("android.hardware.sensor.ambient_temperature");
            unsupportFeatures.add("android.hardware.sensor.relative_humidity");
+           //disable camera features
+           unsupportFeatures.add("android.hardware.camera");
+           unsupportFeatures.add("android.hardware.camera.autofocus");
+           unsupportFeatures.add("android.hardware.camera.flash");
+           unsupportFeatures.add("android.hardware.camera.front");
+           unsupportFeatures.add("android.hardware.camera.any");
+           unsupportFeatures.add("android.hardware.camera.level.full");
+           unsupportFeatures.add("android.hardware.camera.capability.manual_sensor");
+           unsupportFeatures.add("android.hardware.camera.capability.manual_post_processing");
+           unsupportFeatures.add("android.hardware.camera.capability.raw");
+           unsupportFeatures.add("android.hardware.camera.external");
            Slog.i(TAG,"Removing unsupported features");
         }
 
