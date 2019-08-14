@@ -28,6 +28,7 @@ import static android.net.ConnectivityManager.EXTRA_ERRORED_TETHER;
 import static android.net.ConnectivityManager.EXTRA_NETWORK_INFO;
 import static android.net.ConnectivityManager.TETHERING_BLUETOOTH;
 import static android.net.ConnectivityManager.TETHERING_INVALID;
+import static android.net.ConnectivityManager.TETHERING_P2P;
 import static android.net.ConnectivityManager.TETHERING_USB;
 import static android.net.ConnectivityManager.TETHERING_WIFI;
 import static android.net.ConnectivityManager.TETHER_ERROR_MASTER_ERROR;
@@ -76,6 +77,8 @@ import android.net.util.PrefixUtils;
 import android.net.util.SharedLog;
 import android.net.util.VersionedBroadcastListener;
 import android.net.wifi.WifiManager;
+import android.net.wifi.p2p.WifiP2pInfo;
+import android.net.wifi.p2p.WifiP2pManager;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.Handler;
@@ -189,6 +192,9 @@ public class Tethering extends BaseNetworkObserver {
     private final RemoteCallbackList<ITetheringEventCallback> mTetheringEventCallbacks =
             new RemoteCallbackList<>();
 
+    private WifiP2pManager.Channel mP2pChannel;
+    private boolean mP2pTethered = false;
+
     private volatile TetheringConfiguration mConfig;
     private InterfaceSet mCurrentUpstreamIfaceSet;
     private Notification.Builder mTetheredNotificationBuilder;
@@ -282,6 +288,7 @@ public class Tethering extends BaseNetworkObserver {
         filter.addAction(UsbManager.ACTION_USB_STATE);
         filter.addAction(CONNECTIVITY_ACTION);
         filter.addAction(WifiManager.WIFI_AP_STATE_CHANGED_ACTION);
+        filter.addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION);
         filter.addAction(Intent.ACTION_CONFIGURATION_CHANGED);
         mContext.registerReceiver(mStateReceiver, filter, null, handler);
 
@@ -300,6 +307,10 @@ public class Tethering extends BaseNetworkObserver {
 
     private WifiManager getWifiManager() {
         return (WifiManager) mContext.getSystemService(Context.WIFI_SERVICE);
+    }
+
+    private WifiP2pManager getWifiP2pManager() {
+        return (WifiP2pManager) mContext.getSystemService(Context.WIFI_P2P_SERVICE);
     }
 
     // NOTE: This is always invoked on the mLooper thread.
@@ -409,6 +420,10 @@ public class Tethering extends BaseNetworkObserver {
             case TETHERING_BLUETOOTH:
                 setBluetoothTethering(enable, receiver);
                 break;
+            case TETHERING_P2P:
+                result = setP2pTethering(enable);
+                sendTetherResult(receiver, result);
+                break;
             default:
                 Log.w(TAG, "Invalid tether type.");
                 sendTetherResult(receiver, TETHER_ERROR_UNKNOWN_IFACE);
@@ -468,6 +483,38 @@ public class Tethering extends BaseNetworkObserver {
                 adapter.closeProfileProxy(BluetoothProfile.PAN, proxy);
             }
         }, BluetoothProfile.PAN);
+    }
+
+    private int setP2pTethering(final boolean enable) {
+        final long ident = Binder.clearCallingIdentity();
+
+        try {
+            synchronized (mPublicSync) {
+                WifiP2pManager mgr = getWifiP2pManager();
+                if (mgr == null) {
+                    Log.e(TAG, "SetP2pTethering(" + enable + ") failed to get WifiP2pManager!");
+                    return TETHER_ERROR_SERVICE_UNAVAIL;
+                }
+                if (!enable && mP2pChannel == null) {
+                    // already disabled
+                    return TETHER_ERROR_NO_ERROR;
+                }
+                if (enable && mP2pChannel == null) {
+                    // get p2p channel
+                    mP2pChannel = mgr.initialize(mContext, mLooper, null);
+                }
+                if (mgr.setP2pTetherEnabled(mP2pChannel, enable)) {
+                    Log.e(TAG, "SetP2pTethering(" + enable + ") success");
+                    // clear p2p channel so that p2p can release.
+                    if (!enable) mP2pChannel = null;
+                    return TETHER_ERROR_NO_ERROR;
+                }
+            }
+        } finally {
+            Binder.restoreCallingIdentity(ident);
+        }
+        Log.w(TAG, "setP2pTethering(" + enable + ") failed");
+        return TETHER_ERROR_MASTER_ERROR;
     }
 
     public int tether(String iface) {
@@ -545,6 +592,7 @@ public class Tethering extends BaseNetworkObserver {
         boolean wifiTethered = false;
         boolean usbTethered = false;
         boolean bluetoothTethered = false;
+        boolean p2pTethered = false;
 
         final TetheringConfiguration cfg = mConfig;
 
@@ -565,6 +613,11 @@ public class Tethering extends BaseNetworkObserver {
                         wifiTethered = true;
                     } else if (cfg.isBluetooth(iface)) {
                         bluetoothTethered = true;
+                    } else {
+                        final IpServer ipServer = mTetherStates.valueAt(i).ipServer;
+                        if (ipServer.interfaceType() == TETHERING_P2P) {
+                            p2pTethered = true;
+                        }
                     }
                     tetherList.add(iface);
                 }
@@ -588,13 +641,13 @@ public class Tethering extends BaseNetworkObserver {
         }
 
         if (usbTethered) {
-            if (wifiTethered || bluetoothTethered) {
+            if (wifiTethered || bluetoothTethered || p2pTethered) {
                 showTetheredNotification(SystemMessage.NOTE_TETHER_GENERAL);
             } else {
                 showTetheredNotification(SystemMessage.NOTE_TETHER_USB);
             }
         } else if (wifiTethered) {
-            if (bluetoothTethered) {
+            if (bluetoothTethered || p2pTethered) {
                 showTetheredNotification(SystemMessage.NOTE_TETHER_GENERAL);
             } else {
                 /* We now have a status bar icon for WifiTethering, so drop the notification */
@@ -602,6 +655,8 @@ public class Tethering extends BaseNetworkObserver {
             }
         } else if (bluetoothTethered) {
             showTetheredNotification(SystemMessage.NOTE_TETHER_BLUETOOTH);
+        } else if (p2pTethered) {
+            showTetheredNotification(SystemMessage.NOTE_TETHER_GENERAL);
         } else {
             clearTetheredNotification();
         }
@@ -703,6 +758,8 @@ public class Tethering extends BaseNetworkObserver {
                 handleConnectivityAction(intent);
             } else if (action.equals(WifiManager.WIFI_AP_STATE_CHANGED_ACTION)) {
                 handleWifiApAction(intent);
+            } else if (action.equals(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION)) {
+                handleWifiP2pAction(intent);
             } else if (action.equals(Intent.ACTION_CONFIGURATION_CHANGED)) {
                 mLog.log("OBSERVED configuration changed");
                 updateConfiguration();
@@ -777,6 +834,52 @@ public class Tethering extends BaseNetworkObserver {
                         disableWifiIpServingLocked(ifname, curState);
                         mEntitlementMgr.stopProvisioningIfNeeded(TETHERING_WIFI);
                         break;
+                }
+            }
+        }
+
+        private void maybeReleaseInterfaceLocked(String ifname, int type) {
+            Log.e(TAG, "Canceling tethering request - ifname=" + ifname + " type=" + type);
+            if (!TextUtils.isEmpty(ifname)) {
+                final TetherState ts = mTetherStates.get(ifname);
+                if (ts != null) {
+                    ts.ipServer.unwanted();
+                    return;
+                }
+            }
+
+            for (int i = 0; i < mTetherStates.size(); i++) {
+                final IpServer ipServer = mTetherStates.valueAt(i).ipServer;
+                if (ipServer.interfaceType() == type) {
+                    ipServer.unwanted();
+                    return;
+                }
+            }
+
+            Log.i(TAG, "Error disabling tethering request; " +
+                  (TextUtils.isEmpty(ifname) ? "no interface name specified"
+                       : "specified interface: " + ifname));
+        }
+
+        private void handleWifiP2pAction(Intent intent) {
+            final String ifname = intent.getStringExtra(WifiP2pManager.EXTRA_WIFI_P2P_IFACE);
+            final WifiP2pInfo p2pInfo = (WifiP2pInfo)intent.getParcelableExtra(WifiP2pManager.EXTRA_WIFI_P2P_INFO);
+
+            Log.e(TAG, "handleWifiP2pAction() ifname=" + ifname + " tetherable=" + p2pInfo.tetherable
+                     + " isGroupOwner=" + p2pInfo.isGroupOwner + " groupFormed=" + p2pInfo.groupFormed);
+            synchronized (Tethering.this.mPublicSync) {
+                if (p2pInfo == null) return;
+
+                if (p2pInfo.groupFormed && p2pInfo.isGroupOwner && p2pInfo.tetherable) {
+                    if (TextUtils.isEmpty(ifname)) return;
+                    if (mP2pTethered) return;
+
+                    maybeTrackNewInterfaceLocked(ifname, TETHERING_P2P);
+                    changeInterfaceState(ifname, IpServer.STATE_TETHERED);
+                    mP2pTethered = true;
+                } else {
+                    mP2pTethered = false;
+                    maybeReleaseInterfaceLocked(ifname, TETHERING_P2P);
                 }
             }
         }
@@ -1025,7 +1128,7 @@ public class Tethering extends BaseNetworkObserver {
         if (!mForwardedDownstreams.isEmpty()) return true;
 
         synchronized (mPublicSync) {
-            return mWifiTetherRequested;
+            return mWifiTetherRequested || mP2pTethered;
         }
     }
 
