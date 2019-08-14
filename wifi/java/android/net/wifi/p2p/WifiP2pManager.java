@@ -205,6 +205,13 @@ public class WifiP2pManager {
         "android.net.wifi.p2p.CONNECTION_STATE_CHANGE";
 
     /**
+     * The lookup key for a iface String
+     * Retrieve with {@link android.content.Intent#getStringExtra(String)}.
+     * @hide
+     */
+    public static final String EXTRA_WIFI_P2P_IFACE = "wifiP2pIface";
+
+    /**
      * The lookup key for a {@link android.net.wifi.p2p.WifiP2pInfo} object
      * Retrieve with {@link android.content.Intent#getParcelableExtra(String)}.
      */
@@ -1253,6 +1260,58 @@ public class WifiP2pManager {
     public void cancelConnect(Channel c, ActionListener listener) {
         checkChannel(c);
         c.mAsyncChannel.sendMessage(CANCEL_CONNECT, 0, c.putListener(listener));
+    }
+
+    /**
+     * Set P2P configuration for tethered Group owner.
+     *
+     * @hide
+     */
+    public boolean setP2pTetherConfiguration(WifiP2pConfig config) {
+        try {
+            return mService.setP2pTetherConfiguration(config);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Get P2P configuration for tethered Group owner.
+     *
+     * @hide
+     */
+    public WifiP2pConfig getP2pTetherConfiguration() {
+        try {
+            return mService.getP2pTetherConfiguration();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Create a p2p group with the current device as the group owner with tether support.
+     *
+     * @hide
+     */
+    public boolean setP2pTetherEnabled(Channel c, boolean enable) {
+        checkChannel(c);
+
+        if (enable) {
+            Message resultMsg = c.mAsyncChannel.sendMessageSynchronously(
+                         CREATE_GROUP, WifiP2pGroup.TETHER_NET_ID);
+            if (resultMsg != null && resultMsg.what == CREATE_GROUP_SUCCEEDED) {
+                return true;
+            }
+        } else {
+            Message resultMsg = c.mAsyncChannel.sendMessageSynchronously(
+                         REMOVE_GROUP, 0);
+            if (resultMsg != null && resultMsg.what == REMOVE_GROUP_SUCCEEDED) {
+                return true;
+            }
+        }
+
+        Log.w(TAG, "setP2pTetherEnabled() failed - enable=" + enable);
+        return false;
     }
 
     /**
