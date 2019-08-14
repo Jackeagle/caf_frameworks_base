@@ -350,10 +350,12 @@ public class RestrictedLockUtils {
         }
         boolean isAccountTypeDisabled = false;
         String[] disabledTypes = dpm.getAccountTypesWithManagementDisabledAsUser(userId);
-        for (String type : disabledTypes) {
-            if (accountType.equals(type)) {
-                isAccountTypeDisabled = true;
-                break;
+        if(disabledTypes != null && disabledTypes.length > 0){
+            for (String type : disabledTypes) {
+                if (accountType.equals(type)) {
+                    isAccountTypeDisabled = true;
+                    break;
+                }
             }
         }
         if (!isAccountTypeDisabled) {

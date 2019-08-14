@@ -56,7 +56,8 @@ public class Divider extends SystemUI {
         putComponent(Divider.class, this);
         mDockDividerVisibilityListener = new DockDividerVisibilityListener();
         SystemServicesProxy ssp = Recents.getSystemServices();
-        ssp.registerDockedStackListener(mDockDividerVisibilityListener);
+        if (ssp != null)
+            ssp.registerDockedStackListener(mDockDividerVisibilityListener);
         mForcedResizableController = new ForcedResizableInfoActivityController(mContext);
         EventBus.getDefault().register(this);
     }

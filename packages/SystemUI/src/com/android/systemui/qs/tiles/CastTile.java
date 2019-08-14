@@ -74,7 +74,8 @@ public class CastTile extends QSTileImpl<BooleanState> {
 
     public CastTile(QSHost host) {
         super(host);
-        mController = Dependency.get(CastController.class);
+        //mController = Dependency.get(CastController.class);
+        mController = null;
         mDetailAdapter = new CastDetailAdapter();
         mKeyguard = Dependency.get(KeyguardMonitor.class);
         mActivityStarter = Dependency.get(ActivityStarter.class);
@@ -157,6 +158,7 @@ public class CastTile extends QSTileImpl<BooleanState> {
 
     @Override
     protected void handleUpdateState(BooleanState state, Object arg) {
+        if (mController == null) return;
         state.label = mContext.getString(R.string.quick_settings_cast_title);
         state.contentDescription = state.label;
         state.value = false;
@@ -267,8 +269,10 @@ public class CastTile extends QSTileImpl<BooleanState> {
             mItems.setEmptyState(R.drawable.ic_qs_cast_detail_empty,
                     R.string.quick_settings_cast_detail_empty_text);
             mItems.setCallback(this);
-            updateItems(mController.getCastDevices());
-            mController.setDiscovering(true);
+            if (mController != null) {
+                updateItems(mController.getCastDevices());
+                mController.setDiscovering(true);
+            }
             return mItems;
         }
 
@@ -315,7 +319,7 @@ public class CastTile extends QSTileImpl<BooleanState> {
 
         @Override
         public void onDetailItemClick(Item item) {
-            if (item == null || item.tag == null) return;
+            if (item == null || item.tag == null || mController == null) return;
             MetricsLogger.action(mContext, MetricsEvent.QS_CAST_SELECT);
             final CastDevice device = (CastDevice) item.tag;
             mController.startCasting(device);
@@ -323,7 +327,7 @@ public class CastTile extends QSTileImpl<BooleanState> {
 
         @Override
         public void onDetailItemDisconnect(Item item) {
-            if (item == null || item.tag == null) return;
+            if (item == null || item.tag == null || mController == null) return;
             MetricsLogger.action(mContext, MetricsEvent.QS_CAST_DISCONNECT);
             final CastDevice device = (CastDevice) item.tag;
             mController.stopCasting(device);
