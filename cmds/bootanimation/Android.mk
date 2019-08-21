@@ -84,7 +84,8 @@ LOCAL_SHARED_LIBRARIES := \
     libgui \
     libtinyalsa \
     libbase \
-    libregionalization
+    libregionalization \
+    libmedia
 
 ifdef TARGET_32_BIT_SURFACEFLINGER
 LOCAL_32_BIT_ONLY := true
