@@ -646,14 +646,14 @@ public class LockSettingsService extends ILockSettings.Stub {
         public void onReceive(Context context, Intent intent) {
             if (Intent.ACTION_USER_ADDED.equals(intent.getAction())) {
                 // Notify keystore that a new user was added.
-                final int userHandle = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, 0);
-                if (userHandle > UserHandle.USER_SYSTEM) {
-                    removeUser(userHandle, /* unknownUser= */ true);
-                }
-                final KeyStore ks = KeyStore.getInstance();
-                final UserInfo parentInfo = mUserManager.getProfileParent(userHandle);
-                final int parentHandle = parentInfo != null ? parentInfo.id : -1;
-                ks.onUserAdded(userHandle, parentHandle);
+               // final int userHandle = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, 0);
+               // if (userHandle > UserHandle.USER_SYSTEM) {
+                //    removeUser(userHandle, /* unknownUser= */ true);
+               // }
+               // final KeyStore ks = KeyStore.getInstance();
+                //final UserInfo parentInfo = mUserManager.getProfileParent(userHandle);
+                //final int parentHandle = parentInfo != null ? parentInfo.id : -1;
+                //ks.onUserAdded(userHandle, parentHandle);
             } else if (Intent.ACTION_USER_STARTING.equals(intent.getAction())) {
                 final int userHandle = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, 0);
                 mStorage.prefetchUser(userHandle);
@@ -817,7 +817,7 @@ public class LockSettingsService extends ILockSettings.Stub {
                     Slog.e(TAG, "Invalid tied profile lock type: " + quality);
                 }
             }
-            try {
+           /* try {
                 final String alias = LockPatternUtils.PROFILE_KEY_NAME_ENCRYPT + userInfo.id;
                 java.security.KeyStore keyStore =
                         java.security.KeyStore.getInstance("AndroidKeyStore");
@@ -828,7 +828,7 @@ public class LockSettingsService extends ILockSettings.Stub {
             } catch (KeyStoreException | NoSuchAlgorithmException |
                     CertificateException | IOException e) {
                 Slog.e(TAG, "Unable to remove tied profile key", e);
-            }
+            }*/
         }
 
         boolean isWatch = mContext.getPackageManager().hasSystemFeature(
@@ -2062,8 +2062,8 @@ public class LockSettingsService extends ILockSettings.Stub {
         mStrongAuth.removeUser(userId);
         tryRemoveUserFromSpCacheLater(userId);
 
-        final KeyStore ks = KeyStore.getInstance();
-        ks.onUserRemoved(userId);
+//        final KeyStore ks = KeyStore.getInstance();
+//        ks.onUserRemoved(userId);
 
         try {
             final IGateKeeperService gk = getGateKeeperService();

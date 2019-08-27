@@ -1207,7 +1207,7 @@ public final class SystemServer {
 
             final boolean hasPdb = !SystemProperties.get(PERSISTENT_DATA_BLOCK_PROP).equals("");
             final boolean hasGsi = SystemProperties.getInt(GSI_RUNNING_PROP, 0) > 0;
-            if (hasPdb && !hasGsi) {
+/*            if (hasPdb && !hasGsi) {
                 traceBeginAndSlog("StartPersistentDataBlock");
                 mSystemServiceManager.startService(PersistentDataBlockService.class);
                 traceEnd();
@@ -1223,7 +1223,7 @@ public final class SystemServer {
                 mSystemServiceManager.startService(OemLockService.class);
                 traceEnd();
             }
-
+*/
             traceBeginAndSlog("StartDeviceIdleController");
             mSystemServiceManager.startService(DeviceIdleController.class);
             traceEnd();
@@ -1321,7 +1321,7 @@ public final class SystemServer {
             }
             traceEnd();
 
-            if (context.getPackageManager().hasSystemFeature(
+           if (context.getPackageManager().hasSystemFeature(
                     PackageManager.FEATURE_WIFI)) {
                 // Wifi Service must be started first for wifi-related services.
                 traceBeginAndSlog("StartWifi");

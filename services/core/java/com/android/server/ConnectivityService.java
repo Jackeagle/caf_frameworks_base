@@ -2122,7 +2122,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
         // Try bringing up tracker, but KeyStore won't be ready yet for secondary users so wait
         // for user to unlock device too.
-        updateLockdownVpn();
+        //updateLockdownVpn();
 
         // Create network requests for always-on networks.
         mHandler.sendMessage(mHandler.obtainMessage(EVENT_CONFIGURE_ALWAYS_ON_NETWORKS));
