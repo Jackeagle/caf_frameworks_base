@@ -638,7 +638,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     volatile boolean mScreenOnEarly;
     boolean mScreenOnFully;
     ScreenOnListener mScreenOnListener;
-    boolean mKeyguardDrawComplete;
+    volatile boolean mKeyguardDrawComplete;
     boolean mWindowManagerDrawComplete;
     boolean mOrientationSensorEnabled = false;
     int mCurrentAppOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
@@ -7764,9 +7764,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     @Override
     public boolean canDismissBootAnimation() {
-        synchronized (mLock) {
-            return mKeyguardDrawComplete;
-        }
+	return mKeyguardDrawComplete;
     }
 
     ProgressDialog mBootMsgDialog = null;
