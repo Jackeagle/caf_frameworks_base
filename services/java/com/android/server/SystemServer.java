@@ -767,6 +767,9 @@ public final class SystemServer {
         boolean isWatch = context.getPackageManager().hasSystemFeature(
                 PackageManager.FEATURE_WATCH);
 
+        boolean enableVrService = context.getPackageManager().hasSystemFeature(
+                PackageManager.FEATURE_VR_MODE_HIGH_PERFORMANCE);
+
         // For debugging RescueParty
         if (Build.IS_DEBUGGABLE && SystemProperties.getBoolean("debug.crash_system", false)) {
             throw new RuntimeException();
@@ -900,7 +903,7 @@ public final class SystemServer {
                 traceLog.traceEnd();
             }, START_HIDL_SERVICES);
 
-            if (!isWatch) {
+            if (!isWatch && enableVrService) {
                 traceBeginAndSlog("StartVrManagerService");
                 mSystemServiceManager.startService(VrManagerService.class);
                 traceEnd();
@@ -1187,7 +1190,6 @@ public final class SystemServer {
                 ServiceManager.addService(Context.CONNECTIVITY_SERVICE, connectivity,
                             /* allowIsolated= */ false,
                     DUMP_FLAG_PRIORITY_HIGH | DUMP_FLAG_PRIORITY_NORMAL);
-                networkStats.bindConnectivityManager(connectivity);
                 networkPolicy.bindConnectivityManager(connectivity);
             } catch (Throwable e) {
                 reportWtf("starting Connectivity Service", e);

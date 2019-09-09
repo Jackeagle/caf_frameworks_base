@@ -1026,9 +1026,9 @@
     <string name="add_contact_desc" msgid="4830217847004590345">"เพิ่มในรายชื่อติดต่อ"</string>
     <string name="view_calendar" msgid="979609872939597838">"ดู"</string>
     <string name="view_calendar_desc" msgid="5828320291870344584">"ดูเวลาที่เลือกในปฏิทิน"</string>
-    <string name="add_calendar_event" msgid="1953664627192056206">"กำหนดการ"</string>
+    <string name="add_calendar_event" msgid="1953664627192056206">"ตั้งเวลา"</string>
     <string name="add_calendar_event_desc" msgid="4326891793260687388">"ตั้งเวลากิจกรรมสำหรับเวลาที่เลือก"</string>
-    <string name="view_flight" msgid="7691640491425680214">"แทร็ก"</string>
+    <string name="view_flight" msgid="7691640491425680214">"ติดตาม"</string>
     <string name="view_flight_desc" msgid="3876322502674253506">"ติดตามเที่ยวบินที่เลือก"</string>
     <string name="low_internal_storage_view_title" msgid="5576272496365684834">"พื้นที่จัดเก็บเหลือน้อย"</string>
     <string name="low_internal_storage_view_text" msgid="6640505817617414371">"บางฟังก์ชันระบบอาจไม่ทำงาน"</string>
@@ -1456,7 +1456,7 @@
     <string name="data_usage_mobile_limit_snoozed_title" msgid="3171402244827034372">"เกินปริมาณเน็ตมือถือที่กำหนดไว้"</string>
     <string name="data_usage_wifi_limit_snoozed_title" msgid="3547771791046344188">"เกินขีดจำกัดของข้อมูล Wi-Fi"</string>
     <string name="data_usage_limit_snoozed_body" msgid="1671222777207603301">"คุณใช้อินเทอร์เน็ตเกินไป <xliff:g id="SIZE">%s</xliff:g> จากปริมาณที่กำหนดไว้"</string>
-    <string name="data_usage_restricted_title" msgid="5965157361036321914">"จำกัดข้อมูลแบ็กกราวด์"</string>
+    <string name="data_usage_restricted_title" msgid="5965157361036321914">"จำกัดอินเทอร์เน็ตที่ใช้งานอยู่เบื้องหลัง"</string>
     <string name="data_usage_restricted_body" msgid="469866376337242726">"แตะเพื่อนำข้อจำกัดออก"</string>
     <string name="data_usage_rapid_title" msgid="1809795402975261331">"ปริมาณการใช้เน็ตมือถือสูง"</string>
     <string name="data_usage_rapid_body" msgid="6897825788682442715">"แอปของคุณใช้อินเทอร์เน็ตมากกว่าปกติ"</string>
