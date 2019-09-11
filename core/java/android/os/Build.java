@@ -845,8 +845,10 @@ public class Build {
     public static boolean isBuildConsistent() {
         // Don't care on eng builds.  Incremental build may trigger false negative.
         if (IS_ENG) return true;
-        //disalbe check compatibility due to kernel4.9 can't satisfy androidO requirement
-        if (false /*IS_TREBLE_ENABLED*/) {
+        // Disalbe check compatibility due to kernel4.9 can't satisfy androidO requirement
+        if (IS_TREBLE_ENABLED) {
+            return true;
+            /*
             int result = VintfObject.verify(new String[0]);
 
             if (result != 0) {
@@ -855,6 +857,7 @@ public class Build {
             }
 
             return result == 0;
+            */
         }
 
         final String system = SystemProperties.get("ro.build.fingerprint");

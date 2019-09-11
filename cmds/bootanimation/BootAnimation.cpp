@@ -67,6 +67,10 @@
 
 #include "audioplay.h"
 
+#include <system/audio.h>
+#include <media/mediaplayer.h>
+#include <media/MediaPlayerInterface.h>
+
 namespace android {
 
 static const char OEM_BOOTANIMATION_FILE[] = "/oem/media/bootanimation.zip";
@@ -391,6 +395,49 @@ bool BootAnimation::android()
 
     mCallbacks->init({});
 
+    /* Excute playback in an early stage to tigger firmware loading
+     *  The firmware of aw8896 codec won't be loaded until the first music is going to playback.
+     *  This will lead to a issue that the first time's playback has low response or has no sound
+     *  if the music is very short.
+     *  Add a workaround here to force trigger the fw loading.
+     *
+     */
+    sp<MediaPlayer> mediaplayer = nullptr;
+    status_t mediastatus = NO_ERROR;
+    bool need_fw = false;
+    int fd = -1;
+    do {
+        // Only play sounds for system boots, not runtime restarts or shutting down.
+        if (android::base::GetBoolProperty("sys.boot_completed", false) ||
+            !android::base::GetProperty("sys.powerctl", "").empty())
+            break;
+
+        ALOGD("trigger codec firmware loading begin");
+
+        const char* path = "/system/media/audio/ui/Effect_Tick.ogg";
+        need_fw = true;
+        fd = open(path, O_RDONLY);
+
+        if (fd < 0) {
+            ALOGE("%s does not exist", path);
+            mediastatus = NAME_NOT_FOUND;
+            break;
+        }
+        mediaplayer = new MediaPlayer();
+        mediaplayer->setVolume(0.0, 0.0);
+
+        if (NO_ERROR != (mediastatus = mediaplayer->setAudioStreamType(AUDIO_STREAM_SYSTEM)))
+            break;
+        if (NO_ERROR != (mediastatus = mediaplayer->setDataSource(fd, 0, 0x7ffffffffffffffLL)))
+            break;
+        if (NO_ERROR != (mediastatus = mediaplayer->prepare()))
+            break;
+        if (NO_ERROR != (mediastatus = mediaplayer->start())) {
+            ALOGE("trigger codec firmware loading failed");
+            break;
+        }
+    } while(0);
+
     // clear screen
     glShadeModel(GL_FLAT);
     glDisable(GL_DITHER);
@@ -445,9 +492,14 @@ bool BootAnimation::android()
 
         checkExit();
     } while (!exitPending());
-
     glDeleteTextures(1, &mAndroid[0].name);
     glDeleteTextures(1, &mAndroid[1].name);
+
+    if (NO_ERROR == mediastatus && need_fw)
+        mediaplayer->stop();
+    if (fd >= 0)
+        close(fd);
+
     return false;
 }
 
