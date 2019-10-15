@@ -17,6 +17,7 @@
 package android.net.wifi.p2p;
 
 import android.os.Messenger;
+import android.net.wifi.p2p.WifiP2pConfig;
 
 /**
  * Interface that WifiP2pService implements
@@ -30,5 +31,7 @@ interface IWifiP2pManager
     oneway void close(in IBinder binder);
     void setMiracastMode(int mode);
     void checkConfigureWifiDisplayPermission();
+    boolean setP2pTetherConfiguration(in WifiP2pConfig config);
+    WifiP2pConfig getP2pTetherConfiguration();
 }
 
