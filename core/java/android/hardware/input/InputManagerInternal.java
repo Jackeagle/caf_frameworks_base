@@ -37,8 +37,8 @@ public abstract class InputManagerInternal {
             DisplayViewport externalTouchViewport, List<DisplayViewport> virtualTouchViewports);
 
     public abstract void setDisplayViewports(DisplayViewport defaultViewport,
-            DisplayViewport externalTouchViewport, DisplayViewport tertiaryTouchViewport,
-            List<DisplayViewport> virtualTouchViewports);
+            DisplayViewport externalTouchViewport, DisplayViewport tertiaryTouchViewport1,
+            DisplayViewport tertiaryTouchViewport2, List<DisplayViewport> virtualTouchViewports);
 
     /**
      * Called by the power manager to tell the input manager whether it should start
