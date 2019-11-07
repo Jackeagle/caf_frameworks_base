@@ -140,6 +140,7 @@
     <protected-broadcast android:name="android.bluetooth.adapter.action.LOCAL_NAME_CHANGED" />
     <protected-broadcast android:name="android.bluetooth.adapter.action.BLUETOOTH_ADDRESS_CHANGED" />
     <protected-broadcast android:name="android.bluetooth.adapter.action.CONNECTION_STATE_CHANGED" />
+    <protected-broadcast android:name="android.bluetooth.adapter.action.CUSTOM_ACTION_RESULT" />
     <protected-broadcast android:name="android.bluetooth.device.action.UUID" />
     <protected-broadcast android:name="android.bluetooth.device.action.MAS_INSTANCE" />
     <protected-broadcast android:name="android.bluetooth.device.action.ALIAS_CHANGED" />
@@ -211,6 +212,8 @@
     <protected-broadcast
         android:name="android.bluetooth.avrcp-controller.profile.action.TRACK_EVENT" />
     <protected-broadcast
+        android:name="android.bluetooth.avrcp-controller.profile.action.UIDS_EVENT" />
+    <protected-broadcast
         android:name="android.bluetooth.input.profile.action.CONNECTION_STATE_CHANGED" />
     <protected-broadcast
         android:name="android.bluetooth.input.profile.action.IDLE_TIME_CHANGED" />
@@ -226,6 +229,8 @@
     <protected-broadcast android:name="android.bluetooth.mapmce.profile.action.MESSAGE_RECEIVED" />
     <protected-broadcast android:name="android.bluetooth.mapmce.profile.action.MESSAGE_SENT_SUCCESSFULLY" />
     <protected-broadcast android:name="android.bluetooth.mapmce.profile.action.MESSAGE_DELIVERED_SUCCESSFULLY" />
+    <protected-broadcast android:name="android.bluetooth.mapmce.profile.action.MESSAGE_READ_STATUS_CHANGED" />
+    <protected-broadcast android:name="android.bluetooth.mapmce.profile.action.ext.MESSAGE_DELETED_STATUS_CHANGED" />
     <protected-broadcast
         android:name="com.android.bluetooth.BluetoothMapContentObserver.action.MESSAGE_SENT" />
     <protected-broadcast
