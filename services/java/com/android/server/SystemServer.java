@@ -1759,13 +1759,13 @@ public final class SystemServer {
                     traceLog.traceEnd();
                 }, WEBVIEW_PREPARATION);
             }
-            /*
+
             if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE)) {
                 traceBeginAndSlog("StartCarServiceHelperService");
                 mSystemServiceManager.startService(CarServiceHelperService.class);
                 traceEnd();
             }
-            */
+
             traceBeginAndSlog("StartSystemUI");
             try {
                 startSystemUi(context, windowManagerF);
