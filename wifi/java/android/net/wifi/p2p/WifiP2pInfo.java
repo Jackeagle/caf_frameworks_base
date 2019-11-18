@@ -35,6 +35,10 @@ public class WifiP2pInfo implements Parcelable {
     /** Indicates if the current device is the group owner */
     public boolean isGroupOwner;
 
+    /** Indicates if the current device is tetherable */
+    /** @hide */
+    public boolean tetherable;
+
     /** Group owner address */
     public InetAddress groupOwnerAddress;
 
@@ -59,6 +63,7 @@ public class WifiP2pInfo implements Parcelable {
         if (source != null) {
             groupFormed = source.groupFormed;
             isGroupOwner = source.isGroupOwner;
+            tetherable = source.tetherable;
             groupOwnerAddress = source.groupOwnerAddress;
        }
     }
@@ -67,6 +72,7 @@ public class WifiP2pInfo implements Parcelable {
     public void writeToParcel(Parcel dest, int flags) {
         dest.writeByte(groupFormed ? (byte)1 : (byte)0);
         dest.writeByte(isGroupOwner ? (byte)1 : (byte)0);
+        dest.writeByte(tetherable ? (byte)1 : (byte)0);
 
         if (groupOwnerAddress != null) {
             dest.writeByte((byte)1);
@@ -83,6 +89,7 @@ public class WifiP2pInfo implements Parcelable {
                 WifiP2pInfo info = new WifiP2pInfo();
                 info.groupFormed = (in.readByte() == 1);
                 info.isGroupOwner = (in.readByte() == 1);
+                info.tetherable = (in.readByte() == 1);
                 if (in.readByte() == 1) {
                     try {
                         info.groupOwnerAddress = InetAddress.getByAddress(in.createByteArray());

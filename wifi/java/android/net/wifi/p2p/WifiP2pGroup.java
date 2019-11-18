@@ -47,6 +47,11 @@ public class WifiP2pGroup implements Parcelable {
      * {@hide} */
     public static final int PERSISTENT_NET_ID = -2;
 
+    /** The tether network id.
+     * Creates a new Automonous GO with ip tethered
+     * {@hide} */
+    public static final int TETHER_NET_ID = -3;
+
     /** The network name */
     private String mNetworkName;
 

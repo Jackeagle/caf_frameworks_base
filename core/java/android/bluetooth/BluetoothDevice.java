@@ -872,6 +872,102 @@ public final class BluetoothDevice implements Parcelable {
     public static final String EXTRA_MAS_INSTANCE =
             "android.bluetooth.device.extra.MAS_INSTANCE";
 
+    /** @hide */
+    public static final String ACTION_CUSTOM_ACTION_RESULT =
+            "android.bluetooth.adapter.action.CUSTOM_ACTION_RESULT";
+
+    /**
+     * Used as an extra field in {@link #ACTION_CUSTOM_ACTION_RESULT} intent.
+     * intents for link key number string.
+     *
+     * @hide
+     */
+    public static final String EXTRA_KEY_LINK_KEY = "link_key";
+
+    /**
+     * Used as an extra field in {@link #ACTION_CUSTOM_ACTION_RESULT} intent.
+     * intents for Link Key Notification Event. Possible values are:
+     * {@link #LKEY_TYPE_COMBINATION}, {@link #LKEY_TYPE_LOCAL_UNIT},
+     * {@link #LKEY_TYPE_REMOTE_UNIT}, {@link #LKEY_TYPE_DEBUG_COMB},
+     * {@link #LKEY_TYPE_UNAUTH_COMB}, {@link #LKEY_TYPE_AUTH_COMB},
+     * {@link #LKEY_TYPE_CHANGED_COMB}, {@link #LKEY_TYPE_UNAUTH_COMB_P_256},
+     * {@link #LKEY_TYPE_AUTH_COMB_P_256}, {@link #LKEY_TYPE_NO_LINK},
+     *
+     * @hide
+     */
+
+    public static final String EXTRA_KEY_LINK_KEY_TYPE = "link_key_type";
+
+    /**
+     * link ket type is Combination Key.
+     *
+     * @hide
+     */
+    public static final int LKEY_TYPE_COMBINATION = 0x00;
+
+    /**
+     * link ket type is Local Unit Key.
+     *
+     * @hide
+     */
+    public static final int LKEY_TYPE_LOCAL_UNIT = 0x01;
+
+    /**
+     * link ket type is Remote Unit Key.
+     *
+     * @hide
+     */
+    public static final int LKEY_TYPE_REMOTE_UNIT = 0x02;
+
+    /**
+     * link ket type is Debug Combination Key.
+     *
+     * @hide
+     */
+    public static final int LKEY_TYPE_DEBUG_COMB = 0x03;
+
+    /**
+     * link ket type is Unauthenticated Combination Key generated from P-192.
+     *
+     * @hide
+     */
+    public static final int LKEY_TYPE_UNAUTH_COMB = 0x04;
+
+    /**
+     * link ket type is Authenticated Combination Key generated from P-192.
+     *
+     * @hide
+     */
+    public static final int TYPE_AUTH_COMB = 0x05;
+
+    /**
+     * link ket type is Changed Combination Key.
+     *
+     * @hide
+     */
+    public static final int LKEY_TYPE_CHANGED_COMB = 0x06;
+
+    /**
+     * link ket type is Unauthenticated Combination Key generated from P-256.
+     *
+     * @hide
+     */
+    public static final int LKEY_TYPE_UNAUTH_COMB_P_256 = 0x07;
+
+    /**
+     * link ket type is Authenticated Combination Key generated from P-256.
+     *
+     * @hide
+     */
+    public static final int LKEY_TYPE_AUTH_COMB_P_256 = 0x08;
+
+    /**
+     * link ket type is no link key.
+     *
+     * @hide
+     */
+    public static final int LKEY_TYPE_NO_LINK = -1;
+
     /**
      * Lazy initialization. Guaranteed final after first object constructed, or
      * getService() called.
@@ -1229,6 +1325,59 @@ public final class BluetoothDevice implements Parcelable {
             Log.e(TAG, "", e);
         }
         return false;
+    }
+
+    /**
+     * Start the bonding (pairing) process with the remote device using the
+     * specified linkkey and key details.
+     *
+     * <p>This is an asynchronous call, it will return immediately. Register
+     * for {@link #ACTION_BOND_STATE_CHANGED} intents to be notified when
+     * the bonding process completes, and its result.
+     *
+     * <p>Android system services will handle the necessary user interactions
+     * to confirm and complete the bonding process.
+     *
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH_ADMIN}.
+     *
+     * @param linkKey - Linkkey to use
+     * @param linkKeyType - Linkkey type
+     * @param pinLen - pin length
+     * @return false on immediate error, true if bonding will begin
+     * @hide
+     */
+     public boolean addOutOfBandBondDevice(String linkKey, int linkKeyType, int pinLen) {
+        final IBluetooth service = sService;
+        if (service == null) {
+            Log.w(TAG, "BT not enabled, addOutOfBandBondDevice failed");
+            return false;
+        }
+        try {
+            return service.addOutOfBandBondDevice(this, linkKey, linkKeyType, pinLen);
+        } catch (RemoteException e) {
+            Log.e(TAG, "", e);
+        }
+        return false;
+    }
+
+    /**
+     * get link key numbers and type of current device.
+     *
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH_ADMIN}.
+     *
+     * @hide
+     */
+    public void getLinkKey() {
+        final IBluetooth service = sService;
+        if (service == null) {
+            Log.w(TAG, "BT not enabled, getLinkKey failed");
+            return;
+        }
+        try {
+            service.getLinkKey(this);
+        } catch (RemoteException e) {
+            Log.e(TAG, "", e);
+        }
     }
 
     /** @hide */

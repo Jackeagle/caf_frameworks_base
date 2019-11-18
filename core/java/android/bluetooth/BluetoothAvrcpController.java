@@ -76,6 +76,28 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
     public static final String EXTRA_PLAYER_SETTING =
             "android.bluetooth.avrcp-controller.profile.extra.PLAYER_SETTING";
 
+    /**
+     * Intent used to broadcast the change in connection state of the AVRCP Controller
+     * profile.
+     *
+     * <p>This intent will have 1 extra:
+     * <ul>
+     *   <li> {@link BluetoothDevice#EXTRA_DEVICE} - The remote device. </li>
+     * </ul>
+     *
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH} permission to
+     * receive.
+     */
+    public static final String ACTION_UIDS_EVENT =
+        "android.bluetooth.avrcp-controller.profile.action.UIDS_EVENT";
+
+    /* Remote supported Features */
+    public static final int BTRC_FEAT_NONE = 0x00;
+    public static final int BTRC_FEAT_METADATA = 0x01;
+    public static final int BTRC_FEAT_ABSOLUTE_VOLUME = 0x02;
+    public static final int BTRC_FEAT_BROWSE = 0x04;
+    public static final int BTRC_FEAT_COVER_ART = 0x08;
+
     private BluetoothAdapter mAdapter;
     private final BluetoothProfileConnector<IBluetoothAvrcpController> mProfileConnector =
             new BluetoothProfileConnector(this, BluetoothProfile.AVRCP_CONTROLLER,
