@@ -49,6 +49,11 @@ import com.android.systemui.SysuiTestCase;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.statusbar.NotificationMediaManager;
 import com.android.systemui.statusbar.StatusBarState;
+<<<<<<< HEAD
+=======
+import com.android.systemui.statusbar.phone.DozeParameters;
+import com.android.systemui.statusbar.phone.KeyguardBypassController;
+>>>>>>> 0d7e17eb676695de8b19ad2ec33fdfcefa165b97
 import com.android.systemui.statusbar.policy.ZenModeController;
 import com.android.systemui.util.wakelock.SettableWakeLock;
 
@@ -77,11 +82,15 @@ public class KeyguardSliceProviderTest extends SysuiTestCase {
     @Mock
     private StatusBarStateController mStatusBarStateController;
     @Mock
+    private KeyguardBypassController mKeyguardBypassController;
+    @Mock
     private ZenModeController mZenModeController;
     @Mock
     private SettableWakeLock mMediaWakeLock;
     @Mock
     private KeyguardUpdateMonitor mKeyguardUpdateMonitor;
+    @Mock
+    private DozeParameters mDozeParameters;
     private TestableKeyguardSliceProvider mProvider;
     private boolean mIsZenMode;
 
@@ -91,7 +100,8 @@ public class KeyguardSliceProviderTest extends SysuiTestCase {
         mIsZenMode = false;
         mProvider = new TestableKeyguardSliceProvider();
         mProvider.attachInfo(getContext(), null);
-        mProvider.initDependencies(mNotificationMediaManager, mStatusBarStateController);
+        mProvider.initDependencies(mNotificationMediaManager, mStatusBarStateController,
+                mKeyguardBypassController, mDozeParameters);
         SliceProvider.setSpecs(new HashSet<>(Arrays.asList(SliceSpecs.LIST)));
     }
 
@@ -111,10 +121,23 @@ public class KeyguardSliceProviderTest extends SysuiTestCase {
     }
 
     @Test
-    public void onBindSlice_readsMedia() {
+    public void onBindSlice_readsMedia_withoutBypass() {
         MediaMetadata metadata = mock(MediaMetadata.class);
         when(metadata.getText(any())).thenReturn("metadata");
         mProvider.onDozingChanged(true);
+        mProvider.onMetadataOrStateChanged(metadata, PlaybackState.STATE_PLAYING);
+        mProvider.onBindSlice(mProvider.getUri());
+        verify(metadata).getText(eq(MediaMetadata.METADATA_KEY_TITLE));
+        verify(metadata).getText(eq(MediaMetadata.METADATA_KEY_ARTIST));
+        verify(mNotificationMediaManager).getMediaIcon();
+    }
+
+    @Test
+    public void onBindSlice_readsMedia_withBypass_notDozing() {
+        MediaMetadata metadata = mock(MediaMetadata.class);
+        when(metadata.getText(any())).thenReturn("metadata");
+        when(mKeyguardBypassController.getBypassEnabled()).thenReturn(true);
+        when(mDozeParameters.getAlwaysOn()).thenReturn(true);
         mProvider.onMetadataOrStateChanged(metadata, PlaybackState.STATE_PLAYING);
         mProvider.onBindSlice(mProvider.getUri());
         verify(metadata).getText(eq(MediaMetadata.METADATA_KEY_TITLE));
