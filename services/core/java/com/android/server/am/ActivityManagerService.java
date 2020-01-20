@@ -6559,10 +6559,10 @@ public class ActivityManagerService extends IActivityManager.Stub
             final int NA = apps.size();
             for (int ia=0; ia<NA; ia++) {
                 ProcessRecord app = apps.valueAt(ia);
-				if("false".equals(SystemProperties.get("def_nfc_on")) && app.processName == "com.android.nfc") {
-				    app.persistent = false;
-				    app.setAdj = ProcessList.HOME_APP_ADJ;
-				}
+                if("false".equals(SystemProperties.get("def_nfc_on")) && app.processName.equals("com.android.nfc")) {
+                    app.persistent = false;
+                    app.setAdj = ProcessList.HOME_APP_ADJ;
+                }
                 if (app.persistent && !evenPersistent) {
                     // we don't kill persistent processes
                     continue;
