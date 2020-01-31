@@ -4006,6 +4006,11 @@ public class ActivityManagerService extends IActivityManager.Stub
             mBatteryStatsService.noteProcessStart(app.processName, app.info.uid);
             checkTime(startTime, "startProcess: done updating battery stats");
 
+            if("false".equals(SystemProperties.get("def_nfc_on")) && app.processName.equals("com.android.nfc")) {
+                app.persistent = true;
+                app.maxAdj = ProcessList.PERSISTENT_PROC_ADJ;
+            }
+
             EventLog.writeEvent(EventLogTags.AM_PROC_START,
                     UserHandle.getUserId(uid), startResult.pid, uid,
                     app.processName, hostingType,
