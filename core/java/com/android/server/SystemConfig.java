@@ -715,7 +715,7 @@ public class SystemConfig {
             removeFeature(PackageManager.FEATURE_VULKAN_HARDWARE_COMPUTE);
         }
 
-        if ((SystemProperties.get("ro.baseband")).equals("apq")) {
+        if (SystemProperties.get("ro.baseband").matches("apq|mdm|unknown")) {
            //disable telephony features
            unsupportFeatures.add("android.hardware.telephony");
            unsupportFeatures.add("android.hardware.telephony.gsm");
