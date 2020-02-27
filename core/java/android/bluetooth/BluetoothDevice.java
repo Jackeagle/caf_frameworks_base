@@ -2145,4 +2145,40 @@ public final class BluetoothDevice implements Parcelable {
         return new BluetoothSocket(BluetoothSocket.TYPE_L2CAP_LE, -1, false, false, this, psm,
                 null);
     }
+
+    /**
+     * Remove ACL connection of the remote device and optionally
+     * remove bonding.
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH_ADMIN}.
+     *
+     * @param removeDevice remove bonding info or not.
+     * @param transport Bluetooth transport to use.
+     * @return true on success, false on error
+     * @hide
+     */
+    @RequiresPermission(Manifest.permission.BLUETOOTH)
+    public boolean removeAcl(boolean removeDevice, int transport) {
+        final IBluetooth service = sService;
+        if (service == null) {
+            Log.e(TAG, "BT not enabled. Cannot remove ACL");
+            return false;
+        }
+        if (TRANSPORT_AUTO > transport || transport > TRANSPORT_LE) {
+            throw new IllegalArgumentException(transport + " is not a valid Bluetooth transport");
+        }
+        try {
+            if (isConnected()) {
+                Log.i(TAG, "removeAcl() for device " + getAddress()
+                        + " removeDevice : " + removeDevice
+                        + " called by pid: " + Process.myPid()
+                        + " tid: " + Process.myTid());
+                return service.removeAcl(this, removeDevice, transport);
+            } else {
+                Log.e(TAG, "ACL NOT connected");
+            }
+        } catch (RemoteException e) {
+            Log.e(TAG, "", e);
+        }
+        return false;
+    }
 }
