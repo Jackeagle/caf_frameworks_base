@@ -582,6 +582,18 @@ public class CarrierConfigManager {
             "carrier_wfc_supports_wifi_only_bool";
 
     /**
+     * Flag specifying whether WFC over IMS supports the "ims preferred" option.  If false, the wifi
+     * calling settings will not include an option for "ims preferred".  If true, the wifi calling
+     * settings will include an option for "ims preferred"
+     * <p>
+     * By default, it is assumed that WFC does not support "ims preferred".
+     * @hide
+     */
+    public static final String KEY_CARRIER_WFC_SUPPORTS_IMS_PREFERRED_BOOL =
+            "carrier_wfc_supports_ims_preferred_bool";
+
+
+    /**
      * Default mode for WFC over IMS on home network:
      * <ul>
      *   <li>0: Wi-Fi only
@@ -2832,6 +2844,22 @@ public class CarrierConfigManager {
             "always_show_primary_signal_bar_in_opportunistic_network_boolean";
 
     /**
+     * Title text to be used in the emergency notification displayed when VoWifi is available
+     *
+     * @hide
+     */
+    public static final String KEY_EMERGENCY_NOTIFICATION_TITLE_STRING =
+            "emergency_notification_title_string";
+
+    /**
+     * Summary text to be used in the emergency notification displayed when VoWifi is available
+     *
+     * @hide
+     */
+    public static final String KEY_EMERGENCY_NOTIFICATION_SUMMARY_STRING =
+            "emergency_notification_summary_string";
+
+    /**
      * GPS configs. See android.hardware.gnss@1.0 IGnssConfiguration.
      * @hide
      */
@@ -3152,6 +3180,16 @@ public class CarrierConfigManager {
     public static final String KEY_CARRIER_CERTIFICATE_STRING_ARRAY =
             "carrier_certificate_string_array";
 
+    /**
+     * Flag indicating whether carrier supports multianchor conference.
+     * In multianchor conference, a participant of a conference can add
+     * other participants to the call using merge button thereby resulting
+     * in a conference with multi anchors.
+     * @hide
+     */
+    public static final String KEY_CARRIER_SUPPORTS_MULTIANCHOR_CONFERENCE =
+            "carrier_supports_multianchor_conference";
+
     /** The default value for every variable. */
     private final static PersistableBundle sDefaults;
 
@@ -3184,6 +3222,7 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_IGNORE_RESET_UT_CAPABILITY_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_WFC_IMS_AVAILABLE_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_WFC_SUPPORTS_WIFI_ONLY_BOOL, false);
+        sDefaults.putBoolean(KEY_CARRIER_WFC_SUPPORTS_IMS_PREFERRED_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_DEFAULT_WFC_IMS_ENABLED_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_DEFAULT_WFC_IMS_ROAMING_ENABLED_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_PROMOTE_WFC_ON_CALL_FAIL_BOOL, false);
@@ -3580,6 +3619,9 @@ public class CarrierConfigManager {
                 });
         sDefaults.putBoolean(KEY_SUPPORT_WPS_OVER_IMS_BOOL, true);
         sDefaults.putStringArray(KEY_CARRIER_CERTIFICATE_STRING_ARRAY, null);
+        sDefaults.putString(KEY_EMERGENCY_NOTIFICATION_SUMMARY_STRING, "");
+        sDefaults.putString(KEY_EMERGENCY_NOTIFICATION_TITLE_STRING, "");
+        sDefaults.putBoolean(KEY_CARRIER_SUPPORTS_MULTIANCHOR_CONFERENCE, false);
     }
 
     /**
