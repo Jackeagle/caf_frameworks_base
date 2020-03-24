@@ -606,7 +606,7 @@ public final class SystemServer {
         traceBeginAndSlog("StartSidekickService");
         // Package manager isn't started yet; need to use SysProp not hardware feature
         if (SystemProperties.getBoolean("config.enable_sidekick_graphics", false)) {
-            mSystemServiceManager.startService(WEAR_SIDEKICK_SERVICE_CLASS);
+            //mSystemServiceManager.startService(WEAR_SIDEKICK_SERVICE_CLASS);
         }
         traceEnd();
 
@@ -1326,7 +1326,7 @@ public final class SystemServer {
 
             if (isWatch) {
                 traceBeginAndSlog("StartThermalObserver");
-                mSystemServiceManager.startService(THERMAL_OBSERVER_CLASS);
+                //mSystemServiceManager.startService(THERMAL_OBSERVER_CLASS);
                 traceEnd();
             }
 
@@ -1605,26 +1605,26 @@ public final class SystemServer {
 
         if (isWatch) {
             traceBeginAndSlog("StartWearConfigService");
-            mSystemServiceManager.startService(WEAR_CONFIG_SERVICE_CLASS);
+            //mSystemServiceManager.startService(WEAR_CONFIG_SERVICE_CLASS);
             traceEnd();
 
             traceBeginAndSlog("StartWearConnectivityService");
-            mSystemServiceManager.startService(WEAR_CONNECTIVITY_SERVICE_CLASS);
+            //mSystemServiceManager.startService(WEAR_CONNECTIVITY_SERVICE_CLASS);
             traceEnd();
 
             traceBeginAndSlog("StartWearTimeService");
-            mSystemServiceManager.startService(WEAR_DISPLAY_SERVICE_CLASS);
-            mSystemServiceManager.startService(WEAR_TIME_SERVICE_CLASS);
+            //mSystemServiceManager.startService(WEAR_DISPLAY_SERVICE_CLASS);
+            //mSystemServiceManager.startService(WEAR_TIME_SERVICE_CLASS);
             traceEnd();
 
             if (enableLeftyService) {
                 traceBeginAndSlog("StartWearLeftyService");
-                mSystemServiceManager.startService(WEAR_LEFTY_SERVICE_CLASS);
+                //mSystemServiceManager.startService(WEAR_LEFTY_SERVICE_CLASS);
                 traceEnd();
             }
 
             traceBeginAndSlog("StartWearGlobalActionsService");
-            mSystemServiceManager.startService(WEAR_GLOBAL_ACTIONS_SERVICE_CLASS);
+            //mSystemServiceManager.startService(WEAR_GLOBAL_ACTIONS_SERVICE_CLASS);
             traceEnd();
         }
 
