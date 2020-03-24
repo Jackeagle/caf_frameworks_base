@@ -1083,16 +1083,14 @@ public final class SystemServer {
             mSystemServiceManager.startService(DevicePolicyManagerService.Lifecycle.class);
             traceEnd();
 
-            if (!isWatch) {
-                traceBeginAndSlog("StartStatusBarManagerService");
-                try {
-                    statusBar = new StatusBarManagerService(context, wm);
-                    ServiceManager.addService(Context.STATUS_BAR_SERVICE, statusBar);
-                } catch (Throwable e) {
-                    reportWtf("starting StatusBarManagerService", e);
-                }
-                traceEnd();
-            }
+	    traceBeginAndSlog("StartStatusBarManagerService");
+	    try {
+		statusBar = new StatusBarManagerService(context, wm);
+		ServiceManager.addService(Context.STATUS_BAR_SERVICE, statusBar);
+	    } catch (Throwable e) {
+		reportWtf("starting StatusBarManagerService", e);
+	    }
+	    traceEnd();
 
             traceBeginAndSlog("StartClipboardService");
             mSystemServiceManager.startService(ClipboardService.class);
@@ -1458,16 +1456,14 @@ public final class SystemServer {
                 traceEnd();
             }
 
-            if (!isWatch) {
-                traceBeginAndSlog("StartNetworkTimeUpdateService");
-                try {
-                    networkTimeUpdater = new NetworkTimeUpdateService(context);
-                    ServiceManager.addService("network_time_update_service", networkTimeUpdater);
-                } catch (Throwable e) {
-                    reportWtf("starting NetworkTimeUpdate service", e);
-                }
-                traceEnd();
-            }
+	    traceBeginAndSlog("StartNetworkTimeUpdateService");
+	    try {
+		networkTimeUpdater = new NetworkTimeUpdateService(context);
+		ServiceManager.addService("network_time_update_service", networkTimeUpdater);
+	    } catch (Throwable e) {
+		reportWtf("starting NetworkTimeUpdate service", e);
+	    }
+	    traceEnd();
 
             traceBeginAndSlog("StartCommonTimeManagementService");
             try {
@@ -1603,11 +1599,9 @@ public final class SystemServer {
             traceEnd();
         }
 
-        if (!isWatch) {
-            traceBeginAndSlog("StartMediaProjectionManager");
-            mSystemServiceManager.startService(MediaProjectionManagerService.class);
-            traceEnd();
-        }
+	traceBeginAndSlog("StartMediaProjectionManager");
+	mSystemServiceManager.startService(MediaProjectionManagerService.class);
+	traceEnd();
 
         if (isWatch) {
             traceBeginAndSlog("StartWearConfigService");
