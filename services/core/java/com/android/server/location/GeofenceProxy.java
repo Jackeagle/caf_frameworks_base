@@ -85,11 +85,16 @@ public final class GeofenceProxy {
             defaultServicePackageNameResId, initialPackageNamesResId, mRunnable, handler);
         mGpsGeofenceHardware = gpsGeofence;
         mFusedGeofenceHardware = fusedGeofenceHardware;
-        bindHardwareGeofence();
+        //bindHardwareGeofence();
     }
 
     private boolean bindGeofenceProvider() {
-        return mServiceWatcher.start();
+        if(mServiceWatcher.start()){
+            bindHardwareGeofence();
+            return true;
+        }else {
+            return false;
+        }
     }
 
     private void bindHardwareGeofence() {
