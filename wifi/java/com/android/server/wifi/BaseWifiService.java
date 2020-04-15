@@ -481,9 +481,4 @@ public class BaseWifiService extends IWifiManager.Stub {
     public void updateWifiUsabilityScore(int seqNum, int score, int predictionHorizonSec) {
         throw new UnsupportedOperationException();
     }
-
-    @Override
-    public String getCapabilities(String capaType) {
-        throw new UnsupportedOperationException();
-    }
 }
