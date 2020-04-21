@@ -619,6 +619,18 @@ public class TelecomManager {
             "android.telecom.extra.USE_ASSISTED_DIALING";
 
     /**
+     * Optional extra for {@link #placeCall(Uri, Bundle)} containing an integer that specifies
+     * the source where user initiated this call. This data is used in metrics.
+     * Valid source are:
+     * {@link ParcelableCallAnalytics#CALL_SOURCE_UNSPECIFIED},
+     * {@link ParcelableCallAnalytics#CALL_SOURCE_EMERGENCY_DIALPAD},
+     * {@link ParcelableCallAnalytics#CALL_SOURCE_EMERGENCY_SHORTCUT}.
+     *
+     * @hide
+     */
+    public static final String EXTRA_CALL_SOURCE = "android.telecom.extra.CALL_SOURCE";
+
+    /**
      * The following 4 constants define how properties such as phone numbers and names are
      * displayed to the user.
      */
@@ -1305,6 +1317,9 @@ public class TelecomManager {
      * foreground call is ended.
      * <p>
      * Requires permission {@link android.Manifest.permission#ANSWER_PHONE_CALLS}.
+     * <p>
+     * Note: this method CANNOT be used to end ongoing emergency calls and will return {@code false}
+     * if an attempt is made to end an emergency call.
      *
      * @return {@code true} if there is a call which will be rejected or terminated, {@code false}
      * otherwise.
