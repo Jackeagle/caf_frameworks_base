@@ -1005,8 +1005,8 @@ public class Build {
                 Slog.e(TAG, "Vendor interface is incompatible, error="
                         + String.valueOf(result));
             }
-
-            return result == 0;
+	    return true;
+            //return result == 0;
         }
 
         final String system = SystemProperties.get("ro.build.fingerprint");
