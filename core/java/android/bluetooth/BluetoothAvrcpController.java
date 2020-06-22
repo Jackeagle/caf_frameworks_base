@@ -77,6 +77,27 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
             "android.bluetooth.avrcp-controller.profile.extra.PLAYER_SETTING";
 
     /**
+     * Intent used to broadcast active device changed.
+     *
+     * <p>This intent will have the following extras:
+     * <ul>
+     * <li> {@link BluetoothDevice#EXTRA_DEVICE} - The remote device. </li>
+     * <li> {@link #EXTRA_RESULT} - Active device changed result </li>
+     * </ul>
+     *
+     * <p>{@link #EXTRA_RESULT} can be any of {@link #RESULT_FAILURE},
+     * {@link #RESULT_SUCCESS}
+     *
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH} permission to
+     * receive.
+     */
+    public static final String ACTION_ACTIVE_DEVICE_CHANGED =
+            "android.bluetooth.avrcp-controller.profile.action.ACTIVE_DEVICE_CHANGED";
+
+    public static final String EXTRA_RESULT =
+            "android.bluetooth.avrcp-controller.profile.extra.RESULT";
+
+    /**
      * Intent used to broadcast the change in connection state of the AVRCP Controller
      * profile.
      *
@@ -97,6 +118,9 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
     public static final int BTRC_FEAT_ABSOLUTE_VOLUME = 0x02;
     public static final int BTRC_FEAT_BROWSE = 0x04;
     public static final int BTRC_FEAT_COVER_ART = 0x08;
+
+    public static final int RESULT_FAILURE = 0;
+    public static final int RESULT_SUCCESS = 1;
 
     private BluetoothAdapter mAdapter;
     private final BluetoothProfileConnector<IBluetoothAvrcpController> mProfileConnector =
@@ -270,6 +294,53 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
        }
        if (service == null) Log.w(TAG, "Proxy not attached to service");
        return 0;
+    }
+
+    /**
+     * Set active device
+     * <p>
+     * When active device changed, the result will be published via
+     * {@link #ACTION_ACTIVE_DEVICE_CHANGED} with the changed result
+     * {@link #EXTRA_RESULT}
+     *
+     * @param device Bluetooth device
+     *
+     * @return <code>true</code> if the command has been issued successfully,
+     * <code>false</code> on error
+     */
+    public boolean setActiveDevice(BluetoothDevice device) {
+        if (DBG) Log.d(TAG, "setActiveDevice(" + device + ")");
+        final IBluetoothAvrcpController service =
+                getService();
+        if (service != null && isEnabled()) {
+            try {
+                return service.setActiveDevice(device);
+            } catch (RemoteException e) {
+                Log.e(TAG, "Error talking to BT service in setActiveDevice() " + e);
+                return false;
+            }
+        }
+        if (service == null) Log.w(TAG, "Proxy not attached to service");
+        return false;
+    }
+
+    /**
+     * Get the active device
+     */
+    public BluetoothDevice getActiveDevice() {
+        if (DBG) Log.d(TAG, "getActiveDevice");
+        final IBluetoothAvrcpController service =
+                getService();
+        if (service != null && isEnabled()) {
+            try {
+                return service.getActiveDevice();
+            } catch (RemoteException e) {
+                Log.e(TAG, "Error talking to BT service in getActiveDevice()", e);
+                return null;
+            }
+        }
+        if (service == null) Log.w(TAG, "Proxy not attached to service");
+        return null;
     }
 
     private boolean isEnabled() {
